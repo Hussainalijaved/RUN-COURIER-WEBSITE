@@ -258,18 +258,18 @@ export default function Home() {
               <div className="w-16 h-16 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
                 1
               </div>
-              <h3 className="font-semibold mb-2">Get a Quote</h3>
+              <h3 className="font-semibold mb-2">Enter Details</h3>
               <p className="text-sm text-muted-foreground">
-                Enter pickup and delivery postcodes to get an instant price
+                Enter pickup and delivery postcodes to get started
               </p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
                 2
               </div>
-              <h3 className="font-semibold mb-2">Book & Pay</h3>
+              <h3 className="font-semibold mb-2">Confirm Booking</h3>
               <p className="text-sm text-muted-foreground">
-                Confirm your booking and pay securely online
+                Review your details and confirm your delivery
               </p>
             </div>
             <div className="text-center">

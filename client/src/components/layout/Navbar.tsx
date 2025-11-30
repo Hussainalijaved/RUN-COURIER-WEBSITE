@@ -36,7 +36,6 @@ const navLinks = [
       { href: '/services/return-trip', label: 'Return Trip' },
     ],
   },
-  { href: '/pricing', label: 'Pricing' },
   { href: '/track', label: 'Track Parcel' },
   { href: '/contact', label: 'Contact' },
 ];

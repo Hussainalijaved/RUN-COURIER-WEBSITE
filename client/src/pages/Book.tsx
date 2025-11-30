@@ -37,7 +37,7 @@ import {
   X
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType } from '@shared/schema';
-import { calculateQuote, formatPrice, defaultPricingConfig, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, defaultPricingConfig, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance } from '@/lib/maps';
 
 const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: number }[] = [
@@ -141,8 +141,8 @@ export default function Book() {
   const handleContinue = () => {
     if (!quote) {
       toast({
-        title: 'Quote Required',
-        description: 'Please enter valid postcodes to get a quote first.',
+        title: 'Details Required',
+        description: 'Please enter valid postcodes to continue.',
         variant: 'destructive',
       });
       return;
@@ -168,7 +168,7 @@ export default function Book() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">Book a Delivery</h1>
-            <p className="text-muted-foreground">Get an instant quote and book in minutes</p>
+            <p className="text-muted-foreground">Book your delivery in minutes</p>
           </div>
 
           <div className="flex items-center justify-center gap-4 mb-8">
@@ -176,21 +176,21 @@ export default function Book() {
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                 1
               </div>
-              <span className="hidden sm:inline font-medium">Quote</span>
+              <span className="hidden sm:inline font-medium">Details</span>
             </div>
             <div className="w-8 h-0.5 bg-border" />
             <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                 2
               </div>
-              <span className="hidden sm:inline font-medium">Details</span>
+              <span className="hidden sm:inline font-medium">Address</span>
             </div>
             <div className="w-8 h-0.5 bg-border" />
             <div className={`flex items-center gap-2 ${step >= 3 ? 'text-primary' : 'text-muted-foreground'}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                 3
               </div>
-              <span className="hidden sm:inline font-medium">Payment</span>
+              <span className="hidden sm:inline font-medium">Confirm</span>
             </div>
           </div>
 
@@ -327,7 +327,7 @@ export default function Book() {
                                 <div className="space-y-1 leading-none">
                                   <FormLabel>Multi-Drop</FormLabel>
                                   <FormDescription>
-                                    Add multiple delivery stops (+£5 each)
+                                    Add multiple delivery stops
                                   </FormDescription>
                                 </div>
                               </FormItem>
@@ -348,7 +348,7 @@ export default function Book() {
                                 <div className="space-y-1 leading-none">
                                   <FormLabel>Return Trip</FormLabel>
                                   <FormDescription>
-                                    Driver returns to pickup location (75% rate)
+                                    Driver returns to pickup location
                                   </FormDescription>
                                 </div>
                               </FormItem>
@@ -399,7 +399,7 @@ export default function Book() {
                 <Card className="sticky top-24">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      Your Quote
+                      Delivery Summary
                       {isCalculating && <Loader2 className="h-4 w-4 animate-spin" />}
                     </CardTitle>
                   </CardHeader>
@@ -410,50 +410,33 @@ export default function Book() {
                           <span className="text-muted-foreground">Distance</span>
                           <span>{distance} miles</span>
                         </div>
-                        <Separator />
-                        {quote.baseCharge > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Base charge</span>
-                            <span>{formatPrice(quote.baseCharge)}</span>
-                          </div>
-                        )}
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            Distance charge
-                            {quote.rushHourApplied && (
-                              <Badge variant="secondary" className="ml-2 text-xs">Rush Hour</Badge>
-                            )}
-                          </span>
-                          <span>{formatPrice(quote.distanceCharge)}</span>
+                          <span className="text-muted-foreground">Vehicle</span>
+                          <span>{selectedVehicle?.name}</span>
                         </div>
-                        {quote.weightSurcharge > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Weight</span>
+                          <span>{weight} kg</span>
+                        </div>
+                        {isMultiDrop && multiDropStops.length > 0 && (
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Weight surcharge</span>
-                            <span>{formatPrice(quote.weightSurcharge)}</span>
+                            <span className="text-muted-foreground">Additional stops</span>
+                            <span>{multiDropStops.length}</span>
                           </div>
                         )}
-                        {quote.centralLondonCharge > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Central London</span>
-                            <span>{formatPrice(quote.centralLondonCharge)}</span>
-                          </div>
-                        )}
-                        {quote.multiDropCharge > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Multi-drop ({multiDropStops.length} stops)</span>
-                            <span>{formatPrice(quote.multiDropCharge)}</span>
-                          </div>
-                        )}
-                        {quote.returnTripCharge > 0 && (
+                        {isReturnTrip && (
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Return trip</span>
-                            <span>{formatPrice(quote.returnTripCharge)}</span>
+                            <span>
+                              <CheckCircle className="h-4 w-4 text-green-500 inline" />
+                            </span>
                           </div>
                         )}
                         <Separator />
-                        <div className="flex justify-between font-bold text-lg">
-                          <span>Total</span>
-                          <span className="text-primary">{formatPrice(quote.totalPrice)}</span>
+                        <div className="bg-primary/10 rounded-lg p-4 text-center">
+                          <CheckCircle className="h-8 w-8 text-primary mx-auto mb-2" />
+                          <p className="font-semibold text-primary">Ready to Book</p>
+                          <p className="text-sm text-muted-foreground">Your delivery details are complete</p>
                         </div>
                         <Button 
                           className="w-full" 
@@ -467,7 +450,7 @@ export default function Book() {
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
                         <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Enter postcodes to get a quote</p>
+                        <p>Enter postcodes to continue</p>
                       </div>
                     )}
                   </CardContent>
@@ -513,36 +496,41 @@ export default function Book() {
           {step === 3 && (
             <Card>
               <CardHeader>
-                <CardTitle>Payment</CardTitle>
-                <CardDescription>Complete your booking</CardDescription>
+                <CardTitle>Confirm Booking</CardTitle>
+                <CardDescription>Review and confirm your delivery</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="bg-muted/50 rounded-lg p-6">
                   <h3 className="font-semibold mb-4">Order Summary</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span>From: {pickupPostcode}</span>
-                      <span>To: {deliveryPostcode}</span>
+                      <span className="text-muted-foreground">From</span>
+                      <span>{pickupPostcode}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Vehicle: {selectedVehicle?.name}</span>
-                      <span>Weight: {weight}kg</span>
+                      <span className="text-muted-foreground">To</span>
+                      <span>{deliveryPostcode}</span>
                     </div>
                     <Separator className="my-4" />
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>Total</span>
-                      <span className="text-primary">{quote ? formatPrice(quote.totalPrice) : '—'}</span>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Vehicle</span>
+                      <span>{selectedVehicle?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Weight</span>
+                      <span>{weight}kg</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Distance</span>
+                      <span>{distance} miles</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Card Details</h3>
-                  <Input placeholder="Card number" data-testid="input-card-number" />
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input placeholder="MM/YY" data-testid="input-card-expiry" />
-                    <Input placeholder="CVC" data-testid="input-card-cvc" />
-                  </div>
+                <div className="bg-primary/10 rounded-lg p-6 text-center">
+                  <CheckCircle className="h-10 w-10 text-primary mx-auto mb-3" />
+                  <p className="font-semibold text-lg">Ready to Confirm</p>
+                  <p className="text-sm text-muted-foreground">We'll contact you with final pricing details</p>
                 </div>
 
                 <div className="flex gap-4">
@@ -552,13 +540,14 @@ export default function Book() {
                     onClick={() => {
                       toast({
                         title: 'Booking Confirmed!',
-                        description: 'Your delivery has been booked. You can track it in your dashboard.',
+                        description: 'Your delivery has been booked. We will contact you shortly with pricing details.',
                       });
                       setLocation('/customer');
                     }}
-                    data-testid="button-pay"
+                    data-testid="button-confirm"
                   >
-                    Pay {quote ? formatPrice(quote.totalPrice) : ''}
+                    Confirm Booking
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>

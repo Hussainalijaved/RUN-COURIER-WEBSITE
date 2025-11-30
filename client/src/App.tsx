@@ -10,7 +10,6 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
-import Pricing from "@/pages/Pricing";
 import Track from "@/pages/Track";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
@@ -32,7 +31,6 @@ import {
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminJobs from "@/pages/admin/AdminJobs";
 import AdminDrivers from "@/pages/admin/AdminDrivers";
-import AdminPricing from "@/pages/admin/AdminPricing";
 import AdminMap from "@/pages/admin/AdminMap";
 
 import CustomerDashboard from "@/pages/customer/CustomerDashboard";
@@ -46,7 +44,6 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
-      <Route path="/pricing" component={Pricing} />
       <Route path="/track" component={Track} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
@@ -86,11 +83,6 @@ function Router() {
       <Route path="/admin/drivers">
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminDrivers />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/admin/pricing">
-        <ProtectedRoute allowedRoles={['admin']}>
-          <AdminPricing />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/map">
