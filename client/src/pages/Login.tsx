@@ -17,7 +17,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight } from 'lucide-react';
+import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import type { UserRole } from '@shared/schema';
 
 interface LoginProps {
@@ -87,9 +88,12 @@ export default function Login({ role = 'customer' }: LoginProps) {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="h-14 w-14 bg-primary rounded-xl flex items-center justify-center">
-                <Truck className="h-8 w-8 text-primary-foreground" />
-              </div>
+              <img 
+                src={logoImage} 
+                alt="Run Courier" 
+                className="h-16 w-auto object-contain"
+                data-testid="login-logo-image"
+              />
             </div>
             <CardTitle className="text-2xl">{roleTitle} Login</CardTitle>
             <CardDescription>

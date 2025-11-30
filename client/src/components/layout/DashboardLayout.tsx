@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import {
   Sidebar,
   SidebarContent,
@@ -25,7 +26,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Truck,
   LayoutDashboard,
   Package,
   Users,
@@ -119,12 +119,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex h-screen w-full">
         <Sidebar>
           <SidebarHeader className="border-b border-sidebar-border p-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-                <Truck className="h-4 w-4 text-primary-foreground" />
-              </div>
+            <Link href="/" className="flex items-center gap-2" data-testid="sidebar-logo-link">
+              <img 
+                src={logoImage} 
+                alt="Run Courier" 
+                className="h-8 w-auto object-contain"
+                data-testid="sidebar-logo-image"
+              />
               <div className="flex flex-col">
-                <span className="font-semibold text-sm">Run Courier</span>
                 <span className="text-xs text-muted-foreground">{roleLabel} Panel</span>
               </div>
             </Link>

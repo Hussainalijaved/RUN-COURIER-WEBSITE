@@ -1,5 +1,6 @@
 import { Link } from 'wouter';
-import { Truck, Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock } from 'lucide-react';
+import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
 const footerLinks = {
   services: [
@@ -33,11 +34,13 @@ export function Footer() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-                <Truck className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold">Run Courier</span>
+            <Link href="/" className="flex items-center gap-2 mb-4" data-testid="footer-logo-link">
+              <img 
+                src={logoImage} 
+                alt="Run Courier" 
+                className="h-12 w-auto object-contain"
+                data-testid="footer-logo-image"
+              />
             </Link>
             <p className="text-muted-foreground mb-6 max-w-sm">
               Fast, reliable courier services across the UK. Same-day delivery, medical transport, and more.
