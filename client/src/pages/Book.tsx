@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
@@ -53,6 +53,7 @@ const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: n
 
 export default function Book() {
   const [, setLocation] = useLocation();
+  const searchParams = useSearch();
   const { user } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
@@ -63,6 +64,7 @@ export default function Book() {
   const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
   const [pickupFullAddress, setPickupFullAddress] = useState('');
   const [deliveryFullAddress, setDeliveryFullAddress] = useState('');
+  const [quoteFromParams, setQuoteFromParams] = useState(false);
 
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupBuildingName, setPickupBuildingName] = useState('');
@@ -126,6 +128,67 @@ export default function Book() {
       setPickupPhone(user.phone || '');
     }
   }, [userProfile, user, form]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    const pickup = params.get('pickup');
+    const delivery = params.get('delivery');
+    const vehicle = params.get('vehicle') as VehicleType;
+    const weightParam = params.get('weight');
+    const isMultiDropParam = params.get('multiDrop') === 'true';
+    const stopsParam = params.get('stops');
+    const isReturnParam = params.get('return') === 'true';
+    const returnSameParam = params.get('returnSame') === 'true';
+    const returnPostcodeParam = params.get('returnPostcode');
+    const priceParam = params.get('price');
+    const timeParam = params.get('time');
+
+    if (pickup && delivery && vehicle) {
+      form.setValue('pickupPostcode', pickup);
+      form.setValue('deliveryPostcode', delivery);
+      form.setValue('vehicleType', vehicle);
+      if (weightParam) {
+        form.setValue('weight', parseFloat(weightParam));
+      }
+      if (isMultiDropParam) {
+        form.setValue('isMultiDrop', true);
+        if (stopsParam) {
+          setMultiDropStops(stopsParam.split(','));
+        }
+      }
+      if (isReturnParam) {
+        form.setValue('isReturnTrip', true);
+        form.setValue('returnToSameLocation', returnSameParam);
+        if (returnPostcodeParam) {
+          form.setValue('returnPostcode', returnPostcodeParam);
+        }
+      }
+      if (timeParam) {
+        setEstimatedTime(parseInt(timeParam));
+      }
+      if (priceParam) {
+        setQuoteFromParams(true);
+        const selectedVehicle = vehicleOptions.find(v => v.type === vehicle);
+        if (selectedVehicle) {
+          setQuote({
+            vehicleType: vehicle,
+            baseCharge: 0,
+            distanceCharge: 0,
+            multiDropCharge: 0,
+            multiDropDistanceCharge: 0,
+            weightSurcharge: 0,
+            centralLondonCharge: 0,
+            returnTripCharge: 0,
+            rushHourApplied: false,
+            distance: 0,
+            totalDistance: 0,
+            totalPrice: parseFloat(priceParam),
+            weight: weightParam ? parseFloat(weightParam) : 1,
+          });
+        }
+      }
+    }
+  }, [searchParams, form]);
 
   const handleGetQuote = useCallback(async () => {
     if (!pickupPostcode || !deliveryPostcode || pickupPostcode.length < 3 || deliveryPostcode.length < 3) {

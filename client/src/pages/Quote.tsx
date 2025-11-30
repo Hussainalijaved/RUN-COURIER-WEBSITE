@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PublicLayout } from '@/components/layout/PublicLayout';
@@ -46,6 +46,7 @@ const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: n
 ];
 
 export default function Quote() {
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isCalculating, setIsCalculating] = useState(false);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
@@ -220,6 +221,32 @@ export default function Quote() {
     const newStops = [...multiDropStops];
     newStops[index] = value;
     setMultiDropStops(newStops);
+  };
+
+  const handleBookNow = () => {
+    const params = new URLSearchParams();
+    params.set('pickup', pickupPostcode);
+    params.set('delivery', deliveryPostcode);
+    params.set('vehicle', vehicleType);
+    params.set('weight', weight.toString());
+    if (isMultiDrop) {
+      params.set('multiDrop', 'true');
+      if (multiDropStops.length > 0) {
+        params.set('stops', multiDropStops.filter(s => s.length >= 3).join(','));
+      }
+    }
+    if (isReturnTrip) {
+      params.set('return', 'true');
+      params.set('returnSame', returnToSameLocation ? 'true' : 'false');
+      if (!returnToSameLocation && returnPostcode) {
+        params.set('returnPostcode', returnPostcode);
+      }
+    }
+    if (quote) {
+      params.set('price', quote.totalPrice.toFixed(2));
+    }
+    params.set('time', estimatedTime.toString());
+    setLocation(`/book?${params.toString()}`);
   };
 
   return (
@@ -521,12 +548,10 @@ export default function Quote() {
                           </div>
                         </div>
 
-                        <Link href="/book">
-                          <Button className="w-full gap-2" size="lg" data-testid="button-book-now">
-                            Book Now
-                            <ArrowRight className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <Button className="w-full gap-2" size="lg" onClick={handleBookNow} data-testid="button-book-now">
+                          Book Now
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
                       </div>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
