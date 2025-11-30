@@ -18,6 +18,8 @@ import Signup from "@/pages/Signup";
 import AdminSignup from "@/pages/AdminSignup";
 import Book from "@/pages/Book";
 import Quote from "@/pages/Quote";
+import PaymentSuccess from "@/pages/PaymentSuccess";
+import PaymentCancel from "@/pages/PaymentCancel";
 
 import {
   SameDayService,
@@ -74,6 +76,8 @@ function Router() {
       
       <Route path="/book" component={Book} />
       <Route path="/quote" component={Quote} />
+      <Route path="/payment/success" component={PaymentSuccess} />
+      <Route path="/payment/cancel" component={PaymentCancel} />
       
       <Route path="/services/same-day" component={SameDayService} />
       <Route path="/services/medical" component={MedicalService} />

@@ -13,7 +13,7 @@ import {
   type JobStatus,
   type VehicleType,
 } from "@shared/schema";
-import { stripeService } from "./stripeService";
+import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 
 function generateTrackingNumber(): string {
@@ -452,6 +452,89 @@ export async function registerRoutes(
     res.json({ 
       status: paymentIntent.status,
       amount: paymentIntent.amount / 100
+    });
+  }));
+
+  app.post("/api/booking/checkout", asyncHandler(async (req, res) => {
+    const bookingData: BookingData = req.body;
+    
+    if (!bookingData.pickupPostcode || !bookingData.deliveryPostcode || !bookingData.vehicleType) {
+      return res.status(400).json({ error: "Missing required booking information" });
+    }
+
+    if (!bookingData.customerEmail && !bookingData.pickupPhone) {
+      return res.status(400).json({ error: "Customer email or phone is required" });
+    }
+
+    const customerEmail = bookingData.customerEmail || `${bookingData.pickupPhone}@guest.runcourier.co.uk`;
+    const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    
+    const session = await stripeService.createBookingCheckoutSession(
+      customerEmail,
+      bookingData,
+      `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      `${baseUrl}/payment/cancel`
+    );
+
+    res.json({ url: session.url, sessionId: session.id });
+  }));
+
+  app.post("/api/booking/confirm-payment", asyncHandler(async (req, res) => {
+    const { sessionId } = req.body;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: "Session ID is required" });
+    }
+
+    const session = await stripeService.getCheckoutSession(sessionId);
+    
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({ error: "Payment not completed", status: session.payment_status });
+    }
+
+    const metadata = session.metadata || {};
+    
+    if (metadata.bookingType !== 'courier_delivery') {
+      return res.status(400).json({ error: "Invalid booking session" });
+    }
+
+    const trackingNumber = generateTrackingNumber();
+    const jobData = {
+      trackingNumber,
+      pickupPostcode: metadata.pickupPostcode || '',
+      pickupAddress: metadata.pickupAddress || '',
+      pickupBuildingName: metadata.pickupBuildingName || '',
+      pickupContactName: metadata.pickupName || '',
+      pickupContactPhone: metadata.pickupPhone || '',
+      pickupInstructions: metadata.pickupInstructions || null,
+      deliveryPostcode: metadata.deliveryPostcode || '',
+      deliveryAddress: metadata.deliveryAddress || '',
+      deliveryBuildingName: metadata.deliveryBuildingName || '',
+      recipientName: metadata.recipientName || '',
+      recipientPhone: metadata.recipientPhone || '',
+      deliveryInstructions: metadata.deliveryInstructions || null,
+      vehicleType: metadata.vehicleType as VehicleType,
+      weight: parseFloat(metadata.weight || '1'),
+      quotedPrice: parseFloat(metadata.totalPrice || '0'),
+      distanceMiles: parseFloat(metadata.distance || '0'),
+      estimatedMinutes: parseInt(metadata.estimatedTime || '30'),
+      customerId: metadata.customerId || null,
+      customerEmail: metadata.customerEmail || session.customer_email || '',
+      stripePaymentIntentId: session.payment_intent as string || null,
+      stripeSessionId: session.id,
+      paymentStatus: 'paid' as const,
+      status: 'pending' as JobStatus,
+      isMultiDrop: metadata.isMultiDrop === 'true',
+      isReturnTrip: metadata.isReturnTrip === 'true',
+      multiDropStops: metadata.multiDropStops ? metadata.multiDropStops.split(',') : null,
+    };
+
+    const job = await storage.createJob(jobData);
+    
+    res.json({ 
+      success: true, 
+      trackingNumber: job.trackingNumber,
+      jobId: job.id 
     });
   }));
 

@@ -36,9 +36,11 @@ import {
   Loader2,
   Clock,
   CheckCircle,
+  CreditCard,
   X,
   User,
-  Calculator
+  Calculator,
+  Lock
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
@@ -58,6 +60,7 @@ export default function Book() {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [distance, setDistance] = useState<number>(0);
   const [estimatedTime, setEstimatedTime] = useState<number>(0);
@@ -71,6 +74,7 @@ export default function Book() {
   const [pickupName, setPickupName] = useState('');
   const [pickupPhone, setPickupPhone] = useState('');
   const [pickupInstructions, setPickupInstructions] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryBuildingName, setDeliveryBuildingName] = useState('');
   const [recipientName, setRecipientName] = useState('');
@@ -120,12 +124,14 @@ export default function Book() {
       setPickupAddress(userProfile.address || '');
       setPickupName(userProfile.fullName || '');
       setPickupPhone(userProfile.phone || '');
+      setCustomerEmail(userProfile.email || '');
       if (userProfile.postcode && !form.getValues('pickupPostcode')) {
         form.setValue('pickupPostcode', userProfile.postcode);
       }
     } else if (user) {
       setPickupName(user.fullName || '');
       setPickupPhone(user.phone || '');
+      setCustomerEmail(user.email || '');
     }
   }, [userProfile, user, form]);
 
@@ -923,22 +929,38 @@ export default function Book() {
           {step === 3 && (
             <Card>
               <CardHeader>
-                <CardTitle>Confirm Booking</CardTitle>
-                <CardDescription>Review and confirm your delivery</CardDescription>
+                <CardTitle>Review & Pay</CardTitle>
+                <CardDescription>Review your booking and complete payment</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Pickup Details</h3>
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+                      <p><span className="text-muted-foreground">Postcode:</span> {pickupPostcode}</p>
+                      <p><span className="text-muted-foreground">Address:</span> {pickupAddress || pickupFullAddress || '-'}</p>
+                      {pickupBuildingName && <p><span className="text-muted-foreground">Building:</span> {pickupBuildingName}</p>}
+                      <p><span className="text-muted-foreground">Contact:</span> {pickupName}</p>
+                      <p><span className="text-muted-foreground">Phone:</span> {pickupPhone}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Delivery Details</h3>
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+                      <p><span className="text-muted-foreground">Postcode:</span> {deliveryPostcode}</p>
+                      <p><span className="text-muted-foreground">Address:</span> {deliveryAddress || deliveryFullAddress || '-'}</p>
+                      {deliveryBuildingName && <p><span className="text-muted-foreground">Building:</span> {deliveryBuildingName}</p>}
+                      <p><span className="text-muted-foreground">Recipient:</span> {recipientName}</p>
+                      <p><span className="text-muted-foreground">Phone:</span> {recipientPhone}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
                 <div className="bg-muted/50 rounded-lg p-6">
                   <h3 className="font-semibold mb-4">Order Summary</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">From</span>
-                      <span>{pickupPostcode}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">To</span>
-                      <span>{deliveryPostcode}</span>
-                    </div>
-                    <Separator className="my-4" />
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Vehicle</span>
                       <span>{selectedVehicle?.name}</span>
@@ -947,36 +969,158 @@ export default function Book() {
                       <span className="text-muted-foreground">Weight</span>
                       <span>{weight}kg</span>
                     </div>
+                    {isMultiDrop && multiDropStops.length > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Multi-drop Stops</span>
+                        <span>{multiDropStops.length + 1} stops</span>
+                      </div>
+                    )}
+                    {isReturnTrip && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Return Trip</span>
+                        <span>Yes</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Est. Time</span>
+                      <span>
+                        {estimatedTime >= 60 
+                          ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
+                          : `${estimatedTime} mins`}
+                      </span>
+                    </div>
+                    <Separator className="my-4" />
                     {quote && (
-                      <div className="flex justify-between font-semibold text-primary pt-2">
-                        <span>Total Price</span>
+                      <div className="flex justify-between font-bold text-lg text-primary">
+                        <span>Total to Pay</span>
                         <span>£{quote.totalPrice.toFixed(2)}</span>
                       </div>
                     )}
                   </div>
                 </div>
+
+                {!user && (
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-email">Email Address *</Label>
+                    <Input
+                      id="customer-email"
+                      type="email"
+                      placeholder="Enter your email for booking confirmation"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      data-testid="input-customer-email"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      We'll send your booking confirmation and tracking details to this email
+                    </p>
+                  </div>
+                )}
                 
-                <div className="bg-primary/10 rounded-lg p-6 text-center">
-                  <CheckCircle className="h-10 w-10 text-primary mx-auto mb-3" />
-                  <p className="font-semibold text-lg">Ready to Confirm</p>
-                  <p className="text-sm text-muted-foreground">We'll contact you with final pricing details</p>
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <Lock className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-700 dark:text-green-400">Secure Payment</p>
+                      <p className="text-sm text-green-600 dark:text-green-500">
+                        Your payment is processed securely via Stripe
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => setStep(2)} data-testid="button-back-step2">Back</Button>
+                  <Button variant="outline" onClick={() => setStep(2)} data-testid="button-back-step2" disabled={isProcessingPayment}>
+                    Back
+                  </Button>
                   <Button 
                     className="flex-1" 
-                    onClick={() => {
-                      toast({
-                        title: 'Booking Confirmed!',
-                        description: 'Your delivery has been booked. We will contact you shortly with pricing details.',
-                      });
-                      setLocation('/customer');
+                    onClick={async () => {
+                      if (!customerEmail && !user) {
+                        toast({
+                          title: 'Email Required',
+                          description: 'Please enter your email address to receive booking confirmation.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+
+                      if (!quote) {
+                        toast({
+                          title: 'Quote Required',
+                          description: 'Please get a quote before proceeding to payment.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+
+                      setIsProcessingPayment(true);
+                      try {
+                        const bookingData = {
+                          pickupPostcode,
+                          pickupAddress: pickupAddress || pickupFullAddress,
+                          pickupBuildingName,
+                          pickupName,
+                          pickupPhone,
+                          pickupInstructions,
+                          deliveryPostcode,
+                          deliveryAddress: deliveryAddress || deliveryFullAddress,
+                          deliveryBuildingName,
+                          recipientName,
+                          recipientPhone,
+                          deliveryInstructions,
+                          vehicleType,
+                          weight,
+                          totalPrice: quote.totalPrice,
+                          distance,
+                          estimatedTime,
+                          isMultiDrop,
+                          isReturnTrip,
+                          multiDropStops: multiDropStops.join(','),
+                          customerId: user?.id || undefined,
+                          customerEmail: customerEmail || user?.email,
+                        };
+
+                        const response = await fetch('/api/booking/checkout', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(bookingData),
+                        });
+
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                          throw new Error(result.error || 'Failed to create checkout session');
+                        }
+
+                        if (result.url) {
+                          window.location.href = result.url;
+                        } else {
+                          throw new Error('No checkout URL received');
+                        }
+                      } catch (error: any) {
+                        console.error('Payment error:', error);
+                        toast({
+                          title: 'Payment Error',
+                          description: error.message || 'Failed to process payment. Please try again.',
+                          variant: 'destructive',
+                        });
+                        setIsProcessingPayment(false);
+                      }
                     }}
-                    data-testid="button-confirm"
+                    disabled={isProcessingPayment}
+                    data-testid="button-pay-now"
                   >
-                    Confirm Booking
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    {isProcessingPayment ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Pay £{quote?.totalPrice.toFixed(2) || '0.00'} Now
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
