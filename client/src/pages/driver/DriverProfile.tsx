@@ -23,7 +23,6 @@ import {
   Clock,
   Save,
   Loader2,
-  Hash,
   Copy,
   MapPin,
 } from 'lucide-react';
@@ -138,7 +137,7 @@ export default function DriverProfile() {
                     </div>
                     
                     <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border" data-testid="driver-id-container">
-                      <Hash className="h-4 w-4 text-primary" />
+                      <User className="h-4 w-4 text-primary" />
                       <span className="text-sm text-muted-foreground">Driver ID:</span>
                       <code className="font-mono text-sm font-semibold text-primary" data-testid="text-driver-id">
                         {driver?.id || 'Not assigned'}
@@ -216,11 +215,18 @@ export default function DriverProfile() {
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      <Hash className="h-4 w-4" />
-                      Account ID
+                      <MapPin className="h-4 w-4" />
+                      Postcode
                     </Label>
-                    <Input value={driver?.userId || user?.id || ''} disabled className="font-mono text-xs" data-testid="input-user-id" />
+                    <Input value={driver?.postcode || 'Not set'} disabled data-testid="input-postcode" />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Full Address
+                  </Label>
+                  <Input value={driver?.address || 'Not set'} disabled data-testid="input-address" />
                 </div>
               </CardContent>
             </Card>

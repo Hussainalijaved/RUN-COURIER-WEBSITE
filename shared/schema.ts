@@ -32,6 +32,8 @@ export const drivers = pgTable("drivers", {
   fullName: text("full_name"),
   email: text("email"),
   phone: text("phone"),
+  postcode: text("postcode"),
+  address: text("address"),
   vehicleType: text("vehicle_type").$type<VehicleType>().notNull(),
   vehicleRegistration: text("vehicle_registration"),
   vehicleMake: text("vehicle_make"),
