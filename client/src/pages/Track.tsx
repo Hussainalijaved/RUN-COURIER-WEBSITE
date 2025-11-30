@@ -1,0 +1,286 @@
+import { useState, useEffect } from 'react';
+import { useSearch } from 'wouter';
+import { PublicLayout } from '@/components/layout/PublicLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Search,
+  Package,
+  Truck,
+  MapPin,
+  Clock,
+  CheckCircle,
+  User,
+  Phone,
+  Loader2,
+} from 'lucide-react';
+import type { JobStatus } from '@shared/schema';
+
+const statusSteps: { status: JobStatus; label: string; icon: any }[] = [
+  { status: 'pending', label: 'Order Placed', icon: Package },
+  { status: 'assigned', label: 'Driver Assigned', icon: User },
+  { status: 'on_the_way_pickup', label: 'En Route to Pickup', icon: Truck },
+  { status: 'arrived_pickup', label: 'Arrived at Pickup', icon: MapPin },
+  { status: 'collected', label: 'Parcel Collected', icon: Package },
+  { status: 'on_the_way_delivery', label: 'Out for Delivery', icon: Truck },
+  { status: 'delivered', label: 'Delivered', icon: CheckCircle },
+];
+
+const getStatusIndex = (status: JobStatus): number => {
+  const index = statusSteps.findIndex((s) => s.status === status);
+  return index >= 0 ? index : 0;
+};
+
+const getStatusColor = (status: JobStatus): string => {
+  switch (status) {
+    case 'delivered':
+      return 'bg-green-500';
+    case 'cancelled':
+      return 'bg-red-500';
+    case 'on_the_way_delivery':
+    case 'on_the_way_pickup':
+      return 'bg-blue-500';
+    default:
+      return 'bg-yellow-500';
+  }
+};
+
+interface MockJob {
+  id: string;
+  trackingNumber: string;
+  status: JobStatus;
+  pickupAddress: string;
+  deliveryAddress: string;
+  driverName?: string;
+  driverPhone?: string;
+  vehicleType: string;
+  estimatedDelivery?: string;
+  createdAt: string;
+}
+
+export default function Track() {
+  const searchParams = useSearch();
+  const params = new URLSearchParams(searchParams);
+  const initialId = params.get('id') || '';
+  
+  const [trackingNumber, setTrackingNumber] = useState(initialId);
+  const [isLoading, setIsLoading] = useState(false);
+  const [job, setJob] = useState<MockJob | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleTrack = async () => {
+    if (!trackingNumber.trim()) {
+      setError('Please enter a tracking number');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    if (trackingNumber.toUpperCase().startsWith('RC')) {
+      setJob({
+        id: '1',
+        trackingNumber: trackingNumber.toUpperCase(),
+        status: 'on_the_way_delivery',
+        pickupAddress: '123 High Street, London EC1A 1BB',
+        deliveryAddress: '456 Oxford Road, Manchester M1 2AB',
+        driverName: 'John Smith',
+        driverPhone: '07700 900123',
+        vehicleType: 'Car',
+        estimatedDelivery: '14:30',
+        createdAt: new Date().toISOString(),
+      });
+    } else {
+      setError('Tracking number not found. Please check and try again.');
+      setJob(null);
+    }
+
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (initialId) {
+      handleTrack();
+    }
+  }, []);
+
+  const currentStepIndex = job ? getStatusIndex(job.status) : -1;
+
+  return (
+    <PublicLayout>
+      <section className="py-20 bg-gradient-to-b from-primary/5 to-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6">Track Your Parcel</h1>
+            <p className="text-lg text-muted-foreground mb-8">
+              Enter your tracking number to see real-time updates on your delivery
+            </p>
+            <div className="max-w-md mx-auto flex gap-2">
+              <Input
+                type="text"
+                placeholder="e.g., RC123456789"
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleTrack()}
+                className="flex-1"
+                data-testid="input-tracking"
+              />
+              <Button onClick={handleTrack} disabled={isLoading} data-testid="button-track">
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {error && (
+              <p className="text-destructive mt-4 text-sm">{error}</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {job && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <Card className="mb-8">
+                <CardHeader className="pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-lg">Tracking Number</CardTitle>
+                      <p className="text-2xl font-mono font-bold text-primary">
+                        {job.trackingNumber}
+                      </p>
+                    </div>
+                    <Badge className={`${getStatusColor(job.status)} text-white`}>
+                      {statusSteps.find((s) => s.status === job.status)?.label || job.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+                    <div className="space-y-8">
+                      {statusSteps.map((step, idx) => {
+                        const isCompleted = idx <= currentStepIndex;
+                        const isCurrent = idx === currentStepIndex;
+                        return (
+                          <div key={step.status} className="relative flex gap-4">
+                            <div
+                              className={`relative z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 ${
+                                isCompleted
+                                  ? 'bg-primary border-primary text-primary-foreground'
+                                  : 'bg-background border-border'
+                              } ${isCurrent ? 'ring-4 ring-primary/20' : ''}`}
+                            >
+                              <step.icon className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 pt-1">
+                              <p
+                                className={`font-medium ${
+                                  isCompleted ? 'text-foreground' : 'text-muted-foreground'
+                                }`}
+                              >
+                                {step.label}
+                              </p>
+                              {isCurrent && job.estimatedDelivery && step.status === 'on_the_way_delivery' && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Estimated arrival: {job.estimatedDelivery}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      Delivery Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">From</p>
+                      <p className="font-medium">{job.pickupAddress}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">To</p>
+                      <p className="font-medium">{job.deliveryAddress}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {job.driverName && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <User className="h-4 w-4 text-primary" />
+                        Driver Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Driver</p>
+                        <p className="font-medium">{job.driverName}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Vehicle</p>
+                        <p className="font-medium">{job.vehicleType}</p>
+                      </div>
+                      {job.driverPhone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <span>{job.driverPhone}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {job.estimatedDelivery && job.status !== 'delivered' && (
+                <Card className="mt-6 bg-primary/5 border-primary/20">
+                  <CardContent className="py-4">
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">Estimated Delivery Time</p>
+                        <p className="text-2xl font-bold text-primary">{job.estimatedDelivery}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!job && !isLoading && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-2xl mx-auto text-center">
+              <Package className="h-16 w-16 mx-auto text-muted-foreground mb-6" />
+              <h2 className="text-xl font-semibold mb-2">Enter Your Tracking Number</h2>
+              <p className="text-muted-foreground">
+                Your tracking number was provided in your confirmation email and starts with "RC"
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+    </PublicLayout>
+  );
+}
