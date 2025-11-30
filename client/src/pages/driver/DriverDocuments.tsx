@@ -22,13 +22,14 @@ import {
   useDriverDocuments,
 } from '@/hooks/useSupabaseDriver';
 
-const documentTypes = [
+const baseDocumentTypes = [
   {
     type: 'driving_license',
     label: 'Driving License',
     description: 'Valid UK driving license (front and back)',
     icon: CreditCard,
     required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
   },
   {
     type: 'hire_and_reward_insurance',
@@ -36,6 +37,7 @@ const documentTypes = [
     description: 'Motor insurance for courier/delivery work (Hire & Reward cover)',
     icon: Shield,
     required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
   },
   {
     type: 'goods_in_transit_insurance',
@@ -43,6 +45,7 @@ const documentTypes = [
     description: 'Insurance covering goods during transportation',
     icon: Package,
     required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
   },
   {
     type: 'vehicle_photo_front',
@@ -50,6 +53,7 @@ const documentTypes = [
     description: 'Clear photo of your vehicle from the front',
     icon: Car,
     required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
   },
   {
     type: 'vehicle_photo_back',
@@ -57,6 +61,31 @@ const documentTypes = [
     description: 'Clear photo of your vehicle from the back',
     icon: Car,
     required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
+  },
+  {
+    type: 'vehicle_photo_left',
+    label: 'Vehicle Photo (Left Side)',
+    description: 'Clear photo of your vehicle from the left side',
+    icon: Car,
+    required: true,
+    vehicleTypes: ['small_van', 'medium_van'],
+  },
+  {
+    type: 'vehicle_photo_right',
+    label: 'Vehicle Photo (Right Side)',
+    description: 'Clear photo of your vehicle from the right side',
+    icon: Car,
+    required: true,
+    vehicleTypes: ['small_van', 'medium_van'],
+  },
+  {
+    type: 'vehicle_photo_load_space',
+    label: 'Vehicle Photo (Load Space)',
+    description: 'Clear photo of your vehicle load space/cargo area',
+    icon: Car,
+    required: true,
+    vehicleTypes: ['small_van', 'medium_van'],
   },
   {
     type: 'proof_of_identity',
@@ -64,6 +93,7 @@ const documentTypes = [
     description: 'Passport or national ID card',
     icon: User,
     required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
   },
   {
     type: 'proof_of_address',
@@ -71,6 +101,7 @@ const documentTypes = [
     description: 'Utility bill or bank statement (within 3 months)',
     icon: FileText,
     required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
   },
 ];
 
@@ -90,6 +121,12 @@ const getStatusBadge = (status: string | undefined) => {
 export default function DriverDocuments() {
   const { data: driver, isLoading: driverLoading } = useDriver();
   const { data: documents, isLoading: docsLoading } = useDriverDocuments(driver?.id);
+
+  const vehicleType = driver?.vehicleType || 'car';
+  
+  const documentTypes = baseDocumentTypes.filter(
+    (doc) => doc.vehicleTypes.includes(vehicleType)
+  );
 
   const getDocumentStatus = (docType: string) => {
     const doc = documents?.find((d) => d.type === docType);
