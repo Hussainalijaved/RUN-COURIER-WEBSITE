@@ -54,17 +54,17 @@ export default function DriverJobs() {
   const { toast } = useToast();
 
   const { data: driver } = useQuery<Driver>({
-    queryKey: [`/api/drivers/user/${user?.id}`],
+    queryKey: ['/api/drivers/user', user?.id],
     enabled: !!user?.id,
   });
 
   const { data: myJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: [`/api/jobs?driverId=${driver?.id}`],
+    queryKey: ['/api/jobs', { driverId: driver?.id }],
     enabled: !!driver?.id,
   });
 
   const { data: availableJobs, isLoading: availableLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs?status=pending'],
+    queryKey: ['/api/jobs', { status: 'pending' }],
     enabled: Boolean(driver?.isAvailable && driver?.isVerified),
   });
 
@@ -74,7 +74,7 @@ export default function DriverJobs() {
       return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId: driver.id });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().startsWith('/api/jobs') ?? false });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Job accepted!' });
     },
     onError: () => {

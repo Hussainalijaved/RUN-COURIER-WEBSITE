@@ -35,12 +35,12 @@ export default function DriverHistory() {
   const [searchTerm, setSearchTerm] = useState('');
 
   const { data: driver } = useQuery<Driver>({
-    queryKey: [`/api/drivers/user/${user?.id}`],
+    queryKey: ['/api/drivers/user', user?.id],
     enabled: !!user?.id,
   });
 
   const { data: myJobs, isLoading } = useQuery<Job[]>({
-    queryKey: [`/api/jobs?driverId=${driver?.id}`],
+    queryKey: ['/api/jobs', { driverId: driver?.id }],
     enabled: !!driver?.id,
   });
 

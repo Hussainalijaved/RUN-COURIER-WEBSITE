@@ -75,12 +75,12 @@ export default function DriverDocuments() {
   const { user } = useAuth();
 
   const { data: driver, isLoading: driverLoading } = useQuery<Driver>({
-    queryKey: [`/api/drivers/user/${user?.id}`],
+    queryKey: ['/api/drivers/user', user?.id],
     enabled: !!user?.id,
   });
 
   const { data: documents, isLoading: docsLoading } = useQuery<Document[]>({
-    queryKey: [`/api/documents?driverId=${driver?.id}`],
+    queryKey: ['/api/documents', { driverId: driver?.id }],
     enabled: !!driver?.id,
   });
 

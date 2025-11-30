@@ -43,7 +43,7 @@ export default function DriverProfile() {
   const { toast } = useToast();
 
   const { data: driver, isLoading } = useQuery<Driver>({
-    queryKey: [`/api/drivers/user/${user?.id}`],
+    queryKey: ['/api/drivers/user', user?.id],
     enabled: !!user?.id,
   });
 
@@ -69,7 +69,7 @@ export default function DriverProfile() {
       return apiRequest('PATCH', `/api/drivers/${driver.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/drivers/user/${user?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/user', user?.id] });
       toast({ title: 'Profile updated successfully' });
     },
     onError: () => {

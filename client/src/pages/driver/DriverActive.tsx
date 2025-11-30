@@ -60,12 +60,12 @@ export default function DriverActive() {
   const { toast } = useToast();
 
   const { data: driver, isLoading: driverLoading } = useQuery<Driver>({
-    queryKey: [`/api/drivers/user/${user?.id}`],
+    queryKey: ['/api/drivers/user', user?.id],
     enabled: !!user?.id,
   });
 
   const { data: myJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: [`/api/jobs?driverId=${driver?.id}`],
+    queryKey: ['/api/jobs', { driverId: driver?.id }],
     enabled: !!driver?.id,
   });
 
@@ -74,7 +74,7 @@ export default function DriverActive() {
       return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().startsWith('/api/jobs') ?? false });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Status updated' });
     },
     onError: () => {

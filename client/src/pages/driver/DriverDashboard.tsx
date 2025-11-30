@@ -79,22 +79,22 @@ export default function DriverDashboard() {
   const { toast } = useToast();
 
   const { data: driver, isLoading: driverLoading, error: driverError } = useQuery<Driver>({
-    queryKey: [`/api/drivers/user/${user?.id}`],
+    queryKey: ['/api/drivers/user', user?.id],
     enabled: !!user?.id,
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<DriverStats>({
-    queryKey: [`/api/stats/driver/${driver?.id}`],
+    queryKey: ['/api/stats/driver', driver?.id],
     enabled: !!driver?.id,
   });
 
   const { data: myJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: [`/api/jobs?driverId=${driver?.id}`],
+    queryKey: ['/api/jobs', { driverId: driver?.id }],
     enabled: !!driver?.id,
   });
 
   const { data: availableJobs } = useQuery<Job[]>({
-    queryKey: ['/api/jobs?status=pending'],
+    queryKey: ['/api/jobs', { status: 'pending' }],
     enabled: Boolean(driver?.isAvailable && driver?.isVerified),
   });
 
@@ -104,7 +104,7 @@ export default function DriverDashboard() {
       return apiRequest('PATCH', `/api/drivers/${driver.id}/availability`, { isAvailable });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/drivers/user/${user?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/user', user?.id] });
       toast({ title: driver?.isAvailable ? 'You are now offline' : 'You are now online' });
     },
     onError: () => {
@@ -117,7 +117,7 @@ export default function DriverDashboard() {
       return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().startsWith('/api/jobs') ?? false });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Status updated' });
     },
     onError: () => {
@@ -131,7 +131,7 @@ export default function DriverDashboard() {
       return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId: driver.id });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().startsWith('/api/jobs') ?? false });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Job accepted!' });
     },
     onError: () => {
