@@ -15,6 +15,7 @@ import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import AdminSignup from "@/pages/AdminSignup";
 import Book from "@/pages/Book";
 
 import {
@@ -62,6 +63,11 @@ function Router() {
       <Route path="/signup">
         <PublicOnlyRoute>
           <Signup />
+        </PublicOnlyRoute>
+      </Route>
+      <Route path="/admin-signup">
+        <PublicOnlyRoute>
+          <AdminSignup />
         </PublicOnlyRoute>
       </Route>
       
