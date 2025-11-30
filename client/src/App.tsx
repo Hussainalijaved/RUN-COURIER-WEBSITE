@@ -35,6 +35,11 @@ import AdminMap from "@/pages/admin/AdminMap";
 
 import CustomerDashboard from "@/pages/customer/CustomerDashboard";
 import DriverDashboard from "@/pages/driver/DriverDashboard";
+import DriverJobs from "@/pages/driver/DriverJobs";
+import DriverActive from "@/pages/driver/DriverActive";
+import DriverHistory from "@/pages/driver/DriverHistory";
+import DriverDocuments from "@/pages/driver/DriverDocuments";
+import DriverProfile from "@/pages/driver/DriverProfile";
 import DispatcherDashboard from "@/pages/dispatcher/DispatcherDashboard";
 import VendorDashboard from "@/pages/vendor/VendorDashboard";
 
@@ -139,27 +144,27 @@ function Router() {
       </Route>
       <Route path="/driver/jobs">
         <ProtectedRoute allowedRoles={['driver']}>
-          <DriverDashboard />
+          <DriverJobs />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/active">
         <ProtectedRoute allowedRoles={['driver']}>
-          <DriverDashboard />
+          <DriverActive />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/history">
         <ProtectedRoute allowedRoles={['driver']}>
-          <DriverDashboard />
+          <DriverHistory />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/documents">
         <ProtectedRoute allowedRoles={['driver']}>
-          <DriverDashboard />
+          <DriverDocuments />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/profile">
         <ProtectedRoute allowedRoles={['driver']}>
-          <DriverDashboard />
+          <DriverProfile />
         </ProtectedRoute>
       </Route>
 
