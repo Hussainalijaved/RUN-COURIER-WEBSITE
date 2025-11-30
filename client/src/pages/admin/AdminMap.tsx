@@ -83,7 +83,7 @@ export default function AdminMap() {
                 <MapPin className="h-5 w-5 text-primary" />
                 Live Driver Map
               </CardTitle>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" data-testid="button-refresh-map">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
@@ -167,7 +167,7 @@ export default function AdminMap() {
                   </div>
                 )}
               </div>
-              <Button className="w-full mt-4" size="sm">
+              <Button className="w-full mt-4" size="sm" data-testid="button-contact-driver">
                 <Phone className="h-4 w-4 mr-2" />
                 Contact Driver
               </Button>

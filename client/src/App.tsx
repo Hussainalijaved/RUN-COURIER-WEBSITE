@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
+import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
@@ -49,8 +50,18 @@ function Router() {
       <Route path="/track" component={Track} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Signup} />
+      
+      <Route path="/login">
+        <PublicOnlyRoute>
+          <Login />
+        </PublicOnlyRoute>
+      </Route>
+      <Route path="/signup">
+        <PublicOnlyRoute>
+          <Signup />
+        </PublicOnlyRoute>
+      </Route>
+      
       <Route path="/book" component={Book} />
       
       <Route path="/services/same-day" component={SameDayService} />
@@ -62,39 +73,155 @@ function Router() {
       <Route path="/services/scheduled" component={ScheduledService} />
       <Route path="/services/restaurants" component={RestaurantsService} />
 
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/jobs" component={AdminJobs} />
-      <Route path="/admin/drivers" component={AdminDrivers} />
-      <Route path="/admin/pricing" component={AdminPricing} />
-      <Route path="/admin/map" component={AdminMap} />
-      <Route path="/admin/customers" component={AdminDashboard} />
-      <Route path="/admin/documents" component={AdminDashboard} />
-      <Route path="/admin/analytics" component={AdminDashboard} />
+      <Route path="/admin">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/jobs">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminJobs />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/drivers">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminDrivers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/pricing">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminPricing />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/map">
+        <ProtectedRoute allowedRoles={['admin', 'dispatcher']}>
+          <AdminMap />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/customers">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/documents">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/analytics">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
 
-      <Route path="/customer" component={CustomerDashboard} />
-      <Route path="/customer/orders" component={CustomerDashboard} />
-      <Route path="/customer/book" component={Book} />
-      <Route path="/customer/track" component={Track} />
-      <Route path="/customer/profile" component={CustomerDashboard} />
+      <Route path="/customer">
+        <ProtectedRoute allowedRoles={['customer']}>
+          <CustomerDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/orders">
+        <ProtectedRoute allowedRoles={['customer']}>
+          <CustomerDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/book">
+        <ProtectedRoute allowedRoles={['customer']}>
+          <Book />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/track">
+        <ProtectedRoute allowedRoles={['customer']}>
+          <Track />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/profile">
+        <ProtectedRoute allowedRoles={['customer']}>
+          <CustomerDashboard />
+        </ProtectedRoute>
+      </Route>
 
-      <Route path="/driver" component={DriverDashboard} />
-      <Route path="/driver/jobs" component={DriverDashboard} />
-      <Route path="/driver/active" component={DriverDashboard} />
-      <Route path="/driver/history" component={DriverDashboard} />
-      <Route path="/driver/documents" component={DriverDashboard} />
-      <Route path="/driver/profile" component={DriverDashboard} />
+      <Route path="/driver">
+        <ProtectedRoute allowedRoles={['driver']}>
+          <DriverDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/jobs">
+        <ProtectedRoute allowedRoles={['driver']}>
+          <DriverDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/active">
+        <ProtectedRoute allowedRoles={['driver']}>
+          <DriverDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/history">
+        <ProtectedRoute allowedRoles={['driver']}>
+          <DriverDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/documents">
+        <ProtectedRoute allowedRoles={['driver']}>
+          <DriverDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/profile">
+        <ProtectedRoute allowedRoles={['driver']}>
+          <DriverDashboard />
+        </ProtectedRoute>
+      </Route>
 
-      <Route path="/dispatcher" component={DispatcherDashboard} />
-      <Route path="/dispatcher/jobs" component={DispatcherDashboard} />
-      <Route path="/dispatcher/drivers" component={DispatcherDashboard} />
-      <Route path="/dispatcher/map" component={AdminMap} />
-      <Route path="/dispatcher/assign" component={DispatcherDashboard} />
+      <Route path="/dispatcher">
+        <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
+          <DispatcherDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dispatcher/jobs">
+        <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
+          <DispatcherDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dispatcher/drivers">
+        <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
+          <DispatcherDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dispatcher/map">
+        <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
+          <AdminMap />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dispatcher/assign">
+        <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
+          <DispatcherDashboard />
+        </ProtectedRoute>
+      </Route>
 
-      <Route path="/vendor" component={VendorDashboard} />
-      <Route path="/vendor/orders" component={VendorDashboard} />
-      <Route path="/vendor/upload" component={VendorDashboard} />
-      <Route path="/vendor/scheduled" component={VendorDashboard} />
-      <Route path="/vendor/api" component={VendorDashboard} />
+      <Route path="/vendor">
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/vendor/orders">
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/vendor/upload">
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/vendor/scheduled">
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/vendor/api">
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorDashboard />
+        </ProtectedRoute>
+      </Route>
 
       <Route component={NotFound} />
     </Switch>

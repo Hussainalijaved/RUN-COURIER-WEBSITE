@@ -500,7 +500,7 @@ export default function Book() {
                   </div>
                 </div>
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                  <Button variant="outline" onClick={() => setStep(1)} data-testid="button-back-step1">Back</Button>
                   <Button onClick={() => setStep(3)} data-testid="button-to-payment">
                     Continue to Payment
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -546,7 +546,7 @@ export default function Book() {
                 </div>
 
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+                  <Button variant="outline" onClick={() => setStep(2)} data-testid="button-back-step2">Back</Button>
                   <Button 
                     className="flex-1" 
                     onClick={() => {
