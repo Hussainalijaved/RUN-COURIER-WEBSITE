@@ -1,23 +1,26 @@
-import { Loader } from '@googlemaps/js-api-loader';
+/// <reference types="@types/google.maps" />
+import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
-let loader: Loader | null = null;
-let google: typeof window.google | null = null;
+let isInitialized = false;
 
-export async function initGoogleMaps(): Promise<typeof window.google> {
-  if (google) return google;
+async function ensureLoaded(): Promise<void> {
+  if (isInitialized) return;
   
-  if (!loader) {
-    loader = new Loader({
-      apiKey,
-      version: 'weekly',
-      libraries: ['places', 'geometry'],
-    });
-  }
+  setOptions({
+    key: apiKey,
+    v: 'weekly',
+  });
   
-  google = await loader.load();
-  return google;
+  await importLibrary('maps');
+  await importLibrary('places');
+  await importLibrary('geometry');
+  isInitialized = true;
+}
+
+export async function initGoogleMaps(): Promise<void> {
+  await ensureLoaded();
 }
 
 export async function geocodePostcode(postcode: string): Promise<{
@@ -26,14 +29,17 @@ export async function geocodePostcode(postcode: string): Promise<{
   formattedAddress: string;
 } | null> {
   try {
-    const g = await initGoogleMaps();
-    const geocoder = new g.maps.Geocoder();
+    await ensureLoaded();
+    const geocoder = new google.maps.Geocoder();
     
     return new Promise((resolve) => {
       geocoder.geocode(
         { address: `${postcode}, UK` },
-        (results, status) => {
-          if (status === 'OK' && results && results[0]) {
+        (
+          results: google.maps.GeocoderResult[] | null,
+          status: google.maps.GeocoderStatus
+        ) => {
+          if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
             const location = results[0].geometry.location;
             resolve({
               lat: location.lat(),
@@ -57,19 +63,25 @@ export async function calculateDistance(
   destination: { lat: number; lng: number }
 ): Promise<{ distance: number; duration: number } | null> {
   try {
-    const g = await initGoogleMaps();
-    const service = new g.maps.DistanceMatrixService();
+    await ensureLoaded();
+    const service = new google.maps.DistanceMatrixService();
     
     return new Promise((resolve) => {
       service.getDistanceMatrix(
         {
-          origins: [new g.maps.LatLng(origin.lat, origin.lng)],
-          destinations: [new g.maps.LatLng(destination.lat, destination.lng)],
-          travelMode: g.maps.TravelMode.DRIVING,
-          unitSystem: g.maps.UnitSystem.IMPERIAL,
+          origins: [new google.maps.LatLng(origin.lat, origin.lng)],
+          destinations: [new google.maps.LatLng(destination.lat, destination.lng)],
+          travelMode: google.maps.TravelMode.DRIVING,
+          unitSystem: google.maps.UnitSystem.IMPERIAL,
         },
-        (response, status) => {
-          if (status === 'OK' && response?.rows[0]?.elements[0]?.status === 'OK') {
+        (
+          response: google.maps.DistanceMatrixResponse | null,
+          status: google.maps.DistanceMatrixStatus
+        ) => {
+          if (
+            status === google.maps.DistanceMatrixStatus.OK &&
+            response?.rows[0]?.elements[0]?.status === 'OK'
+          ) {
             const element = response.rows[0].elements[0];
             const distanceInMiles = element.distance.value / 1609.34;
             const durationInMinutes = element.duration.value / 60;
@@ -95,8 +107,8 @@ export async function getPlacePredictions(
   if (!input || input.length < 2) return [];
   
   try {
-    const g = await initGoogleMaps();
-    const service = new g.maps.places.AutocompleteService();
+    await ensureLoaded();
+    const service = new google.maps.places.AutocompleteService();
     
     return new Promise((resolve) => {
       service.getPlacePredictions(
@@ -105,8 +117,11 @@ export async function getPlacePredictions(
           componentRestrictions: { country: 'uk' },
           types: ['postal_code', 'geocode'],
         },
-        (predictions, status) => {
-          if (status === 'OK' && predictions) {
+        (
+          predictions: google.maps.places.AutocompletePrediction[] | null,
+          status: google.maps.places.PlacesServiceStatus
+        ) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
             resolve(
               predictions.map((p) => ({
                 description: p.description,
@@ -142,4 +157,38 @@ export function calculateETA(durationMinutes: number): string {
   const now = new Date();
   now.setMinutes(now.getMinutes() + durationMinutes);
   return now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+export async function calculateDistanceFromPostcodes(
+  pickupPostcode: string,
+  deliveryPostcode: string
+): Promise<{ distance: number; duration: number; pickupAddress: string; deliveryAddress: string } | null> {
+  try {
+    const pickup = await geocodePostcode(pickupPostcode);
+    const delivery = await geocodePostcode(deliveryPostcode);
+    
+    if (!pickup || !delivery) {
+      console.error('Could not geocode postcodes');
+      return null;
+    }
+    
+    const result = await calculateDistance(
+      { lat: pickup.lat, lng: pickup.lng },
+      { lat: delivery.lat, lng: delivery.lng }
+    );
+    
+    if (!result) {
+      return null;
+    }
+    
+    return {
+      distance: result.distance,
+      duration: result.duration,
+      pickupAddress: pickup.formattedAddress,
+      deliveryAddress: delivery.formattedAddress,
+    };
+  } catch (error) {
+    console.error('Error calculating distance from postcodes:', error);
+    return null;
+  }
 }
