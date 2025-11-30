@@ -34,6 +34,7 @@ import AdminDrivers from "@/pages/admin/AdminDrivers";
 import AdminMap from "@/pages/admin/AdminMap";
 
 import CustomerDashboard from "@/pages/customer/CustomerDashboard";
+import CustomerProfile from "@/pages/customer/CustomerProfile";
 import DriverDashboard from "@/pages/driver/DriverDashboard";
 import DriverJobs from "@/pages/driver/DriverJobs";
 import DriverActive from "@/pages/driver/DriverActive";
@@ -133,7 +134,7 @@ function Router() {
       </Route>
       <Route path="/customer/profile">
         <ProtectedRoute allowedRoles={['customer']}>
-          <CustomerDashboard />
+          <CustomerProfile />
         </ProtectedRoute>
       </Route>
 
