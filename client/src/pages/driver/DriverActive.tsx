@@ -13,12 +13,14 @@ import {
   Loader2,
   ArrowRight,
 } from 'lucide-react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
-import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
-import type { Job, Driver, JobStatus } from '@shared/schema';
+import {
+  useDriver,
+  useDriverJobs,
+  useUpdateJobStatus,
+} from '@/hooks/useSupabaseDriver';
+import type { Job, JobStatus } from '@shared/schema';
 
 const getStatusLabel = (status: JobStatus) => {
   const labels: Record<string, string> = {
@@ -56,31 +58,11 @@ const statusFlow: JobStatus[] = [
 ];
 
 export default function DriverActive() {
-  const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: driver, isLoading: driverLoading } = useQuery<Driver>({
-    queryKey: ['/api/drivers/user', user?.id],
-    enabled: !!user?.id,
-  });
-
-  const { data: myJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { driverId: driver?.id }],
-    enabled: !!driver?.id,
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ jobId, status }: { jobId: string; status: JobStatus }) => {
-      return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      toast({ title: 'Status updated' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to update status', variant: 'destructive' });
-    },
-  });
+  const { data: driver, isLoading: driverLoading } = useDriver();
+  const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
+  const updateStatusMutation = useUpdateJobStatus();
 
   const activeJob = myJobs?.find((j) => 
     !['delivered', 'cancelled', 'pending'].includes(j.status)
@@ -90,7 +72,13 @@ export default function DriverActive() {
     const currentIndex = statusFlow.indexOf(job.status);
     if (currentIndex < statusFlow.length - 1) {
       const nextStatus = statusFlow[currentIndex + 1];
-      updateStatusMutation.mutate({ jobId: job.id, status: nextStatus });
+      updateStatusMutation.mutate(
+        { jobId: job.id, status: nextStatus },
+        {
+          onSuccess: () => toast({ title: 'Status updated' }),
+          onError: () => toast({ title: 'Failed to update status', variant: 'destructive' }),
+        }
+      );
     }
   };
 

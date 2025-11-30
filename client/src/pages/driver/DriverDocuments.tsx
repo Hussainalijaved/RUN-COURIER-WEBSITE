@@ -16,9 +16,10 @@ import {
   CreditCard,
   User,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/context/AuthContext';
-import type { Driver, Document } from '@shared/schema';
+import {
+  useDriver,
+  useDriverDocuments,
+} from '@/hooks/useSupabaseDriver';
 
 const documentTypes = [
   {
@@ -72,17 +73,8 @@ const getStatusBadge = (status: string | undefined) => {
 };
 
 export default function DriverDocuments() {
-  const { user } = useAuth();
-
-  const { data: driver, isLoading: driverLoading } = useQuery<Driver>({
-    queryKey: ['/api/drivers/user', user?.id],
-    enabled: !!user?.id,
-  });
-
-  const { data: documents, isLoading: docsLoading } = useQuery<Document[]>({
-    queryKey: ['/api/documents', { driverId: driver?.id }],
-    enabled: !!driver?.id,
-  });
+  const { data: driver, isLoading: driverLoading } = useDriver();
+  const { data: documents, isLoading: docsLoading } = useDriverDocuments(driver?.id);
 
   const getDocumentStatus = (docType: string) => {
     const doc = documents?.find((d) => d.type === docType);

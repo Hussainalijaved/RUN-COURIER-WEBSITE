@@ -1,5 +1,5 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,11 +12,14 @@ import {
   Loader2,
   CheckCircle,
 } from 'lucide-react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
-import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Job, Driver, JobStatus } from '@shared/schema';
+import {
+  useDriver,
+  useDriverJobs,
+  useAvailableJobs,
+  useAcceptJob,
+} from '@/hooks/useSupabaseDriver';
+import type { JobStatus } from '@shared/schema';
 
 const formatPrice = (price: string | number) => {
   const num = typeof price === 'string' ? parseFloat(price) : price;
@@ -50,37 +53,25 @@ const getStatusBadge = (status: JobStatus) => {
 };
 
 export default function DriverJobs() {
-  const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: driver } = useQuery<Driver>({
-    queryKey: ['/api/drivers/user', user?.id],
-    enabled: !!user?.id,
-  });
+  const { data: driver } = useDriver();
+  const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
+  const { data: availableJobs, isLoading: availableLoading } = useAvailableJobs(
+    Boolean(driver?.isAvailable && driver?.isVerified)
+  );
+  const acceptJobMutation = useAcceptJob();
 
-  const { data: myJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { driverId: driver?.id }],
-    enabled: !!driver?.id,
-  });
-
-  const { data: availableJobs, isLoading: availableLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { status: 'pending' }],
-    enabled: Boolean(driver?.isAvailable && driver?.isVerified),
-  });
-
-  const acceptJobMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      if (!driver) return;
-      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId: driver.id });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      toast({ title: 'Job accepted!' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to accept job', variant: 'destructive' });
-    },
-  });
+  const handleAcceptJob = (jobId: string) => {
+    if (!driver) return;
+    acceptJobMutation.mutate(
+      { jobId, driverId: driver.id },
+      {
+        onSuccess: () => toast({ title: 'Job accepted!' }),
+        onError: () => toast({ title: 'Failed to accept job', variant: 'destructive' }),
+      }
+    );
+  };
 
   const activeJobs = myJobs?.filter((j) => !['delivered', 'cancelled'].includes(j.status)) || [];
   const completedJobs = myJobs?.filter((j) => j.status === 'delivered') || [];
@@ -200,7 +191,7 @@ export default function DriverJobs() {
                         <Button 
                           size="sm" 
                           className="mt-2" 
-                          onClick={() => acceptJobMutation.mutate(job.id)}
+                          onClick={() => handleAcceptJob(job.id)}
                           disabled={acceptJobMutation.isPending}
                           data-testid={`button-accept-job-${job.id}`}
                         >

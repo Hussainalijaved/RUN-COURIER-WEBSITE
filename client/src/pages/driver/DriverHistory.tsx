@@ -11,10 +11,11 @@ import {
   CheckCircle,
   Search,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
-import type { Job, Driver } from '@shared/schema';
+import {
+  useDriver,
+  useDriverJobs,
+} from '@/hooks/useSupabaseDriver';
 
 const formatPrice = (price: string | number) => {
   const num = typeof price === 'string' ? parseFloat(price) : price;
@@ -31,18 +32,10 @@ const formatDate = (date: Date | string | null) => {
 };
 
 export default function DriverHistory() {
-  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: driver } = useQuery<Driver>({
-    queryKey: ['/api/drivers/user', user?.id],
-    enabled: !!user?.id,
-  });
-
-  const { data: myJobs, isLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { driverId: driver?.id }],
-    enabled: !!driver?.id,
-  });
+  const { data: driver } = useDriver();
+  const { data: myJobs, isLoading } = useDriverJobs(driver?.id);
 
   const completedJobs = myJobs?.filter((j) => j.status === 'delivered') || [];
   

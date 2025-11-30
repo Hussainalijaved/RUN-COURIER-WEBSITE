@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,22 +16,20 @@ import {
   Star,
   Truck,
   ArrowRight,
-  XCircle,
   Loader2,
 } from 'lucide-react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Job, Driver, JobStatus } from '@shared/schema';
-
-interface DriverStats {
-  todaysJobs: number;
-  completedJobs: number;
-  activeJobs: number;
-  totalEarnings: number;
-  totalJobs: number;
-}
+import {
+  useDriver,
+  useDriverJobs,
+  useAvailableJobs,
+  useDriverStats,
+  useUpdateDriverAvailability,
+  useUpdateJobStatus,
+  useAcceptJob,
+} from '@/hooks/useSupabaseDriver';
+import type { Job, JobStatus } from '@shared/schema';
 
 const formatPrice = (price: string | number) => {
   const num = typeof price === 'string' ? parseFloat(price) : price;
@@ -78,66 +75,37 @@ export default function DriverDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: driver, isLoading: driverLoading, error: driverError } = useQuery<Driver>({
-    queryKey: ['/api/drivers/user', user?.id],
-    enabled: !!user?.id,
-  });
+  const { data: driver, isLoading: driverLoading } = useDriver();
+  const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
+  const { data: availableJobs } = useAvailableJobs(Boolean(driver?.isAvailable && driver?.isVerified));
+  const stats = useDriverStats(driver?.id);
+  const statsLoading = jobsLoading;
 
-  const { data: stats, isLoading: statsLoading } = useQuery<DriverStats>({
-    queryKey: ['/api/stats/driver', driver?.id],
-    enabled: !!driver?.id,
-  });
+  const availabilityMutation = useUpdateDriverAvailability();
+  const updateStatusMutation = useUpdateJobStatus();
+  const acceptJobMutation = useAcceptJob();
 
-  const { data: myJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { driverId: driver?.id }],
-    enabled: !!driver?.id,
-  });
+  const handleAvailabilityChange = (isAvailable: boolean) => {
+    if (!driver) return;
+    availabilityMutation.mutate(
+      { driverId: driver.id, isAvailable },
+      {
+        onSuccess: () => toast({ title: isAvailable ? 'You are now online' : 'You are now offline' }),
+        onError: () => toast({ title: 'Failed to update status', variant: 'destructive' }),
+      }
+    );
+  };
 
-  const { data: availableJobs } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { status: 'pending' }],
-    enabled: Boolean(driver?.isAvailable && driver?.isVerified),
-  });
-
-  const availabilityMutation = useMutation({
-    mutationFn: async (isAvailable: boolean) => {
-      if (!driver) return;
-      return apiRequest('PATCH', `/api/drivers/${driver.id}/availability`, { isAvailable });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers/user', user?.id] });
-      toast({ title: driver?.isAvailable ? 'You are now offline' : 'You are now online' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to update status', variant: 'destructive' });
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ jobId, status }: { jobId: string; status: JobStatus }) => {
-      return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      toast({ title: 'Status updated' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to update status', variant: 'destructive' });
-    },
-  });
-
-  const acceptJobMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      if (!driver) return;
-      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId: driver.id });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      toast({ title: 'Job accepted!' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to accept job', variant: 'destructive' });
-    },
-  });
+  const handleAcceptJob = (jobId: string) => {
+    if (!driver) return;
+    acceptJobMutation.mutate(
+      { jobId, driverId: driver.id },
+      {
+        onSuccess: () => toast({ title: 'Job accepted!' }),
+        onError: () => toast({ title: 'Failed to accept job', variant: 'destructive' }),
+      }
+    );
+  };
 
   const activeJob = myJobs?.find((j) => 
     !['delivered', 'cancelled', 'pending'].includes(j.status)
@@ -147,7 +115,13 @@ export default function DriverDashboard() {
     const currentIndex = statusFlow.indexOf(job.status);
     if (currentIndex < statusFlow.length - 1) {
       const nextStatus = statusFlow[currentIndex + 1];
-      updateStatusMutation.mutate({ jobId: job.id, status: nextStatus });
+      updateStatusMutation.mutate(
+        { jobId: job.id, status: nextStatus },
+        {
+          onSuccess: () => toast({ title: 'Status updated' }),
+          onError: () => toast({ title: 'Failed to update status', variant: 'destructive' }),
+        }
+      );
     }
   };
 
@@ -172,7 +146,7 @@ export default function DriverDashboard() {
                 <Switch
                   id="online-toggle"
                   checked={isOnline}
-                  onCheckedChange={(checked) => availabilityMutation.mutate(checked)}
+                  onCheckedChange={handleAvailabilityChange}
                   disabled={availabilityMutation.isPending}
                   data-testid="switch-online"
                 />
@@ -342,7 +316,7 @@ export default function DriverDashboard() {
                         <Button 
                           size="sm" 
                           className="mt-2" 
-                          onClick={() => acceptJobMutation.mutate(job.id)}
+                          onClick={() => handleAcceptJob(job.id)}
                           disabled={acceptJobMutation.isPending}
                           data-testid={`button-accept-job-${job.id}`}
                         >

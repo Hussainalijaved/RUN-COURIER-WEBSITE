@@ -24,12 +24,14 @@ import {
   Save,
   Loader2,
 } from 'lucide-react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
-import type { Driver, VehicleType } from '@shared/schema';
+import {
+  useDriver,
+  useUpdateDriverProfile,
+} from '@/hooks/useSupabaseDriver';
+import type { VehicleType } from '@shared/schema';
 
 const vehicleTypes: { value: VehicleType; label: string }[] = [
   { value: 'motorbike', label: 'Motorbike' },
@@ -42,10 +44,8 @@ export default function DriverProfile() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: driver, isLoading } = useQuery<Driver>({
-    queryKey: ['/api/drivers/user', user?.id],
-    enabled: !!user?.id,
-  });
+  const { data: driver, isLoading } = useDriver();
+  const updateProfileMutation = useUpdateDriverProfile();
 
   const [vehicleType, setVehicleType] = useState<VehicleType>('car');
   const [vehicleRegistration, setVehicleRegistration] = useState('');
@@ -63,28 +63,24 @@ export default function DriverProfile() {
     }
   }, [driver]);
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: Partial<Driver>) => {
-      if (!driver) return;
-      return apiRequest('PATCH', `/api/drivers/${driver.id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers/user', user?.id] });
-      toast({ title: 'Profile updated successfully' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to update profile', variant: 'destructive' });
-    },
-  });
-
   const handleSave = () => {
-    updateProfileMutation.mutate({
-      vehicleType,
-      vehicleRegistration,
-      vehicleMake,
-      vehicleModel,
-      vehicleColor,
-    });
+    if (!driver) return;
+    updateProfileMutation.mutate(
+      {
+        driverId: driver.id,
+        data: {
+          vehicleType,
+          vehicleRegistration,
+          vehicleMake,
+          vehicleModel,
+          vehicleColor,
+        },
+      },
+      {
+        onSuccess: () => toast({ title: 'Profile updated successfully' }),
+        onError: () => toast({ title: 'Failed to update profile', variant: 'destructive' }),
+      }
+    );
   };
 
   return (
