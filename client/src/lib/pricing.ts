@@ -60,7 +60,7 @@ export const defaultPricingConfig: PricingConfig = {
     { min: 50, max: null, charge: 40 },
   ],
   centralLondonSurcharge: 15,
-  multiDropCharge: 5,
+  multiDropCharge: 3,
   returnTripMultiplier: 0.75,
   waitingTimeFreeMinutes: 10,
   waitingTimePerMinute: 0.5,
@@ -111,9 +111,11 @@ export function getWeightSurcharge(weight: number): number {
 export interface QuoteBreakdown {
   vehicleType: VehicleType;
   distance: number;
+  totalDistance: number;
   weight: number;
   baseCharge: number;
   distanceCharge: number;
+  multiDropDistanceCharge: number;
   weightSurcharge: number;
   centralLondonCharge: number;
   multiDropCharge: number;
@@ -131,6 +133,7 @@ export function calculateQuote(
     deliveryPostcode: string;
     isMultiDrop?: boolean;
     multiDropCount?: number;
+    multiDropDistances?: number[];
     isReturnTrip?: boolean;
     returnToSameLocation?: boolean;
     returnDistance?: number;
@@ -151,9 +154,18 @@ export function calculateQuote(
   const isCentralDelivery = isCentralLondon(options.deliveryPostcode);
   const centralLondonCharge = (isCentralPickup || isCentralDelivery) ? config.centralLondonSurcharge : 0;
   
-  const multiDropCharge = options.isMultiDrop && options.multiDropCount
-    ? config.multiDropCharge * options.multiDropCount
-    : 0;
+  let multiDropCharge = 0;
+  let multiDropDistanceCharge = 0;
+  let totalMultiDropDistance = 0;
+  
+  if (options.isMultiDrop && options.multiDropCount && options.multiDropCount > 0) {
+    multiDropCharge = config.multiDropCharge * options.multiDropCount;
+    
+    if (options.multiDropDistances && options.multiDropDistances.length > 0) {
+      totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
+      multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
+    }
+  }
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
@@ -161,14 +173,17 @@ export function calculateQuote(
     returnTripCharge = returnDist * perMileRate * config.returnTripMultiplier;
   }
   
-  const totalPrice = baseCharge + distanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge + returnTripCharge;
+  const totalDistance = distance + totalMultiDropDistance;
+  const totalPrice = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge + returnTripCharge;
   
   return {
     vehicleType,
     distance,
+    totalDistance,
     weight,
     baseCharge,
     distanceCharge,
+    multiDropDistanceCharge,
     weightSurcharge,
     centralLondonCharge,
     multiDropCharge,

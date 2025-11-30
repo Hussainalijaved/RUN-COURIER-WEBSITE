@@ -146,11 +146,35 @@ export default function Book() {
         );
 
         if (distanceResult) {
-          setDistance(distanceResult.distance);
-          setEstimatedTime(distanceResult.duration);
+          let totalEstimatedTime = distanceResult.duration;
+          const multiDropDistances: number[] = [];
+          
+          if (isMultiDrop && multiDropStops.length > 0) {
+            const validStops = multiDropStops.filter(stop => stop.length >= 3);
+            
+            if (validStops.length > 0) {
+              let previousLocation = { lat: deliveryLocation.lat, lng: deliveryLocation.lng };
+              
+              for (const stop of validStops) {
+                const stopLocation = await geocodePostcode(stop);
+                if (stopLocation) {
+                  const legDistance = await calculateDistance(previousLocation, { lat: stopLocation.lat, lng: stopLocation.lng });
+                  if (legDistance) {
+                    multiDropDistances.push(legDistance.distance);
+                    totalEstimatedTime += legDistance.duration;
+                  }
+                  previousLocation = { lat: stopLocation.lat, lng: stopLocation.lng };
+                }
+              }
+            }
+          }
+          
+          const totalDistance = distanceResult.distance + multiDropDistances.reduce((sum, d) => sum + d, 0);
+          setDistance(totalDistance);
+          setEstimatedTime(totalEstimatedTime);
           
           let finalVehicleType = vehicleType;
-          const switchTo = shouldSwitchVehicle(vehicleType, distanceResult.distance);
+          const switchTo = shouldSwitchVehicle(vehicleType, totalDistance);
           
           if (switchTo) {
             finalVehicleType = switchTo;
@@ -165,7 +189,8 @@ export default function Book() {
             pickupPostcode,
             deliveryPostcode,
             isMultiDrop,
-            multiDropCount: multiDropStops.length,
+            multiDropCount: multiDropStops.filter(s => s.length >= 3).length,
+            multiDropDistances,
             isReturnTrip,
             returnToSameLocation,
           });
@@ -198,7 +223,7 @@ export default function Book() {
     } finally {
       setIsCalculating(false);
     }
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, multiDropStops.length, toast]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, multiDropStops, toast]);
 
   const addMultiDropStop = () => {
     setMultiDropStops([...multiDropStops, '']);
