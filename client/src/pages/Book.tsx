@@ -72,6 +72,15 @@ export default function Book() {
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
+  
+  interface StopDetails {
+    postcode: string;
+    address: string;
+    name: string;
+    phone: string;
+    instructions: string;
+  }
+  const [multiDropStopDetails, setMultiDropStopDetails] = useState<StopDetails[]>([]);
 
   const { data: userProfile } = useQuery<UserType>({
     queryKey: ['/api/users', user?.id],
@@ -227,16 +236,37 @@ export default function Book() {
 
   const addMultiDropStop = () => {
     setMultiDropStops([...multiDropStops, '']);
+    setMultiDropStopDetails([...multiDropStopDetails, { postcode: '', address: '', name: '', phone: '', instructions: '' }]);
   };
 
   const removeMultiDropStop = (index: number) => {
     setMultiDropStops(multiDropStops.filter((_, i) => i !== index));
+    setMultiDropStopDetails(multiDropStopDetails.filter((_, i) => i !== index));
   };
 
-  const updateMultiDropStop = (index: number, value: string) => {
+  const updateMultiDropStop = (index: number, value: string, fullAddress?: string) => {
     const newStops = [...multiDropStops];
     newStops[index] = value;
     setMultiDropStops(newStops);
+    
+    const newDetails = [...multiDropStopDetails];
+    if (!newDetails[index]) {
+      newDetails[index] = { postcode: '', address: '', name: '', phone: '', instructions: '' };
+    }
+    newDetails[index].postcode = value;
+    if (fullAddress) {
+      newDetails[index].address = fullAddress;
+    }
+    setMultiDropStopDetails(newDetails);
+  };
+
+  const updateStopDetail = (index: number, field: keyof StopDetails, value: string) => {
+    const newDetails = [...multiDropStopDetails];
+    if (!newDetails[index]) {
+      newDetails[index] = { postcode: '', address: '', name: '', phone: '', instructions: '' };
+    }
+    newDetails[index][field] = value;
+    setMultiDropStopDetails(newDetails);
   };
 
   const handleContinue = () => {
@@ -475,7 +505,7 @@ export default function Book() {
                                 <div className="flex-1">
                                   <PostcodeAutocomplete
                                     value={stop}
-                                    onChange={(value) => updateMultiDropStop(index, value)}
+                                    onChange={(value, fullAddress) => updateMultiDropStop(index, value, fullAddress)}
                                     placeholder={`Stop ${index + 1} postcode or address`}
                                     data-testid={`input-stop-${index}`}
                                   />
@@ -673,12 +703,12 @@ export default function Book() {
                     </div>
                   </div>
                   <div className="space-y-4">
-                    <h3 className="font-semibold">Delivery Details</h3>
+                    <h3 className="font-semibold">Delivery Details (Stop 1)</h3>
                     <div className="space-y-2">
                       <Label>Full Address</Label>
                       <Input 
                         placeholder="Full address" 
-                        value={deliveryAddress}
+                        value={deliveryAddress || deliveryFullAddress}
                         onChange={(e) => setDeliveryAddress(e.target.value)}
                         data-testid="input-delivery-address" 
                       />
@@ -712,6 +742,63 @@ export default function Book() {
                     </div>
                   </div>
                 </div>
+                
+                {isMultiDrop && multiDropStopDetails.length > 0 && (
+                  <div className="space-y-6">
+                    <Separator />
+                    <h3 className="font-semibold text-lg">Additional Stop Details</h3>
+                    {multiDropStopDetails.map((stopDetail, index) => (
+                      <Card key={index} className="border-dashed">
+                        <CardContent className="pt-4 space-y-4">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">Stop {index + 2}</Badge>
+                            <span className="text-sm text-muted-foreground truncate flex-1">
+                              {stopDetail.postcode || `Additional stop ${index + 1}`}
+                            </span>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Full Address</Label>
+                              <Input 
+                                placeholder="Full address" 
+                                value={stopDetail.address}
+                                onChange={(e) => updateStopDetail(index, 'address', e.target.value)}
+                                data-testid={`input-stop-${index}-address`} 
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Recipient Name</Label>
+                              <Input 
+                                placeholder="Recipient name" 
+                                value={stopDetail.name}
+                                onChange={(e) => updateStopDetail(index, 'name', e.target.value)}
+                                data-testid={`input-stop-${index}-name`} 
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Phone Number</Label>
+                              <Input 
+                                placeholder="Phone number" 
+                                value={stopDetail.phone}
+                                onChange={(e) => updateStopDetail(index, 'phone', e.target.value)}
+                                data-testid={`input-stop-${index}-phone`} 
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Special Instructions</Label>
+                              <Input 
+                                placeholder="Special instructions (optional)" 
+                                value={stopDetail.instructions}
+                                onChange={(e) => updateStopDetail(index, 'instructions', e.target.value)}
+                                data-testid={`input-stop-${index}-instructions`} 
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-4">
                   <Button variant="outline" onClick={() => setStep(1)} data-testid="button-back-step1">Back</Button>
                   <Button onClick={() => setStep(3)} data-testid="button-to-payment">
