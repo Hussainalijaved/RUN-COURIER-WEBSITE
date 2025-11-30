@@ -45,6 +45,20 @@ const documentTypes = [
     required: true,
   },
   {
+    type: 'vehicle_photo_front',
+    label: 'Vehicle Photo (Front)',
+    description: 'Clear photo of your vehicle from the front',
+    icon: Car,
+    required: true,
+  },
+  {
+    type: 'vehicle_photo_back',
+    label: 'Vehicle Photo (Back)',
+    description: 'Clear photo of your vehicle from the back',
+    icon: Car,
+    required: true,
+  },
+  {
     type: 'proof_of_identity',
     label: 'Proof of Identity',
     description: 'Passport or national ID card',
