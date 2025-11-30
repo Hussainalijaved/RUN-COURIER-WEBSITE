@@ -25,6 +25,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { User as UserType } from '@shared/schema';
+import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 
 export default function CustomerProfile() {
   const { user } = useAuth();
@@ -202,34 +203,37 @@ export default function CustomerProfile() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="postcode">Postcode</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="postcode"
-                        value={postcode}
-                        onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-                        className="pl-10"
-                        placeholder="e.g., SW1A 1AA"
-                        data-testid="input-postcode"
-                      />
-                    </div>
+                    <Label htmlFor="postcode">Postcode / Address</Label>
+                    <PostcodeAutocomplete
+                      value={postcode}
+                      onChange={(value, fullAddress) => {
+                        setPostcode(value);
+                        if (fullAddress && !address) {
+                          setAddress(fullAddress);
+                        }
+                      }}
+                      placeholder="Start typing postcode or address"
+                      data-testid="input-postcode"
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="address">Full Address</Label>
-                  <div className="relative">
-                    <Home className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Textarea
-                      id="address"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      className="pl-10 min-h-[80px]"
-                      placeholder="Enter your full address (street, city, county)"
-                      data-testid="input-address"
-                    />
-                  </div>
+                  <PostcodeAutocomplete
+                    value={address}
+                    onChange={(value, fullAddress) => {
+                      setAddress(fullAddress || value);
+                      if (fullAddress) {
+                        const postcodeMatch = fullAddress.match(/[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}/i);
+                        if (postcodeMatch && !postcode) {
+                          setPostcode(postcodeMatch[0].toUpperCase());
+                        }
+                      }
+                    }}
+                    placeholder="Start typing your full address"
+                    data-testid="input-address"
+                  />
                   <p className="text-xs text-muted-foreground">
                     This address will be used as the default pickup location for your bookings
                   </p>

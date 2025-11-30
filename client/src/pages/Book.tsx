@@ -447,12 +447,14 @@ export default function Book() {
                             <Label>Additional Stops</Label>
                             {multiDropStops.map((stop, index) => (
                               <div key={index} className="flex gap-2">
-                                <Input
-                                  placeholder={`Stop ${index + 1} postcode`}
-                                  value={stop}
-                                  onChange={(e) => updateMultiDropStop(index, e.target.value)}
-                                  data-testid={`input-stop-${index}`}
-                                />
+                                <div className="flex-1">
+                                  <PostcodeAutocomplete
+                                    value={stop}
+                                    onChange={(value) => updateMultiDropStop(index, value)}
+                                    placeholder={`Stop ${index + 1} postcode or address`}
+                                    data-testid={`input-stop-${index}`}
+                                  />
+                                </div>
                                 <Button
                                   type="button"
                                   variant="outline"

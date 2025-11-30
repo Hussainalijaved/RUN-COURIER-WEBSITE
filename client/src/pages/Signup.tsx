@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Building2 } from 'lucide-react';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import type { UserRole } from '@shared/schema';
+import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 
 interface SignupProps {
   role?: UserRole;
@@ -269,9 +270,10 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                         <FormItem>
                           <FormLabel>Business Address</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="123 Business Street, London"
-                              {...field}
+                            <PostcodeAutocomplete
+                              value={field.value || ''}
+                              onChange={(value, fullAddress) => field.onChange(fullAddress || value)}
+                              placeholder="Start typing your business address"
                               data-testid="input-business-address"
                             />
                           </FormControl>
