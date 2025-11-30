@@ -187,7 +187,7 @@ export default function DriverProfile() {
                   <User className="h-5 w-5" />
                   Personal Information
                 </CardTitle>
-                <CardDescription>Your account details from Supabase (synced from mobile app registration)</CardDescription>
+                <CardDescription>Your account details (synced from mobile app registration)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -217,7 +217,7 @@ export default function DriverProfile() {
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
                       <Hash className="h-4 w-4" />
-                      Supabase User ID
+                      Account ID
                     </Label>
                     <Input value={driver?.userId || user?.id || ''} disabled className="font-mono text-xs" data-testid="input-user-id" />
                   </div>
