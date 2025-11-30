@@ -616,26 +616,6 @@ export default function Book() {
                       {quote && (
                         <>
                           <Separator />
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Distance</span>
-                            <span className="font-medium">{distance} miles</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              Est. Time
-                            </span>
-                            <span className="font-medium">
-                              {estimatedTime >= 60 
-                                ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
-                                : `${estimatedTime} mins`}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">ETA</span>
-                            <span className="font-medium">{calculateETA(estimatedTime)}</span>
-                          </div>
-                          <Separator />
                           <div className="bg-primary/10 rounded-lg p-4 text-center">
                             <p className="text-2xl font-bold text-primary">
                               £{quote.totalPrice.toFixed(2)}
@@ -643,6 +623,14 @@ export default function Book() {
                             <p className="text-xs text-muted-foreground mt-1">
                               Total delivery cost
                             </p>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Est. Time</span>
+                            <span className="font-medium">
+                              {estimatedTime >= 60 
+                                ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
+                                : `${estimatedTime} mins`}
+                            </span>
                           </div>
                           <Button 
                             className="w-full" 
@@ -887,10 +875,12 @@ export default function Book() {
                       <span className="text-muted-foreground">Weight</span>
                       <span>{weight}kg</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Distance</span>
-                      <span>{distance} miles</span>
-                    </div>
+                    {quote && (
+                      <div className="flex justify-between font-semibold text-primary pt-2">
+                        <span>Total Price</span>
+                        <span>£{quote.totalPrice.toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 

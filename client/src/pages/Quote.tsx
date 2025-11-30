@@ -488,84 +488,29 @@ export default function Quote() {
                   </CardHeader>
                   <CardContent>
                     {quote ? (
-                      <div className="space-y-4">
-                        <div className="text-center py-4">
+                      <div className="space-y-6">
+                        <div className="bg-primary/10 rounded-lg p-6 text-center">
                           <div className="text-4xl font-bold text-primary" data-testid="text-total-price">
                             £{quote.totalPrice.toFixed(2)}
                           </div>
-                          <p className="text-muted-foreground text-sm mt-1">Estimated price</p>
+                          <p className="text-muted-foreground text-sm mt-2">Total delivery cost</p>
                         </div>
-
-                        <Separator />
 
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Distance</span>
-                            <span className="font-medium">{quote.totalDistance.toFixed(1)} miles</span>
+                            <span className="text-muted-foreground">Vehicle</span>
+                            <Badge variant="secondary">{vehicleOptions.find(v => v.type === quote.vehicleType)?.name}</Badge>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Est. Time</span>
                             <span className="font-medium flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {estimatedTime} mins
+                              {estimatedTime >= 60 
+                                ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
+                                : `${estimatedTime} mins`}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Vehicle</span>
-                            <Badge variant="secondary">{vehicleOptions.find(v => v.type === quote.vehicleType)?.name}</Badge>
-                          </div>
                         </div>
-
-                        <Separator />
-
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Base Charge</span>
-                            <span>£{quote.baseCharge.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Distance ({quote.distance.toFixed(1)} mi)</span>
-                            <span>£{quote.distanceCharge.toFixed(2)}</span>
-                          </div>
-                          {quote.multiDropDistanceCharge > 0 && (
-                            <div className="flex justify-between">
-                              <span>Multi-drop Distance</span>
-                              <span>£{quote.multiDropDistanceCharge.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {quote.multiDropCharge > 0 && (
-                            <div className="flex justify-between">
-                              <span>Multi-drop Stops</span>
-                              <span>£{quote.multiDropCharge.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {quote.weightSurcharge > 0 && (
-                            <div className="flex justify-between">
-                              <span>Weight Surcharge</span>
-                              <span>£{quote.weightSurcharge.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {quote.centralLondonCharge > 0 && (
-                            <div className="flex justify-between">
-                              <span>Central London</span>
-                              <span>£{quote.centralLondonCharge.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {quote.returnTripCharge > 0 && (
-                            <div className="flex justify-between">
-                              <span>Return Trip</span>
-                              <span>£{quote.returnTripCharge.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {quote.rushHourApplied && (
-                            <div className="flex justify-between text-orange-600">
-                              <span>Rush Hour Rate Applied</span>
-                              <Badge variant="outline" className="text-orange-600 border-orange-600">Active</Badge>
-                            </div>
-                          )}
-                        </div>
-
-                        <Separator />
 
                         <Link href="/book">
                           <Button className="w-full gap-2" size="lg" data-testid="button-book-now">
