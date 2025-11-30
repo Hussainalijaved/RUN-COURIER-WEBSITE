@@ -61,7 +61,7 @@ export const defaultPricingConfig: PricingConfig = {
   ],
   centralLondonSurcharge: 15,
   multiDropCharge: 3,
-  returnTripMultiplier: 0.75,
+  returnTripMultiplier: 0.60,
   waitingTimeFreeMinutes: 10,
   waitingTimePerMinute: 0.5,
   rushHourPeriods: [
@@ -167,14 +167,15 @@ export function calculateQuote(
     }
   }
   
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge;
+  
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
-    const returnDist = options.returnToSameLocation ? distance : (options.returnDistance || distance);
-    returnTripCharge = returnDist * perMileRate * config.returnTripMultiplier;
+    returnTripCharge = subtotalBeforeReturn * config.returnTripMultiplier;
   }
   
   const totalDistance = distance + totalMultiDropDistance;
-  const totalPrice = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge + returnTripCharge;
+  const totalPrice = subtotalBeforeReturn + returnTripCharge;
   
   return {
     vehicleType,
