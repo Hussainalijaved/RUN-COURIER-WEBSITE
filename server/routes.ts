@@ -13,6 +13,8 @@ import {
   type JobStatus,
   type VehicleType,
 } from "@shared/schema";
+import { stripeService } from "./stripeService";
+import { getStripePublishableKey } from "./stripeClient";
 
 function generateTrackingNumber(): string {
   const prefix = "RC";
@@ -363,6 +365,94 @@ export async function registerRoutes(
   app.get("/api/stats/vendor/:vendorId", asyncHandler(async (req, res) => {
     const stats = await storage.getVendorStats(req.params.vendorId);
     res.json(stats);
+  }));
+
+  app.get("/api/stripe/config", asyncHandler(async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      res.status(500).json({ error: "Stripe not configured" });
+    }
+  }));
+
+  app.post("/api/stripe/create-checkout-session", asyncHandler(async (req, res) => {
+    const { jobId, amount, description, customerEmail, customerId } = req.body;
+    
+    if (!amount || !description) {
+      return res.status(400).json({ error: "Amount and description are required" });
+    }
+
+    let stripeCustomerId = customerId;
+    
+    if (!stripeCustomerId && customerEmail) {
+      const customer = await stripeService.createCustomer(
+        customerEmail, 
+        jobId || 'guest',
+        'Run Courier Customer'
+      );
+      stripeCustomerId = customer.id;
+    }
+
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: "Customer email or customer ID required" });
+    }
+
+    const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    
+    const session = await stripeService.createCheckoutSession(
+      stripeCustomerId,
+      Math.round(amount * 100),
+      description,
+      `${baseUrl}/payment/success?job=${jobId || ''}`,
+      `${baseUrl}/payment/cancel?job=${jobId || ''}`,
+      { jobId: jobId || '' }
+    );
+
+    res.json({ url: session.url, sessionId: session.id });
+  }));
+
+  app.post("/api/stripe/create-payment-intent", asyncHandler(async (req, res) => {
+    const { jobId, amount, customerEmail, customerId } = req.body;
+    
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    let stripeCustomerId = customerId;
+    
+    if (!stripeCustomerId && customerEmail) {
+      const customer = await stripeService.createCustomer(
+        customerEmail,
+        jobId || 'guest',
+        'Run Courier Customer'
+      );
+      stripeCustomerId = customer.id;
+    }
+
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: "Customer email or customer ID required" });
+    }
+
+    const paymentIntent = await stripeService.createPaymentIntent(
+      Math.round(amount * 100),
+      'gbp',
+      stripeCustomerId,
+      { jobId: jobId || '' }
+    );
+
+    res.json({ 
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id 
+    });
+  }));
+
+  app.get("/api/stripe/payment-status/:paymentIntentId", asyncHandler(async (req, res) => {
+    const paymentIntent = await stripeService.getPaymentIntent(req.params.paymentIntentId);
+    res.json({ 
+      status: paymentIntent.status,
+      amount: paymentIntent.amount / 100
+    });
   }));
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
