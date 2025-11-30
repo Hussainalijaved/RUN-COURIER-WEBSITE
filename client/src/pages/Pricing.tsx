@@ -222,7 +222,7 @@ export default function Pricing() {
           <p className="mb-8 max-w-xl mx-auto opacity-90">
             Enter your pickup and delivery details for an accurate price estimate
           </p>
-          <Link href="/book">
+          <Link href="/quote">
             <Button size="lg" variant="secondary" className="gap-2" data-testid="cta-get-quote">
               Get a Quote
               <ArrowRight className="h-4 w-4" />

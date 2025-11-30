@@ -17,6 +17,7 @@ import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import AdminSignup from "@/pages/AdminSignup";
 import Book from "@/pages/Book";
+import Quote from "@/pages/Quote";
 
 import {
   SameDayService,
@@ -72,6 +73,7 @@ function Router() {
       </Route>
       
       <Route path="/book" component={Book} />
+      <Route path="/quote" component={Quote} />
       
       <Route path="/services/same-day" component={SameDayService} />
       <Route path="/services/medical" component={MedicalService} />
