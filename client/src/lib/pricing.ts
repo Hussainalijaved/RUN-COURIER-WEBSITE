@@ -8,6 +8,7 @@ export interface PricingConfig {
       perMileRate: number;
       rushHourRate: number;
       maxWeight: number;
+      maxDistance?: number;
     };
   };
   weightSurcharges: { min: number; max: number | null; charge: number }[];
@@ -23,10 +24,11 @@ export const defaultPricingConfig: PricingConfig = {
   vehicles: {
     motorbike: {
       name: "Motorbike",
-      baseCharge: 0,
-      perMileRate: 3.0,
-      rushHourRate: 3.0,
+      baseCharge: 5,
+      perMileRate: 1.3,
+      rushHourRate: 1.5,
       maxWeight: 5,
+      maxDistance: 10,
     },
     car: {
       name: "Car",
@@ -187,4 +189,29 @@ export function getVehicleForWeight(weight: number): VehicleType {
   if (weight <= vehicles.car.maxWeight) return "car";
   if (weight <= vehicles.small_van.maxWeight) return "small_van";
   return "medium_van";
+}
+
+export function getVehicleForWeightAndDistance(weight: number, distance: number): VehicleType {
+  const { vehicles } = defaultPricingConfig;
+  
+  if (weight <= vehicles.motorbike.maxWeight) {
+    if (vehicles.motorbike.maxDistance && distance > vehicles.motorbike.maxDistance) {
+      return "car";
+    }
+    return "motorbike";
+  }
+  if (weight <= vehicles.car.maxWeight) return "car";
+  if (weight <= vehicles.small_van.maxWeight) return "small_van";
+  return "medium_van";
+}
+
+export function shouldSwitchVehicle(vehicleType: VehicleType, distance: number): VehicleType | null {
+  const vehicle = defaultPricingConfig.vehicles[vehicleType];
+  
+  if (vehicle.maxDistance && distance > vehicle.maxDistance) {
+    if (vehicleType === "motorbike") {
+      return "car";
+    }
+  }
+  return null;
 }

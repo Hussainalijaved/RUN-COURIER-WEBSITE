@@ -41,7 +41,7 @@ import {
   Calculator
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType } from '@shared/schema';
-import { calculateQuote, defaultPricingConfig, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance, calculateETA } from '@/lib/maps';
 
 const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: number }[] = [
@@ -148,7 +148,20 @@ export default function Book() {
         if (distanceResult) {
           setDistance(distanceResult.distance);
           setEstimatedTime(distanceResult.duration);
-          const calculatedQuote = calculateQuote(vehicleType, distanceResult.distance, weight, {
+          
+          let finalVehicleType = vehicleType;
+          const switchTo = shouldSwitchVehicle(vehicleType, distanceResult.distance);
+          
+          if (switchTo) {
+            finalVehicleType = switchTo;
+            form.setValue('vehicleType', switchTo);
+            toast({
+              title: 'Vehicle Changed',
+              description: `Distance exceeds ${defaultPricingConfig.vehicles[vehicleType].maxDistance} miles for ${vehicleType}. Switched to ${switchTo}.`,
+            });
+          }
+          
+          const calculatedQuote = calculateQuote(finalVehicleType, distanceResult.distance, weight, {
             pickupPostcode,
             deliveryPostcode,
             isMultiDrop,
