@@ -342,6 +342,16 @@ export async function registerRoutes(
     res.json(stats);
   }));
 
+  app.get("/api/stats/dispatcher", asyncHandler(async (req, res) => {
+    const stats = await storage.getDispatcherStats();
+    res.json(stats);
+  }));
+
+  app.get("/api/stats/vendor/:vendorId", asyncHandler(async (req, res) => {
+    const stats = await storage.getVendorStats(req.params.vendorId);
+    res.json(stats);
+  }));
+
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("API Error:", err);
     if (err instanceof z.ZodError) {

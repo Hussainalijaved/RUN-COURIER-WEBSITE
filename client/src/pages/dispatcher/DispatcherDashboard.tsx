@@ -6,29 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Package,
   Users,
@@ -39,76 +17,110 @@ import {
   Truck,
   CheckCircle,
   Radio,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import type { JobStatus } from '@shared/schema';
+import type { Job, Driver, User } from '@shared/schema';
 
-const stats = [
-  { title: 'Pending Jobs', value: '8', icon: Clock, color: 'text-yellow-500' },
-  { title: 'Active Drivers', value: '12', icon: Truck, color: 'text-green-500' },
-  { title: 'In Progress', value: '15', icon: Radio, color: 'text-blue-500' },
-  { title: 'Delivered Today', value: '47', icon: CheckCircle, color: 'text-primary' },
-];
-
-const pendingJobs = [
-  { id: 'RC001240', customer: 'Tech Corp', pickup: 'EC2A 4NE', delivery: 'W2 1NY', vehicleType: 'car', weight: 8, urgency: 'high' },
-  { id: 'RC001241', customer: 'Sarah Williams', pickup: 'SW1A 1AA', delivery: 'NW1 6XE', vehicleType: 'motorbike', weight: 2, urgency: 'normal' },
-  { id: 'RC001242', customer: 'Legal Docs Ltd', pickup: 'WC2A 1PL', delivery: 'EC4A 1BD', vehicleType: 'motorbike', weight: 1, urgency: 'high' },
-  { id: 'RC001243', customer: 'Home Goods', pickup: 'N1 9GU', delivery: 'SE1 7PB', vehicleType: 'small_van', weight: 45, urgency: 'normal' },
-];
-
-const availableDrivers = [
-  { id: 'd1', name: 'Mike Wilson', vehicle: 'Car', location: 'EC1A', rating: 4.9, jobsToday: 5, distance: '0.8 miles' },
-  { id: 'd2', name: 'Tom Brown', vehicle: 'Motorbike', location: 'W1D', rating: 4.7, jobsToday: 7, distance: '1.2 miles' },
-  { id: 'd3', name: 'James Lee', vehicle: 'Car', location: 'SE1', rating: 4.8, jobsToday: 4, distance: '2.1 miles' },
-  { id: 'd4', name: 'Sarah Miller', vehicle: 'Small Van', location: 'N1', rating: 4.6, jobsToday: 3, distance: '0.5 miles' },
-];
-
-const getUrgencyBadge = (urgency: string) => {
-  if (urgency === 'high') {
-    return <Badge className="bg-red-500 text-white">Urgent</Badge>;
-  }
-  return <Badge variant="secondary">Normal</Badge>;
-};
+interface DispatcherStats {
+  pendingJobs: number;
+  activeDrivers: number;
+  inProgressJobs: number;
+  deliveredToday: number;
+}
 
 export default function DispatcherDashboard() {
   const { toast } = useToast();
-  const [selectedJob, setSelectedJob] = useState<typeof pendingJobs[0] | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleAssign = (driverId: string, driverName: string) => {
-    toast({
-      title: 'Driver Assigned',
-      description: `${driverName} has been assigned to job ${selectedJob?.id}`,
-    });
-    setSelectedJob(null);
+  const { data: stats, isLoading: statsLoading } = useQuery<DispatcherStats>({
+    queryKey: ['/api/stats/dispatcher'],
+  });
+
+  const { data: pendingJobs, isLoading: jobsLoading } = useQuery<Job[]>({
+    queryKey: ['/api/jobs', { status: 'pending' }],
+  });
+
+  const { data: drivers, isLoading: driversLoading } = useQuery<Driver[]>({
+    queryKey: ['/api/drivers'],
+  });
+
+  const { data: users } = useQuery<User[]>({
+    queryKey: ['/api/users', { role: 'driver' }],
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async ({ jobId, driverId }: { jobId: string; driverId: string }) => {
+      return apiRequest(`/api/jobs/${jobId}/assign`, {
+        method: 'PATCH',
+        body: JSON.stringify({ driverId }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats/dispatcher'] });
+      toast({ title: 'Driver assigned successfully' });
+      setSelectedJob(null);
+    },
+    onError: () => {
+      toast({ title: 'Failed to assign driver', variant: 'destructive' });
+    },
+  });
+
+  const getDriverUser = (userId: string) => {
+    return users?.find((u) => u.id === userId);
   };
 
-  const filteredDrivers = availableDrivers.filter(driver => {
-    if (!selectedJob) return true;
-    return driver.vehicle.toLowerCase().replace(' ', '_') === selectedJob.vehicleType ||
-           (selectedJob.vehicleType === 'car' && driver.vehicle === 'Car') ||
-           (selectedJob.vehicleType === 'motorbike' && driver.vehicle === 'Motorbike') ||
-           (selectedJob.vehicleType === 'small_van' && driver.vehicle === 'Small Van');
+  const availableDrivers = drivers?.filter((d) => d.isAvailable && d.isVerified) || [];
+
+  const filteredDrivers = availableDrivers.filter((driver) => {
+    const user = getDriverUser(driver.userId);
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = 
+      user?.fullName?.toLowerCase().includes(searchLower) ||
+      driver.vehicleRegistration?.toLowerCase().includes(searchLower);
+    
+    if (!selectedJob) return matchesSearch;
+    return matchesSearch && driver.vehicleType === selectedJob.vehicleType;
   });
+
+  const formatPrice = (price: string | number) => {
+    const num = typeof price === 'string' ? parseFloat(price) : price;
+    return `£${num.toFixed(2)}`;
+  };
+
+  const statCards = [
+    { title: 'Pending Jobs', value: stats?.pendingJobs || 0, icon: Clock, color: 'text-yellow-500' },
+    { title: 'Active Drivers', value: stats?.activeDrivers || 0, icon: Truck, color: 'text-green-500' },
+    { title: 'In Progress', value: stats?.inProgressJobs || 0, icon: Radio, color: 'text-blue-500' },
+    { title: 'Delivered Today', value: stats?.deliveredToday || 0, icon: CheckCircle, color: 'text-primary' },
+  ];
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Dispatch Center</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Dispatch Center</h1>
           <p className="text-muted-foreground">Assign drivers to pending jobs</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          {stats.map((stat, idx) => (
-            <Card key={idx}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          {statCards.map((stat, idx) => (
+            <Card key={idx} data-testid={`stat-${stat.title.toLowerCase().replace(/\s/g, '-')}`}>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-12" />
+                ) : (
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -124,37 +136,50 @@ export default function DispatcherDashboard() {
               <CardDescription>Jobs waiting for driver assignment</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {pendingJobs.map((job) => (
-                  <div
-                    key={job.id}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                      selectedJob?.id === job.id
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-primary/50'
-                    }`}
-                    onClick={() => setSelectedJob(job)}
-                    data-testid={`pending-job-${job.id}`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono font-medium">{job.id}</span>
-                      {getUrgencyBadge(job.urgency)}
+              {jobsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              ) : pendingJobs && pendingJobs.length > 0 ? (
+                <div className="space-y-3">
+                  {pendingJobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                        selectedJob?.id === job.id
+                          ? 'border-primary bg-primary/5'
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => setSelectedJob(job)}
+                      data-testid={`pending-job-${job.id}`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="font-mono font-medium">{job.trackingNumber}</span>
+                        <span className="text-sm font-bold text-primary">{formatPrice(job.totalPrice)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 text-sm">
+                        <MapPin className="h-3 w-3 text-green-500" />
+                        {job.pickupPostcode}
+                        <span>→</span>
+                        <MapPin className="h-3 w-3 text-red-500" />
+                        {job.deliveryPostcode}
+                      </div>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
+                        <Badge variant="outline">{job.weight}kg</Badge>
+                        {job.isUrgent && <Badge className="bg-red-500 text-white">Urgent</Badge>}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground">{job.customer}</div>
-                    <div className="flex items-center gap-2 mt-2 text-sm">
-                      <MapPin className="h-3 w-3 text-green-500" />
-                      {job.pickup}
-                      <span>→</span>
-                      <MapPin className="h-3 w-3 text-red-500" />
-                      {job.delivery}
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      <Badge variant="outline" className="capitalize">{job.vehicleType.replace('_', ' ')}</Badge>
-                      <Badge variant="outline">{job.weight}kg</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                  <p className="text-muted-foreground">All jobs have been assigned</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -166,7 +191,7 @@ export default function DispatcherDashboard() {
               </CardTitle>
               <CardDescription>
                 {selectedJob
-                  ? `Drivers matching ${selectedJob.vehicleType.replace('_', ' ')}`
+                  ? `Drivers matching ${selectedJob.vehicleType?.replace('_', ' ')}`
                   : 'Select a job to see matching drivers'
                 }
               </CardDescription>
@@ -182,45 +207,74 @@ export default function DispatcherDashboard() {
                   data-testid="input-search-drivers"
                 />
               </div>
-              <ScrollArea className="h-[400px]">
-                <div className="space-y-3 pr-4">
-                  {filteredDrivers.map((driver) => (
-                    <div
-                      key={driver.id}
-                      className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            {driver.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{driver.name}</div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-2">
-                            <Truck className="h-3 w-3" />
-                            {driver.vehicle}
-                            <span className="text-xs">•</span>
-                            {driver.distance} away
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {driver.jobsToday} jobs today • Rating: {driver.rating}
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        disabled={!selectedJob}
-                        onClick={() => handleAssign(driver.id, driver.name)}
-                        data-testid={`assign-driver-${driver.id}`}
-                      >
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Assign
-                      </Button>
-                    </div>
+              {driversLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
                   ))}
                 </div>
-              </ScrollArea>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-3 pr-4">
+                    {filteredDrivers.length > 0 ? (
+                      filteredDrivers.map((driver) => {
+                        const user = getDriverUser(driver.userId);
+                        const initials = user?.fullName?.split(' ').map((n) => n[0]).join('') || 'D';
+                        return (
+                          <div
+                            key={driver.id}
+                            className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/50 transition-colors"
+                            data-testid={`driver-${driver.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarFallback className="bg-primary text-primary-foreground">
+                                  {initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">{user?.fullName || 'Unknown'}</div>
+                                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                  <Truck className="h-3 w-3" />
+                                  <span className="capitalize">{driver.vehicleType?.replace('_', ' ')}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {driver.totalJobs || 0} jobs • Rating: {driver.rating || '5.0'}
+                                </div>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              disabled={!selectedJob || assignMutation.isPending}
+                              onClick={() => selectedJob && assignMutation.mutate({ jobId: selectedJob.id, driverId: driver.id })}
+                              data-testid={`button-assign-${driver.id}`}
+                            >
+                              {assignMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Assign
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">
+                          {selectedJob 
+                            ? `No available ${selectedJob.vehicleType?.replace('_', ' ')} drivers`
+                            : 'No available drivers'
+                          }
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
             </CardContent>
           </Card>
         </div>

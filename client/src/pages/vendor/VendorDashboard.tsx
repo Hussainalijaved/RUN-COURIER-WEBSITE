@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -22,6 +23,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   Package,
@@ -32,86 +36,143 @@ import {
   EyeOff,
   RefreshCw,
   Trash2,
-  Clock,
+  Code,
   CheckCircle,
   TrendingUp,
-  Code,
+  Loader2,
 } from 'lucide-react';
-import type { JobStatus } from '@shared/schema';
+import type { Job, VendorApiKey, JobStatus } from '@shared/schema';
 
-const stats = [
-  { title: 'API Calls Today', value: '1,234', icon: Code, color: 'text-blue-500' },
-  { title: 'Jobs Created', value: '156', icon: Package, color: 'text-primary' },
-  { title: 'Success Rate', value: '99.2%', icon: CheckCircle, color: 'text-green-500' },
-  { title: 'Monthly Spend', value: '£2,456', icon: TrendingUp, color: 'text-purple-500' },
-];
-
-const mockApiKeys = [
-  { id: 'key1', name: 'Production', key: 'sk_live_xxxx...xxxx', created: '2024-01-01', lastUsed: '2 mins ago', status: 'active' },
-  { id: 'key2', name: 'Development', key: 'sk_test_xxxx...xxxx', created: '2024-01-10', lastUsed: '1 hour ago', status: 'active' },
-];
-
-const recentJobs = [
-  { id: 'RC001234', pickup: 'EC1A 1BB', delivery: 'SW1A 1AA', status: 'delivered' as JobStatus, created: '2024-01-15 09:30' },
-  { id: 'RC001235', pickup: 'W1D 3QS', delivery: 'E14 5HP', status: 'on_the_way_delivery' as JobStatus, created: '2024-01-15 10:15' },
-  { id: 'RC001236', pickup: 'N1 9GU', delivery: 'SE1 7PB', status: 'pending' as JobStatus, created: '2024-01-15 10:45' },
-];
+interface VendorStats {
+  apiCallsToday: number;
+  jobsCreated: number;
+  successRate: number;
+  monthlySpend: number;
+}
 
 const getStatusBadge = (status: JobStatus) => {
   switch (status) {
     case 'delivered':
-      return <Badge className="bg-green-500 text-white">Delivered</Badge>;
+      return <Badge className="bg-green-500 text-white" data-testid={`badge-status-${status}`}>Delivered</Badge>;
     case 'on_the_way_delivery':
-      return <Badge className="bg-blue-500 text-white">In Transit</Badge>;
+    case 'collected':
+      return <Badge className="bg-blue-500 text-white" data-testid={`badge-status-${status}`}>In Transit</Badge>;
     case 'pending':
-      return <Badge className="bg-yellow-500 text-white">Pending</Badge>;
+      return <Badge className="bg-yellow-500 text-white" data-testid={`badge-status-${status}`}>Pending</Badge>;
+    case 'cancelled':
+      return <Badge className="bg-red-500 text-white" data-testid={`badge-status-${status}`}>Cancelled</Badge>;
     default:
-      return <Badge>{status}</Badge>;
+      return <Badge data-testid={`badge-status-${status}`}>{status}</Badge>;
   }
 };
 
+const formatDate = (date: Date | string | null) => {
+  if (!date) return '—';
+  return new Date(date).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 export default function VendorDashboard() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [newKeyName, setNewKeyName] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const { data: stats, isLoading: statsLoading } = useQuery<VendorStats>({
+    queryKey: ['/api/stats/vendor', user?.id],
+    enabled: !!user?.id,
+  });
+
+  const { data: apiKeys, isLoading: keysLoading } = useQuery<VendorApiKey[]>({
+    queryKey: ['/api/vendor/api-keys', user?.id],
+    enabled: !!user?.id,
+  });
+
+  const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
+    queryKey: ['/api/jobs', { vendorId: user?.id }],
+    enabled: !!user?.id,
+  });
+
+  const createKeyMutation = useMutation({
+    mutationFn: async (name: string) => {
+      return apiRequest('/api/vendor/api-keys', {
+        method: 'POST',
+        body: JSON.stringify({ name, userId: user?.id }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vendor/api-keys'] });
+      toast({ title: 'API Key Created', description: `New API key "${newKeyName}" has been created.` });
+      setNewKeyName('');
+      setDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to create API key', variant: 'destructive' });
+    },
+  });
+
+  const deleteKeyMutation = useMutation({
+    mutationFn: async (keyId: string) => {
+      return apiRequest(`/api/vendor/api-keys/${keyId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vendor/api-keys'] });
+      toast({ title: 'API Key Deleted' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete API key', variant: 'destructive' });
+    },
+  });
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({
-      title: 'Copied',
-      description: 'API key copied to clipboard',
-    });
+    toast({ title: 'Copied', description: 'API key copied to clipboard' });
   };
 
   const toggleKeyVisibility = (keyId: string) => {
     setShowKeys((prev) => ({ ...prev, [keyId]: !prev[keyId] }));
   };
 
-  const createNewKey = () => {
-    toast({
-      title: 'API Key Created',
-      description: `New API key "${newKeyName}" has been created.`,
-    });
-    setNewKeyName('');
+  const maskKey = (key: string) => {
+    if (!key) return '—';
+    return key.substring(0, 8) + '...' + key.substring(key.length - 4);
   };
+
+  const statCards = [
+    { title: 'API Calls Today', value: stats?.apiCallsToday || 0, icon: Code, color: 'text-blue-500' },
+    { title: 'Jobs Created', value: stats?.jobsCreated || 0, icon: Package, color: 'text-primary' },
+    { title: 'Success Rate', value: `${stats?.successRate || 100}%`, icon: CheckCircle, color: 'text-green-500' },
+    { title: 'Monthly Spend', value: `£${(stats?.monthlySpend || 0).toFixed(2)}`, icon: TrendingUp, color: 'text-purple-500' },
+  ];
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Vendor Dashboard</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Vendor Dashboard</h1>
           <p className="text-muted-foreground">Manage your API integration and deliveries</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          {stats.map((stat, idx) => (
-            <Card key={idx}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          {statCards.map((stat, idx) => (
+            <Card key={idx} data-testid={`stat-${stat.title.toLowerCase().replace(/\s/g, '-')}`}>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -119,19 +180,19 @@ export default function VendorDashboard() {
 
         <Tabs defaultValue="api-keys" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="api-keys">API Keys</TabsTrigger>
-            <TabsTrigger value="jobs">Recent Jobs</TabsTrigger>
-            <TabsTrigger value="docs">Documentation</TabsTrigger>
+            <TabsTrigger value="api-keys" data-testid="tab-api-keys">API Keys</TabsTrigger>
+            <TabsTrigger value="jobs" data-testid="tab-jobs">Recent Jobs</TabsTrigger>
+            <TabsTrigger value="docs" data-testid="tab-docs">Documentation</TabsTrigger>
           </TabsList>
 
           <TabsContent value="api-keys">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <div>
                   <CardTitle>API Keys</CardTitle>
                   <CardDescription>Manage your API authentication keys</CardDescription>
                 </div>
-                <Dialog>
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-create-key">
                       <Plus className="mr-2 h-4 w-4" />
@@ -157,7 +218,14 @@ export default function VendorDashboard() {
                       </div>
                     </div>
                     <div className="flex justify-end">
-                      <Button onClick={createNewKey} data-testid="button-confirm-create">
+                      <Button 
+                        onClick={() => createKeyMutation.mutate(newKeyName)} 
+                        disabled={!newKeyName || createKeyMutation.isPending}
+                        data-testid="button-confirm-create"
+                      >
+                        {createKeyMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : null}
                         Create Key
                       </Button>
                     </div>
@@ -165,65 +233,87 @@ export default function VendorDashboard() {
                 </Dialog>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Key</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Last Used</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockApiKeys.map((apiKey) => (
-                      <TableRow key={apiKey.id}>
-                        <TableCell className="font-medium">{apiKey.name}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <code className="text-sm bg-muted px-2 py-1 rounded">
-                              {showKeys[apiKey.id] ? 'sk_live_1234567890abcdef' : apiKey.key}
-                            </code>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleKeyVisibility(apiKey.id)}
-                            >
-                              {showKeys[apiKey.id] ? (
-                                <EyeOff className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell>{apiKey.created}</TableCell>
-                        <TableCell>{apiKey.lastUsed}</TableCell>
-                        <TableCell>
-                          <Badge className="bg-green-500 text-white">Active</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => copyToClipboard('sk_live_1234567890abcdef')}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                {keysLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+                ) : apiKeys && apiKeys.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Key</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Last Used</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {apiKeys.map((apiKey) => (
+                        <TableRow key={apiKey.id} data-testid={`row-api-key-${apiKey.id}`}>
+                          <TableCell className="font-medium">{apiKey.name}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <code className="text-sm bg-muted px-2 py-1 rounded">
+                                {showKeys[apiKey.id] ? apiKey.key : maskKey(apiKey.key)}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility(apiKey.id)}
+                                data-testid={`button-toggle-visibility-${apiKey.id}`}
+                              >
+                                {showKeys[apiKey.id] ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>{formatDate(apiKey.createdAt)}</TableCell>
+                          <TableCell>{apiKey.lastUsedAt ? formatDate(apiKey.lastUsedAt) : 'Never'}</TableCell>
+                          <TableCell>
+                            <Badge className={apiKey.isActive ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}>
+                              {apiKey.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => copyToClipboard(apiKey.key)}
+                                data-testid={`button-copy-${apiKey.id}`}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-destructive"
+                                onClick={() => deleteKeyMutation.mutate(apiKey.id)}
+                                disabled={deleteKeyMutation.isPending}
+                                data-testid={`button-delete-${apiKey.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Key className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No API keys yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Create your first API key to get started</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -235,26 +325,40 @@ export default function VendorDashboard() {
                 <CardDescription>Jobs created via the API</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Job ID</TableHead>
-                      <TableHead>Route</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentJobs.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-mono">{job.id}</TableCell>
-                        <TableCell>{job.pickup} → {job.delivery}</TableCell>
-                        <TableCell>{job.created}</TableCell>
-                        <TableCell>{getStatusBadge(job.status)}</TableCell>
-                      </TableRow>
+                {jobsLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+                ) : jobs && jobs.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Job ID</TableHead>
+                        <TableHead>Route</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {jobs.slice(0, 10).map((job) => (
+                        <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                          <TableCell className="font-mono">{job.trackingNumber}</TableCell>
+                          <TableCell>{job.pickupPostcode} → {job.deliveryPostcode}</TableCell>
+                          <TableCell>{formatDate(job.createdAt)}</TableCell>
+                          <TableCell>{getStatusBadge(job.status)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No jobs yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Use the API to create your first job</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
