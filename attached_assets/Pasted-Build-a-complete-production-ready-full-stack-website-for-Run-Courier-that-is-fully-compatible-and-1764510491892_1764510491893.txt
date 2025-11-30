@@ -1,0 +1,398 @@
+Build a complete, production-ready full-stack website for “Run Courier” that is fully compatible and fully synced with my existing iOS and Android mobile apps (built in Replit). The website must connect to the same Supabase backend and use the same database tables, authentication, and logic. Follow the instructions exactly:
+
+1. GENERAL REQUIREMENTS
+
+Use Supabase for authentication, storage, and database.
+
+Use the same schema used in the mobile app:
+
+users (individual + business)
+
+drivers
+
+jobs
+
+pricing_settings
+
+vehicles
+
+multi_drop
+
+notifications
+
+Website must be fully synced with the mobile app in real time.
+
+When admin assigns a job on website → the driver receives it instantly in the mobile app.
+
+When driver updates job status → website updates instantly.
+
+Build the website using modern tech:
+React, Next.js, Tailwind CSS, Supabase JS client.
+
+2. PANELS TO INCLUDE
+
+Build all panels separately with role-based access:
+
+A. Admin Panel
+
+Admin login (Supabase auth)
+
+Full job management
+
+Create bookings
+
+Assign drivers
+
+Live driver map tracking
+
+Cancel job
+
+Edit pricing settings (base charge, per-mile, rush hour, return trip rules, multi-drop, congestion charge, waiting time)
+
+View all users
+
+View all drivers
+
+Approve driver documents
+
+Verify insurance, right to work, ID
+
+Manage dispatchers
+
+Manage business accounts
+
+Full analytics dashboard (daily jobs, revenue, vehicle usage)
+
+B. Driver Panel (Web Version)
+
+Login with driver Supabase account
+
+Receive assigned jobs in real time
+
+Accept / reject jobs with reasons
+
+Live map for pickup & delivery
+
+Update job status
+
+“On the way”
+
+“Arrived at pickup”
+
+“Parcel collected”
+
+“On the way to drop-off”
+
+“Delivered”
+
+Upload POD (photo + signature)
+
+Update availability
+
+Update profile details
+
+Update vehicle details
+
+Upload required documents
+
+All documents saved to Supabase Storage
+
+C. Customer Panel
+
+(For both individual and business users)
+
+Login/signup using Supabase
+
+Make booking
+
+Get instant quote
+
+Choose vehicle type
+
+Multi-drop
+
+Return trip
+
+Real-time tracking
+
+See live driver map
+
+Upload instructions
+
+Make Stripe payment
+
+View previous orders
+
+Download receipts & invoices
+
+Business users: store customer ID for Pay Later flow
+
+D. Dispatcher Panel
+
+View all jobs
+
+Assign jobs to drivers
+
+Chat with drivers
+
+View all drivers on live map
+
+Manage driver workloads
+
+E. Vendor Panel
+
+Bulk order upload (Excel/CSV)
+
+API key for integrations
+
+Order list
+
+Scheduled pickups
+
+Custom reporting
+
+3. FULL FEATURE LIST REQUIRED
+
+You must include every feature that exists in my mobile app:
+
+A. Booking System
+
+Pickup postcode (autocomplete)
+
+Delivery postcode (autocomplete)
+
+Weight
+
+Vehicle type
+
+Multi-drop
+
+Return trip
+
+Real-time distance calculation using Google Maps
+
+Apply full pricing logic (see section 4)
+
+B. Live Tracking
+
+Driver real-time GPS location from Supabase or mobile app
+
+Customer sees:
+
+Driver name
+
+Vehicle
+
+ETA
+
+Map view
+
+C. Driver Verification
+
+Drivers must upload:
+
+ID / Passport
+
+Driving licence
+
+Right to work (except British)
+
+Vehicle photos
+
+Insurance documents
+
+Goods in transit
+
+Hire & reward insurance (vans)
+
+All files stored in Supabase Storage
+
+Admin can:
+
+Approve
+
+Reject
+
+Request resubmission
+
+4. PRICING LOGIC (MUST IMPLEMENT EXACTLY)
+
+Use these rules:
+
+Motorbike
+
+£3.00 per mile
+
+Max 5 kg
+
+Car
+
+£25 base
+
+£1.20 per mile
+
+£1.40 rush hour
+
+Max 50 kg
+
+Small Van
+
+£25 base
+
+£1.30 per mile
+
+£1.60 rush hour
+
+Max 400 kg
+
+Medium Van
+
+£25 base
+
+£1.40 per mile
+
+£1.70 rush hour
+
+Max 750 kg
+
+Weight surcharge
+
+4–10 kg: £5
+
+10–20 kg: £10
+
+20–30 kg: £15
+
+30–50 kg: £20
+
+Over 50 kg: £40
+
+Waiting time
+
+10 minutes free
+
+£0.50/min after
+
+Central London surcharge
+
+£15
+
+Multi-drop
+
+£5 per extra stop
+
+Return trip
+
+Back to same location: 75% of per-mile rate
+
+Different location: full rate
+
+Pricing must calculate automatically.
+
+5. DESIGN REQUIREMENTS
+
+Use the same branding as Run Courier:
+
+Primary color: Light blue (#007BFF)
+
+Clean, modern, professional
+
+Mobile responsive
+
+Home page includes:
+
+Hero section
+
+Icons for Same Day, Multi-drop, Return Trip, Scheduled, Medical, Legal, Retail, Restaurants
+
+Each icon clickable to open a separate page with full explanation
+
+Include “Track Your Parcel” section connected to Supabase jobs.
+
+6. AUTHENTICATION
+
+Use Supabase authentication for:
+
+Admin
+
+Drivers
+
+Customers
+
+Dispatchers
+
+Vendors
+
+With role-based routing and permissions.
+
+7. REAL-TIME SYNC
+
+Use:
+
+Supabase real-time listeners
+
+Channels + RLS
+
+Live updates for jobs, driver status, and tracking
+
+Website must always sync with mobile apps instantly.
+
+8. PAGES TO BUILD
+
+Home
+
+About
+
+Services
+
+Same-day delivery
+
+Medical delivery
+
+Retail & E-commerce
+
+Multi-drop
+
+Return trip
+
+Contact
+
+Driver signup
+
+Customer signup
+
+Business signup
+
+Admin login
+
+Driver login
+
+Dispatcher login
+
+Vendor login
+
+Tracking page
+
+Pricing info
+
+Terms & Conditions
+
+Privacy Policy
+
+9. DEPLOYMENT INSTRUCTIONS
+
+Provide:
+
+Full code
+
+Step-by-step setup
+
+Supabase environment variables
+
+API keys
+
+How to deploy on Replit, Hostinger, or Vercel
+
+How to connect to my mobile app without breaking anything
+
+Your output must be the full website code + all backend routes + all UI pages + instructions.
