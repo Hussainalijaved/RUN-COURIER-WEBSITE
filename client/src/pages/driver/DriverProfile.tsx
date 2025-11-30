@@ -23,6 +23,9 @@ import {
   Clock,
   Save,
   Loader2,
+  Hash,
+  Copy,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +55,13 @@ export default function DriverProfile() {
   const [vehicleMake, setVehicleMake] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleColor, setVehicleColor] = useState('');
+
+  const copyDriverId = () => {
+    if (driver?.id) {
+      navigator.clipboard.writeText(driver.id);
+      toast({ title: 'Driver ID copied to clipboard' });
+    }
+  };
 
   useEffect(() => {
     if (driver) {
@@ -98,17 +108,17 @@ export default function DriverProfile() {
           </div>
         ) : (
           <>
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <Card className="border-primary/20">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                   <Avatar className="h-20 w-20">
                     <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                      {user?.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'D'}
+                      {driver?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || user?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'D'}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
+                  <div className="flex-1 space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <CardTitle className="text-xl">{user?.fullName}</CardTitle>
+                      <CardTitle className="text-xl">{driver?.fullName || user?.fullName}</CardTitle>
                       {driver?.isVerified ? (
                         <Badge className="bg-green-500">
                           <CheckCircle className="mr-1 h-3 w-3" />
@@ -120,9 +130,37 @@ export default function DriverProfile() {
                           Pending Verification
                         </Badge>
                       )}
+                      {driver?.isAvailable && (
+                        <Badge variant="outline" className="border-green-500 text-green-600">
+                          Online
+                        </Badge>
+                      )}
                     </div>
-                    <CardDescription className="mt-1">Driver since {new Date(driver?.createdAt || Date.now()).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</CardDescription>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                    
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border" data-testid="driver-id-container">
+                      <Hash className="h-4 w-4 text-primary" />
+                      <span className="text-sm text-muted-foreground">Driver ID:</span>
+                      <code className="font-mono text-sm font-semibold text-primary" data-testid="text-driver-id">
+                        {driver?.id || 'Not assigned'}
+                      </code>
+                      {driver?.id && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 ml-auto"
+                          onClick={copyDriverId}
+                          data-testid="button-copy-driver-id"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <CardDescription>
+                      Driver since {new Date(driver?.createdAt || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </CardDescription>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                       <div className="flex items-center gap-1">
                         <Star className="h-4 w-4 text-yellow-500" />
                         <span>{driver?.rating || '5.00'} rating</span>
@@ -131,6 +169,12 @@ export default function DriverProfile() {
                         <CheckCircle className="h-4 w-4 text-green-500" />
                         <span>{driver?.totalJobs || 0} deliveries</span>
                       </div>
+                      {driver?.currentLatitude && driver?.currentLongitude && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4 text-blue-500" />
+                          <span>Location tracked</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -143,23 +187,39 @@ export default function DriverProfile() {
                   <User className="h-5 w-5" />
                   Personal Information
                 </CardTitle>
-                <CardDescription>Your account details (managed through your login)</CardDescription>
+                <CardDescription>Your account details from Supabase (synced from mobile app registration)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      Email
+                      <User className="h-4 w-4" />
+                      Full Name
                     </Label>
-                    <Input value={user?.email || ''} disabled data-testid="input-email" />
+                    <Input value={driver?.fullName || user?.fullName || ''} disabled data-testid="input-fullname" />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Phone
+                      <Mail className="h-4 w-4" />
+                      Email
                     </Label>
-                    <Input value={user?.phone || 'Not set'} disabled data-testid="input-phone" />
+                    <Input value={driver?.email || user?.email || ''} disabled data-testid="input-email" />
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      Phone Number
+                    </Label>
+                    <Input value={driver?.phone || user?.phone || 'Not set'} disabled data-testid="input-phone" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Hash className="h-4 w-4" />
+                      Supabase User ID
+                    </Label>
+                    <Input value={driver?.userId || user?.id || ''} disabled className="font-mono text-xs" data-testid="input-user-id" />
                   </div>
                 </div>
               </CardContent>

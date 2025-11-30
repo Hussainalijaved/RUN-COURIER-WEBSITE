@@ -29,6 +29,9 @@ export const users = pgTable("users", {
 export const drivers = pgTable("drivers", {
   id: varchar("id", { length: 36 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }).notNull(),
+  fullName: text("full_name"),
+  email: text("email"),
+  phone: text("phone"),
   vehicleType: text("vehicle_type").$type<VehicleType>().notNull(),
   vehicleRegistration: text("vehicle_registration"),
   vehicleMake: text("vehicle_make"),
