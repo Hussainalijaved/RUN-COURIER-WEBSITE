@@ -2,6 +2,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -11,6 +12,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import type { Job, Driver, Document } from '@shared/schema';
 import {
   Package,
   Users,
@@ -23,147 +26,217 @@ import {
   FileText,
   ArrowRight,
   Eye,
+  AlertCircle,
 } from 'lucide-react';
 
-const stats = [
-  { title: "Today's Jobs", value: '47', change: '+12%', icon: Package, color: 'text-blue-500' },
-  { title: 'Active Drivers', value: '23', change: '+3', icon: Truck, color: 'text-green-500' },
-  { title: "Today's Revenue", value: '£2,456', change: '+18%', icon: TrendingUp, color: 'text-primary' },
-  { title: 'Pending Approvals', value: '5', change: '', icon: FileText, color: 'text-yellow-500' },
-];
-
-const recentJobs = [
-  { id: 'RC001234', customer: 'John Smith', pickup: 'EC1A 1BB', delivery: 'SW1A 1AA', status: 'in_progress', driver: 'Mike Wilson', amount: '£45.00' },
-  { id: 'RC001235', customer: 'Sarah Johnson', pickup: 'W1D 3QS', delivery: 'E14 5HP', status: 'pending', driver: null, amount: '£32.50' },
-  { id: 'RC001236', customer: 'ABC Corp', pickup: 'N1 9GU', delivery: 'SE1 7PB', status: 'delivered', driver: 'Tom Brown', amount: '£67.00' },
-  { id: 'RC001237', customer: 'Emily Davis', pickup: 'NW1 6XE', delivery: 'SW3 1AY', status: 'in_progress', driver: 'James Lee', amount: '£28.00' },
-  { id: 'RC001238', customer: 'Tech Solutions', pickup: 'EC2A 4NE', delivery: 'W2 1NY', status: 'cancelled', driver: null, amount: '£0.00' },
-];
-
-const pendingDocuments = [
-  { driver: 'Alex Turner', type: 'Driving Licence', uploaded: '2 hours ago' },
-  { driver: 'Sarah Williams', type: 'Insurance', uploaded: '4 hours ago' },
-  { driver: 'Chris Evans', type: 'Right to Work', uploaded: '1 day ago' },
-];
+interface AdminStats {
+  todaysJobs: number;
+  activeDrivers: number;
+  totalDrivers: number;
+  pendingJobs: number;
+  completedToday: number;
+  totalRevenue: number;
+  todayRevenue: number;
+  totalJobs: number;
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'delivered':
-      return <Badge className="bg-green-500 text-white">Delivered</Badge>;
-    case 'in_progress':
-      return <Badge className="bg-blue-500 text-white">In Progress</Badge>;
+      return <Badge className="bg-green-500 text-white" data-testid={`badge-status-${status}`}>Delivered</Badge>;
+    case 'on_the_way_delivery':
+    case 'on_the_way_pickup':
+    case 'collected':
+      return <Badge className="bg-blue-500 text-white" data-testid={`badge-status-${status}`}>In Progress</Badge>;
     case 'pending':
-      return <Badge className="bg-yellow-500 text-white">Pending</Badge>;
+      return <Badge className="bg-yellow-500 text-white" data-testid={`badge-status-${status}`}>Pending</Badge>;
+    case 'assigned':
+    case 'accepted':
+      return <Badge className="bg-purple-500 text-white" data-testid={`badge-status-${status}`}>Assigned</Badge>;
     case 'cancelled':
-      return <Badge className="bg-red-500 text-white">Cancelled</Badge>;
+      return <Badge className="bg-red-500 text-white" data-testid={`badge-status-${status}`}>Cancelled</Badge>;
     default:
-      return <Badge>{status}</Badge>;
+      return <Badge data-testid={`badge-status-${status}`}>{status}</Badge>;
   }
 };
 
+function StatCard({ title, value, icon: Icon, color, isLoading }: { title: string; value: string | number; icon: any; color: string; isLoading?: boolean }) {
+  return (
+    <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className={`h-5 w-5 ${color}`} />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-8 w-20" />
+        ) : (
+          <div className="text-2xl font-bold">{value}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminDashboard() {
+  const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
+    queryKey: ['/api/stats/admin'],
+  });
+
+  const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
+    queryKey: ['/api/jobs', { limit: 10 }],
+  });
+
+  const { data: drivers } = useQuery<Driver[]>({
+    queryKey: ['/api/drivers'],
+  });
+
+  const { data: documents } = useQuery<Document[]>({
+    queryKey: ['/api/documents', { status: 'pending' }],
+  });
+
+  const getDriverName = (driverId: string | null) => {
+    if (!driverId || !drivers) return '—';
+    const driver = drivers.find((d) => d.id === driverId);
+    return driver ? driver.vehicleRegistration : driverId;
+  };
+
+  const formatPrice = (price: string | number) => {
+    const num = typeof price === 'string' ? parseFloat(price) : price;
+    return `£${num.toFixed(2)}`;
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
           <p className="text-muted-foreground">Overview of your courier operations</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat, idx) => (
-            <Card key={idx}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                {stat.change && (
-                  <p className="text-xs text-muted-foreground">
-                    <span className="text-green-500">{stat.change}</span> from yesterday
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+          <StatCard
+            title="Today's Jobs"
+            value={stats?.todaysJobs || 0}
+            icon={Package}
+            color="text-blue-500"
+            isLoading={statsLoading}
+          />
+          <StatCard
+            title="Active Drivers"
+            value={`${stats?.activeDrivers || 0}/${stats?.totalDrivers || 0}`}
+            icon={Truck}
+            color="text-green-500"
+            isLoading={statsLoading}
+          />
+          <StatCard
+            title="Today's Revenue"
+            value={formatPrice(stats?.todayRevenue || 0)}
+            icon={TrendingUp}
+            color="text-primary"
+            isLoading={statsLoading}
+          />
+          <StatCard
+            title="Pending Jobs"
+            value={stats?.pendingJobs || 0}
+            icon={Clock}
+            color="text-yellow-500"
+            isLoading={statsLoading}
+          />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <div>
                 <CardTitle>Recent Jobs</CardTitle>
                 <CardDescription>Latest delivery orders</CardDescription>
               </div>
               <Link href="/admin/jobs">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" data-testid="button-view-all-jobs">
                   View All <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Route</TableHead>
-                    <TableHead>Driver</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentJobs.map((job) => (
-                    <TableRow key={job.id}>
-                      <TableCell className="font-mono text-sm">{job.id}</TableCell>
-                      <TableCell>{job.customer}</TableCell>
-                      <TableCell className="text-sm">
-                        {job.pickup} → {job.delivery}
-                      </TableCell>
-                      <TableCell>{job.driver || '—'}</TableCell>
-                      <TableCell>{getStatusBadge(job.status)}</TableCell>
-                      <TableCell className="text-right font-medium">{job.amount}</TableCell>
-                    </TableRow>
+              {jobsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              ) : jobs && jobs.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order ID</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobs.slice(0, 5).map((job) => (
+                      <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                        <TableCell className="font-mono text-sm">{job.trackingNumber}</TableCell>
+                        <TableCell className="text-sm">
+                          {job.pickupPostcode} → {job.deliveryPostcode}
+                        </TableCell>
+                        <TableCell className="capitalize">{job.vehicleType?.replace('_', ' ')}</TableCell>
+                        <TableCell>{getStatusBadge(job.status)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatPrice(job.totalPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No jobs yet</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <div className="space-y-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base">Pending Documents</CardTitle>
                 <Link href="/admin/documents">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="icon" data-testid="button-view-documents">
                     <Eye className="h-4 w-4" />
                   </Button>
                 </Link>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {pendingDocuments.map((doc, idx) => (
-                    <div key={idx} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{doc.driver}</p>
-                        <p className="text-xs text-muted-foreground">{doc.type}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{doc.uploaded}</span>
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500">
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500">
-                            <XCircle className="h-4 w-4" />
-                          </Button>
+                {documents && documents.length > 0 ? (
+                  <div className="space-y-4">
+                    {documents.slice(0, 3).map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between" data-testid={`doc-${doc.id}`}>
+                        <div>
+                          <p className="font-medium text-sm">{doc.fileName}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{doc.type.replace('_', ' ')}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" data-testid={`button-approve-doc-${doc.id}`}>
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" data-testid={`button-reject-doc-${doc.id}`}>
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4 text-center">
+                    <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
+                    <p className="text-sm text-muted-foreground">All documents reviewed</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -173,21 +246,27 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <Link href="/admin/jobs">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start" data-testid="button-manage-jobs">
                     <Package className="mr-2 h-4 w-4" />
                     Manage Jobs
                   </Button>
                 </Link>
                 <Link href="/admin/drivers">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start" data-testid="button-manage-drivers">
                     <Users className="mr-2 h-4 w-4" />
                     Manage Drivers
                   </Button>
                 </Link>
                 <Link href="/admin/map">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start" data-testid="button-live-map">
                     <MapPin className="mr-2 h-4 w-4" />
                     Live Map
+                  </Button>
+                </Link>
+                <Link href="/admin/pricing">
+                  <Button variant="outline" className="w-full justify-start" data-testid="button-pricing-settings">
+                    <TrendingUp className="mr-2 h-4 w-4" />
+                    Pricing Settings
                   </Button>
                 </Link>
               </CardContent>
