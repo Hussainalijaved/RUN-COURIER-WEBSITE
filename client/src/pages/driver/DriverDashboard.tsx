@@ -78,36 +78,33 @@ export default function DriverDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: driver, isLoading: driverLoading } = useQuery<Driver>({
-    queryKey: ['/api/drivers/user', user?.id],
+  const { data: driver, isLoading: driverLoading, error: driverError } = useQuery<Driver>({
+    queryKey: [`/api/drivers/user/${user?.id}`],
     enabled: !!user?.id,
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<DriverStats>({
-    queryKey: ['/api/stats/driver', driver?.id],
+    queryKey: [`/api/stats/driver/${driver?.id}`],
     enabled: !!driver?.id,
   });
 
   const { data: myJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { driverId: driver?.id }],
+    queryKey: [`/api/jobs?driverId=${driver?.id}`],
     enabled: !!driver?.id,
   });
 
   const { data: availableJobs } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { status: 'pending' }],
-    enabled: driver?.isAvailable && driver?.isVerified,
+    queryKey: ['/api/jobs?status=pending'],
+    enabled: Boolean(driver?.isAvailable && driver?.isVerified),
   });
 
   const availabilityMutation = useMutation({
     mutationFn: async (isAvailable: boolean) => {
       if (!driver) return;
-      return apiRequest(`/api/drivers/${driver.id}/availability`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isAvailable }),
-      });
+      return apiRequest('PATCH', `/api/drivers/${driver.id}/availability`, { isAvailable });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers/user', user?.id] });
+      queryClient.invalidateQueries({ queryKey: [`/api/drivers/user/${user?.id}`] });
       toast({ title: driver?.isAvailable ? 'You are now offline' : 'You are now online' });
     },
     onError: () => {
@@ -117,13 +114,10 @@ export default function DriverDashboard() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ jobId, status }: { jobId: string; status: JobStatus }) => {
-      return apiRequest(`/api/jobs/${jobId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
+      return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().startsWith('/api/jobs') ?? false });
       toast({ title: 'Status updated' });
     },
     onError: () => {
@@ -134,13 +128,10 @@ export default function DriverDashboard() {
   const acceptJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
       if (!driver) return;
-      return apiRequest(`/api/jobs/${jobId}/assign`, {
-        method: 'PATCH',
-        body: JSON.stringify({ driverId: driver.id }),
-      });
+      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId: driver.id });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().startsWith('/api/jobs') ?? false });
       toast({ title: 'Job accepted!' });
     },
     onError: () => {

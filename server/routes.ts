@@ -132,9 +132,22 @@ export async function registerRoutes(
   }));
 
   app.get("/api/drivers/user/:userId", asyncHandler(async (req, res) => {
-    const driver = await storage.getDriverByUserId(req.params.userId);
+    let driver = await storage.getDriverByUserId(req.params.userId);
     if (!driver) {
-      return res.status(404).json({ error: "Driver not found" });
+      driver = await storage.createDriver({
+        userId: req.params.userId,
+        vehicleType: "car",
+        vehicleRegistration: null,
+        vehicleMake: null,
+        vehicleModel: null,
+        vehicleColor: null,
+        isAvailable: false,
+        isVerified: false,
+        currentLatitude: null,
+        currentLongitude: null,
+        rating: "5.00",
+        totalJobs: 0,
+      });
     }
     res.json(driver);
   }));
