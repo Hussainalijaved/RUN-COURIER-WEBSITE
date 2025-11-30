@@ -108,6 +108,7 @@ export default function Book() {
   const isMultiDrop = form.watch('isMultiDrop');
   const isReturnTrip = form.watch('isReturnTrip');
   const returnToSameLocation = form.watch('returnToSameLocation');
+  const returnPostcode = form.watch('returnPostcode');
 
   useEffect(() => {
     if (userProfile) {
@@ -182,8 +183,26 @@ export default function Book() {
           setDistance(totalDistance);
           setEstimatedTime(totalEstimatedTime);
           
+          let returnDistance = 0;
+          if (isReturnTrip && !returnToSameLocation && returnPostcode && returnPostcode.length >= 3) {
+            const lastStopLocation = isMultiDrop && multiDropStops.length > 0 
+              ? await geocodePostcode(multiDropStops[multiDropStops.length - 1]) 
+              : deliveryLocation;
+            const returnLocation = await geocodePostcode(returnPostcode);
+            
+            if (lastStopLocation && returnLocation) {
+              const returnResult = await calculateDistance(
+                { lat: lastStopLocation.lat, lng: lastStopLocation.lng },
+                { lat: returnLocation.lat, lng: returnLocation.lng }
+              );
+              if (returnResult) {
+                returnDistance = returnResult.distance;
+              }
+            }
+          }
+          
           let finalVehicleType = vehicleType;
-          const switchTo = shouldSwitchVehicle(vehicleType, totalDistance);
+          const switchTo = shouldSwitchVehicle(vehicleType, totalDistance + returnDistance);
           
           if (switchTo) {
             finalVehicleType = switchTo;
@@ -202,6 +221,7 @@ export default function Book() {
             multiDropDistances,
             isReturnTrip,
             returnToSameLocation,
+            returnDistance,
           });
           setQuote(calculatedQuote);
           toast({
@@ -232,7 +252,7 @@ export default function Book() {
     } finally {
       setIsCalculating(false);
     }
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, multiDropStops, toast]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, returnPostcode, multiDropStops, toast]);
 
   const addMultiDropStop = () => {
     setMultiDropStops([...multiDropStops, '']);

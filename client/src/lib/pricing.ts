@@ -171,7 +171,11 @@ export function calculateQuote(
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
-    returnTripCharge = subtotalBeforeReturn * config.returnTripMultiplier;
+    if (options.returnToSameLocation) {
+      returnTripCharge = subtotalBeforeReturn * config.returnTripMultiplier;
+    } else if (options.returnDistance) {
+      returnTripCharge = options.returnDistance * perMileRate;
+    }
   }
   
   const totalDistance = distance + totalMultiDropDistance;
