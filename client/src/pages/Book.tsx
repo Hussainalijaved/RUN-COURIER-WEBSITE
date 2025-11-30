@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { 
   Bike, 
   Car, 
@@ -36,11 +37,12 @@ import {
   Clock,
   CheckCircle,
   X,
-  User
+  User,
+  Calculator
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, type QuoteBreakdown } from '@/lib/pricing';
-import { geocodePostcode, calculateDistance } from '@/lib/maps';
+import { geocodePostcode, calculateDistance, calculateETA } from '@/lib/maps';
 
 const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: number }[] = [
   { type: 'motorbike', icon: Bike, name: 'Motorbike', maxWeight: 5 },
@@ -57,7 +59,10 @@ export default function Book() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [distance, setDistance] = useState<number>(0);
+  const [estimatedTime, setEstimatedTime] = useState<number>(0);
   const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
+  const [pickupFullAddress, setPickupFullAddress] = useState('');
+  const [deliveryFullAddress, setDeliveryFullAddress] = useState('');
 
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupName, setPickupName] = useState('');
@@ -109,12 +114,18 @@ export default function Book() {
     }
   }, [userProfile, user, form]);
 
-  const calculateQuoteHandler = useCallback(async () => {
+  const handleGetQuote = useCallback(async () => {
     if (!pickupPostcode || !deliveryPostcode || pickupPostcode.length < 3 || deliveryPostcode.length < 3) {
+      toast({
+        title: 'Enter Postcodes',
+        description: 'Please enter both pickup and delivery postcodes.',
+        variant: 'destructive',
+      });
       return;
     }
 
     setIsCalculating(true);
+    setQuote(null);
     try {
       const [pickupLocation, deliveryLocation] = await Promise.all([
         geocodePostcode(pickupPostcode),
@@ -122,6 +133,13 @@ export default function Book() {
       ]);
 
       if (pickupLocation && deliveryLocation) {
+        if (pickupLocation.formattedAddress) {
+          setPickupFullAddress(pickupLocation.formattedAddress);
+        }
+        if (deliveryLocation.formattedAddress) {
+          setDeliveryFullAddress(deliveryLocation.formattedAddress);
+        }
+
         const distanceResult = await calculateDistance(
           { lat: pickupLocation.lat, lng: pickupLocation.lng },
           { lat: deliveryLocation.lat, lng: deliveryLocation.lng }
@@ -129,6 +147,7 @@ export default function Book() {
 
         if (distanceResult) {
           setDistance(distanceResult.distance);
+          setEstimatedTime(distanceResult.duration);
           const calculatedQuote = calculateQuote(vehicleType, distanceResult.distance, weight, {
             pickupPostcode,
             deliveryPostcode,
@@ -138,21 +157,35 @@ export default function Book() {
             returnToSameLocation,
           });
           setQuote(calculatedQuote);
+          toast({
+            title: 'Quote Ready',
+            description: `Your delivery quote is £${calculatedQuote.totalPrice.toFixed(2)}`,
+          });
+        } else {
+          toast({
+            title: 'Unable to Calculate',
+            description: 'Could not calculate route between these locations.',
+            variant: 'destructive',
+          });
         }
+      } else {
+        toast({
+          title: 'Invalid Postcodes',
+          description: 'Could not find one or both postcodes. Please check and try again.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error calculating quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to calculate quote. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsCalculating(false);
     }
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, multiDropStops.length]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      calculateQuoteHandler();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [calculateQuoteHandler]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, multiDropStops.length, toast]);
 
   const addMultiDropStop = () => {
     setMultiDropStops([...multiDropStops, '']);
@@ -243,16 +276,21 @@ export default function Book() {
                               <FormItem>
                                 <FormLabel>Pickup Postcode</FormLabel>
                                 <FormControl>
-                                  <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input 
-                                      placeholder="e.g., EC1A 1BB" 
-                                      className="pl-10" 
-                                      {...field} 
-                                      data-testid="input-pickup-postcode"
-                                    />
-                                  </div>
+                                  <PostcodeAutocomplete
+                                    value={field.value}
+                                    onChange={(value, fullAddress) => {
+                                      field.onChange(value);
+                                      if (fullAddress) setPickupFullAddress(fullAddress);
+                                    }}
+                                    placeholder="e.g., HA4 6LW or start typing address"
+                                    data-testid="input-pickup-postcode"
+                                  />
                                 </FormControl>
+                                {pickupFullAddress && (
+                                  <FormDescription className="text-xs truncate">
+                                    {pickupFullAddress}
+                                  </FormDescription>
+                                )}
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -264,16 +302,21 @@ export default function Book() {
                               <FormItem>
                                 <FormLabel>Delivery Postcode</FormLabel>
                                 <FormControl>
-                                  <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input 
-                                      placeholder="e.g., SW1A 1AA" 
-                                      className="pl-10" 
-                                      {...field}
-                                      data-testid="input-delivery-postcode"
-                                    />
-                                  </div>
+                                  <PostcodeAutocomplete
+                                    value={field.value}
+                                    onChange={(value, fullAddress) => {
+                                      field.onChange(value);
+                                      if (fullAddress) setDeliveryFullAddress(fullAddress);
+                                    }}
+                                    placeholder="e.g., SW1A 1AA or start typing address"
+                                    data-testid="input-delivery-postcode"
+                                  />
                                 </FormControl>
+                                {deliveryFullAddress && (
+                                  <FormDescription className="text-xs truncate">
+                                    {deliveryFullAddress}
+                                  </FormDescription>
+                                )}
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -434,55 +477,98 @@ export default function Book() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {quote ? (
-                      <div className="space-y-4">
+                    <div className="space-y-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Vehicle</span>
+                        <span className="font-medium">{selectedVehicle?.name}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Weight</span>
+                        <span>{weight} kg</span>
+                      </div>
+                      {isMultiDrop && multiDropStops.length > 0 && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Distance</span>
-                          <span>{distance} miles</span>
+                          <span className="text-muted-foreground">Additional stops</span>
+                          <span>{multiDropStops.length}</span>
                         </div>
+                      )}
+                      {isReturnTrip && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Vehicle</span>
-                          <span>{selectedVehicle?.name}</span>
+                          <span className="text-muted-foreground">Return trip</span>
+                          <span>
+                            <CheckCircle className="h-4 w-4 text-green-500 inline" />
+                          </span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Weight</span>
-                          <span>{weight} kg</span>
-                        </div>
-                        {isMultiDrop && multiDropStops.length > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Additional stops</span>
-                            <span>{multiDropStops.length}</span>
-                          </div>
+                      )}
+                      
+                      <Button 
+                        className="w-full" 
+                        onClick={handleGetQuote}
+                        disabled={isCalculating || !pickupPostcode || !deliveryPostcode}
+                        data-testid="button-get-quote"
+                      >
+                        {isCalculating ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Calculating...
+                          </>
+                        ) : (
+                          <>
+                            <Calculator className="mr-2 h-4 w-4" />
+                            Get Quote
+                          </>
                         )}
-                        {isReturnTrip && (
+                      </Button>
+
+                      {quote && (
+                        <>
+                          <Separator />
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Return trip</span>
-                            <span>
-                              <CheckCircle className="h-4 w-4 text-green-500 inline" />
+                            <span className="text-muted-foreground">Distance</span>
+                            <span className="font-medium">{distance} miles</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Est. Time
+                            </span>
+                            <span className="font-medium">
+                              {estimatedTime >= 60 
+                                ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
+                                : `${estimatedTime} mins`}
                             </span>
                           </div>
-                        )}
-                        <Separator />
-                        <div className="bg-primary/10 rounded-lg p-4 text-center">
-                          <CheckCircle className="h-8 w-8 text-primary mx-auto mb-2" />
-                          <p className="font-semibold text-primary">Ready to Book</p>
-                          <p className="text-sm text-muted-foreground">Your delivery details are complete</p>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">ETA</span>
+                            <span className="font-medium">{calculateETA(estimatedTime)}</span>
+                          </div>
+                          <Separator />
+                          <div className="bg-primary/10 rounded-lg p-4 text-center">
+                            <p className="text-2xl font-bold text-primary">
+                              £{quote.totalPrice.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Total delivery cost
+                            </p>
+                          </div>
+                          <Button 
+                            className="w-full" 
+                            onClick={handleContinue}
+                            data-testid="button-continue"
+                          >
+                            Continue to Book
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+
+                      {!quote && !isCalculating && (
+                        <div className="text-center py-4 text-muted-foreground">
+                          <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                          <p className="text-sm">Enter postcodes and click Get Quote</p>
                         </div>
-                        <Button 
-                          className="w-full" 
-                          onClick={handleContinue}
-                          data-testid="button-continue"
-                        >
-                          Continue
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Enter postcodes to continue</p>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
