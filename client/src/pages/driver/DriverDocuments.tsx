@@ -45,13 +45,6 @@ const documentTypes = [
     required: true,
   },
   {
-    type: 'vehicle_registration',
-    label: 'Vehicle Registration (V5C)',
-    description: 'Vehicle registration certificate',
-    icon: Car,
-    required: true,
-  },
-  {
     type: 'proof_of_identity',
     label: 'Proof of Identity',
     description: 'Passport or national ID card',
