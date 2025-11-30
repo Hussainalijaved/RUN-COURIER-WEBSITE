@@ -65,10 +65,12 @@ export default function Book() {
   const [deliveryFullAddress, setDeliveryFullAddress] = useState('');
 
   const [pickupAddress, setPickupAddress] = useState('');
+  const [pickupBuildingName, setPickupBuildingName] = useState('');
   const [pickupName, setPickupName] = useState('');
   const [pickupPhone, setPickupPhone] = useState('');
   const [pickupInstructions, setPickupInstructions] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryBuildingName, setDeliveryBuildingName] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
@@ -76,6 +78,7 @@ export default function Book() {
   interface StopDetails {
     postcode: string;
     address: string;
+    buildingName: string;
     name: string;
     phone: string;
     instructions: string;
@@ -256,7 +259,7 @@ export default function Book() {
 
   const addMultiDropStop = () => {
     setMultiDropStops([...multiDropStops, '']);
-    setMultiDropStopDetails([...multiDropStopDetails, { postcode: '', address: '', name: '', phone: '', instructions: '' }]);
+    setMultiDropStopDetails([...multiDropStopDetails, { postcode: '', address: '', buildingName: '', name: '', phone: '', instructions: '' }]);
   };
 
   const removeMultiDropStop = (index: number) => {
@@ -271,7 +274,7 @@ export default function Book() {
     
     const newDetails = [...multiDropStopDetails];
     if (!newDetails[index]) {
-      newDetails[index] = { postcode: '', address: '', name: '', phone: '', instructions: '' };
+      newDetails[index] = { postcode: '', address: '', buildingName: '', name: '', phone: '', instructions: '' };
     }
     newDetails[index].postcode = value;
     if (fullAddress) {
@@ -283,7 +286,7 @@ export default function Book() {
   const updateStopDetail = (index: number, field: keyof StopDetails, value: string) => {
     const newDetails = [...multiDropStopDetails];
     if (!newDetails[index]) {
-      newDetails[index] = { postcode: '', address: '', name: '', phone: '', instructions: '' };
+      newDetails[index] = { postcode: '', address: '', buildingName: '', name: '', phone: '', instructions: '' };
     }
     newDetails[index][field] = value;
     setMultiDropStopDetails(newDetails);
@@ -689,9 +692,18 @@ export default function Book() {
                       <Label>Full Address</Label>
                       <Input 
                         placeholder="Full address" 
-                        value={pickupAddress}
+                        value={pickupAddress || pickupFullAddress}
                         onChange={(e) => setPickupAddress(e.target.value)}
                         data-testid="input-pickup-address" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Building Name / Number</Label>
+                      <Input 
+                        placeholder="Building name or number" 
+                        value={pickupBuildingName}
+                        onChange={(e) => setPickupBuildingName(e.target.value)}
+                        data-testid="input-pickup-building" 
                       />
                     </div>
                     <div className="space-y-2">
@@ -731,6 +743,15 @@ export default function Book() {
                         value={deliveryAddress || deliveryFullAddress}
                         onChange={(e) => setDeliveryAddress(e.target.value)}
                         data-testid="input-delivery-address" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Building Name / Number</Label>
+                      <Input 
+                        placeholder="Building name or number" 
+                        value={deliveryBuildingName}
+                        onChange={(e) => setDeliveryBuildingName(e.target.value)}
+                        data-testid="input-delivery-building" 
                       />
                     </div>
                     <div className="space-y-2">
@@ -787,6 +808,15 @@ export default function Book() {
                               />
                             </div>
                             <div className="space-y-2">
+                              <Label>Building Name / Number</Label>
+                              <Input 
+                                placeholder="Building name or number" 
+                                value={stopDetail.buildingName}
+                                onChange={(e) => updateStopDetail(index, 'buildingName', e.target.value)}
+                                data-testid={`input-stop-${index}-building`} 
+                              />
+                            </div>
+                            <div className="space-y-2">
                               <Label>Recipient Name</Label>
                               <Input 
                                 placeholder="Recipient name" 
@@ -804,7 +834,7 @@ export default function Book() {
                                 data-testid={`input-stop-${index}-phone`} 
                               />
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 sm:col-span-2">
                               <Label>Special Instructions</Label>
                               <Input 
                                 placeholder="Special instructions (optional)" 

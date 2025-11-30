@@ -35,6 +35,7 @@ export default function CustomerProfile() {
   const [phone, setPhone] = useState('');
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
+  const [buildingName, setBuildingName] = useState('');
 
   const { data: profile, isLoading } = useQuery<UserType>({
     queryKey: ['/api/users', user?.id],
@@ -47,6 +48,7 @@ export default function CustomerProfile() {
       setPhone(profile.phone || '');
       setPostcode(profile.postcode || '');
       setAddress(profile.address || '');
+      setBuildingName(profile.buildingName || '');
     } else if (user) {
       setFullName(user.fullName || '');
       setPhone(user.phone || '');
@@ -79,6 +81,7 @@ export default function CustomerProfile() {
       phone,
       postcode,
       address,
+      buildingName,
     });
   };
 
@@ -218,25 +221,44 @@ export default function CustomerProfile() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="address">Full Address</Label>
-                  <PostcodeAutocomplete
-                    value={address}
-                    onChange={(value, fullAddress) => {
-                      setAddress(fullAddress || value);
-                      if (fullAddress) {
-                        const postcodeMatch = fullAddress.match(/[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}/i);
-                        if (postcodeMatch && !postcode) {
-                          setPostcode(postcodeMatch[0].toUpperCase());
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Full Address</Label>
+                    <PostcodeAutocomplete
+                      value={address}
+                      onChange={(value, fullAddress) => {
+                        setAddress(fullAddress || value);
+                        if (fullAddress) {
+                          const postcodeMatch = fullAddress.match(/[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}/i);
+                          if (postcodeMatch && !postcode) {
+                            setPostcode(postcodeMatch[0].toUpperCase());
+                          }
                         }
-                      }
-                    }}
-                    placeholder="Start typing your full address"
-                    data-testid="input-address"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This address will be used as the default pickup location for your bookings
-                  </p>
+                      }}
+                      placeholder="Start typing your full address"
+                      data-testid="input-address"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Default pickup location for bookings
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="buildingName">Building Name / Number</Label>
+                    <div className="relative">
+                      <Home className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="buildingName"
+                        value={buildingName}
+                        onChange={(e) => setBuildingName(e.target.value)}
+                        className="pl-10"
+                        placeholder="e.g., Unit 5, Suite 200"
+                        data-testid="input-building-name"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Building name, flat number, or suite
+                    </p>
+                  </div>
                 </div>
 
                 {(profile?.userType || user?.userType) === 'business' && (profile?.companyName || user?.companyName) && (

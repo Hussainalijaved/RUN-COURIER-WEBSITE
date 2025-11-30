@@ -45,6 +45,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
       userType: 'individual',
       companyName: '',
       businessAddress: '',
+      buildingName: '',
     },
   });
 
@@ -61,6 +62,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
         userType: data.userType,
         companyName: data.companyName,
         businessAddress: data.businessAddress,
+        buildingName: data.buildingName,
       });
 
       if (error) {
@@ -275,6 +277,24 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                               onChange={(value, fullAddress) => field.onChange(fullAddress || value)}
                               placeholder="Start typing your business address"
                               data-testid="input-business-address"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="buildingName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Building Name / Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Building name or number"
+                              {...field}
+                              data-testid="input-building-name"
                             />
                           </FormControl>
                           <FormMessage />

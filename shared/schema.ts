@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   postcode: text("postcode"),
   address: text("address"),
+  buildingName: text("building_name"),
   role: text("role").$type<UserRole>().notNull().default("customer"),
   userType: text("user_type").$type<UserType>().default("individual"),
   companyName: text("company_name"),
@@ -233,6 +234,7 @@ export const registerSchema = z.object({
   userType: z.enum(["individual", "business"]).default("individual"),
   companyName: z.string().optional(),
   businessAddress: z.string().optional(),
+  buildingName: z.string().optional(),
 });
 
 export const bookingQuoteSchema = z.object({
