@@ -147,7 +147,7 @@ export default function Home() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/pricing">
+              <Link href="/book">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="hero-get-quote">
                   Get a Quote
                 </Button>
