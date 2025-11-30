@@ -14,7 +14,7 @@ import Track from "@/pages/Track";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 import Login from "@/pages/Login";
-import Signup from "@/pages/Signup";
+import Signup, { DriverSignup, VendorSignup } from "@/pages/Signup";
 import AdminSignup from "@/pages/AdminSignup";
 import Book from "@/pages/Book";
 import Quote from "@/pages/Quote";
@@ -71,6 +71,26 @@ function Router() {
       <Route path="/admin-signup">
         <PublicOnlyRoute>
           <AdminSignup />
+        </PublicOnlyRoute>
+      </Route>
+      <Route path="/driver/signup">
+        <PublicOnlyRoute>
+          <DriverSignup />
+        </PublicOnlyRoute>
+      </Route>
+      <Route path="/driver/login">
+        <PublicOnlyRoute>
+          <Login role="driver" />
+        </PublicOnlyRoute>
+      </Route>
+      <Route path="/vendor/signup">
+        <PublicOnlyRoute>
+          <VendorSignup />
+        </PublicOnlyRoute>
+      </Route>
+      <Route path="/vendor/login">
+        <PublicOnlyRoute>
+          <Login role="vendor" />
         </PublicOnlyRoute>
       </Route>
       

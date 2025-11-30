@@ -24,8 +24,10 @@ import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import type { UserRole } from '@shared/schema';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 
+type SignupRole = 'driver' | 'customer' | 'vendor';
+
 interface SignupProps {
-  role?: UserRole;
+  role?: SignupRole;
 }
 
 export default function Signup({ role = 'customer' }: SignupProps) {
