@@ -96,7 +96,7 @@ export default function Book() {
       pickupPostcode: '',
       deliveryPostcode: '',
       weight: 1,
-      vehicleType: 'car',
+      vehicleType: '' as VehicleType,
       isMultiDrop: false,
       isReturnTrip: false,
       returnToSameLocation: true,
@@ -132,6 +132,15 @@ export default function Book() {
       toast({
         title: 'Enter Postcodes',
         description: 'Please enter both pickup and delivery postcodes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!vehicleType) {
+      toast({
+        title: 'Select Vehicle',
+        description: 'Please select a vehicle type for your delivery.',
         variant: 'destructive',
       });
       return;
