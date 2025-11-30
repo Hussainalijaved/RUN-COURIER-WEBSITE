@@ -19,7 +19,6 @@ import {
   Phone,
   MapPin,
   Building,
-  Copy,
   Save,
   CheckCircle,
   Home,
@@ -82,13 +81,6 @@ export default function CustomerProfile() {
     });
   };
 
-  const copyAccountId = () => {
-    if (user?.id) {
-      navigator.clipboard.writeText(user.id);
-      toast({ title: 'Account ID copied to clipboard' });
-    }
-  };
-
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -136,23 +128,12 @@ export default function CustomerProfile() {
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border" data-testid="account-id-container">
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border" data-testid="account-type-container">
                       <User className="h-4 w-4 text-primary" />
-                      <span className="text-sm text-muted-foreground">Account ID:</span>
-                      <code className="font-mono text-sm font-semibold text-primary" data-testid="text-account-id">
-                        {user?.id || 'Not available'}
-                      </code>
-                      {user?.id && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 ml-auto"
-                          onClick={copyAccountId}
-                          data-testid="button-copy-account-id"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      )}
+                      <span className="text-sm text-muted-foreground">Account Type:</span>
+                      <span className="text-sm font-semibold" data-testid="text-account-type">
+                        {(profile?.userType || user?.userType) === 'business' ? 'Business Account' : 'Individual Account'}
+                      </span>
                     </div>
 
                     <CardDescription>
@@ -252,19 +233,6 @@ export default function CustomerProfile() {
                   <p className="text-xs text-muted-foreground">
                     This address will be used as the default pickup location for your bookings
                   </p>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="userType">Account Type</Label>
-                  <Input
-                    id="userType"
-                    value={(profile?.userType || user?.userType) === 'business' ? 'Business Account' : 'Individual Account'}
-                    className="capitalize"
-                    disabled
-                    data-testid="input-account-type"
-                  />
                 </div>
 
                 {(profile?.userType || user?.userType) === 'business' && (profile?.companyName || user?.companyName) && (
