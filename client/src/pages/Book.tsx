@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,9 +35,10 @@ import {
   Loader2,
   Clock,
   CheckCircle,
-  X
+  X,
+  User
 } from 'lucide-react';
-import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType } from '@shared/schema';
+import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance } from '@/lib/maps';
 
@@ -56,6 +58,20 @@ export default function Book() {
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [distance, setDistance] = useState<number>(0);
   const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
+
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [pickupName, setPickupName] = useState('');
+  const [pickupPhone, setPickupPhone] = useState('');
+  const [pickupInstructions, setPickupInstructions] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [deliveryInstructions, setDeliveryInstructions] = useState('');
+
+  const { data: userProfile } = useQuery<UserType>({
+    queryKey: ['/api/users', user?.id],
+    enabled: !!user?.id,
+  });
 
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
@@ -78,6 +94,20 @@ export default function Book() {
   const isMultiDrop = form.watch('isMultiDrop');
   const isReturnTrip = form.watch('isReturnTrip');
   const returnToSameLocation = form.watch('returnToSameLocation');
+
+  useEffect(() => {
+    if (userProfile) {
+      setPickupAddress(userProfile.address || '');
+      setPickupName(userProfile.fullName || '');
+      setPickupPhone(userProfile.phone || '');
+      if (userProfile.postcode && !form.getValues('pickupPostcode')) {
+        form.setValue('pickupPostcode', userProfile.postcode);
+      }
+    } else if (user) {
+      setPickupName(user.fullName || '');
+      setPickupPhone(user.phone || '');
+    }
+  }, [userProfile, user, form]);
 
   const calculateQuoteHandler = useCallback(async () => {
     if (!pickupPostcode || !deliveryPostcode || pickupPostcode.length < 3 || deliveryPostcode.length < 3) {
@@ -463,23 +493,97 @@ export default function Book() {
             <Card>
               <CardHeader>
                 <CardTitle>Delivery Details</CardTitle>
-                <CardDescription>Enter pickup and delivery information</CardDescription>
+                <CardDescription>
+                  {user ? 'Your saved details have been pre-filled. Update if needed.' : 'Enter pickup and delivery information'}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <h3 className="font-semibold">Pickup Details</h3>
-                    <Input placeholder="Full address" data-testid="input-pickup-address" />
-                    <Input placeholder="Contact name" data-testid="input-pickup-name" />
-                    <Input placeholder="Phone number" data-testid="input-pickup-phone" />
-                    <Input placeholder="Special instructions (optional)" data-testid="input-pickup-instructions" />
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">Pickup Details</h3>
+                      {user && (
+                        <Badge variant="secondary" className="text-xs">
+                          <User className="h-3 w-3 mr-1" />
+                          From Profile
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Full Address</Label>
+                      <Input 
+                        placeholder="Full address" 
+                        value={pickupAddress}
+                        onChange={(e) => setPickupAddress(e.target.value)}
+                        data-testid="input-pickup-address" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Contact Name</Label>
+                      <Input 
+                        placeholder="Contact name" 
+                        value={pickupName}
+                        onChange={(e) => setPickupName(e.target.value)}
+                        data-testid="input-pickup-name" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Phone Number</Label>
+                      <Input 
+                        placeholder="Phone number" 
+                        value={pickupPhone}
+                        onChange={(e) => setPickupPhone(e.target.value)}
+                        data-testid="input-pickup-phone" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Special Instructions</Label>
+                      <Input 
+                        placeholder="Special instructions (optional)" 
+                        value={pickupInstructions}
+                        onChange={(e) => setPickupInstructions(e.target.value)}
+                        data-testid="input-pickup-instructions" 
+                      />
+                    </div>
                   </div>
                   <div className="space-y-4">
                     <h3 className="font-semibold">Delivery Details</h3>
-                    <Input placeholder="Full address" data-testid="input-delivery-address" />
-                    <Input placeholder="Recipient name" data-testid="input-recipient-name" />
-                    <Input placeholder="Phone number" data-testid="input-recipient-phone" />
-                    <Input placeholder="Special instructions (optional)" data-testid="input-delivery-instructions" />
+                    <div className="space-y-2">
+                      <Label>Full Address</Label>
+                      <Input 
+                        placeholder="Full address" 
+                        value={deliveryAddress}
+                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                        data-testid="input-delivery-address" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Recipient Name</Label>
+                      <Input 
+                        placeholder="Recipient name" 
+                        value={recipientName}
+                        onChange={(e) => setRecipientName(e.target.value)}
+                        data-testid="input-recipient-name" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Phone Number</Label>
+                      <Input 
+                        placeholder="Phone number" 
+                        value={recipientPhone}
+                        onChange={(e) => setRecipientPhone(e.target.value)}
+                        data-testid="input-recipient-phone" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Special Instructions</Label>
+                      <Input 
+                        placeholder="Special instructions (optional)" 
+                        value={deliveryInstructions}
+                        onChange={(e) => setDeliveryInstructions(e.target.value)}
+                        data-testid="input-delivery-instructions" 
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-4">
