@@ -11,6 +11,13 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Form,
   FormControl,
   FormField,
@@ -20,6 +27,7 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { 
   Bike, 
@@ -32,7 +40,9 @@ import {
   Loader2,
   Clock,
   X,
-  Calculator
+  Calculator,
+  User,
+  LogIn
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
@@ -47,12 +57,14 @@ const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: n
 
 export default function Quote() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isCalculating, setIsCalculating] = useState(false);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [distance, setDistance] = useState<number>(0);
   const [estimatedTime, setEstimatedTime] = useState<number>(0);
   const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
 
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
@@ -223,7 +235,7 @@ export default function Quote() {
     setMultiDropStops(newStops);
   };
 
-  const handleBookNow = () => {
+  const buildBookingParams = () => {
     const params = new URLSearchParams();
     params.set('pickup', pickupPostcode);
     params.set('delivery', deliveryPostcode);
@@ -246,7 +258,26 @@ export default function Quote() {
       params.set('price', quote.totalPrice.toFixed(2));
     }
     params.set('time', estimatedTime.toString());
-    setLocation(`/book?${params.toString()}`);
+    return params.toString();
+  };
+
+  const handleBookNow = () => {
+    if (user) {
+      setLocation(`/book?${buildBookingParams()}`);
+    } else {
+      setShowLoginDialog(true);
+    }
+  };
+
+  const handleContinueAsGuest = () => {
+    setShowLoginDialog(false);
+    setLocation(`/book?${buildBookingParams()}`);
+  };
+
+  const handleLoginToBook = () => {
+    setShowLoginDialog(false);
+    const bookingParams = buildBookingParams();
+    setLocation(`/login?redirect=/book?${encodeURIComponent(bookingParams)}`);
   };
 
   return (
@@ -566,6 +597,53 @@ export default function Quote() {
           </div>
         </div>
       </div>
+
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Complete Your Booking</DialogTitle>
+            <DialogDescription className="text-center">
+              How would you like to proceed with your booking?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-muted/50 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-primary">£{quote?.totalPrice.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground">Your quoted price</p>
+            </div>
+            <Button 
+              className="w-full gap-2" 
+              size="lg"
+              onClick={handleLoginToBook}
+              data-testid="button-login-to-book"
+            >
+              <LogIn className="h-4 w-4" />
+              Login to Complete Booking
+            </Button>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full gap-2" 
+              size="lg"
+              onClick={handleContinueAsGuest}
+              data-testid="button-continue-guest"
+            >
+              <User className="h-4 w-4" />
+              Continue as Guest
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Create an account during checkout to track your deliveries
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PublicLayout>
   );
 }

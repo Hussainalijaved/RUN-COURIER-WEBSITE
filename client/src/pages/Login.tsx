@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/AuthContext';
@@ -27,9 +27,13 @@ interface LoginProps {
 
 export default function Login({ role = 'customer' }: LoginProps) {
   const [, setLocation] = useLocation();
+  const searchParams = useSearch();
   const { signIn } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  
+  const params = new URLSearchParams(searchParams);
+  const redirectUrl = params.get('redirect');
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -54,12 +58,16 @@ export default function Login({ role = 'customer' }: LoginProps) {
           title: 'Welcome back!',
           description: 'You have been logged in successfully.',
         });
-        const redirectPath = role === 'admin' ? '/admin' 
-          : role === 'driver' ? '/driver'
-          : role === 'dispatcher' ? '/dispatcher'
-          : role === 'vendor' ? '/vendor'
-          : '/customer';
-        setLocation(redirectPath);
+        if (redirectUrl) {
+          setLocation(decodeURIComponent(redirectUrl));
+        } else {
+          const redirectPath = role === 'admin' ? '/admin' 
+            : role === 'driver' ? '/driver'
+            : role === 'dispatcher' ? '/dispatcher'
+            : role === 'vendor' ? '/vendor'
+            : '/customer';
+          setLocation(redirectPath);
+        }
       }
     } catch (error) {
       toast({
