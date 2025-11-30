@@ -15,6 +15,7 @@ import {
   Shield,
   CreditCard,
   User,
+  Package,
 } from 'lucide-react';
 import {
   useDriver,
@@ -30,10 +31,17 @@ const documentTypes = [
     required: true,
   },
   {
-    type: 'insurance',
-    label: 'Vehicle Insurance',
-    description: 'Comprehensive insurance certificate',
+    type: 'hire_and_reward_insurance',
+    label: 'Hire and Reward Insurance',
+    description: 'Motor insurance for courier/delivery work (Hire & Reward cover)',
     icon: Shield,
+    required: true,
+  },
+  {
+    type: 'goods_in_transit_insurance',
+    label: 'Goods in Transit Insurance',
+    description: 'Insurance covering goods during transportation',
+    icon: Package,
     required: true,
   },
   {
