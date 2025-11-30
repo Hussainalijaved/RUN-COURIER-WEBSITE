@@ -4,19 +4,40 @@ import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 let isInitialized = false;
+let initPromise: Promise<void> | null = null;
 
-async function ensureLoaded(): Promise<void> {
-  if (isInitialized) return;
+async function ensureLoaded(): Promise<boolean> {
+  if (isInitialized) return true;
   
-  setOptions({
-    key: apiKey,
-    v: 'weekly',
-  });
+  if (!apiKey) {
+    console.error('Google Maps API key is not configured');
+    return false;
+  }
   
-  await importLibrary('maps');
-  await importLibrary('places');
-  await importLibrary('geometry');
-  isInitialized = true;
+  if (initPromise) {
+    await initPromise;
+    return isInitialized;
+  }
+  
+  initPromise = (async () => {
+    try {
+      setOptions({
+        key: apiKey,
+        v: 'weekly',
+      });
+      
+      await importLibrary('maps');
+      await importLibrary('places');
+      await importLibrary('geometry');
+      isInitialized = true;
+    } catch (error) {
+      console.error('Failed to load Google Maps:', error);
+      isInitialized = false;
+    }
+  })();
+  
+  await initPromise;
+  return isInitialized;
 }
 
 export async function initGoogleMaps(): Promise<void> {
@@ -29,7 +50,9 @@ export async function geocodePostcode(postcode: string): Promise<{
   formattedAddress: string;
 } | null> {
   try {
-    await ensureLoaded();
+    const loaded = await ensureLoaded();
+    if (!loaded) return null;
+    
     const geocoder = new google.maps.Geocoder();
     
     return new Promise((resolve) => {
@@ -47,6 +70,7 @@ export async function geocodePostcode(postcode: string): Promise<{
               formattedAddress: results[0].formatted_address,
             });
           } else {
+            console.error('Geocoding failed:', status);
             resolve(null);
           }
         }
@@ -63,7 +87,9 @@ export async function calculateDistance(
   destination: { lat: number; lng: number }
 ): Promise<{ distance: number; duration: number } | null> {
   try {
-    await ensureLoaded();
+    const loaded = await ensureLoaded();
+    if (!loaded) return null;
+    
     const service = new google.maps.DistanceMatrixService();
     
     return new Promise((resolve) => {
@@ -90,6 +116,7 @@ export async function calculateDistance(
               duration: Math.round(durationInMinutes),
             });
           } else {
+            console.error('Distance calculation failed:', status);
             resolve(null);
           }
         }
@@ -107,15 +134,17 @@ export async function getPlacePredictions(
   if (!input || input.length < 2) return [];
   
   try {
-    await ensureLoaded();
+    const loaded = await ensureLoaded();
+    if (!loaded) return [];
+    
     const service = new google.maps.places.AutocompleteService();
     
     return new Promise((resolve) => {
       service.getPlacePredictions(
         {
           input,
-          componentRestrictions: { country: 'uk' },
-          types: ['postal_code', 'geocode'],
+          componentRestrictions: { country: 'gb' },
+          types: ['geocode'],
         },
         (
           predictions: google.maps.places.AutocompletePrediction[] | null,
