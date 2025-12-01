@@ -9,9 +9,11 @@ import {
   insertDocumentSchema,
   insertNotificationSchema,
   insertVendorApiKeySchema,
+  insertDriverApplicationSchema,
   bookingQuoteSchema,
   type JobStatus,
   type VehicleType,
+  type DriverApplicationStatus,
 } from "@shared/schema";
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
@@ -536,6 +538,76 @@ export async function registerRoutes(
       trackingNumber: job.trackingNumber,
       jobId: job.id 
     });
+  }));
+
+  app.get("/api/driver-applications", asyncHandler(async (req, res) => {
+    const { status } = req.query;
+    const applications = await storage.getDriverApplications({
+      status: status as DriverApplicationStatus | undefined,
+    });
+    res.json(applications);
+  }));
+
+  app.get("/api/driver-applications/:id", asyncHandler(async (req, res) => {
+    const application = await storage.getDriverApplication(req.params.id);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+    res.json(application);
+  }));
+
+  app.get("/api/driver-applications/check/:email", asyncHandler(async (req, res) => {
+    const application = await storage.getDriverApplicationByEmail(req.params.email);
+    if (application) {
+      res.json({ exists: true, status: application.status, id: application.id });
+    } else {
+      res.json({ exists: false });
+    }
+  }));
+
+  app.post("/api/driver-applications", asyncHandler(async (req, res) => {
+    const existingApplication = await storage.getDriverApplicationByEmail(req.body.email);
+    if (existingApplication) {
+      return res.status(400).json({ 
+        error: "An application with this email already exists",
+        status: existingApplication.status,
+        applicationId: existingApplication.id
+      });
+    }
+
+    const data = insertDriverApplicationSchema.parse(req.body);
+    const application = await storage.createDriverApplication(data);
+    res.status(201).json(application);
+  }));
+
+  app.patch("/api/driver-applications/:id", asyncHandler(async (req, res) => {
+    const application = await storage.updateDriverApplication(req.params.id, req.body);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+    res.json(application);
+  }));
+
+  app.patch("/api/driver-applications/:id/review", asyncHandler(async (req, res) => {
+    const { status, reviewedBy, reviewNotes, rejectionReason } = req.body;
+    
+    if (!status || !reviewedBy) {
+      return res.status(400).json({ error: "Status and reviewedBy are required" });
+    }
+
+    const application = await storage.reviewDriverApplication(
+      req.params.id,
+      status as DriverApplicationStatus,
+      reviewedBy,
+      reviewNotes,
+      rejectionReason
+    );
+
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    res.json(application);
   }));
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {

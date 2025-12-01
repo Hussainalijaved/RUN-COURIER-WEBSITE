@@ -35,6 +35,7 @@ import {
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminJobs from "@/pages/admin/AdminJobs";
 import AdminDrivers from "@/pages/admin/AdminDrivers";
+import AdminApplications from "@/pages/admin/AdminApplications";
 import AdminMap from "@/pages/admin/AdminMap";
 
 import CustomerDashboard from "@/pages/customer/CustomerDashboard";
@@ -45,6 +46,8 @@ import DriverActive from "@/pages/driver/DriverActive";
 import DriverHistory from "@/pages/driver/DriverHistory";
 import DriverDocuments from "@/pages/driver/DriverDocuments";
 import DriverProfile from "@/pages/driver/DriverProfile";
+import DriverApplication from "@/pages/driver/DriverApplication";
+import DriverApplicationSuccess from "@/pages/driver/ApplicationSuccess";
 import DispatcherDashboard from "@/pages/dispatcher/DispatcherDashboard";
 import VendorDashboard from "@/pages/vendor/VendorDashboard";
 
@@ -98,6 +101,8 @@ function Router() {
           <AdminLogin />
         </PublicOnlyRoute>
       </Route>
+      <Route path="/driver/apply" component={DriverApplication} />
+      <Route path="/driver/application-success" component={DriverApplicationSuccess} />
       
       <Route path="/book" component={Book} />
       <Route path="/quote" component={Quote} />
@@ -126,6 +131,11 @@ function Router() {
       <Route path="/admin/drivers">
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminDrivers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/applications">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminApplications />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/map">

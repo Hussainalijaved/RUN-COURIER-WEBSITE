@@ -1,0 +1,794 @@
+import { useState, useCallback } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { supabase, uploadFile, getPublicUrl } from "@/lib/supabase";
+import { PublicLayout } from "@/components/layout/PublicLayout";
+
+const driverApplicationFormSchema = z.object({
+  fullName: z.string().min(2, "Full name is required"),
+  email: z.string().email("Valid email is required"),
+  phone: z.string().min(10, "Valid phone number is required"),
+  postcode: z.string().min(3, "Valid postcode is required"),
+  fullAddress: z.string().min(5, "Full address is required"),
+  buildingName: z.string().optional(),
+  nationality: z.string().min(2, "Nationality is required"),
+  isBritish: z.boolean().default(false),
+  nationalInsuranceNumber: z.string().min(9, "Valid National Insurance number is required"),
+  vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van"]),
+  bankName: z.string().min(2, "Bank name is required"),
+  accountHolderName: z.string().min(2, "Account holder name is required"),
+  sortCode: z.string().regex(/^\d{2}-?\d{2}-?\d{2}$/, "Valid sort code is required (e.g., 12-34-56)"),
+  accountNumber: z.string().regex(/^\d{8}$/, "Valid 8-digit account number is required"),
+});
+
+type DriverApplicationFormValues = z.infer<typeof driverApplicationFormSchema>;
+
+const STEPS = [
+  { id: 1, title: "Personal Details", icon: User },
+  { id: 2, title: "Documents", icon: FileText },
+  { id: 3, title: "Vehicle & Bank", icon: CreditCard },
+  { id: 4, title: "Review", icon: CheckCircle },
+];
+
+export default function DriverApplication() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  const [uploadedFiles, setUploadedFiles] = useState<{
+    profilePicture: string | null;
+    rightToWork: string | null;
+    drivingLicenceFront: string | null;
+    drivingLicenceBack: string | null;
+    dbsCertificate: string | null;
+    goodsInTransitInsurance: string | null;
+    hireAndReward: string | null;
+  }>({
+    profilePicture: null,
+    rightToWork: null,
+    drivingLicenceFront: null,
+    drivingLicenceBack: null,
+    dbsCertificate: null,
+    goodsInTransitInsurance: null,
+    hireAndReward: null,
+  });
+
+  const form = useForm<DriverApplicationFormValues>({
+    resolver: zodResolver(driverApplicationFormSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      phone: "",
+      postcode: "",
+      fullAddress: "",
+      buildingName: "",
+      nationality: "",
+      isBritish: false,
+      nationalInsuranceNumber: "",
+      vehicleType: "car",
+      bankName: "",
+      accountHolderName: "",
+      sortCode: "",
+      accountNumber: "",
+    },
+  });
+
+  const isBritish = form.watch("isBritish");
+
+  const uploadFileMutation = useMutation({
+    mutationFn: async ({ file, type }: { file: File; type: keyof typeof uploadedFiles }) => {
+      setIsUploading(true);
+      const timestamp = Date.now();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `driver-applications/${type}_${timestamp}.${fileExt}`;
+      
+      const { data, error } = await uploadFile("documents", fileName, file);
+      
+      if (error) throw error;
+      
+      const publicUrl = getPublicUrl("documents", fileName);
+      return { type, url: publicUrl };
+    },
+    onSuccess: ({ type, url }) => {
+      setUploadedFiles(prev => ({ ...prev, [type]: url }));
+      toast({
+        title: "File uploaded",
+        description: "Your document has been uploaded successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload file. Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsUploading(false);
+    },
+  });
+
+  const submitApplicationMutation = useMutation({
+    mutationFn: async (data: DriverApplicationFormValues) => {
+      const applicationData = {
+        ...data,
+        profilePictureUrl: uploadedFiles.profilePicture,
+        rightToWorkUrl: uploadedFiles.rightToWork,
+        drivingLicenceFrontUrl: uploadedFiles.drivingLicenceFront,
+        drivingLicenceBackUrl: uploadedFiles.drivingLicenceBack,
+        dbsCertificateUrl: uploadedFiles.dbsCertificate,
+        goodsInTransitInsuranceUrl: uploadedFiles.goodsInTransitInsurance,
+        hireAndRewardUrl: uploadedFiles.hireAndReward,
+      };
+      
+      const response = await apiRequest("POST", "/api/driver-applications", applicationData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Application submitted",
+        description: "Your driver application has been submitted for review. We'll be in touch soon!",
+      });
+      navigate("/driver/application-success");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Submission failed",
+        description: error.message || "Failed to submit application. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileChange = useCallback(async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: keyof typeof uploadedFiles
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select a file smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    uploadFileMutation.mutate({ file, type });
+  }, [uploadFileMutation, toast]);
+
+  const validateStep = async (step: number): Promise<boolean> => {
+    switch (step) {
+      case 1:
+        return form.trigger(["fullName", "email", "phone", "postcode", "fullAddress", "nationality", "isBritish", "nationalInsuranceNumber"]);
+      case 2:
+        if (!uploadedFiles.drivingLicenceFront || !uploadedFiles.drivingLicenceBack) {
+          toast({
+            title: "Documents required",
+            description: "Please upload both sides of your driving licence.",
+            variant: "destructive",
+          });
+          return false;
+        }
+        if (!isBritish && !uploadedFiles.rightToWork) {
+          toast({
+            title: "Right to work required",
+            description: "Please upload your right to work document.",
+            variant: "destructive",
+          });
+          return false;
+        }
+        return true;
+      case 3:
+        return form.trigger(["vehicleType", "bankName", "accountHolderName", "sortCode", "accountNumber"]);
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = async () => {
+    const isValid = await validateStep(currentStep);
+    if (isValid && currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const onSubmit = (data: DriverApplicationFormValues) => {
+    submitApplicationMutation.mutate(data);
+  };
+
+  const FileUploadField = ({ 
+    label, 
+    type, 
+    required = false,
+    description 
+  }: { 
+    label: string; 
+    type: keyof typeof uploadedFiles;
+    required?: boolean;
+    description?: string;
+  }) => (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-2">
+        {label}
+        {required && <span className="text-destructive">*</span>}
+      </Label>
+      {description && (
+        <p className="text-sm text-muted-foreground">{description}</p>
+      )}
+      <div className="flex items-center gap-4">
+        <Input
+          type="file"
+          accept="image/*,.pdf"
+          onChange={(e) => handleFileChange(e, type)}
+          disabled={isUploading}
+          className="flex-1"
+          data-testid={`input-file-${type}`}
+        />
+        {uploadedFiles[type] && (
+          <CheckCircle className="h-5 w-5 text-green-500" />
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <PublicLayout>
+      <div className="container mx-auto py-8 px-4 max-w-3xl">
+        <div className="mb-8">
+          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4" data-testid="button-back-home">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Home
+          </Button>
+          <h1 className="text-3xl font-bold text-foreground">Become a Driver</h1>
+          <p className="text-muted-foreground mt-2">
+            Join our delivery network and start earning on your own schedule.
+          </p>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex justify-between items-center">
+            {STEPS.map((step) => {
+              const Icon = step.icon;
+              const isActive = currentStep === step.id;
+              const isCompleted = currentStep > step.id;
+              
+              return (
+                <div key={step.id} className="flex flex-col items-center flex-1">
+                  <div 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-colors ${
+                      isActive 
+                        ? "bg-primary text-primary-foreground" 
+                        : isCompleted 
+                          ? "bg-green-500 text-white" 
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle className="h-5 w-5" />
+                    ) : (
+                      <Icon className="h-5 w-5" />
+                    )}
+                  </div>
+                  <span className={`text-sm ${isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                    {step.title}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            {currentStep === 1 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Personal Information
+                  </CardTitle>
+                  <CardDescription>
+                    Tell us about yourself so we can verify your identity.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="fullName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John Smith" {...field} data-testid="input-full-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address *</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="john@example.com" {...field} data-testid="input-email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number *</FormLabel>
+                          <FormControl>
+                            <Input type="tel" placeholder="07123 456789" {...field} data-testid="input-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="postcode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Postcode *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="SW1A 1AA" {...field} data-testid="input-postcode" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="fullAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Address *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123 Example Street, London" {...field} data-testid="input-address" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="buildingName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Building Name (if applicable)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Tower Block A" {...field} data-testid="input-building-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="nationality"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nationality *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="British" {...field} data-testid="input-nationality" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="nationalInsuranceNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>National Insurance Number *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="AB123456C" {...field} data-testid="input-ni-number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="isBritish"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-is-british"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>I am a British citizen</FormLabel>
+                          <FormDescription>
+                            If you are not a British citizen, you will need to provide proof of right to work in the UK.
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {currentStep === 2 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Required Documents
+                  </CardTitle>
+                  <CardDescription>
+                    Please upload clear photos or scans of the following documents. Files must be less than 10MB.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <FileUploadField
+                    label="Profile Picture"
+                    type="profilePicture"
+                    description="A clear photo of yourself for identification"
+                  />
+
+                  {!isBritish && (
+                    <FileUploadField
+                      label="Right to Work Document"
+                      type="rightToWork"
+                      required
+                      description="Visa, work permit, or other proof of right to work in the UK"
+                    />
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FileUploadField
+                      label="Driving Licence (Front)"
+                      type="drivingLicenceFront"
+                      required
+                      description="Front side of your UK driving licence"
+                    />
+                    <FileUploadField
+                      label="Driving Licence (Back)"
+                      type="drivingLicenceBack"
+                      required
+                      description="Back side of your UK driving licence"
+                    />
+                  </div>
+
+                  <FileUploadField
+                    label="DBS Certificate"
+                    type="dbsCertificate"
+                    description="Disclosure and Barring Service certificate (if available)"
+                  />
+
+                  <FileUploadField
+                    label="Goods in Transit Insurance"
+                    type="goodsInTransitInsurance"
+                    description="Proof of goods in transit insurance coverage"
+                  />
+
+                  <FileUploadField
+                    label="Hire and Reward Insurance"
+                    type="hireAndReward"
+                    description="Proof of hire and reward insurance coverage"
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {currentStep === 3 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Truck className="h-5 w-5" />
+                    Vehicle & Payment Details
+                  </CardTitle>
+                  <CardDescription>
+                    Select your vehicle type and provide bank details for payments.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="vehicleType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Vehicle Type *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-vehicle-type">
+                              <SelectValue placeholder="Select your vehicle type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="motorbike">Motorbike (up to 5kg)</SelectItem>
+                            <SelectItem value="car">Car (up to 50kg)</SelectItem>
+                            <SelectItem value="small_van">Small Van (up to 400kg)</SelectItem>
+                            <SelectItem value="medium_van">Medium Van (up to 750kg)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Choose the vehicle type you will use for deliveries
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="border-t pt-6 mt-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Bank Details
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Your earnings will be paid directly to this account.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="bankName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bank Name *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Barclays" {...field} data-testid="input-bank-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="accountHolderName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Account Holder Name *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John Smith" {...field} data-testid="input-account-holder" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <FormField
+                        control={form.control}
+                        name="sortCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sort Code *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="12-34-56" {...field} data-testid="input-sort-code" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="accountNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Account Number *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="12345678" {...field} data-testid="input-account-number" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {currentStep === 4 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5" />
+                    Review Your Application
+                  </CardTitle>
+                  <CardDescription>
+                    Please review your information before submitting.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium text-foreground mb-3">Personal Details</h4>
+                      <dl className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Full Name:</dt>
+                          <dd className="font-medium" data-testid="text-review-name">{form.getValues("fullName")}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Email:</dt>
+                          <dd className="font-medium" data-testid="text-review-email">{form.getValues("email")}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Phone:</dt>
+                          <dd className="font-medium">{form.getValues("phone")}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Postcode:</dt>
+                          <dd className="font-medium">{form.getValues("postcode")}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Nationality:</dt>
+                          <dd className="font-medium">{form.getValues("nationality")}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">British Citizen:</dt>
+                          <dd className="font-medium">{form.getValues("isBritish") ? "Yes" : "No"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-foreground mb-3">Documents Uploaded</h4>
+                      <ul className="space-y-2 text-sm">
+                        {Object.entries(uploadedFiles).map(([key, value]) => {
+                          if (key === "rightToWork" && isBritish) return null;
+                          const labels: Record<string, string> = {
+                            profilePicture: "Profile Picture",
+                            rightToWork: "Right to Work",
+                            drivingLicenceFront: "Driving Licence (Front)",
+                            drivingLicenceBack: "Driving Licence (Back)",
+                            dbsCertificate: "DBS Certificate",
+                            goodsInTransitInsurance: "Goods in Transit Insurance",
+                            hireAndReward: "Hire and Reward Insurance",
+                          };
+                          return (
+                            <li key={key} className="flex items-center gap-2">
+                              {value ? (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <div className="h-4 w-4 rounded-full border-2 border-muted" />
+                              )}
+                              <span className={value ? "text-foreground" : "text-muted-foreground"}>
+                                {labels[key]}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-medium text-foreground mb-3">Vehicle</h4>
+                        <p className="text-sm capitalize" data-testid="text-review-vehicle">
+                          {form.getValues("vehicleType").replace("_", " ")}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-foreground mb-3">Bank Details</h4>
+                        <dl className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Bank:</dt>
+                            <dd className="font-medium">{form.getValues("bankName")}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Account Holder:</dt>
+                            <dd className="font-medium">{form.getValues("accountHolderName")}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Sort Code:</dt>
+                            <dd className="font-medium">{form.getValues("sortCode")}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Account Number:</dt>
+                            <dd className="font-medium">****{form.getValues("accountNumber").slice(-4)}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-muted/50 rounded-lg p-4 text-sm">
+                    <p className="text-muted-foreground">
+                      By submitting this application, you confirm that all information provided is accurate 
+                      and that you have the legal right to work in the United Kingdom. Your application will 
+                      be reviewed by our team and we will contact you within 2-3 business days.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex justify-between pt-4">
+              {currentStep > 1 ? (
+                <Button type="button" variant="outline" onClick={prevStep} data-testid="button-prev-step">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+              ) : (
+                <div />
+              )}
+
+              {currentStep < 4 ? (
+                <Button type="button" onClick={nextStep} data-testid="button-next-step">
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : (
+                <Button 
+                  type="submit" 
+                  disabled={submitApplicationMutation.isPending}
+                  data-testid="button-submit-application"
+                >
+                  {submitApplicationMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Submit Application
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </form>
+        </Form>
+      </div>
+    </PublicLayout>
+  );
+}

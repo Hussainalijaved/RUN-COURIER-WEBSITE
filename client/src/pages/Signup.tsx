@@ -341,7 +341,8 @@ export default function Signup({ role = 'customer' }: SignupProps) {
 }
 
 export function DriverSignup() {
-  return <Signup role="driver" />;
+  window.location.href = '/driver/apply';
+  return null;
 }
 
 export function VendorSignup() {
