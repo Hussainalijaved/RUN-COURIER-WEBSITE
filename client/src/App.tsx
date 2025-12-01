@@ -13,7 +13,7 @@ import Contact from "@/pages/Contact";
 import Track from "@/pages/Track";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
-import Login from "@/pages/Login";
+import Login, { AdminLogin } from "@/pages/Login";
 import Signup, { DriverSignup, VendorSignup } from "@/pages/Signup";
 import AdminSignup from "@/pages/AdminSignup";
 import Book from "@/pages/Book";
@@ -91,6 +91,11 @@ function Router() {
       <Route path="/vendor/login">
         <PublicOnlyRoute>
           <Login role="vendor" />
+        </PublicOnlyRoute>
+      </Route>
+      <Route path="/admin/login">
+        <PublicOnlyRoute>
+          <AdminLogin />
         </PublicOnlyRoute>
       </Route>
       
