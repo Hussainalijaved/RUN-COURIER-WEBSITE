@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,10 +12,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { supabase, uploadFile, getPublicUrl } from "@/lib/supabase";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import { cn } from "@/lib/utils";
+
+const COUNTRIES = [
+  "Afghan", "Albanian", "Algerian", "American", "Andorran", "Angolan", "Argentine", "Armenian", 
+  "Australian", "Austrian", "Azerbaijani", "Bahamian", "Bahraini", "Bangladeshi", "Barbadian", 
+  "Belarusian", "Belgian", "Belizean", "Beninese", "Bhutanese", "Bolivian", "Bosnian", "Brazilian", 
+  "British", "Bruneian", "Bulgarian", "Burkinabe", "Burmese", "Burundian", "Cambodian", "Cameroonian", 
+  "Canadian", "Cape Verdean", "Central African", "Chadian", "Chilean", "Chinese", "Colombian", 
+  "Comoran", "Congolese", "Costa Rican", "Croatian", "Cuban", "Cypriot", "Czech", "Danish", 
+  "Djiboutian", "Dominican", "Dutch", "Ecuadorean", "Egyptian", "Emirati", "English", "Equatorial Guinean", 
+  "Eritrean", "Estonian", "Ethiopian", "Fijian", "Filipino", "Finnish", "French", "Gabonese", 
+  "Gambian", "Georgian", "German", "Ghanaian", "Greek", "Grenadian", "Guatemalan", "Guinean", 
+  "Guyanese", "Haitian", "Honduran", "Hungarian", "Icelandic", "Indian", "Indonesian", "Iranian", 
+  "Iraqi", "Irish", "Israeli", "Italian", "Ivorian", "Jamaican", "Japanese", "Jordanian", 
+  "Kazakh", "Kenyan", "Kiribati", "Korean", "Kosovar", "Kuwaiti", "Kyrgyz", "Laotian", 
+  "Latvian", "Lebanese", "Liberian", "Libyan", "Liechtenstein", "Lithuanian", "Luxembourgish", 
+  "Macedonian", "Malagasy", "Malawian", "Malaysian", "Maldivian", "Malian", "Maltese", "Marshallese", 
+  "Mauritanian", "Mauritian", "Mexican", "Micronesian", "Moldovan", "Monegasque", "Mongolian", 
+  "Montenegrin", "Moroccan", "Mozambican", "Namibian", "Nauruan", "Nepalese", "New Zealand", 
+  "Nicaraguan", "Nigerian", "Nigerien", "Northern Irish", "Norwegian", "Omani", "Pakistani", 
+  "Palauan", "Palestinian", "Panamanian", "Papua New Guinean", "Paraguayan", "Peruvian", "Polish", 
+  "Portuguese", "Qatari", "Romanian", "Russian", "Rwandan", "Saint Lucian", "Salvadoran", "Samoan", 
+  "Saudi", "Scottish", "Senegalese", "Serbian", "Seychellois", "Sierra Leonean", "Singaporean", 
+  "Slovak", "Slovenian", "Solomon Islander", "Somali", "South African", "South Sudanese", "Spanish", 
+  "Sri Lankan", "Sudanese", "Surinamese", "Swazi", "Swedish", "Swiss", "Syrian", "Taiwanese", 
+  "Tajik", "Tanzanian", "Thai", "Togolese", "Tongan", "Trinidadian", "Tunisian", "Turkish", 
+  "Turkmen", "Tuvaluan", "Ugandan", "Ukrainian", "Uruguayan", "Uzbek", "Vanuatuan", "Vatican", 
+  "Venezuelan", "Vietnamese", "Welsh", "Yemeni", "Zambian", "Zimbabwean"
+].sort();
 
 const driverApplicationFormSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
@@ -49,6 +80,7 @@ export default function DriverApplication() {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
+  const [nationalityOpen, setNationalityOpen] = useState(false);
   
   const [uploadedFiles, setUploadedFiles] = useState<{
     profilePicture: string | null;
@@ -415,11 +447,55 @@ export default function DriverApplication() {
                       control={form.control}
                       name="nationality"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                           <FormLabel>Nationality *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="British" {...field} data-testid="input-nationality" />
-                          </FormControl>
+                          <Popover open={nationalityOpen} onOpenChange={setNationalityOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={nationalityOpen}
+                                  className={cn(
+                                    "w-full justify-between",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                  data-testid="input-nationality"
+                                >
+                                  {field.value || "Select nationality..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0">
+                              <Command>
+                                <CommandInput placeholder="Search nationality..." />
+                                <CommandList>
+                                  <CommandEmpty>No nationality found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {COUNTRIES.map((country) => (
+                                      <CommandItem
+                                        key={country}
+                                        value={country}
+                                        onSelect={() => {
+                                          field.onChange(country);
+                                          setNationalityOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            field.value === country ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        {country}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
