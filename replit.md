@@ -124,8 +124,37 @@ vendor → /vendor
 
 **Supabase Services:**
 - **Authentication**: User signup, signin, session management
-- **Future Storage**: Document uploads (insurance, ID verification)
+- **Storage**: Document uploads for driver applications (profile pictures, driving licences, DBS certificates, insurance documents)
 - **Environment Variables**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+
+### Driver Application System
+
+**Overview:**
+Prospective drivers must submit a comprehensive application before gaining driver access. The system includes a multi-step application form and admin review workflow.
+
+**Application Flow:**
+1. Prospective driver visits `/driver/apply` (redirected from "Become a Driver" link)
+2. Completes 4-step form: Personal Details → Documents → Vehicle & Bank → Review
+3. Submits application (status: pending)
+4. Admin reviews at `/admin/applications`, approves or rejects
+5. Upon approval, driver account is activated
+
+**Data Collected:**
+- **Personal Details**: Full name, email, phone, postcode, address, nationality, NI number, right to work status
+- **Documents**: Profile picture, driving licence (front/back), DBS certificate, insurance documents
+- **Vehicle & Bank**: Vehicle type selection, bank details (account name, number, sort code)
+
+**Key Files:**
+- `client/src/pages/driver/DriverApplication.tsx` - Multi-step application form
+- `client/src/pages/driver/ApplicationSuccess.tsx` - Success confirmation page
+- `client/src/pages/admin/AdminApplications.tsx` - Admin review interface
+- `shared/schema.ts` - `driverApplications` table schema
+
+**API Endpoints:**
+- `POST /api/driver-applications` - Submit new application
+- `GET /api/driver-applications` - List all applications (admin)
+- `GET /api/driver-applications/:id` - Get single application
+- `PATCH /api/driver-applications/:id/review` - Approve/reject application
 
 **Neon Database:**
 - Serverless PostgreSQL hosting
