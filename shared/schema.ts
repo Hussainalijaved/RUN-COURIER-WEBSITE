@@ -191,6 +191,51 @@ export const vendorApiKeys = pgTable("vendor_api_keys", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export type DriverApplicationStatus = "pending" | "approved" | "rejected";
+
+export const driverApplications = pgTable("driver_applications", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  
+  // Personal Information
+  fullName: text("full_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  postcode: text("postcode").notNull(),
+  fullAddress: text("full_address").notNull(),
+  buildingName: text("building_name"),
+  profilePictureUrl: text("profile_picture_url"),
+  nationality: text("nationality").notNull(),
+  isBritish: boolean("is_british").default(false),
+  nationalInsuranceNumber: text("national_insurance_number").notNull(),
+  
+  // Documents
+  rightToWorkUrl: text("right_to_work_url"),
+  drivingLicenceFrontUrl: text("driving_licence_front_url"),
+  drivingLicenceBackUrl: text("driving_licence_back_url"),
+  dbsCertificateUrl: text("dbs_certificate_url"),
+  goodsInTransitInsuranceUrl: text("goods_in_transit_insurance_url"),
+  hireAndRewardUrl: text("hire_and_reward_url"),
+  
+  // Vehicle Information
+  vehicleType: text("vehicle_type").$type<VehicleType>().notNull(),
+  
+  // Bank Details
+  bankName: text("bank_name").notNull(),
+  accountHolderName: text("account_holder_name").notNull(),
+  sortCode: text("sort_code").notNull(),
+  accountNumber: text("account_number").notNull(),
+  
+  // Application Status
+  status: text("status").$type<DriverApplicationStatus>().notNull().default("pending"),
+  reviewedBy: varchar("reviewed_by", { length: 36 }),
+  reviewNotes: text("review_notes"),
+  rejectionReason: text("rejection_reason"),
+  
+  // Timestamps
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertDriverSchema = createInsertSchema(drivers).omit({ id: true, createdAt: true });
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true });
@@ -200,6 +245,7 @@ export const insertMultiDropStopSchema = createInsertSchema(multiDropStops).omit
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, uploadedAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertVendorApiKeySchema = createInsertSchema(vendorApiKeys).omit({ id: true, createdAt: true });
+export const insertDriverApplicationSchema = createInsertSchema(driverApplications).omit({ id: true, submittedAt: true, reviewedAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -219,6 +265,8 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertVendorApiKey = z.infer<typeof insertVendorApiKeySchema>;
 export type VendorApiKey = typeof vendorApiKeys.$inferSelect;
+export type InsertDriverApplication = z.infer<typeof insertDriverApplicationSchema>;
+export type DriverApplication = typeof driverApplications.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
