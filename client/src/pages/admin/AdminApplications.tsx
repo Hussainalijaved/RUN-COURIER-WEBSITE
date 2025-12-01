@@ -412,6 +412,12 @@ export default function AdminApplications() {
                         <dt className="text-muted-foreground">NI Number:</dt>
                         <dd className="font-medium">{selectedApplication.nationalInsuranceNumber}</dd>
                       </div>
+                      {!selectedApplication.isBritish && selectedApplication.rightToWorkShareCode && (
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Right to Work Share Code:</dt>
+                          <dd className="font-medium">{selectedApplication.rightToWorkShareCode}</dd>
+                        </div>
+                      )}
                     </dl>
                   </div>
 
@@ -422,9 +428,6 @@ export default function AdminApplications() {
                     </h3>
                     <div className="space-y-2">
                       <DocumentLink url={selectedApplication.profilePictureUrl} label="Profile Picture" />
-                      {!selectedApplication.isBritish && (
-                        <DocumentLink url={selectedApplication.rightToWorkUrl} label="Right to Work" />
-                      )}
                       <DocumentLink url={selectedApplication.drivingLicenceFrontUrl} label="Driving Licence (Front)" />
                       <DocumentLink url={selectedApplication.drivingLicenceBackUrl} label="Driving Licence (Back)" />
                       <DocumentLink url={selectedApplication.dbsCertificateUrl} label="DBS Certificate" />

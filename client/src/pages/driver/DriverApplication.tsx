@@ -27,6 +27,7 @@ const driverApplicationFormSchema = z.object({
   nationality: z.string().min(2, "Nationality is required"),
   isBritish: z.boolean().default(false),
   nationalInsuranceNumber: z.string().min(9, "Valid National Insurance number is required"),
+  rightToWorkShareCode: z.string().optional(),
   vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van"]),
   bankName: z.string().min(2, "Bank name is required"),
   accountHolderName: z.string().min(2, "Account holder name is required"),
@@ -51,7 +52,6 @@ export default function DriverApplication() {
   
   const [uploadedFiles, setUploadedFiles] = useState<{
     profilePicture: string | null;
-    rightToWork: string | null;
     drivingLicenceFront: string | null;
     drivingLicenceBack: string | null;
     dbsCertificate: string | null;
@@ -59,7 +59,6 @@ export default function DriverApplication() {
     hireAndReward: string | null;
   }>({
     profilePicture: null,
-    rightToWork: null,
     drivingLicenceFront: null,
     drivingLicenceBack: null,
     dbsCertificate: null,
@@ -79,6 +78,7 @@ export default function DriverApplication() {
       nationality: "",
       isBritish: false,
       nationalInsuranceNumber: "",
+      rightToWorkShareCode: "",
       vehicleType: "car",
       bankName: "",
       accountHolderName: "",
@@ -127,7 +127,6 @@ export default function DriverApplication() {
       const applicationData = {
         ...data,
         profilePictureUrl: uploadedFiles.profilePicture,
-        rightToWorkUrl: uploadedFiles.rightToWork,
         drivingLicenceFrontUrl: uploadedFiles.drivingLicenceFront,
         drivingLicenceBackUrl: uploadedFiles.drivingLicenceBack,
         dbsCertificateUrl: uploadedFiles.dbsCertificate,
@@ -176,20 +175,24 @@ export default function DriverApplication() {
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
       case 1:
-        return form.trigger(["fullName", "email", "phone", "postcode", "fullAddress", "nationality", "isBritish", "nationalInsuranceNumber"]);
+        const step1Fields: (keyof DriverApplicationFormValues)[] = ["fullName", "email", "phone", "postcode", "fullAddress", "nationality", "isBritish", "nationalInsuranceNumber"];
+        if (!isBritish) {
+          const shareCode = form.getValues("rightToWorkShareCode");
+          if (!shareCode || shareCode.trim().length < 9) {
+            toast({
+              title: "Right to Work Share Code required",
+              description: "Please enter your UK Right to Work Share Code.",
+              variant: "destructive",
+            });
+            return false;
+          }
+        }
+        return form.trigger(step1Fields);
       case 2:
         if (!uploadedFiles.drivingLicenceFront || !uploadedFiles.drivingLicenceBack) {
           toast({
             title: "Documents required",
             description: "Please upload both sides of your driving licence.",
-            variant: "destructive",
-          });
-          return false;
-        }
-        if (!isBritish && !uploadedFiles.rightToWork) {
-          toast({
-            title: "Right to work required",
-            description: "Please upload your right to work document.",
             variant: "destructive",
           });
           return false;
@@ -451,12 +454,35 @@ export default function DriverApplication() {
                         <div className="space-y-1 leading-none">
                           <FormLabel>I am a British citizen</FormLabel>
                           <FormDescription>
-                            If you are not a British citizen, you will need to provide proof of right to work in the UK.
+                            If you are not a British citizen, you will need to provide your Right to Work Share Code.
                           </FormDescription>
                         </div>
                       </FormItem>
                     )}
                   />
+
+                  {!isBritish && (
+                    <FormField
+                      control={form.control}
+                      name="rightToWorkShareCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Right to Work Share Code *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter your 9-character share code" 
+                              {...field} 
+                              data-testid="input-share-code"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Enter your UK Right to Work Share Code from the gov.uk online service.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -478,15 +504,6 @@ export default function DriverApplication() {
                     type="profilePicture"
                     description="A clear photo of yourself for identification"
                   />
-
-                  {!isBritish && (
-                    <FileUploadField
-                      label="Right to Work Document"
-                      type="rightToWork"
-                      required
-                      description="Visa, work permit, or other proof of right to work in the UK"
-                    />
-                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FileUploadField
@@ -674,6 +691,12 @@ export default function DriverApplication() {
                           <dt className="text-muted-foreground">British Citizen:</dt>
                           <dd className="font-medium">{form.getValues("isBritish") ? "Yes" : "No"}</dd>
                         </div>
+                        {!isBritish && (
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Right to Work Share Code:</dt>
+                            <dd className="font-medium">{form.getValues("rightToWorkShareCode")}</dd>
+                          </div>
+                        )}
                       </dl>
                     </div>
 
@@ -681,10 +704,8 @@ export default function DriverApplication() {
                       <h4 className="font-medium text-foreground mb-3">Documents Uploaded</h4>
                       <ul className="space-y-2 text-sm">
                         {Object.entries(uploadedFiles).map(([key, value]) => {
-                          if (key === "rightToWork" && isBritish) return null;
                           const labels: Record<string, string> = {
                             profilePicture: "Profile Picture",
-                            rightToWork: "Right to Work",
                             drivingLicenceFront: "Driving Licence (Front)",
                             drivingLicenceBack: "Driving Licence (Back)",
                             dbsCertificate: "DBS Certificate",

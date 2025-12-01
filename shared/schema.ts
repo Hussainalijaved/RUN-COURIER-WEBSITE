@@ -208,8 +208,10 @@ export const driverApplications = pgTable("driver_applications", {
   isBritish: boolean("is_british").default(false),
   nationalInsuranceNumber: text("national_insurance_number").notNull(),
   
+  // Right to Work (for non-British citizens)
+  rightToWorkShareCode: text("right_to_work_share_code"),
+  
   // Documents
-  rightToWorkUrl: text("right_to_work_url"),
   drivingLicenceFrontUrl: text("driving_licence_front_url"),
   drivingLicenceBackUrl: text("driving_licence_back_url"),
   dbsCertificateUrl: text("dbs_certificate_url"),
