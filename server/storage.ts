@@ -5,6 +5,8 @@ import {
   type Document, type InsertDocument,
   type Notification, type InsertNotification,
   type VendorApiKey, type InsertVendorApiKey,
+  type DriverApplication, type InsertDriverApplication,
+  type DriverApplicationStatus,
   type PricingSettings,
   type Vehicle,
   type JobStatus,
@@ -67,6 +69,13 @@ export interface IStorage {
   getCustomerStats(customerId: string): Promise<any>;
   getDispatcherStats(): Promise<any>;
   getVendorStats(vendorId: string): Promise<any>;
+
+  getDriverApplication(id: string): Promise<DriverApplication | undefined>;
+  getDriverApplicationByEmail(email: string): Promise<DriverApplication | undefined>;
+  getDriverApplications(filters?: { status?: DriverApplicationStatus }): Promise<DriverApplication[]>;
+  createDriverApplication(application: InsertDriverApplication): Promise<DriverApplication>;
+  updateDriverApplication(id: string, data: Partial<DriverApplication>): Promise<DriverApplication | undefined>;
+  reviewDriverApplication(id: string, status: DriverApplicationStatus, reviewedBy: string, reviewNotes?: string, rejectionReason?: string): Promise<DriverApplication | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -76,6 +85,7 @@ export class MemStorage implements IStorage {
   private documents: Map<string, Document>;
   private notifications: Map<string, Notification>;
   private vendorApiKeys: Map<string, VendorApiKey>;
+  private driverApplications: Map<string, DriverApplication>;
   private pricingSettings: PricingSettings;
   private vehicles: Map<VehicleType, Vehicle>;
 
@@ -86,6 +96,7 @@ export class MemStorage implements IStorage {
     this.documents = new Map();
     this.notifications = new Map();
     this.vendorApiKeys = new Map();
+    this.driverApplications = new Map();
     
     this.pricingSettings = {
       id: "default",
@@ -989,6 +1000,82 @@ export class MemStorage implements IStorage {
       successRate: jobs.length > 0 ? 99.2 : 100,
       monthlySpend: Math.round(monthlySpend * 100) / 100,
     };
+  }
+
+  async getDriverApplication(id: string): Promise<DriverApplication | undefined> {
+    return this.driverApplications.get(id);
+  }
+
+  async getDriverApplicationByEmail(email: string): Promise<DriverApplication | undefined> {
+    return Array.from(this.driverApplications.values()).find(
+      (app) => app.email.toLowerCase() === email.toLowerCase()
+    );
+  }
+
+  async getDriverApplications(filters?: { status?: DriverApplicationStatus }): Promise<DriverApplication[]> {
+    let applications = Array.from(this.driverApplications.values());
+    if (filters?.status) {
+      applications = applications.filter((app) => app.status === filters.status);
+    }
+    return applications.sort((a, b) => {
+      const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+      const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  }
+
+  async createDriverApplication(application: InsertDriverApplication): Promise<DriverApplication> {
+    const id = randomUUID();
+    const newApplication: DriverApplication = {
+      id,
+      ...application,
+      status: (application.status || "pending") as DriverApplicationStatus,
+      isBritish: application.isBritish || false,
+      buildingName: application.buildingName || null,
+      profilePictureUrl: application.profilePictureUrl || null,
+      rightToWorkUrl: application.rightToWorkUrl || null,
+      drivingLicenceFrontUrl: application.drivingLicenceFrontUrl || null,
+      drivingLicenceBackUrl: application.drivingLicenceBackUrl || null,
+      dbsCertificateUrl: application.dbsCertificateUrl || null,
+      goodsInTransitInsuranceUrl: application.goodsInTransitInsuranceUrl || null,
+      hireAndRewardUrl: application.hireAndRewardUrl || null,
+      reviewedBy: null,
+      reviewNotes: null,
+      rejectionReason: null,
+      submittedAt: new Date(),
+      reviewedAt: null,
+    };
+    this.driverApplications.set(id, newApplication);
+    return newApplication;
+  }
+
+  async updateDriverApplication(id: string, data: Partial<DriverApplication>): Promise<DriverApplication | undefined> {
+    const application = this.driverApplications.get(id);
+    if (!application) return undefined;
+    const updated = { ...application, ...data };
+    this.driverApplications.set(id, updated);
+    return updated;
+  }
+
+  async reviewDriverApplication(
+    id: string, 
+    status: DriverApplicationStatus, 
+    reviewedBy: string, 
+    reviewNotes?: string, 
+    rejectionReason?: string
+  ): Promise<DriverApplication | undefined> {
+    const application = this.driverApplications.get(id);
+    if (!application) return undefined;
+    const updated: DriverApplication = {
+      ...application,
+      status,
+      reviewedBy,
+      reviewNotes: reviewNotes || null,
+      rejectionReason: status === "rejected" ? rejectionReason || null : null,
+      reviewedAt: new Date(),
+    };
+    this.driverApplications.set(id, updated);
+    return updated;
   }
 }
 
