@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -106,11 +106,21 @@ export default function AdminCreateJob() {
 
   const availableDrivers = drivers?.filter(d => d.isAvailable && d.isVerified) || [];
 
-  const watchedFields = form.watch(['pickupPostcode', 'deliveryPostcode', 'weight', 'vehicleType', 'isReturnTrip']);
+  const pickupPostcode = form.watch('pickupPostcode');
+  const deliveryPostcode = form.watch('deliveryPostcode');
+  const weight = form.watch('weight');
+  const vehicleType = form.watch('vehicleType');
+  const isReturnTrip = form.watch('isReturnTrip');
+
+  const lastCalculatedRef = useRef<string>('');
 
   useEffect(() => {
     const calculateQuoteFromFields = async () => {
-      const [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip] = watchedFields;
+      const cacheKey = `${pickupPostcode}-${deliveryPostcode}-${weight}-${vehicleType}-${isReturnTrip}`;
+      
+      if (cacheKey === lastCalculatedRef.current) {
+        return;
+      }
       
       if (pickupPostcode && deliveryPostcode && pickupPostcode.length >= 3 && deliveryPostcode.length >= 3) {
         setIsCalculating(true);
@@ -129,6 +139,7 @@ export default function AdminCreateJob() {
             setQuote(quoteResult);
             setPriceOverride(null);
             setIsEditingPrice(false);
+            lastCalculatedRef.current = cacheKey;
           }
         } catch (error) {
           console.error('Error calculating quote:', error);
@@ -140,7 +151,7 @@ export default function AdminCreateJob() {
 
     const timer = setTimeout(calculateQuoteFromFields, 500);
     return () => clearTimeout(timer);
-  }, [watchedFields]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip]);
 
   const createJobMutation = useMutation({
     mutationFn: async (data: CreateJobInput) => {
