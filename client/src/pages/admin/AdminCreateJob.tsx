@@ -78,6 +78,8 @@ export default function AdminCreateJob() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [priceOverride, setPriceOverride] = useState<number | null>(null);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [driverPrice, setDriverPrice] = useState<number | null>(null);
+  const [isEditingDriverPrice, setIsEditingDriverPrice] = useState(false);
 
   const form = useForm<CreateJobInput>({
     resolver: zodResolver(createJobSchema),
@@ -154,6 +156,7 @@ export default function AdminCreateJob() {
         centralLondonCharge: quote?.centralLondonCharge.toString() || '0',
         returnTripCharge: quote?.returnTripCharge.toString() || '0',
         totalPrice: finalPrice.toString(),
+        driverPrice: driverPrice !== null ? driverPrice.toString() : null,
         paymentStatus: 'pending',
         status: data.driverId ? 'assigned' : 'pending',
       };
@@ -599,7 +602,7 @@ export default function AdminCreateJob() {
                         
                         <Separator />
                         
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           <div className="flex justify-between items-center">
                             <span className="font-semibold">Calculated Total</span>
                             <span className="text-lg" data-testid="text-calculated-total">
@@ -607,10 +610,13 @@ export default function AdminCreateJob() {
                             </span>
                           </div>
                           
-                          {/* Price Override Section */}
-                          <div className="space-y-2">
+                          {/* Customer Total Price - Admin Only */}
+                          <div className="space-y-2 p-3 border border-primary/20 rounded-lg bg-primary/5">
                             <div className="flex items-center justify-between">
-                              <Label className="text-sm font-medium">Final Price</Label>
+                              <div className="flex items-center gap-2">
+                                <Label className="text-sm font-medium">Customer Total Price</Label>
+                                <Badge variant="secondary" className="text-xs">Admin Only</Badge>
+                              </div>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -637,17 +643,71 @@ export default function AdminCreateJob() {
                                 />
                               </div>
                             ) : (
-                              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                              <div className="flex items-center justify-between p-2 bg-background rounded">
                                 <span className="font-bold text-xl" data-testid="text-final-price">
                                   {formatPrice(getFinalPrice())}
                                 </span>
                                 {priceOverride !== null && priceOverride !== quote.totalPrice && (
-                                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                                     Modified
                                   </Badge>
                                 )}
                               </div>
                             )}
+                          </div>
+                          
+                          <Separator />
+                          
+                          {/* Driver Price - What Driver Gets Paid */}
+                          <div className="space-y-2 p-3 border border-green-500/20 rounded-lg bg-green-50 dark:bg-green-950/20">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Label className="text-sm font-medium text-green-700 dark:text-green-400">Driver Price</Label>
+                                <Badge variant="outline" className="text-xs border-green-500 text-green-700 dark:text-green-400">
+                                  Driver Sees This
+                                </Badge>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsEditingDriverPrice(!isEditingDriverPrice)}
+                                data-testid="button-edit-driver-price"
+                              >
+                                <Edit3 className="h-4 w-4 mr-1" />
+                                {isEditingDriverPrice ? 'Cancel' : 'Edit'}
+                              </Button>
+                            </div>
+                            
+                            {isEditingDriverPrice ? (
+                              <div className="relative">
+                                <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" />
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={driverPrice !== null ? driverPrice : ''}
+                                  onChange={(e) => setDriverPrice(parseFloat(e.target.value) || 0)}
+                                  className="pl-10 text-lg font-bold border-green-300 focus:border-green-500"
+                                  placeholder="Enter driver payment amount"
+                                  data-testid="input-driver-price"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between p-2 bg-background rounded">
+                                <span className="font-bold text-xl text-green-700 dark:text-green-400" data-testid="text-driver-price">
+                                  {driverPrice !== null ? formatPrice(driverPrice) : 'Not set'}
+                                </span>
+                                {driverPrice !== null && (
+                                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    Set
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              This is the amount the driver will see and get paid for this job.
+                            </p>
                           </div>
                         </div>
                       </>

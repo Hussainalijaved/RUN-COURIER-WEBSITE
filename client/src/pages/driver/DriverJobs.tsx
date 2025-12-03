@@ -26,6 +26,13 @@ const formatPrice = (price: string | number) => {
   return `£${num.toFixed(2)}`;
 };
 
+const getDriverPayment = (job: { driverPrice?: string | null; totalPrice?: string | number }) => {
+  if (job.driverPrice) {
+    return parseFloat(job.driverPrice);
+  }
+  return typeof job.totalPrice === 'string' ? parseFloat(job.totalPrice) : (job.totalPrice || 0);
+};
+
 const getStatusBadge = (status: JobStatus) => {
   const variants: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
     pending: 'secondary',
@@ -124,7 +131,7 @@ export default function DriverJobs() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-primary text-lg">{formatPrice(job.totalPrice)}</div>
+                        <div className="font-bold text-primary text-lg">{formatPrice(getDriverPayment(job))}</div>
                         <Button size="sm" className="mt-2" data-testid={`button-view-job-${job.id}`}>
                           View Details
                           <ArrowRight className="ml-2 h-4 w-4" />
@@ -187,7 +194,7 @@ export default function DriverJobs() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-primary text-lg">{formatPrice(job.totalPrice)}</div>
+                        <div className="font-bold text-primary text-lg">{formatPrice(getDriverPayment(job))}</div>
                         <Button 
                           size="sm" 
                           className="mt-2" 
@@ -235,7 +242,7 @@ export default function DriverJobs() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-green-600">{formatPrice(job.totalPrice)}</div>
+                        <div className="font-bold text-green-600">{formatPrice(getDriverPayment(job))}</div>
                         <p className="text-xs text-muted-foreground mt-1">Completed</p>
                       </div>
                     </div>

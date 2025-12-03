@@ -125,6 +125,7 @@ export const jobs = pgTable("jobs", {
   centralLondonCharge: decimal("central_london_charge", { precision: 10, scale: 2 }).default("0"),
   waitingTimeCharge: decimal("waiting_time_charge", { precision: 10, scale: 2 }).default("0"),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  driverPrice: decimal("driver_price", { precision: 10, scale: 2 }),
   paymentStatus: text("payment_status").default("pending"),
   paymentIntentId: text("payment_intent_id"),
   podPhotoUrl: text("pod_photo_url"),

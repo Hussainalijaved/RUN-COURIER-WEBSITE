@@ -45,8 +45,15 @@ export default function DriverHistory() {
     job.deliveryPostcode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getDriverPayment = (job: { driverPrice?: string | null; totalPrice?: string | number }) => {
+    if (job.driverPrice) {
+      return parseFloat(job.driverPrice);
+    }
+    return typeof job.totalPrice === 'string' ? parseFloat(job.totalPrice) : (job.totalPrice || 0);
+  };
+
   const totalEarnings = completedJobs.reduce((sum, job) => {
-    return sum + parseFloat(job.totalPrice?.toString() || '0');
+    return sum + getDriverPayment(job);
   }, 0);
 
   return (
@@ -145,7 +152,7 @@ export default function DriverHistory() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-green-600 text-lg">{formatPrice(job.totalPrice)}</div>
+                      <div className="font-bold text-green-600 text-lg">{formatPrice(getDriverPayment(job))}</div>
                     </div>
                   </div>
                 ))}

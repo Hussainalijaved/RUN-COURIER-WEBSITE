@@ -312,7 +312,7 @@ export default function DriverDashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-primary">{formatPrice(job.totalPrice)}</div>
+                        <div className="font-bold text-primary">{formatPrice(job.driverPrice || job.totalPrice)}</div>
                         <Button 
                           size="sm" 
                           className="mt-2" 
