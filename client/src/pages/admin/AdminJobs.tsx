@@ -43,7 +43,9 @@ import {
   MapPin,
   Package,
   Loader2,
+  Plus,
 } from 'lucide-react';
+import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -83,10 +85,7 @@ export default function AdminJobs() {
 
   const assignDriverMutation = useMutation({
     mutationFn: async ({ jobId, driverId }: { jobId: string; driverId: string }) => {
-      return apiRequest(`/api/jobs/${jobId}/assign`, {
-        method: 'PATCH',
-        body: JSON.stringify({ driverId }),
-      });
+      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
@@ -101,10 +100,7 @@ export default function AdminJobs() {
 
   const cancelJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      return apiRequest(`/api/jobs/${jobId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'cancelled' }),
-      });
+      return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status: 'cancelled' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
@@ -155,6 +151,12 @@ export default function AdminJobs() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Jobs Management</h1>
             <p className="text-muted-foreground">View and manage all delivery jobs</p>
           </div>
+          <Link href="/admin/jobs/create">
+            <Button data-testid="button-create-job">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Job
+            </Button>
+          </Link>
         </div>
 
         <Card>
