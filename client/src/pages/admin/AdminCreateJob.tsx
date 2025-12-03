@@ -677,14 +677,17 @@ export default function AdminCreateJob() {
                       name="driverId"
                       render={({ field }) => (
                         <FormItem>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select 
+                            onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
+                            value={field.value || "none"}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-driver">
                                 <SelectValue placeholder="Select driver (optional)" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">No driver (pending assignment)</SelectItem>
+                              <SelectItem value="none">No driver (pending assignment)</SelectItem>
                               {availableDrivers.map((driver) => (
                                 <SelectItem key={driver.id} value={driver.id}>
                                   <div className="flex items-center gap-2">
