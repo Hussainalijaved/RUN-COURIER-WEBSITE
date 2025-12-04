@@ -325,23 +325,6 @@ export default function ServicePage({ type }: ServicePageProps) {
         </div>
       </section>
 
-      <section className="py-16 bg-card">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-2xl font-bold mb-4">Pricing</h2>
-            <p className="text-3xl font-bold text-primary mb-6">{service.pricing}</p>
-            <div className="flex justify-center">
-              <Link href="/book">
-                <Button size="lg" className="gap-2" data-testid="service-book-now">
-                  Book Now
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
