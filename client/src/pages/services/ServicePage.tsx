@@ -20,6 +20,7 @@ import {
   Calendar
 } from 'lucide-react';
 import medicalHeroImage from '@assets/WhatsApp_Image_2025-09-03_at_19.11.49_c1dbfbad_1764877241699.jpg';
+import sameDayHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.06.18_8ff558b5_1764877634513.jpg';
 
 interface ServicePageProps {
   type: 'same-day' | 'medical' | 'legal' | 'retail' | 'multi-drop' | 'return-trip' | 'scheduled' | 'restaurants';
@@ -32,6 +33,7 @@ const serviceData = {
     subtitle: 'Urgent deliveries within hours',
     description: 'When time is of the essence, our same-day delivery service ensures your packages reach their destination quickly and securely. Available across London with collection within the hour.',
     color: 'bg-blue-500',
+    heroImage: sameDayHeroImage,
     features: [
       'Collection within 60 minutes',
       'Delivery within 4 hours in London',
