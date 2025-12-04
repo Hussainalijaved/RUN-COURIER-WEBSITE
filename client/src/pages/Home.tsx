@@ -2,7 +2,7 @@ import { Link } from 'wouter';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import {
   Truck,
@@ -22,7 +22,18 @@ import {
   Layers,
   CheckCircle,
   Star,
+  CalendarClock,
+  Repeat,
 } from 'lucide-react';
+import heroBackground from '@assets/stock_images/delivery_courier_van_12c659d1.jpg';
+
+const heroServices = [
+  { icon: Clock, label: 'Same-Day', href: '/services/same-day' },
+  { icon: Calendar, label: 'Next-Day', href: '/services/scheduled' },
+  { icon: CalendarClock, label: 'Scheduled', href: '/services/scheduled' },
+  { icon: Layers, label: 'Multi-Drop', href: '/services/multi-drop' },
+  { icon: Repeat, label: 'Return Trip', href: '/services/return-trip' },
+];
 
 const services = [
   {
@@ -124,34 +135,60 @@ export default function Home() {
 
   return (
     <PublicLayout>
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10 py-20 lg:py-32">
-        <div className="absolute inset-0 bg-grid-pattern opacity-5" />
-        <div className="container mx-auto px-4 relative">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
-              <Truck className="h-4 w-4" />
-              UK's Most Trusted Courier Service
-            </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-              Fast, Reliable
-              <span className="text-primary block mt-2">Courier Delivery</span>
+      <section className="relative min-h-[600px] lg:min-h-[700px] flex flex-col">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroBackground})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/90 via-[#0096C7]/85 to-[#00B4D8]/75" />
+        
+        <div className="relative flex-1 flex items-center justify-center px-4 py-20">
+          <div className="max-w-4xl mx-auto text-center text-white">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
+              Fast. Reliable. Same-Day
+              <span className="block">Delivery Across the UK.</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Same-day delivery across London and UK-wide express service. 
-              From urgent documents to large parcels - we deliver with care.
+            <p className="text-lg md:text-xl text-white/90 mb-10 max-w-2xl mx-auto">
+              Trusted by businesses and individuals for urgent deliveries.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/book">
-                <Button size="lg" className="gap-2 w-full sm:w-auto" data-testid="hero-book-now">
-                  Book Now
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
               <Link href="/quote">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="hero-get-quote">
-                  Get a Quote
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  className="bg-white text-[#0077B6] border-white hover:bg-white/90 hover:text-[#005f92] font-semibold px-8 py-6 text-lg w-full sm:w-auto"
+                  data-testid="hero-get-quote"
+                >
+                  Get Quote
                 </Button>
               </Link>
+              <Link href="/book">
+                <Button 
+                  size="lg"
+                  className="bg-white/20 text-white border-2 border-white/50 hover:bg-white/30 font-semibold px-8 py-6 text-lg w-full sm:w-auto backdrop-blur-sm"
+                  data-testid="hero-book-now"
+                >
+                  Book Now
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative bg-white/95 backdrop-blur-sm py-4 px-4 shadow-lg">
+          <div className="container mx-auto">
+            <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 lg:gap-8">
+              {heroServices.map((service) => (
+                <Link key={service.label} href={service.href}>
+                  <button
+                    className="flex items-center gap-2 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors group"
+                    data-testid={`service-tab-${service.label.toLowerCase().replace(' ', '-')}`}
+                  >
+                    <service.icon className="h-5 w-5 text-gray-500 group-hover:text-[#0077B6]" />
+                    <span className="font-medium text-sm md:text-base">{service.label}</span>
+                  </button>
+                </Link>
+              ))}
             </div>
           </div>
         </div>
@@ -232,13 +269,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-20 bg-primary text-primary-foreground">
+      <section className="py-20 bg-gradient-to-r from-[#0077B6] via-[#0096C7] to-[#00B4D8] text-white">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
             {stats.map((stat, idx) => (
               <div key={idx}>
                 <div className="text-4xl lg:text-5xl font-bold mb-2">{stat.value}</div>
-                <div className="text-primary-foreground/80">{stat.label}</div>
+                <div className="text-white/80">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -255,7 +292,7 @@ export default function Home() {
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <div className="text-center">
-              <div className="w-16 h-16 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              <div className="w-16 h-16 bg-[#0077B6] text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
                 1
               </div>
               <h3 className="font-semibold mb-2">Enter Details</h3>
@@ -264,7 +301,7 @@ export default function Home() {
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              <div className="w-16 h-16 bg-[#0096C7] text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
                 2
               </div>
               <h3 className="font-semibold mb-2">Confirm Booking</h3>
@@ -273,7 +310,7 @@ export default function Home() {
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              <div className="w-16 h-16 bg-[#00B4D8] text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
                 3
               </div>
               <h3 className="font-semibold mb-2">Track & Receive</h3>
@@ -294,12 +331,12 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/book">
-                <Button size="lg" className="gap-2" data-testid="cta-book-now">
+                <Button size="lg" className="gap-2 bg-[#0077B6] hover:bg-[#005f92]" data-testid="cta-book-now">
                   Book a Delivery
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/driver/signup">
+              <Link href="/driver/apply">
                 <Button size="lg" variant="outline" data-testid="cta-become-driver">
                   Become a Driver
                 </Button>
