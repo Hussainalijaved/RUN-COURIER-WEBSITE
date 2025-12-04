@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
-import { SiWhatsapp } from 'react-icons/si';
+import { SiWhatsapp, SiFacebook } from 'react-icons/si';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
 const footerLinks = {
@@ -153,10 +153,19 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Run Courier. All rights reserved.
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <span className="text-xs text-muted-foreground">
               Trusted by 10,000+ businesses across the UK
             </span>
+            <a 
+              href="https://www.facebook.com/profile.php?id=61576739843460" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-700 transition-colors"
+              data-testid="facebook-link"
+            >
+              <SiFacebook className="h-5 w-5" />
+            </a>
           </div>
         </div>
       </div>
