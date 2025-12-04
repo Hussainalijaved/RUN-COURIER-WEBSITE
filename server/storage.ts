@@ -103,7 +103,7 @@ export class MemStorage implements IStorage {
       id: "default",
       centralLondonSurcharge: "15.00",
       multiDropCharge: "5.00",
-      returnTripMultiplier: "0.75",
+      returnTripMultiplier: "0.60",
       waitingTimeFreeMinutes: 10,
       waitingTimePerMinute: "0.50",
       rushHourStart: "07:00",
@@ -814,7 +814,7 @@ export class MemStorage implements IStorage {
 
     let returnTripCharge = 0;
     if (input.isReturnTrip) {
-      const returnMultiplier = parseFloat(this.pricingSettings.returnTripMultiplier || "0.75");
+      const returnMultiplier = parseFloat(this.pricingSettings.returnTripMultiplier || "0.60");
       returnTripCharge = distance * rate * returnMultiplier;
     }
 

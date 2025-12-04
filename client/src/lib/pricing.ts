@@ -61,7 +61,7 @@ export const defaultPricingConfig: PricingConfig = {
   ],
   centralLondonSurcharge: 15,
   multiDropCharge: 3,
-  returnTripMultiplier: 0.75,
+  returnTripMultiplier: 0.60,
   waitingTimeFreeMinutes: 10,
   waitingTimePerMinute: 0.5,
   rushHourPeriods: [

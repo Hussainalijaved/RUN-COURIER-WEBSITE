@@ -93,7 +93,7 @@ const additionalCharges = [
     icon: RotateCcw,
     title: 'Return Trip',
     items: [
-      'Same location: 75% of distance rate',
+      'Same location: 60% of distance rate',
       'Different location: Full rate',
     ],
   },

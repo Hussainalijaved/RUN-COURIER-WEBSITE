@@ -68,7 +68,7 @@ export const pricingSettings = pgTable("pricing_settings", {
   id: varchar("id", { length: 36 }).primaryKey(),
   centralLondonSurcharge: decimal("central_london_surcharge", { precision: 10, scale: 2 }).default("15.00"),
   multiDropCharge: decimal("multi_drop_charge", { precision: 10, scale: 2 }).default("5.00"),
-  returnTripMultiplier: decimal("return_trip_multiplier", { precision: 5, scale: 2 }).default("0.75"),
+  returnTripMultiplier: decimal("return_trip_multiplier", { precision: 5, scale: 2 }).default("0.60"),
   waitingTimeFreeMinutes: integer("waiting_time_free_minutes").default(10),
   waitingTimePerMinute: decimal("waiting_time_per_minute", { precision: 10, scale: 2 }).default("0.50"),
   rushHourStart: text("rush_hour_start").default("07:00"),

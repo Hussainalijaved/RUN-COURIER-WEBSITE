@@ -171,7 +171,7 @@ const serviceData = {
       'Product exchanges',
       'Document notarization rounds',
     ],
-    pricing: 'Return at 75% of outbound rate',
+    pricing: 'Return at 60% of outbound rate',
   },
   'scheduled': {
     icon: Calendar,
