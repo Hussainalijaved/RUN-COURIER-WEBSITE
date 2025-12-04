@@ -234,7 +234,7 @@ export default function ServicePage({ type }: ServicePageProps) {
             className="absolute inset-0 bg-cover bg-center bg-no-repeat"
             style={{ backgroundImage: `url(${heroImage})` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/85 via-[#0096C7]/75 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/60 via-[#0096C7]/50 to-transparent" />
           <div className="relative container mx-auto px-4 py-16">
             <div className="max-w-2xl">
               <div className="flex items-center gap-4 mb-6">
