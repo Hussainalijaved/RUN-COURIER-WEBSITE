@@ -19,6 +19,7 @@ import {
   Layers,
   Calendar
 } from 'lucide-react';
+import medicalHeroImage from '@assets/WhatsApp_Image_2025-09-03_at_19.11.49_c1dbfbad_1764877241699.jpg';
 
 interface ServicePageProps {
   type: 'same-day' | 'medical' | 'legal' | 'retail' | 'multi-drop' | 'return-trip' | 'scheduled' | 'restaurants';
@@ -54,6 +55,7 @@ const serviceData = {
     subtitle: 'Safe transport for medical specimens',
     description: 'Specialized courier service for medical specimens, pharmaceuticals, and healthcare supplies. Our drivers are trained in handling sensitive medical materials with the utmost care.',
     color: 'bg-red-500',
+    heroImage: medicalHeroImage,
     features: [
       'Temperature-controlled options',
       'UN3373 compliant packaging',
@@ -214,27 +216,76 @@ const serviceData = {
 export default function ServicePage({ type }: ServicePageProps) {
   const service = serviceData[type];
   const Icon = service.icon;
+  const heroImage = 'heroImage' in service ? service.heroImage : null;
 
   return (
     <PublicLayout>
-      <section className="py-20 bg-gradient-to-b from-primary/5 to-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center gap-4 mb-6">
-              <div className={`w-16 h-16 ${service.color} rounded-xl flex items-center justify-center`}>
-                <Icon className="h-8 w-8 text-white" />
+      {heroImage ? (
+        <section className="relative min-h-[400px] lg:min-h-[500px] flex items-center">
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${heroImage})` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/85 via-[#0096C7]/75 to-transparent" />
+          <div className="relative container mx-auto px-4 py-16">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-4 mb-6">
+                <div className={`w-16 h-16 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center`}>
+                  <Icon className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-bold text-white">{service.title}</h1>
+                  <p className="text-lg text-white/90">{service.subtitle}</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold">{service.title}</h1>
-                <p className="text-lg text-muted-foreground">{service.subtitle}</p>
+              <p className="text-lg text-white/90 max-w-xl">
+                {service.description}
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                <Link href="/book">
+                  <Button 
+                    size="lg" 
+                    className="bg-white text-[#0077B6] hover:bg-white/90 font-semibold gap-2"
+                    data-testid="hero-book-now"
+                  >
+                    Book Now
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/quote">
+                  <Button 
+                    size="lg"
+                    variant="outline"
+                    className="border-white text-white hover:bg-white/20"
+                    data-testid="hero-get-quote"
+                  >
+                    Get Quote
+                  </Button>
+                </Link>
               </div>
             </div>
-            <p className="text-lg text-muted-foreground max-w-3xl">
-              {service.description}
-            </p>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="py-20 bg-gradient-to-b from-primary/5 to-background">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center gap-4 mb-6">
+                <div className={`w-16 h-16 ${service.color} rounded-xl flex items-center justify-center`}>
+                  <Icon className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-bold">{service.title}</h1>
+                  <p className="text-lg text-muted-foreground">{service.subtitle}</p>
+                </div>
+              </div>
+              <p className="text-lg text-muted-foreground max-w-3xl">
+                {service.description}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="py-16">
         <div className="container mx-auto px-4">
