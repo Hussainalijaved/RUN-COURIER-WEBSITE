@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export interface DriverLocation {
   driverId: string;
@@ -86,15 +87,27 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         if (!mountedRef.current) return;
         
-        const authMessage = {
-          type: 'auth',
-          role: user.role || 'customer',
-          userId: user.id,
-        };
-        ws.send(JSON.stringify(authMessage));
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) {
+            setError('No valid session');
+            ws.close();
+            return;
+          }
+          
+          const authMessage = {
+            type: 'auth',
+            token: session.access_token,
+          };
+          ws.send(JSON.stringify(authMessage));
+        } catch (err) {
+          console.error('Failed to get session for WebSocket auth:', err);
+          setError('Authentication failed');
+          ws.close();
+        }
       };
 
       ws.onmessage = (event) => {
@@ -244,14 +257,24 @@ export function useDriverLocationUpdater() {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      const authMessage = {
-        type: 'auth',
-        role: 'driver',
-        userId: user.id,
-        driverId: user.id,
-      };
-      ws.send(JSON.stringify(authMessage));
+    ws.onopen = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          console.error('No valid session for driver WebSocket');
+          ws.close();
+          return;
+        }
+        
+        const authMessage = {
+          type: 'auth',
+          token: session.access_token,
+        };
+        ws.send(JSON.stringify(authMessage));
+      } catch (err) {
+        console.error('Failed to get session for driver WebSocket auth:', err);
+        ws.close();
+      }
     };
 
     ws.onmessage = (event) => {

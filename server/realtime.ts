@@ -3,6 +3,7 @@ import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
 import { log } from './index';
 import { storage } from './storage';
+import { verifyAccessToken, type VerifiedUser } from './supabaseAdmin';
 
 interface DriverLocation {
   driverId: string;
@@ -16,9 +17,7 @@ interface DriverLocation {
 
 interface AuthMessage {
   type: 'auth';
-  role: 'driver' | 'admin' | 'dispatcher' | 'customer';
-  userId: string;
-  driverId?: string;
+  token: string;
 }
 
 interface LocationUpdateMessage {
@@ -74,8 +73,7 @@ type OutgoingMessage =
 
 interface AuthenticatedClient {
   ws: WebSocket;
-  role: 'driver' | 'admin' | 'dispatcher' | 'customer';
-  userId: string;
+  user: VerifiedUser;
   driverId?: string;
   isSubscribed: boolean;
   lastActivity: number;
@@ -125,7 +123,7 @@ export function setupRealtimeServer(server: Server): WebSocketServer {
 
         if (message.type === 'auth') {
           clearTimeout(authTimeout);
-          client = handleAuth(ws, message, clientId);
+          client = await handleAuth(ws, message, clientId);
           return;
         }
 
@@ -155,7 +153,7 @@ export function setupRealtimeServer(server: Server): WebSocketServer {
     ws.on('close', () => {
       clearTimeout(authTimeout);
       if (client) {
-        if (client.role === 'driver' && client.driverId) {
+        if (client.user.role === 'driver' && client.driverId) {
           driverConnections.delete(client.driverId);
           broadcastDriverOffline(client.driverId);
           log(`Driver ${client.driverId} disconnected`, 'realtime');
@@ -196,41 +194,86 @@ export function setupRealtimeServer(server: Server): WebSocketServer {
   return wss;
 }
 
-function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string): AuthenticatedClient | null {
-  const { role, userId, driverId } = message;
+async function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string): Promise<AuthenticatedClient | null> {
+  const { token } = message;
 
-  if (!role || !userId) {
-    sendMessage(ws, { type: 'error', payload: { message: 'Invalid auth payload', code: 'INVALID_AUTH' } });
+  if (!token) {
+    sendMessage(ws, { type: 'error', payload: { message: 'Token required', code: 'INVALID_AUTH' } });
     return null;
+  }
+
+  const verifiedUser = await verifyAccessToken(token);
+  
+  if (!verifiedUser) {
+    sendMessage(ws, { type: 'error', payload: { message: 'Invalid or expired token', code: 'AUTH_FAILED' } });
+    return null;
+  }
+
+  const dbUser = await storage.getUser(verifiedUser.id);
+  
+  let authorizedRole: string;
+  
+  if (dbUser && dbUser.role) {
+    authorizedRole = dbUser.role;
+    log(`WebSocket auth: User ${verifiedUser.id} found in database with role: ${authorizedRole}`, 'realtime');
+  } else {
+    if (!['admin', 'dispatcher', 'driver'].includes(verifiedUser.role)) {
+      log(`WebSocket auth failed: User ${verifiedUser.id} not in database and metadata role (${verifiedUser.role}) is not allowed`, 'realtime');
+      sendMessage(ws, { type: 'error', payload: { message: 'User not found', code: 'USER_NOT_FOUND' } });
+      return null;
+    }
+    authorizedRole = verifiedUser.role;
+    log(`WebSocket auth: User ${verifiedUser.id} using Supabase metadata role: ${authorizedRole}`, 'realtime');
+  }
+
+  const verifiedUserWithDbRole: VerifiedUser = {
+    ...verifiedUser,
+    role: authorizedRole,
+  };
+
+  let driverId: string | undefined;
+  
+  if (authorizedRole === 'driver') {
+    const driver = await storage.getDriver(verifiedUser.id);
+    if (driver && driver.isVerified) {
+      driverId = driver.id;
+    } else {
+      log(`WebSocket auth failed: Driver ${verifiedUser.id} not found or not verified`, 'realtime');
+      sendMessage(ws, { type: 'error', payload: { message: 'Driver profile not found or not verified', code: 'DRIVER_NOT_VERIFIED' } });
+      return null;
+    }
   }
 
   const client: AuthenticatedClient = {
     ws,
-    role,
-    userId,
-    driverId: role === 'driver' ? (driverId || userId) : undefined,
+    user: verifiedUserWithDbRole,
+    driverId,
     isSubscribed: false,
     lastActivity: Date.now(),
   };
 
-  if (role === 'driver' && client.driverId) {
-    const existingConnection = driverConnections.get(client.driverId);
+  if (authorizedRole === 'driver' && driverId) {
+    const existingConnection = driverConnections.get(driverId);
     if (existingConnection) {
       existingConnection.ws.close(4003, 'Replaced by new connection');
     }
-    driverConnections.set(client.driverId, client);
-    log(`Driver ${client.driverId} authenticated`, 'realtime');
-  } else if (['admin', 'dispatcher'].includes(role)) {
+    driverConnections.set(driverId, client);
+    log(`Driver ${driverId} (${verifiedUser.email}) authenticated via database role`, 'realtime');
+  } else if (['admin', 'dispatcher'].includes(authorizedRole)) {
     observerConnections.set(clientId, client);
-    log(`Observer ${role}:${userId} authenticated`, 'realtime');
+    log(`Observer ${authorizedRole}:${verifiedUser.email} authenticated via database role`, 'realtime');
+  } else {
+    log(`WebSocket auth rejected: User ${verifiedUser.id} has insufficient role: ${authorizedRole}`, 'realtime');
+    sendMessage(ws, { type: 'error', payload: { message: 'Insufficient permissions for real-time tracking', code: 'UNAUTHORIZED' } });
+    return null;
   }
 
-  sendMessage(ws, { type: 'auth:success', payload: { role, userId } });
+  sendMessage(ws, { type: 'auth:success', payload: { role: authorizedRole, userId: verifiedUser.id } });
   return client;
 }
 
 async function handleLocationUpdate(client: AuthenticatedClient, message: LocationUpdateMessage): Promise<void> {
-  if (client.role !== 'driver' || !client.driverId) {
+  if (client.user.role !== 'driver' || !client.driverId) {
     sendMessage(client.ws, { type: 'error', payload: { message: 'Only drivers can update location', code: 'UNAUTHORIZED' } });
     return;
   }
@@ -285,7 +328,7 @@ async function handleLocationUpdate(client: AuthenticatedClient, message: Locati
 }
 
 function handleSubscribe(client: AuthenticatedClient): void {
-  if (!['admin', 'dispatcher'].includes(client.role)) {
+  if (!['admin', 'dispatcher'].includes(client.user.role)) {
     sendMessage(client.ws, { type: 'error', payload: { message: 'Only admins and dispatchers can subscribe', code: 'UNAUTHORIZED' } });
     return;
   }
