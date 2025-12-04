@@ -58,7 +58,11 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                 src={logoImage} 
                 alt="Run Courier" 
                 className="h-10 w-auto object-contain"
-                style={{ filter: 'grayscale(100%) contrast(200%) brightness(0)' }}
+                style={{ 
+                  filter: 'grayscale(100%) contrast(1000%) brightness(0)',
+                  mixBlendMode: 'multiply',
+                  opacity: 0.9
+                }}
               />
               <div>
                 <p className="text-xl font-bold text-black leading-tight">RUN</p>
