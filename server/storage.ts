@@ -501,7 +501,8 @@ export class MemStorage implements IStorage {
   }
 
   async createDriver(insertDriver: InsertDriver): Promise<Driver> {
-    const id = randomUUID();
+    // Use the Supabase userId as the driver ID for consistency with mobile app
+    const id = insertDriver.userId;
     const driver: Driver = {
       ...insertDriver,
       id,
