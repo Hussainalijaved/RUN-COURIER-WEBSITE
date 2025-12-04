@@ -25,7 +25,7 @@ import {
   CalendarClock,
   Repeat,
 } from 'lucide-react';
-import heroBackground from '@assets/stock_images/delivery_courier_van_12c659d1.jpg';
+import heroBackground from '@assets/WhatsApp_Image_2025-09-06_at_20.08.04_32824ae2_1764877551595.jpg';
 
 const heroServices = [
   { icon: Clock, label: 'Same-Day', href: '/services/same-day' },
