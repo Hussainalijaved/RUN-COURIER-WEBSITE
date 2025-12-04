@@ -1,5 +1,6 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { SiWhatsapp } from 'react-icons/si';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
 const footerLinks = {
@@ -48,10 +49,28 @@ export function Footer() {
               <div className="flex items-center gap-3 text-sm">
                 <Phone className="h-4 w-4 text-primary" />
                 <span>+44 7311 112 17</span>
+                <a 
+                  href="https://wa.me/4473111217" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-green-500 hover:text-green-600 transition-colors"
+                  data-testid="whatsapp-link-1"
+                >
+                  <SiWhatsapp className="h-4 w-4" />
+                </a>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Phone className="h-4 w-4 text-primary" />
                 <span>+44 7862 771 999</span>
+                <a 
+                  href="https://wa.me/447862771999" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-green-500 hover:text-green-600 transition-colors"
+                  data-testid="whatsapp-link-2"
+                >
+                  <SiWhatsapp className="h-4 w-4" />
+                </a>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="h-4 w-4 text-primary" />
