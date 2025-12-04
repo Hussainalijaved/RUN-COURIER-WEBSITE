@@ -10,6 +10,7 @@ import {
   Target,
   Heart
 } from 'lucide-react';
+import aboutHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.30.47_6eef4c81_1764879185103.jpg';
 
 const values = [
   {
@@ -44,11 +45,17 @@ const stats = [
 export default function About() {
   return (
     <PublicLayout>
-      <section className="py-20 bg-gradient-to-b from-primary/5 to-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
+      <section className="relative min-h-[400px] lg:min-h-[500px] flex items-center">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${aboutHeroImage})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/90 via-[#0096C7]/85 to-[#00B4D8]/75" />
+        
+        <div className="relative container mx-auto px-4 py-20">
+          <div className="max-w-3xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">About Run Courier</h1>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-lg text-white/90">
               We're on a mission to revolutionize courier delivery across the UK. 
               Fast, reliable, and customer-focused - that's the Run Courier promise.
             </p>
