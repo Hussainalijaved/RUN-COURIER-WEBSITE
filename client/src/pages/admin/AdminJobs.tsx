@@ -323,16 +323,38 @@ export default function AdminJobs() {
     setLabelDialogOpen(true);
   };
 
-  const handlePrintLabel = () => {
+  const handlePrintLabel = async () => {
     if (!labelRef.current) return;
+    
+    const convertImagesToBase64 = async (element: HTMLElement): Promise<string> => {
+      const clone = element.cloneNode(true) as HTMLElement;
+      const images = clone.querySelectorAll('img');
+      
+      for (const img of Array.from(images)) {
+        try {
+          const response = await fetch(img.src);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          img.src = base64;
+        } catch (e) {
+          console.error('Failed to convert image:', e);
+        }
+      }
+      
+      return clone.innerHTML;
+    };
+    
+    const labelContent = await convertImagesToBase64(labelRef.current);
     
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast({ title: 'Please allow popups to print labels', variant: 'destructive' });
       return;
     }
-
-    const labelContent = labelRef.current.innerHTML;
     
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -344,6 +366,10 @@ export default function AdminJobs() {
               size: 4in 6in;
               margin: 0;
             }
+            @media print {
+              body { margin: 0; padding: 0; }
+              .label-container { page-break-inside: avoid; }
+            }
             * {
               margin: 0;
               padding: 0;
@@ -351,8 +377,9 @@ export default function AdminJobs() {
             }
             body {
               font-family: Arial, sans-serif;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
             }
             .label-container {
               width: 4in;
@@ -363,15 +390,20 @@ export default function AdminJobs() {
             .flex { display: flex; }
             .flex-col { flex-direction: column; }
             .items-center { align-items: center; }
+            .items-start { align-items: flex-start; }
             .justify-center { justify-content: center; }
             .justify-between { justify-content: space-between; }
+            .flex-shrink-0 { flex-shrink: 0; }
             .gap-1 { gap: 0.25rem; }
             .gap-2 { gap: 0.5rem; }
+            .gap-3 { gap: 0.75rem; }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
             .text-xs { font-size: 0.75rem; }
             .text-sm { font-size: 0.875rem; }
+            .text-base { font-size: 1rem; }
             .text-lg { font-size: 1.125rem; }
+            .text-xl { font-size: 1.25rem; }
             .text-2xl { font-size: 1.5rem; }
             .font-bold { font-weight: 700; }
             .font-semibold { font-weight: 600; }
@@ -380,27 +412,34 @@ export default function AdminJobs() {
             .italic { font-style: italic; }
             .tracking-widest { letter-spacing: 0.1em; }
             .leading-tight { line-height: 1.25; }
-            .border-2 { border: 2px solid; }
-            .border-t-2 { border-top: 2px solid; }
-            .border-t { border-top: 1px solid; }
-            .border-b-2 { border-bottom: 2px solid; }
+            .border { border: 1px solid #000; }
+            .border-2 { border: 2px solid #000; }
+            .border-t { border-top: 1px solid #000; }
+            .border-t-2 { border-top: 2px solid #000; }
+            .border-b-2 { border-bottom: 2px solid #000; }
             .border-dashed { border-style: dashed; }
             .border-black { border-color: #000; }
             .border-gray-300 { border-color: #d1d5db; }
             .border-gray-400 { border-color: #9ca3af; }
             .rounded { border-radius: 0.25rem; }
             .rounded-full { border-radius: 9999px; }
-            .bg-white { background-color: #fff; }
-            .bg-gray-50 { background-color: #f9fafb; }
-            .bg-gray-100 { background-color: #f3f4f6; }
-            .text-white { color: #fff; }
+            .bg-white { background-color: #fff !important; }
+            .bg-black { background-color: #000 !important; }
+            .bg-gray-50 { background-color: #f9fafb !important; }
+            .bg-gray-100 { background-color: #f3f4f6 !important; }
+            .text-white { color: #fff !important; }
             .text-black { color: #000; }
+            .text-gray-400 { color: #9ca3af; }
             .text-gray-500 { color: #6b7280; }
             .text-gray-600 { color: #4b5563; }
-            .text-\\[\\#0077B6\\] { color: #0077B6; }
+            .text-\\[10px\\] { font-size: 10px; }
             .p-1 { padding: 0.25rem; }
+            .p-2 { padding: 0.5rem; }
             .p-3 { padding: 0.75rem; }
+            .p-4 { padding: 1rem; }
+            .pb-2 { padding-bottom: 0.5rem; }
             .pb-3 { padding-bottom: 0.75rem; }
+            .pt-1 { padding-top: 0.25rem; }
             .pt-2 { padding-top: 0.5rem; }
             .pt-3 { padding-top: 0.75rem; }
             .mb-1 { margin-bottom: 0.25rem; }
@@ -410,6 +449,7 @@ export default function AdminJobs() {
             .mt-1 { margin-top: 0.25rem; }
             .mt-2 { margin-top: 0.5rem; }
             .mt-3 { margin-top: 0.75rem; }
+            .space-y-2 > * + * { margin-top: 0.5rem; }
             .space-y-3 > * + * { margin-top: 0.75rem; }
             .grid { display: grid; }
             .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -421,24 +461,27 @@ export default function AdminJobs() {
             .w-auto { width: auto; }
             .object-contain { object-fit: contain; }
             .uppercase { text-transform: uppercase; }
-            img { max-width: 100%; height: auto; }
-            svg { display: inline-block; vertical-align: middle; }
+            img { max-width: 100%; height: auto; display: block; }
+            svg { display: inline-block; vertical-align: middle; width: 0.75rem; height: 0.75rem; }
           </style>
         </head>
         <body>
           <div class="label-container">
             ${labelContent}
           </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 100);
+            };
+          </script>
         </body>
       </html>
     `);
 
     printWindow.document.close();
-    
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
   };
 
   return (
