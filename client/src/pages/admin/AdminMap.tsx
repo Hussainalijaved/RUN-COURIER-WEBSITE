@@ -7,30 +7,59 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { initGoogleMaps, getMapCenter } from '@/lib/maps';
-import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
+import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useDriverLocations, type DriverLocation } from '@/hooks/useDriverLocations';
 import type { Driver, Job } from '@shared/schema';
 
 export default function AdminMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const { 
+    locations: realtimeLocations, 
+    isConnected: wsConnected, 
+    isConnecting: wsConnecting,
+    error: wsError,
+    reconnect 
+  } = useDriverLocations({
+    enabled: true,
+    onConnect: () => console.log('Real-time tracking connected'),
+    onDisconnect: () => console.log('Real-time tracking disconnected'),
+  });
 
   const { data: drivers, isLoading: driversLoading, refetch: refetchDrivers } = useQuery<Driver[]>({
     queryKey: ['/api/drivers'],
-    refetchInterval: 10000,
+    refetchInterval: wsConnected ? false : 10000,
   });
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   const activeDrivers = drivers?.filter(d => d.isVerified) || [];
+
+  const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number } | null => {
+    const realtimeLoc = realtimeLocations.get(driver.id);
+    if (realtimeLoc) {
+      return { lat: realtimeLoc.lat, lng: realtimeLoc.lng };
+    }
+    
+    if (driver.currentLatitude && driver.currentLongitude) {
+      const lat = parseFloat(driver.currentLatitude);
+      const lng = parseFloat(driver.currentLongitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+    
+    return null;
+  }, [realtimeLocations]);
 
   const getDriverCurrentJob = (driverId: string) => {
     return jobs?.find(j => 
@@ -87,60 +116,68 @@ export default function AdminMap() {
     const map = mapInstanceRef.current;
     if (!map || !mapLoaded) return;
 
-    markersRef.current.forEach(m => m.setMap(null));
-    markersRef.current = [];
-    
+    const currentMarkerIds = new Set<string>();
+
     activeDrivers.forEach((driver) => {
-      if (!driver.currentLatitude || !driver.currentLongitude) return;
+      const location = getDriverLocation(driver);
+      if (!location) return;
 
-      const lat = parseFloat(driver.currentLatitude);
-      const lng = parseFloat(driver.currentLongitude);
-      
-      if (isNaN(lat) || isNaN(lng)) return;
-
+      currentMarkerIds.add(driver.id);
       const status = getDriverStatus(driver);
       const fillColor = status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF';
 
-      const marker = new google.maps.Marker({
-        position: { lat, lng },
-        map,
-        title: driver.fullName || driver.vehicleRegistration || 'Driver',
-        icon: {
+      const existingMarker = markersRef.current.get(driver.id);
+      
+      if (existingMarker) {
+        existingMarker.setPosition(location);
+        existingMarker.setIcon({
           path: google.maps.SymbolPath.CIRCLE,
           scale: 12,
           fillColor,
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 2,
-        },
-      });
+        });
+      } else {
+        const marker = new google.maps.Marker({
+          position: location,
+          map,
+          title: driver.fullName || driver.vehicleRegistration || 'Driver',
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor,
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
+        });
 
-      marker.addListener('click', () => {
-        setSelectedDriver(driver);
-        map.panTo({ lat, lng });
-        map.setZoom(15);
-      });
+        marker.addListener('click', () => {
+          setSelectedDriver(driver);
+          map.panTo(location);
+          map.setZoom(15);
+        });
 
-      markersRef.current.push(marker);
+        markersRef.current.set(driver.id, marker);
+      }
     });
-  }, [activeDrivers, mapLoaded, jobs]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await refetchDrivers();
-    setIsRefreshing(false);
-  };
+    markersRef.current.forEach((marker, driverId) => {
+      if (!currentMarkerIds.has(driverId)) {
+        marker.setMap(null);
+        markersRef.current.delete(driverId);
+      }
+    });
+  }, [activeDrivers, mapLoaded, jobs, realtimeLocations, getDriverLocation]);
 
   const handleDriverClick = (driver: Driver) => {
     setSelectedDriver(driver);
     const map = mapInstanceRef.current;
-    if (map && driver.currentLatitude && driver.currentLongitude) {
-      const lat = parseFloat(driver.currentLatitude);
-      const lng = parseFloat(driver.currentLongitude);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        map.panTo({ lat, lng });
-        map.setZoom(15);
-      }
+    const location = getDriverLocation(driver);
+    if (map && location) {
+      map.panTo(location);
+      map.setZoom(15);
     }
   };
 
@@ -156,28 +193,51 @@ export default function AdminMap() {
     }
   };
 
+  const getConnectionStatus = () => {
+    if (wsConnecting) {
+      return (
+        <Badge variant="secondary" className="gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Connecting...
+        </Badge>
+      );
+    }
+    if (wsConnected) {
+      return (
+        <Badge className="bg-green-500 text-white gap-1">
+          <Wifi className="h-3 w-3" />
+          Live
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="destructive" className="gap-1 cursor-pointer" onClick={reconnect}>
+        <WifiOff className="h-3 w-3" />
+        Offline
+      </Badge>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="h-[calc(100vh-8rem)] flex gap-6">
         <Card className="flex-1 overflow-hidden">
           <CardHeader className="border-b">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                Live Driver Map
-              </CardTitle>
+              <div className="flex items-center gap-3">
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-primary" />
+                  Live Driver Map
+                </CardTitle>
+                {getConnectionStatus()}
+              </div>
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={handleRefresh}
-                disabled={isRefreshing}
+                onClick={() => refetchDrivers()}
                 data-testid="button-refresh-map"
               >
-                {isRefreshing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
+                <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
             </div>
@@ -229,6 +289,9 @@ export default function AdminMap() {
               ) : activeDrivers.length > 0 ? (
                 activeDrivers.map((driver) => {
                   const currentJob = getDriverCurrentJob(driver.id);
+                  const location = getDriverLocation(driver);
+                  const isLive = realtimeLocations.has(driver.id);
+                  
                   return (
                     <button
                       key={driver.id}
@@ -241,16 +304,21 @@ export default function AdminMap() {
                       data-testid={`driver-card-${driver.id}`}
                     >
                       <div className="flex items-start gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                            {(driver.fullName || driver.vehicleRegistration || 'DR')
-                              .split(' ')
-                              .map(n => n[0])
-                              .join('')
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                              {(driver.fullName || driver.vehicleRegistration || 'DR')
+                                .split(' ')
+                                .map(n => n[0])
+                                .join('')
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {isLive && (
+                            <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate">
                             {driver.fullName || driver.vehicleRegistration || 'Driver'}
@@ -259,8 +327,11 @@ export default function AdminMap() {
                             <Truck className="h-3 w-3" />
                             <span className="capitalize">{driver.vehicleType?.replace('_', ' ')}</span>
                           </div>
-                          <div className="mt-1">
+                          <div className="mt-1 flex items-center gap-2">
                             {getStatusBadge(driver)}
+                            {isLive && (
+                              <span className="text-[10px] text-green-600 font-medium">LIVE</span>
+                            )}
                           </div>
                           {currentJob && (
                             <div className="text-xs text-muted-foreground mt-1">
@@ -294,15 +365,23 @@ export default function AdminMap() {
                     <span className="text-muted-foreground">({selectedDriver.vehicleRegistration})</span>
                   )}
                 </div>
-                {selectedDriver.currentLatitude && selectedDriver.currentLongitude && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs font-mono">
-                      {parseFloat(selectedDriver.currentLatitude).toFixed(4)}, 
-                      {parseFloat(selectedDriver.currentLongitude).toFixed(4)}
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const loc = getDriverLocation(selectedDriver);
+                  if (loc) {
+                    return (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs font-mono">
+                          {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
+                        </span>
+                        {realtimeLocations.has(selectedDriver.id) && (
+                          <Badge className="bg-green-500 text-white text-[10px] px-1 py-0">LIVE</Badge>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {getDriverCurrentJob(selectedDriver.id) && (
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
