@@ -209,7 +209,7 @@ async function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string)
     return null;
   }
 
-  const dbUser = await storage.getUser(verifiedUser.id);
+  let dbUser = await storage.getUser(verifiedUser.id);
   
   let authorizedRole: string;
   
@@ -217,13 +217,31 @@ async function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string)
     authorizedRole = dbUser.role;
     log(`WebSocket auth: User ${verifiedUser.id} found in database with role: ${authorizedRole}`, 'realtime');
   } else {
-    if (!['admin', 'dispatcher', 'driver'].includes(verifiedUser.role)) {
+    if (verifiedUser.role === 'driver') {
+      authorizedRole = 'driver';
+      log(`WebSocket auth: Driver ${verifiedUser.id} not in users table, will validate driver profile`, 'realtime');
+    } else if (['admin', 'dispatcher'].includes(verifiedUser.role)) {
+      log(`WebSocket auth: Syncing admin/dispatcher user ${verifiedUser.id} from Supabase to local database`, 'realtime');
+      try {
+        dbUser = await storage.createUserWithId(verifiedUser.id, {
+          email: verifiedUser.email,
+          fullName: verifiedUser.fullName || 'Admin User',
+          role: verifiedUser.role as 'admin' | 'dispatcher',
+          userType: 'individual',
+          password: null,
+        });
+        log(`WebSocket auth: Synced user ${verifiedUser.id} with role ${verifiedUser.role}`, 'realtime');
+        authorizedRole = dbUser.role;
+      } catch (error) {
+        log(`WebSocket auth: Failed to sync user ${verifiedUser.id}: ${error}`, 'realtime');
+        sendMessage(ws, { type: 'error', payload: { message: 'Failed to sync user', code: 'SYNC_ERROR' } });
+        return null;
+      }
+    } else {
       log(`WebSocket auth failed: User ${verifiedUser.id} not in database and metadata role (${verifiedUser.role}) is not allowed`, 'realtime');
       sendMessage(ws, { type: 'error', payload: { message: 'User not found', code: 'USER_NOT_FOUND' } });
       return null;
     }
-    authorizedRole = verifiedUser.role;
-    log(`WebSocket auth: User ${verifiedUser.id} using Supabase metadata role: ${authorizedRole}`, 'realtime');
   }
 
   const verifiedUserWithDbRole: VerifiedUser = {

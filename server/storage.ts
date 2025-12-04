@@ -20,6 +20,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUsers(filters?: { role?: string; isActive?: boolean }): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  createUserWithId(id: string, user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
 
   getDriver(id: string): Promise<Driver | undefined>;
@@ -452,6 +453,13 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
+    return this.createUserWithId(id, insertUser);
+  }
+
+  async createUserWithId(id: string, insertUser: InsertUser): Promise<User> {
+    if (this.users.has(id)) {
+      throw new Error(`User with id ${id} already exists`);
+    }
     const user: User = { 
       ...insertUser, 
       id,

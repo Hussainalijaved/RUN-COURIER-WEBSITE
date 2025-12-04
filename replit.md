@@ -105,15 +105,37 @@ vendor → /vendor
 
 ### Real-Time Features
 
-**Approach:**
-- Infrastructure prepared for WebSocket integration (HTTP server created in `server/index.ts`)
-- Current implementation suggests polling-based updates via TanStack Query
-- Driver location updates posted to dedicated endpoint for tracking
+**WebSocket Implementation:**
+- WebSocket server at `/ws/realtime` using the `ws` library
+- Secure token-based authentication using Supabase JWT verification
+- Server-side role validation from local database (not metadata)
+- Auto-sync of admin/dispatcher users from Supabase on first connection
 
-**Planned Capabilities:**
-- Live driver location tracking on maps
-- Real-time job status updates
-- Instant notifications for job assignments and status changes
+**Key Files:**
+- `server/realtime.ts` - WebSocket server with auth, broadcasting, and connection management
+- `server/supabaseAdmin.ts` - Server-side Supabase client for token verification
+- `client/src/hooks/useDriverLocations.ts` - React hook for real-time location updates
+
+**Authentication Flow:**
+1. Client sends Supabase access token via WebSocket auth message
+2. Server verifies token with Supabase Admin API (service role key)
+3. Server looks up user in local database for authoritative role
+4. If admin/dispatcher not in DB, creates user with Supabase ID as primary key
+5. Drivers must have verified profile in drivers table
+6. Only admin/dispatcher roles can subscribe to driver locations
+
+**Features:**
+- Live driver location tracking with automatic reconnection
+- Location broadcasting from drivers to subscribed observers
+- Connection heartbeat with ping/pong every 30 seconds
+- Offline detection with 2-minute timeout
+- Fallback to REST API polling when WebSocket fails
+
+**Client-Side:**
+- `useDriverLocations` hook manages WebSocket lifecycle
+- Exponential backoff for reconnection attempts
+- Merges real-time updates with initial REST data
+- Connection status indicator (Connecting/Live/Offline)
 
 ### External Dependencies
 
