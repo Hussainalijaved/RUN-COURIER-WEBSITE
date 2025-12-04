@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
-import { MapPin, Phone, PackageCheck } from 'lucide-react';
+import { MapPin, Phone } from 'lucide-react';
+import runCourierLogo from '@assets/generated_images/black_running_courier_logo_icon.png';
 import type { Job } from '@shared/schema';
 
 interface ShippingLabelProps {
@@ -53,17 +54,15 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-2">
             <div className="flex items-center gap-2">
-              <div 
+              <img 
+                src={runCourierLogo} 
+                alt="Run Courier" 
                 style={{
-                  width: '40px',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  height: '42px',
+                  width: '42px',
+                  objectFit: 'contain',
                 }}
-              >
-                <PackageCheck style={{ width: '32px', height: '32px', color: 'black', strokeWidth: 2 }} />
-              </div>
+              />
               <div style={{ lineHeight: '1' }}>
                 <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>RUN</p>
                 <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>COURIER</p>
