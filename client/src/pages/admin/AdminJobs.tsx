@@ -49,11 +49,14 @@ import {
   Plus,
   Edit3,
   Save,
+  Printer,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { ShippingLabel } from '@/components/ShippingLabel';
+import { useRef } from 'react';
 import type { Job, Driver, JobStatus } from '@shared/schema';
 
 const JOB_STATUSES: { value: JobStatus; label: string }[] = [
@@ -96,6 +99,9 @@ export default function AdminJobs() {
   const [editDriverId, setEditDriverId] = useState<string>('');
   const [editTotalPrice, setEditTotalPrice] = useState<string>('');
   const [editDriverPrice, setEditDriverPrice] = useState<string>('');
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [jobForLabel, setJobForLabel] = useState<Job | null>(null);
+  const labelRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
@@ -216,6 +222,129 @@ export default function AdminJobs() {
     });
   };
 
+  const openLabelDialog = (job: Job) => {
+    setJobForLabel(job);
+    setLabelDialogOpen(true);
+  };
+
+  const handlePrintLabel = () => {
+    if (!labelRef.current) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Please allow popups to print labels', variant: 'destructive' });
+      return;
+    }
+
+    const labelContent = labelRef.current.innerHTML;
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Shipping Label - ${jobForLabel?.trackingNumber}</title>
+          <style>
+            @page {
+              size: 4in 6in;
+              margin: 0;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .label-container {
+              width: 4in;
+              height: 6in;
+              padding: 0.25in;
+              background: white;
+            }
+            .flex { display: flex; }
+            .flex-col { flex-direction: column; }
+            .items-center { align-items: center; }
+            .justify-center { justify-content: center; }
+            .justify-between { justify-content: space-between; }
+            .gap-1 { gap: 0.25rem; }
+            .gap-2 { gap: 0.5rem; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .text-xs { font-size: 0.75rem; }
+            .text-sm { font-size: 0.875rem; }
+            .text-lg { font-size: 1.125rem; }
+            .text-2xl { font-size: 1.5rem; }
+            .font-bold { font-weight: 700; }
+            .font-semibold { font-weight: 600; }
+            .font-mono { font-family: monospace; }
+            .capitalize { text-transform: capitalize; }
+            .italic { font-style: italic; }
+            .tracking-widest { letter-spacing: 0.1em; }
+            .leading-tight { line-height: 1.25; }
+            .border-2 { border: 2px solid; }
+            .border-t-2 { border-top: 2px solid; }
+            .border-t { border-top: 1px solid; }
+            .border-b-2 { border-bottom: 2px solid; }
+            .border-dashed { border-style: dashed; }
+            .border-black { border-color: #000; }
+            .border-gray-300 { border-color: #d1d5db; }
+            .border-gray-400 { border-color: #9ca3af; }
+            .rounded { border-radius: 0.25rem; }
+            .rounded-full { border-radius: 9999px; }
+            .bg-white { background-color: #fff; }
+            .bg-gray-50 { background-color: #f9fafb; }
+            .bg-green-500 { background-color: #22c55e; }
+            .bg-red-500 { background-color: #ef4444; }
+            .text-white { color: #fff; }
+            .text-black { color: #000; }
+            .text-gray-500 { color: #6b7280; }
+            .text-gray-600 { color: #4b5563; }
+            .p-1 { padding: 0.25rem; }
+            .p-3 { padding: 0.75rem; }
+            .pb-3 { padding-bottom: 0.75rem; }
+            .pt-2 { padding-top: 0.5rem; }
+            .pt-3 { padding-top: 0.75rem; }
+            .mb-1 { margin-bottom: 0.25rem; }
+            .mb-2 { margin-bottom: 0.5rem; }
+            .mb-3 { margin-bottom: 0.75rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .mt-1 { margin-top: 0.25rem; }
+            .mt-2 { margin-top: 0.5rem; }
+            .mt-3 { margin-top: 0.75rem; }
+            .space-y-3 > * + * { margin-top: 0.75rem; }
+            .grid { display: grid; }
+            .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .flex-1 { flex: 1 1 0%; }
+            .h-full { height: 100%; }
+            .h-3 { height: 0.75rem; }
+            .h-12 { height: 3rem; }
+            .w-3 { width: 0.75rem; }
+            .w-auto { width: auto; }
+            .object-contain { object-fit: contain; }
+            .uppercase { text-transform: uppercase; }
+            img { max-width: 100%; height: auto; }
+            svg { display: inline-block; vertical-align: middle; }
+          </style>
+        </head>
+        <body>
+          <div class="label-container">
+            ${labelContent}
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -322,6 +451,10 @@ export default function AdminJobs() {
                             <DropdownMenuItem onClick={() => openEditDialog(job)} data-testid={`menu-edit-${job.id}`}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit Job
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openLabelDialog(job)} data-testid={`menu-print-label-${job.id}`}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Print Label
                             </DropdownMenuItem>
                             {!job.driverId && job.status === 'pending' && (
                               <DropdownMenuItem 
@@ -583,6 +716,41 @@ export default function AdminJobs() {
                     Save Changes
                   </>
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Print Label Dialog */}
+        <Dialog open={labelDialogOpen} onOpenChange={setLabelDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Printer className="h-5 w-5" />
+                Print Shipping Label
+              </DialogTitle>
+              <DialogDescription>
+                4" x 6" Professional Shipping Label for {jobForLabel?.trackingNumber}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center py-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-auto">
+              {jobForLabel && (
+                <div className="transform scale-75 origin-top">
+                  <ShippingLabel 
+                    ref={labelRef} 
+                    job={jobForLabel} 
+                    driverName={getDriverName(jobForLabel.driverId)} 
+                  />
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setLabelDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handlePrintLabel} className="gap-2" data-testid="button-print-label">
+                <Printer className="h-4 w-4" />
+                Print Label
               </Button>
             </DialogFooter>
           </DialogContent>
