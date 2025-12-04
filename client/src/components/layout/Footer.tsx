@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
-import { SiWhatsapp, SiFacebook, SiTrustpilot } from 'react-icons/si';
+import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore } from 'react-icons/si';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
 const footerLinks = {
@@ -174,6 +174,15 @@ export function Footer() {
               data-testid="trustpilot-link"
             >
               <SiTrustpilot className="h-5 w-5" />
+            </a>
+            <a 
+              href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              data-testid="appstore-link"
+            >
+              <SiAppstore className="h-5 w-5" />
             </a>
           </div>
         </div>

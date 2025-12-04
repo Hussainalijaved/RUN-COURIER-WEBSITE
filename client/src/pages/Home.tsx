@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { PublicLayout } from '@/components/layout/PublicLayout';
-import { SiTrustpilot } from 'react-icons/si';
+import { SiTrustpilot, SiAppstore } from 'react-icons/si';
 import {
   Truck,
   Clock,
@@ -368,6 +368,30 @@ export default function Home() {
                 </Button>
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-12 bg-gradient-to-r from-[#0077B6] to-[#00B4D8]">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 text-white">
+            <div className="text-center md:text-left">
+              <h3 className="text-xl font-bold mb-1">Download Our App</h3>
+              <p className="text-white/80 text-sm">Track deliveries on the go</p>
+            </div>
+            <a 
+              href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 bg-black text-white px-6 py-3 rounded-xl hover:bg-gray-900 transition-colors"
+              data-testid="appstore-download"
+            >
+              <SiAppstore className="h-8 w-8" />
+              <div className="text-left">
+                <div className="text-xs">Download on the</div>
+                <div className="text-lg font-semibold">App Store</div>
+              </div>
+            </a>
           </div>
         </div>
       </section>
