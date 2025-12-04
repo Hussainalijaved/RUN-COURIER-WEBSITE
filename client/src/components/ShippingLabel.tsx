@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
-import { MapPin, Phone, Truck } from 'lucide-react';
+import { MapPin, Phone } from 'lucide-react';
+import logoIcon from '@assets/WhatsApp_Image_2025-11-10_at_15.38.41_d075722b_1764883471735.jpg';
 import type { Job } from '@shared/schema';
 
 interface ShippingLabelProps {
@@ -53,19 +54,16 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-2">
             <div className="flex items-center gap-2">
-              <div 
+              <img 
+                src={logoIcon} 
+                alt="Run Courier" 
                 style={{
-                  width: '36px',
-                  height: '36px',
-                  border: '2px solid black',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  height: '40px',
+                  width: 'auto',
+                  filter: 'grayscale(100%) brightness(0)',
+                  mixBlendMode: 'multiply',
                 }}
-              >
-                <Truck style={{ width: '20px', height: '20px', color: 'black' }} />
-              </div>
+              />
               <div style={{ lineHeight: '1' }}>
                 <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>RUN</p>
                 <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>COURIER</p>
