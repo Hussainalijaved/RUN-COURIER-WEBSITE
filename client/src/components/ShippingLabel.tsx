@@ -61,7 +61,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                   height: '50px',
                   width: 'auto',
                   objectFit: 'contain',
-                  filter: 'grayscale(1) contrast(3)',
+                  filter: 'grayscale(1) contrast(5) brightness(0.7)',
                 }}
               />
               <div style={{ lineHeight: '1' }}>
