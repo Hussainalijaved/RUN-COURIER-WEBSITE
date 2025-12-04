@@ -7,6 +7,8 @@ import {
   type VendorApiKey, type InsertVendorApiKey,
   type DriverApplication, type InsertDriverApplication,
   type DriverApplicationStatus,
+  type DocumentType,
+  type DocumentStatus,
   type PricingSettings,
   type Vehicle,
   type JobStatus,
@@ -234,6 +236,44 @@ export class MemStorage implements IStorage {
         createdAt: new Date(),
       };
       this.drivers.set(driver.id, driver);
+
+      // Create sample documents for each driver
+      const docTypes: Array<{ type: DocumentType; name: string }> = [
+        { type: "id_passport", name: "Passport.pdf" },
+        { type: "driving_licence", name: "Driving_Licence.pdf" },
+        { type: "right_to_work", name: "Right_to_Work_Certificate.pdf" },
+        { type: "vehicle_photo", name: "Vehicle_Photo.jpg" },
+        { type: "insurance", name: "Insurance_Certificate.pdf" },
+        { type: "goods_in_transit", name: "Goods_in_Transit_Insurance.pdf" },
+        { type: "hire_reward", name: "Hire_Reward_Policy.pdf" },
+      ];
+
+      // First driver has all approved docs, second has mix, third has pending, fourth has rejected
+      const docStatuses: DocumentStatus[][] = [
+        ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
+        ["approved", "approved", "pending", "approved", "pending", "pending", "pending"],
+        ["pending", "pending", "pending", "pending", "pending", "pending", "pending"],
+        ["approved", "approved", "rejected", "approved", "pending", "rejected", "pending"],
+      ];
+
+      docTypes.forEach((docType, docIndex) => {
+        const docId = `doc-${d.id}-${docType.type}`;
+        const status = docStatuses[i][docIndex];
+        const document: Document = {
+          id: docId,
+          driverId: d.id,
+          type: docType.type,
+          fileName: docType.name,
+          fileUrl: `https://storage.example.com/drivers/${d.id}/${docType.name}`,
+          status,
+          reviewedBy: status !== "pending" ? "admin-1" : null,
+          reviewNotes: status === "rejected" ? "Document expired or unclear, please resubmit" : null,
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+          uploadedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random within last 30 days
+          reviewedAt: status !== "pending" ? new Date() : null,
+        };
+        this.documents.set(docId, document);
+      });
     });
 
     const customers = [
