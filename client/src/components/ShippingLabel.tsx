@@ -61,13 +61,8 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                   height: '50px',
                   width: 'auto',
                   objectFit: 'contain',
-                  filter: 'grayscale(1) contrast(5) brightness(0.7)',
                 }}
               />
-              <div style={{ lineHeight: '1' }}>
-                <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>RUN</p>
-                <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>COURIER</p>
-              </div>
             </div>
             <div className="text-right">
               <p style={{ fontSize: '10px', color: '#444' }}>www.runcourier.co.uk</p>
