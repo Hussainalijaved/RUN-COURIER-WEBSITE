@@ -23,7 +23,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   useDriver,
   useDriverJobs,
-  useAvailableJobs,
   useDriverStats,
   useUpdateDriverAvailability,
   useUpdateJobStatus,
@@ -77,7 +76,6 @@ export default function DriverDashboard() {
 
   const { data: driver, isLoading: driverLoading } = useDriver();
   const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
-  const { data: availableJobs } = useAvailableJobs(Boolean(driver?.isAvailable && driver?.isVerified));
   const stats = useDriverStats(driver?.id);
   const statsLoading = jobsLoading;
 
@@ -277,11 +275,11 @@ export default function DriverDashboard() {
           </Card>
         )}
 
-        {isOnline && driver?.isVerified && (
+        {driver?.isVerified && (
           <Card>
             <CardHeader>
-              <CardTitle>Available Jobs</CardTitle>
-              <CardDescription>Accept a job to start earning</CardDescription>
+              <CardTitle>Assigned Jobs</CardTitle>
+              <CardDescription>Jobs assigned to you by dispatch</CardDescription>
             </CardHeader>
             <CardContent>
               {jobsLoading ? (
@@ -290,13 +288,13 @@ export default function DriverDashboard() {
                     <Skeleton key={i} className="h-24 w-full" />
                   ))}
                 </div>
-              ) : availableJobs && availableJobs.length > 0 ? (
+              ) : myJobs && myJobs.filter(j => j.status === 'assigned').length > 0 ? (
                 <div className="space-y-3">
-                  {availableJobs.map((job) => (
+                  {myJobs.filter(j => j.status === 'assigned').map((job) => (
                     <div
                       key={job.id}
                       className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/50 transition-colors"
-                      data-testid={`available-job-${job.id}`}
+                      data-testid={`assigned-job-${job.id}`}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -312,7 +310,7 @@ export default function DriverDashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-primary">{formatPrice(job.driverPrice || job.totalPrice)}</div>
+                        <div className="font-bold text-primary">{formatPrice(job.totalPrice)}</div>
                         <Button 
                           size="sm" 
                           className="mt-2" 
@@ -336,8 +334,8 @@ export default function DriverDashboard() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No available jobs at the moment</p>
-                  <p className="text-sm text-muted-foreground mt-1">Check back soon for new deliveries</p>
+                  <p className="text-muted-foreground">No jobs assigned to you</p>
+                  <p className="text-sm text-muted-foreground mt-1">Admin will assign jobs when available</p>
                 </div>
               )}
             </CardContent>

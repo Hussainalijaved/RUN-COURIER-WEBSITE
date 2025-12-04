@@ -227,7 +227,7 @@ export default function DriverActive() {
               </p>
               <Link href="/driver/jobs">
                 <Button data-testid="button-find-jobs">
-                  Find Available Jobs
+                  View Assigned Jobs
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>

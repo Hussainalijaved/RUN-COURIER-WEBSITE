@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Package,
   MapPin,
-  Clock,
   ArrowRight,
   Loader2,
   CheckCircle,
@@ -16,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   useDriver,
   useDriverJobs,
-  useAvailableJobs,
   useAcceptJob,
 } from '@/hooks/useSupabaseDriver';
 import type { JobStatus } from '@shared/schema';
@@ -64,9 +62,6 @@ export default function DriverJobs() {
 
   const { data: driver } = useDriver();
   const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
-  const { data: availableJobs, isLoading: availableLoading } = useAvailableJobs(
-    Boolean(driver?.isAvailable && driver?.isVerified)
-  );
   const acceptJobMutation = useAcceptJob();
 
   const handleAcceptJob = (jobId: string) => {
@@ -80,7 +75,8 @@ export default function DriverJobs() {
     );
   };
 
-  const activeJobs = myJobs?.filter((j) => !['delivered', 'cancelled'].includes(j.status)) || [];
+  const assignedJobs = myJobs?.filter((j) => j.status === 'assigned') || [];
+  const activeJobs = myJobs?.filter((j) => !['delivered', 'cancelled', 'assigned', 'pending'].includes(j.status)) || [];
   const completedJobs = myJobs?.filter((j) => j.status === 'delivered') || [];
 
   return (
@@ -91,18 +87,76 @@ export default function DriverJobs() {
           <p className="text-muted-foreground">View and manage your delivery jobs</p>
         </div>
 
-        <Tabs defaultValue="active" className="space-y-4">
+        <Tabs defaultValue="assigned" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="assigned" data-testid="tab-assigned">
+              Assigned ({assignedJobs.length})
+            </TabsTrigger>
             <TabsTrigger value="active" data-testid="tab-active">
               Active ({activeJobs.length})
-            </TabsTrigger>
-            <TabsTrigger value="available" data-testid="tab-available">
-              Available ({availableJobs?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="completed" data-testid="tab-completed">
               Completed ({completedJobs.length})
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="assigned" className="space-y-4">
+            {jobsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-32 w-full" />
+                ))}
+              </div>
+            ) : assignedJobs.length > 0 ? (
+              assignedJobs.map((job) => (
+                <Card key={job.id} data-testid={`assigned-job-${job.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <span className="font-mono font-medium">{job.trackingNumber}</span>
+                          {getStatusBadge(job.status)}
+                          <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <MapPin className="h-3 w-3" />
+                          <span>{job.pickupPostcode} → {job.deliveryPostcode}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {job.distance} miles • {job.weight}kg
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-primary text-lg">{formatPrice(getDriverPayment(job))}</div>
+                        <Button 
+                          size="sm" 
+                          className="mt-2" 
+                          onClick={() => handleAcceptJob(job.id)}
+                          disabled={acceptJobMutation.isPending}
+                          data-testid={`button-accept-job-${job.id}`}
+                        >
+                          {acceptJobMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                          )}
+                          Accept Job
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No jobs assigned to you</p>
+                  <p className="text-sm text-muted-foreground mt-1">Admin will assign jobs when available</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
           <TabsContent value="active" className="space-y-4">
             {jobsLoading ? (
@@ -146,80 +200,7 @@ export default function DriverJobs() {
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Package className="h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">No active jobs</p>
-                  <p className="text-sm text-muted-foreground">Accept a job from the Available tab</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="available" className="space-y-4">
-            {!driver?.isVerified ? (
-              <Card className="border-yellow-500">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Clock className="h-12 w-12 text-yellow-500 mb-4" />
-                  <p className="font-medium text-yellow-600">Account Not Verified</p>
-                  <p className="text-sm text-muted-foreground mt-1">Complete verification to see available jobs</p>
-                </CardContent>
-              </Card>
-            ) : !driver?.isAvailable ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">You're currently offline</p>
-                  <p className="text-sm text-muted-foreground mt-1">Go online from the Dashboard to see available jobs</p>
-                </CardContent>
-              </Card>
-            ) : availableLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-32 w-full" />
-                ))}
-              </div>
-            ) : availableJobs && availableJobs.length > 0 ? (
-              availableJobs.map((job) => (
-                <Card key={job.id} data-testid={`available-job-${job.id}`}>
-                  <CardContent className="p-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <span className="font-mono font-medium">{job.trackingNumber}</span>
-                          <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          <span>{job.pickupPostcode} → {job.deliveryPostcode}</span>
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {job.distance} miles • {job.weight}kg
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-primary text-lg">{formatPrice(getDriverPayment(job))}</div>
-                        <Button 
-                          size="sm" 
-                          className="mt-2" 
-                          onClick={() => handleAcceptJob(job.id)}
-                          disabled={acceptJobMutation.isPending}
-                          data-testid={`button-accept-job-${job.id}`}
-                        >
-                          {acceptJobMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                          )}
-                          Accept Job
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No available jobs</p>
-                  <p className="text-sm text-muted-foreground mt-1">Check back soon for new deliveries</p>
+                  <p className="text-sm text-muted-foreground">Accept an assigned job to start</p>
                 </CardContent>
               </Card>
             )}
