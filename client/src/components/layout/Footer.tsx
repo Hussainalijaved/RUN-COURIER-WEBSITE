@@ -180,13 +180,10 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-border mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="border-t border-border mt-12 pt-8 flex justify-center items-center">
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Run Courier. All rights reserved.
           </p>
-          <span className="text-xs text-muted-foreground">
-            Trusted by 10,000+ businesses across the UK
-          </span>
         </div>
       </div>
     </footer>
