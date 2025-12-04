@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -60,6 +61,9 @@ import {
   ExternalLink,
   AlertCircle,
   Clock,
+  Shield,
+  Globe,
+  CreditCard,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -85,6 +89,12 @@ export default function AdminDrivers() {
   const [editVehicleType, setEditVehicleType] = useState('');
   const [editVehicleReg, setEditVehicleReg] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editNationality, setEditNationality] = useState('');
+  const [editIsBritish, setEditIsBritish] = useState(true);
+  const [editNationalInsurance, setEditNationalInsurance] = useState('');
+  const [editRightToWorkShareCode, setEditRightToWorkShareCode] = useState('');
+  const [editDbsChecked, setEditDbsChecked] = useState(false);
+  const [editDbsCertificateUrl, setEditDbsCertificateUrl] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
   const { toast } = useToast();
 
@@ -178,6 +188,12 @@ export default function AdminDrivers() {
     setEditVehicleType(driver.vehicleType);
     setEditVehicleReg(driver.vehicleRegistration || '');
     setEditPhone(info.phone || '');
+    setEditNationality(driver.nationality || '');
+    setEditIsBritish(driver.isBritish ?? true);
+    setEditNationalInsurance(driver.nationalInsuranceNumber || '');
+    setEditRightToWorkShareCode(driver.rightToWorkShareCode || '');
+    setEditDbsChecked(driver.dbsChecked ?? false);
+    setEditDbsCertificateUrl(driver.dbsCertificateUrl || '');
     setEditMode(false);
     setProfileDialogOpen(true);
   };
@@ -195,6 +211,12 @@ export default function AdminDrivers() {
         vehicleType: editVehicleType as Driver['vehicleType'],
         vehicleRegistration: editVehicleReg,
         phone: editPhone,
+        nationality: editNationality,
+        isBritish: editIsBritish,
+        nationalInsuranceNumber: editNationalInsurance,
+        rightToWorkShareCode: editRightToWorkShareCode,
+        dbsChecked: editDbsChecked,
+        dbsCertificateUrl: editDbsCertificateUrl,
       },
     });
   };
@@ -487,7 +509,7 @@ export default function AdminDrivers() {
 
         {/* Profile Dialog */}
         <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 {selectedDriver && getDriverInfo(selectedDriver).driverCode && (
@@ -610,6 +632,170 @@ export default function AdminDrivers() {
                         </>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Verification & Compliance Section */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-primary" />
+                    Verification & Compliance
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* DBS Check Section */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">DBS Check Status</Label>
+                      {editMode ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="dbs-checked"
+                              checked={editDbsChecked}
+                              onCheckedChange={(checked) => setEditDbsChecked(checked === true)}
+                            />
+                            <label htmlFor="dbs-checked" className="text-sm font-medium leading-none cursor-pointer">
+                              DBS Check Verified
+                            </label>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">DBS Certificate URL</Label>
+                            <Input
+                              value={editDbsCertificateUrl}
+                              onChange={(e) => setEditDbsCertificateUrl(e.target.value)}
+                              placeholder="https://..."
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            {selectedDriver.dbsChecked ? (
+                              <Badge className="bg-green-500 text-white">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                DBS Verified
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Not Verified
+                              </Badge>
+                            )}
+                          </div>
+                          {selectedDriver.dbsCertificateUrl && (
+                            <a 
+                              href={selectedDriver.dbsCertificateUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              View Certificate
+                            </a>
+                          )}
+                          {selectedDriver.dbsCheckDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Verified: {formatDate(selectedDriver.dbsCheckDate)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right to Work Section */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Right to Work (UK)</Label>
+                      {editMode ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="is-british"
+                              checked={editIsBritish}
+                              onCheckedChange={(checked) => setEditIsBritish(checked === true)}
+                            />
+                            <label htmlFor="is-british" className="text-sm font-medium leading-none cursor-pointer">
+                              British Citizen
+                            </label>
+                          </div>
+                          {!editIsBritish && (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Share Code (gov.uk)</Label>
+                              <Input
+                                value={editRightToWorkShareCode}
+                                onChange={(e) => setEditRightToWorkShareCode(e.target.value.toUpperCase())}
+                                placeholder="ABC123XYZ"
+                                maxLength={9}
+                                className="text-sm font-mono"
+                              />
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Nationality</Label>
+                            <Input
+                              value={editNationality}
+                              onChange={(e) => setEditNationality(e.target.value)}
+                              placeholder="e.g. British"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                            <span>{selectedDriver.nationality || 'Not specified'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {selectedDriver.isBritish ? (
+                              <Badge className="bg-blue-500 text-white">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                British Citizen
+                              </Badge>
+                            ) : (
+                              <>
+                                <Badge variant="outline">Non-British</Badge>
+                                {selectedDriver.rightToWorkShareCode && (
+                                  <Badge className="bg-green-500 text-white font-mono">
+                                    Code: {selectedDriver.rightToWorkShareCode}
+                                  </Badge>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          {!selectedDriver.isBritish && !selectedDriver.rightToWorkShareCode && (
+                            <p className="text-xs text-amber-600 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              Share code not provided
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* National Insurance */}
+                  <div className="pt-2">
+                    {editMode ? (
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">National Insurance Number</Label>
+                        <Input
+                          value={editNationalInsurance}
+                          onChange={(e) => setEditNationalInsurance(e.target.value.toUpperCase())}
+                          placeholder="AB123456C"
+                          maxLength={9}
+                          className="max-w-xs font-mono"
+                        />
+                      </div>
+                    ) : (
+                      selectedDriver.nationalInsuranceNumber && (
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">NI: <span className="font-mono">{selectedDriver.nationalInsuranceNumber}</span></span>
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
 
