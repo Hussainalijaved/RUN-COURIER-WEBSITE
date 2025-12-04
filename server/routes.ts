@@ -198,6 +198,42 @@ export async function registerRoutes(
     res.json(driver);
   }));
 
+  // Fetch all drivers from Supabase (users with role=driver)
+  app.get("/api/supabase-drivers", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase admin not configured" });
+    }
+
+    try {
+      // Get all users from Supabase auth
+      const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (error) {
+        console.error("Error fetching Supabase users:", error);
+        return res.status(500).json({ error: "Failed to fetch users from Supabase" });
+      }
+
+      // Filter for driver role users
+      const driverUsers = users
+        .filter(user => user.user_metadata?.role === 'driver')
+        .map(user => ({
+          id: user.id,
+          email: user.email,
+          fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || 'Unknown Driver',
+          phone: user.user_metadata?.phone || null,
+          role: user.user_metadata?.role || 'driver',
+          createdAt: user.created_at,
+        }));
+
+      res.json(driverUsers);
+    } catch (err) {
+      console.error("Error in supabase-drivers:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }));
+
   app.get("/api/users", asyncHandler(async (req, res) => {
     const { role, isActive } = req.query;
     const users = await storage.getUsers({

@@ -59,6 +59,16 @@ import { ShippingLabel } from '@/components/ShippingLabel';
 import { useRef } from 'react';
 import type { Job, Driver, JobStatus } from '@shared/schema';
 
+// Type for drivers from Supabase
+interface SupabaseDriver {
+  id: string;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  role: string;
+  createdAt: string;
+}
+
 const JOB_STATUSES: { value: JobStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'assigned', label: 'Assigned' },
@@ -108,8 +118,14 @@ export default function AdminJobs() {
     queryKey: ['/api/jobs'],
   });
 
+  // Fetch drivers from local storage (for vehicle info)
   const { data: drivers } = useQuery<Driver[]>({
     queryKey: ['/api/drivers'],
+  });
+
+  // Fetch drivers from Supabase (for names)
+  const { data: supabaseDrivers } = useQuery<SupabaseDriver[]>({
+    queryKey: ['/api/supabase-drivers'],
   });
 
   const assignDriverMutation = useMutation({
@@ -198,10 +214,44 @@ export default function AdminJobs() {
   }) || [];
 
   const getDriverName = (driverId: string | null) => {
-    if (!driverId || !drivers) return '—';
-    const driver = drivers.find((d) => d.id === driverId);
-    return driver?.vehicleRegistration || '—';
+    if (!driverId) return '—';
+    // First try Supabase drivers for the real name
+    const supabaseDriver = supabaseDrivers?.find((d) => d.id === driverId);
+    if (supabaseDriver?.fullName) return supabaseDriver.fullName;
+    // Fall back to local drivers for vehicle registration
+    const driver = drivers?.find((d) => d.id === driverId);
+    return driver?.vehicleRegistration || driverId.substring(0, 8) + '...';
   };
+
+  // Get driver info combining Supabase (name) and local (vehicle) data
+  const getDriverInfo = (driverId: string) => {
+    const supabaseDriver = supabaseDrivers?.find((d) => d.id === driverId);
+    const localDriver = drivers?.find((d) => d.id === driverId);
+    return {
+      name: supabaseDriver?.fullName || 'Unknown',
+      email: supabaseDriver?.email || '',
+      phone: supabaseDriver?.phone || localDriver?.phone || '',
+      vehicleType: localDriver?.vehicleType || 'car',
+      vehicleRegistration: localDriver?.vehicleRegistration || '',
+      isVerified: localDriver?.isVerified || false,
+      isAvailable: localDriver?.isAvailable || false,
+    };
+  };
+
+  // Combine Supabase drivers with local driver data
+  const allDriversWithInfo = supabaseDrivers?.map(sd => {
+    const localInfo = getDriverInfo(sd.id);
+    return {
+      id: sd.id,
+      name: sd.fullName,
+      email: sd.email,
+      phone: sd.phone || localInfo.phone,
+      vehicleType: localInfo.vehicleType,
+      vehicleRegistration: localInfo.vehicleRegistration,
+      isVerified: localInfo.isVerified,
+      isAvailable: localInfo.isAvailable,
+    };
+  }) || [];
 
   const availableDrivers = drivers?.filter((d) => d.isAvailable && d.isVerified) || [];
   const allDrivers = drivers || [];
@@ -583,32 +633,38 @@ export default function AdminJobs() {
                 {jobToAssign?.driverId ? (
                   <>Currently assigned to: <span className="font-medium">{getDriverName(jobToAssign.driverId)}</span>. Select a new driver for job {jobToAssign?.trackingNumber}</>
                 ) : (
-                  <>Select an available driver for job {jobToAssign?.trackingNumber}</>
+                  <>Select a driver for job {jobToAssign?.trackingNumber}</>
                 )}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              {allDrivers.filter(d => d.isVerified).length > 0 ? (
-                allDrivers.filter(d => d.isVerified).map((driver) => (
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {allDriversWithInfo.length > 0 ? (
+                allDriversWithInfo.map((driver) => (
                   <Button
                     key={driver.id}
                     variant={driver.id === jobToAssign?.driverId ? "default" : "outline"}
-                    className="w-full justify-between"
+                    className="w-full justify-between h-auto py-3"
                     onClick={() => jobToAssign && assignDriverMutation.mutate({ jobId: jobToAssign.id, driverId: driver.id })}
                     disabled={assignDriverMutation.isPending || driver.id === jobToAssign?.driverId}
                     data-testid={`button-assign-driver-${driver.id}`}
                   >
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="font-medium">{driver.name}</span>
+                      <span className="text-xs text-muted-foreground">{driver.email}</span>
+                    </div>
                     <div className="flex items-center gap-2">
-                      <span>{driver.vehicleRegistration}</span>
-                      <Badge variant="secondary" className="capitalize">{driver.vehicleType?.replace('_', ' ')}</Badge>
-                      {driver.isAvailable && <Badge variant="outline" className="text-green-600">Online</Badge>}
+                      {driver.vehicleRegistration && (
+                        <Badge variant="secondary">{driver.vehicleRegistration}</Badge>
+                      )}
+                      <Badge variant="outline" className="capitalize">{driver.vehicleType?.replace('_', ' ')}</Badge>
+                      {driver.isAvailable && <Badge variant="outline" className="text-green-600 border-green-600">Online</Badge>}
                       {driver.id === jobToAssign?.driverId && <Badge>Current</Badge>}
                     </div>
                     {assignDriverMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                   </Button>
                 ))
               ) : (
-                <p className="text-center text-muted-foreground py-4">No verified drivers available</p>
+                <p className="text-center text-muted-foreground py-4">No drivers found in Supabase</p>
               )}
             </div>
           </DialogContent>
@@ -663,12 +719,15 @@ export default function AdminJobs() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="unassigned">No Driver (Unassigned)</SelectItem>
-                        {allDrivers.map((driver) => (
+                        {allDriversWithInfo.map((driver) => (
                           <SelectItem key={driver.id} value={driver.id}>
                             <div className="flex items-center gap-2">
-                              <span>{driver.vehicleRegistration || driver.userId}</span>
-                              {driver.isAvailable && driver.isVerified && (
-                                <Badge variant="secondary" className="text-xs">Available</Badge>
+                              <span>{driver.name}</span>
+                              {driver.vehicleRegistration && (
+                                <span className="text-muted-foreground text-xs">({driver.vehicleRegistration})</span>
+                              )}
+                              {driver.isAvailable && (
+                                <Badge variant="secondary" className="text-xs">Online</Badge>
                               )}
                             </div>
                           </SelectItem>
