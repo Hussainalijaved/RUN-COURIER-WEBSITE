@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,8 +11,11 @@ import {
   ArrowRight,
   Loader2,
   CheckCircle,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNotificationSound } from '@/hooks/useNotificationSound';
 import {
   useDriver,
   useDriverJobs,
@@ -59,10 +63,35 @@ const getStatusBadge = (status: JobStatus) => {
 
 export default function DriverJobs() {
   const { toast } = useToast();
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const prevAssignedCountRef = useRef<number>(0);
+  const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.8 });
 
   const { data: driver } = useDriver();
   const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
   const acceptJobMutation = useAcceptJob();
+
+  // Detect new assigned jobs and play alert sound
+  const assignedJobs = myJobs?.filter((j) => j.status === 'assigned') || [];
+  
+  useEffect(() => {
+    const currentCount = assignedJobs.length;
+    const prevCount = prevAssignedCountRef.current;
+    
+    // Play sound when new job is assigned
+    if (prevCount > 0 && currentCount > prevCount) {
+      playAlert();
+      toast({
+        title: 'New Job Assigned!',
+        description: 'You have a new delivery job waiting.',
+      });
+    } else if (prevCount === 0 && currentCount > 0) {
+      // First load with assigned jobs - play notification
+      playNotification();
+    }
+    
+    prevAssignedCountRef.current = currentCount;
+  }, [assignedJobs.length, playAlert, playNotification, toast]);
 
   const handleAcceptJob = (jobId: string) => {
     if (!driver) return;
@@ -75,16 +104,39 @@ export default function DriverJobs() {
     );
   };
 
-  const assignedJobs = myJobs?.filter((j) => j.status === 'assigned') || [];
   const activeJobs = myJobs?.filter((j) => !['delivered', 'cancelled', 'assigned', 'pending'].includes(j.status)) || [];
   const completedJobs = myJobs?.filter((j) => j.status === 'delivered') || [];
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">My Jobs</h1>
-          <p className="text-muted-foreground">View and manage your delivery jobs</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">My Jobs</h1>
+            <p className="text-muted-foreground">View and manage your delivery jobs</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              title={soundEnabled ? 'Disable notification sounds' : 'Enable notification sounds'}
+              data-testid="button-toggle-sound"
+            >
+              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                playAlert();
+                toast({ title: 'Sound Test', description: 'Alert sound played!' });
+              }}
+              data-testid="button-test-sound"
+            >
+              Test Sound
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="assigned" className="space-y-4">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,13 +50,15 @@ import {
   Edit3,
   Save,
   Printer,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ShippingLabel } from '@/components/ShippingLabel';
-import { useRef } from 'react';
+import { useNotificationSound } from '@/hooks/useNotificationSound';
 import type { Job, Driver, JobStatus } from '@shared/schema';
 
 // Type for drivers from Supabase
@@ -112,12 +114,36 @@ export default function AdminJobs() {
   const [editDriverPrice, setEditDriverPrice] = useState<string>('');
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [jobForLabel, setJobForLabel] = useState<Job | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const labelRef = useRef<HTMLDivElement>(null);
+  const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
+  const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.7 });
 
   const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
+    refetchInterval: 30000, // Poll every 30 seconds for new jobs
   });
+
+  // Detect new jobs and play sound
+  useEffect(() => {
+    if (!jobs) return;
+    
+    const currentCount = jobs.length;
+    const prevCount = prevJobCountRef.current;
+    
+    // Only play sound if this isn't the initial load and we have more jobs
+    if (prevCount > 0 && currentCount > prevCount) {
+      const newJobCount = currentCount - prevCount;
+      playAlert();
+      toast({
+        title: `${newJobCount} New Job${newJobCount > 1 ? 's' : ''} Received!`,
+        description: 'A new delivery request has come in.',
+      });
+    }
+    
+    prevJobCountRef.current = currentCount;
+  }, [jobs, playAlert, toast]);
 
   // Fetch drivers from local storage (for vehicle info)
   const { data: drivers } = useQuery<Driver[]>({
@@ -423,12 +449,34 @@ export default function AdminJobs() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Jobs Management</h1>
             <p className="text-muted-foreground">View and manage all delivery jobs</p>
           </div>
-          <Link href="/admin/jobs/create">
-            <Button data-testid="button-create-job">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Job
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              title={soundEnabled ? 'Disable notification sounds' : 'Enable notification sounds'}
+              data-testid="button-toggle-sound"
+            >
+              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
-          </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                playAlert();
+                toast({ title: 'Sound Test', description: 'Alert sound played!' });
+              }}
+              data-testid="button-test-sound"
+            >
+              Test Sound
+            </Button>
+            <Link href="/admin/jobs/create">
+              <Button data-testid="button-create-job">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Job
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <Card>
