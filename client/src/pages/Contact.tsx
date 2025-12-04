@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Phone, MapPin, Clock, Loader2, Send } from 'lucide-react';
+import { SiWhatsapp } from 'react-icons/si';
 
 const contactSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -28,29 +29,45 @@ const contactSchema = z.object({
 
 type ContactInput = z.infer<typeof contactSchema>;
 
-const contactInfo = [
+const contactInfo: {
+  icon: typeof Phone;
+  title: string;
+  details: { text: string; whatsapp?: string }[];
+  subtext: string;
+}[] = [
   {
     icon: Phone,
     title: 'Phone',
-    details: ['0800 123 4567', '020 7123 4567'],
+    details: [
+      { text: '+44 7311 112 17', whatsapp: 'https://wa.me/4473111217' },
+      { text: '+44 7862 771 999', whatsapp: 'https://wa.me/447862771999' },
+    ],
     subtext: 'Available 24/7',
   },
   {
     icon: Mail,
     title: 'Email',
-    details: ['info@runcourier.co.uk', 'support@runcourier.co.uk'],
+    details: [
+      { text: 'info@runcourier.co.uk' },
+    ],
     subtext: 'Response within 2 hours',
   },
   {
     icon: MapPin,
     title: 'Office',
-    details: ['123 Courier Lane', 'London, EC1A 1BB'],
-    subtext: 'Mon-Fri: 9am-6pm',
+    details: [
+      { text: '112 Bridgwater Road' },
+      { text: 'London, UK, HA4 6LW' },
+    ],
+    subtext: '24/7 Service Available',
   },
   {
     icon: Clock,
     title: 'Support Hours',
-    details: ['24/7 Customer Service', 'Online & Phone'],
+    details: [
+      { text: '24/7 Customer Service' },
+      { text: 'Online & Phone' },
+    ],
     subtext: 'Always here to help',
   },
 ];
@@ -205,7 +222,20 @@ export default function Contact() {
                       <div>
                         <h3 className="font-semibold mb-1">{info.title}</h3>
                         {info.details.map((detail, i) => (
-                          <p key={i} className="text-sm">{detail}</p>
+                          <div key={i} className="flex items-center gap-2 text-sm">
+                            <span>{detail.text}</span>
+                            {detail.whatsapp && (
+                              <a 
+                                href={detail.whatsapp}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-500 hover:text-green-600 transition-colors"
+                                data-testid={`whatsapp-contact-${i}`}
+                              >
+                                <SiWhatsapp className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
                         ))}
                         <p className="text-xs text-muted-foreground mt-1">{info.subtext}</p>
                       </div>
