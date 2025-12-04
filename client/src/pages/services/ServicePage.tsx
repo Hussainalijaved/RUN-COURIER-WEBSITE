@@ -25,6 +25,7 @@ import multiDropHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.07.21_17
 import retailHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.19.15_47cde5e4_1764877777467.jpg';
 import returnTripHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.14.32_790bffe7_1764877840111.jpg';
 import scheduledHeroImage from '@assets/generated_images/scheduled_delivery_courier_service.png';
+import restaurantsHeroImage from '@assets/generated_images/restaurant_catering_delivery_service.png';
 
 interface ServicePageProps {
   type: 'same-day' | 'medical' | 'legal' | 'retail' | 'multi-drop' | 'return-trip' | 'scheduled' | 'restaurants';
@@ -204,6 +205,7 @@ const serviceData = {
     subtitle: 'Food delivery done right',
     description: 'Specialized delivery for restaurants, caterers, and food businesses. Temperature-conscious handling and timely delivery for your culinary creations.',
     color: 'bg-yellow-500',
+    heroImage: restaurantsHeroImage,
     features: [
       'Insulated bag delivery',
       'Fast collection times',
