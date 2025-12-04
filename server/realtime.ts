@@ -429,3 +429,22 @@ export function getConnectionStats(): { drivers: number; observers: number; cach
     cachedLocations: locationCache.size,
   };
 }
+
+export function broadcastLocationUpdate(
+  driverId: string, 
+  lat: number, 
+  lng: number, 
+  status: 'available' | 'busy' | 'offline' = 'available'
+): void {
+  const location: DriverLocation = {
+    driverId,
+    lat,
+    lng,
+    timestamp: Date.now(),
+  };
+
+  locationCache.set(driverId, location);
+  lastUpdateTime.set(driverId, Date.now());
+  
+  broadcastLocation(location);
+}

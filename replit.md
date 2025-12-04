@@ -178,6 +178,37 @@ Prospective drivers must submit a comprehensive application before gaining drive
 - `GET /api/driver-applications/:id` - Get single application
 - `PATCH /api/driver-applications/:id/review` - Approve/reject application
 
+### Mobile API (Driver App)
+
+**Authentication:**
+- All `/api/mobile/v1/driver/*` endpoints require Supabase JWT token
+- Pass token in `Authorization: Bearer <token>` header
+- Driver must have verified profile in database
+
+**Key Files:**
+- `server/mobileRoutes.ts` - Mobile API endpoints
+- `server/mobileAuth.ts` - Authentication middleware
+
+**Endpoints:**
+- `GET /api/mobile/v1/config` - App configuration (no auth required)
+- `GET /api/mobile/v1/driver/profile` - Get authenticated driver's profile
+- `PATCH /api/mobile/v1/driver/location` - Update driver location (lat, lng)
+- `PATCH /api/mobile/v1/driver/availability` - Toggle availability (isAvailable)
+- `GET /api/mobile/v1/driver/jobs` - Get assigned jobs (?status=active|pending|completed)
+- `GET /api/mobile/v1/driver/jobs/:jobId` - Get specific job details
+- `PATCH /api/mobile/v1/driver/jobs/:jobId/status` - Update job status
+- `POST /api/mobile/v1/driver/jobs/:jobId/pod` - Upload proof of delivery
+
+**Job Status Transitions:**
+```
+assigned → accepted → on_the_way_pickup → arrived_pickup → collected → on_the_way_delivery → delivered
+```
+
+**Location Updates:**
+- REST: Use PATCH `/api/mobile/v1/driver/location` for reliability
+- WebSocket: Connect to `/ws/realtime` for real-time streaming
+- Both methods broadcast to admin/dispatcher observers
+
 **Neon Database:**
 - Serverless PostgreSQL hosting
 - Connection via `@neondatabase/serverless` driver

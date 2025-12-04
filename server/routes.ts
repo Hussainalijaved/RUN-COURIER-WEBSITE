@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
+import { registerMobileRoutes } from "./mobileRoutes";
 
 function generateTrackingNumber(): string {
   const prefix = "RC";
@@ -609,6 +610,8 @@ export async function registerRoutes(
 
     res.json(application);
   }));
+
+  registerMobileRoutes(app);
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("API Error:", err);
