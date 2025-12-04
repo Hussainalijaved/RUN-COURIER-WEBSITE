@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Table,
   TableBody,
@@ -64,7 +66,12 @@ import {
   Shield,
   Globe,
   CreditCard,
+  Upload,
+  ChevronsUpDown,
+  Check,
 } from 'lucide-react';
+import { uploadFile, getPublicUrl } from '@/lib/supabase';
+import { cn } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -79,6 +86,31 @@ interface SupabaseDriver {
   driverCode: string | null;
   createdAt: string;
 }
+
+const COUNTRIES = [
+  "Afghan", "Albanian", "Algerian", "American", "Andorran", "Angolan", "Argentine", "Armenian", 
+  "Australian", "Austrian", "Azerbaijani", "Bahamian", "Bahraini", "Bangladeshi", "Barbadian", 
+  "Belarusian", "Belgian", "Belizean", "Beninese", "Bhutanese", "Bolivian", "Bosnian", "Brazilian", 
+  "British", "Bruneian", "Bulgarian", "Burkinabe", "Burmese", "Burundian", "Cambodian", "Cameroonian", 
+  "Canadian", "Cape Verdean", "Central African", "Chadian", "Chilean", "Chinese", "Colombian", 
+  "Comorian", "Congolese", "Costa Rican", "Croatian", "Cuban", "Cypriot", "Czech", "Danish", 
+  "Djiboutian", "Dominican", "Dutch", "Ecuadorian", "Egyptian", "Emirati", "English", "Eritrean", 
+  "Estonian", "Ethiopian", "Fijian", "Filipino", "Finnish", "French", "Gabonese", "Gambian", 
+  "Georgian", "German", "Ghanaian", "Greek", "Grenadian", "Guatemalan", "Guinean", "Guyanese", 
+  "Haitian", "Honduran", "Hungarian", "Icelandic", "Indian", "Indonesian", "Iranian", "Iraqi", 
+  "Irish", "Israeli", "Italian", "Ivorian", "Jamaican", "Japanese", "Jordanian", "Kazakh", 
+  "Kenyan", "Kuwaiti", "Kyrgyz", "Laotian", "Latvian", "Lebanese", "Liberian", "Libyan", 
+  "Lithuanian", "Luxembourgish", "Macedonian", "Malagasy", "Malawian", "Malaysian", "Maldivian", 
+  "Malian", "Maltese", "Mauritanian", "Mauritian", "Mexican", "Moldovan", "Monegasque", "Mongolian", 
+  "Montenegrin", "Moroccan", "Mozambican", "Namibian", "Nepalese", "New Zealand", "Nicaraguan", 
+  "Nigerian", "North Korean", "Norwegian", "Omani", "Pakistani", "Panamanian", "Papua New Guinean", 
+  "Paraguayan", "Peruvian", "Polish", "Portuguese", "Qatari", "Romanian", "Russian", "Rwandan", 
+  "Saint Lucian", "Salvadoran", "Samoan", "Saudi", "Scottish", "Senegalese", "Serbian", "Sierra Leonean", 
+  "Singaporean", "Slovak", "Slovenian", "Somali", "South African", "South Korean", "Spanish", 
+  "Sri Lankan", "Sudanese", "Surinamese", "Swedish", "Swiss", "Syrian", "Taiwanese", "Tajik", 
+  "Tanzanian", "Thai", "Togolese", "Trinidadian", "Tunisian", "Turkish", "Turkmen", "Ugandan", 
+  "Ukrainian", "Uruguayan", "Uzbek", "Venezuelan", "Vietnamese", "Welsh", "Yemeni", "Zambian", "Zimbabwean"
+];
 
 export default function AdminDrivers() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,6 +128,10 @@ export default function AdminDrivers() {
   const [editDbsChecked, setEditDbsChecked] = useState(false);
   const [editDbsCertificateUrl, setEditDbsCertificateUrl] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
+  const [nationalitySearch, setNationalitySearch] = useState('');
+  const [nationalityOpen, setNationalityOpen] = useState(false);
+  const [uploadingDbs, setUploadingDbs] = useState(false);
+  const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: drivers, isLoading: driversLoading } = useQuery<Driver[]>({
@@ -129,10 +165,14 @@ export default function AdminDrivers() {
 
   const updateDriverMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Driver> }) => {
-      return apiRequest('PATCH', `/api/drivers/${id}`, data);
+      const response = await apiRequest('PATCH', `/api/drivers/${id}`, data);
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedDriver) => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      if (selectedDriver && updatedDriver) {
+        setSelectedDriver({ ...selectedDriver, ...updatedDriver });
+      }
       toast({ title: 'Driver updated successfully' });
       setEditMode(false);
     },
@@ -220,6 +260,67 @@ export default function AdminDrivers() {
       },
     });
   };
+
+  const handleDbsFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedDriver) return;
+
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload a file smaller than 10MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload a PDF or image file (JPG, PNG)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUploadingDbs(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `dbs_certificate_${selectedDriver.id}_${Date.now()}.${fileExt}`;
+      const filePath = `drivers/${selectedDriver.id}/dbs/${fileName}`;
+      
+      const { error } = await uploadFile('documents', filePath, file);
+      
+      if (error) {
+        throw error;
+      }
+
+      const publicUrl = getPublicUrl('documents', filePath);
+      setEditDbsCertificateUrl(publicUrl);
+      toast({
+        title: 'DBS certificate uploaded',
+        description: 'File uploaded successfully',
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload DBS certificate. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingDbs(false);
+      if (dbsFileInputRef.current) {
+        dbsFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const filteredCountries = COUNTRIES.filter((country) =>
+    country.toLowerCase().includes(nationalitySearch.toLowerCase())
+  );
 
   const filteredDrivers = drivers?.filter((driver) => {
     const info = getDriverInfo(driver);
@@ -661,13 +762,48 @@ export default function AdminDrivers() {
                             </label>
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground">DBS Certificate URL</Label>
-                            <Input
-                              value={editDbsCertificateUrl}
-                              onChange={(e) => setEditDbsCertificateUrl(e.target.value)}
-                              placeholder="https://..."
-                              className="text-sm"
-                            />
+                            <Label className="text-xs text-muted-foreground">DBS Certificate</Label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                ref={dbsFileInputRef}
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={handleDbsFileUpload}
+                                className="hidden"
+                                data-testid="input-dbs-file"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => dbsFileInputRef.current?.click()}
+                                disabled={uploadingDbs}
+                                data-testid="button-upload-dbs"
+                              >
+                                {uploadingDbs ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Upload className="h-4 w-4 mr-2" />
+                                )}
+                                {uploadingDbs ? 'Uploading...' : 'Upload Certificate'}
+                              </Button>
+                              {editDbsCertificateUrl && (
+                                <a 
+                                  href={editDbsCertificateUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  View uploaded
+                                </a>
+                              )}
+                            </div>
+                            {editDbsCertificateUrl && (
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                {editDbsCertificateUrl.split('/').pop()}
+                              </p>
+                            )}
                           </div>
                         </div>
                       ) : (
@@ -729,16 +865,71 @@ export default function AdminDrivers() {
                                 placeholder="ABC123XYZ"
                                 maxLength={9}
                                 className="text-sm font-mono"
+                                data-testid="input-share-code"
                               />
                             </div>
                           )}
                           <div className="space-y-2">
                             <Label className="text-xs text-muted-foreground">Nationality</Label>
-                            <Input
-                              value={editNationality}
-                              onChange={(e) => setEditNationality(e.target.value)}
-                              placeholder="e.g. British"
-                            />
+                            <Popover open={nationalityOpen} onOpenChange={setNationalityOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={nationalityOpen}
+                                  className="w-full justify-between text-sm font-normal"
+                                  data-testid="button-nationality-select"
+                                >
+                                  {editNationality || "Select nationality..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[200px] p-0" align="start">
+                                <div className="p-2">
+                                  <Input
+                                    placeholder="Search nationality..."
+                                    value={nationalitySearch}
+                                    onChange={(e) => setNationalitySearch(e.target.value)}
+                                    className="h-8 text-sm"
+                                    data-testid="input-nationality-search"
+                                  />
+                                </div>
+                                <ScrollArea className="h-[200px]">
+                                  <div className="p-1">
+                                    {filteredCountries.length === 0 ? (
+                                      <p className="text-sm text-muted-foreground text-center py-2">
+                                        No nationality found
+                                      </p>
+                                    ) : (
+                                      filteredCountries.map((country) => (
+                                        <Button
+                                          key={country}
+                                          variant="ghost"
+                                          className={cn(
+                                            "w-full justify-start text-sm font-normal h-8",
+                                            editNationality === country && "bg-accent"
+                                          )}
+                                          onClick={() => {
+                                            setEditNationality(country);
+                                            setNationalityOpen(false);
+                                            setNationalitySearch('');
+                                          }}
+                                          data-testid={`option-nationality-${country.toLowerCase().replace(/\s+/g, '-')}`}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              editNationality === country ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {country}
+                                        </Button>
+                                      ))
+                                    )}
+                                  </div>
+                                </ScrollArea>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                       ) : (
