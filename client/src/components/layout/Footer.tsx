@@ -59,7 +59,7 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <MapPin className="h-4 w-4 text-primary" />
-                <span>London, United Kingdom</span>
+                <span>112 Bridgwater Road, London, UK, HA4 6LW</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Clock className="h-4 w-4 text-primary" />
