@@ -735,7 +735,7 @@ export default function AdminJobs() {
             </DialogHeader>
             <div className="flex justify-center py-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-auto">
               {jobForLabel && (
-                <div className="transform scale-75 origin-top">
+                <div className="transform origin-top" style={{ transform: 'scale(0.6)' }}>
                   <ShippingLabel 
                     ref={labelRef} 
                     job={jobForLabel} 
