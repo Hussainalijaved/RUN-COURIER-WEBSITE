@@ -53,11 +53,17 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-3">
-            <img 
-              src={logoImage} 
-              alt="Run Courier" 
-              className="h-12 w-auto object-contain"
-            />
+            <div className="flex items-center gap-2">
+              <img 
+                src={logoImage} 
+                alt="Run Courier" 
+                className="h-12 w-auto object-contain"
+              />
+              <div>
+                <p className="text-xl font-bold text-[#0077B6] leading-tight">RUN</p>
+                <p className="text-xl font-bold text-[#0077B6] leading-tight">COURIER</p>
+              </div>
+            </div>
             <div className="text-right">
               <p className="text-xs text-gray-600">www.runcourier.co.uk</p>
               <p className="text-xs text-gray-600">+44 7311 121 217</p>

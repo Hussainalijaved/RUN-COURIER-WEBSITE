@@ -302,6 +302,7 @@ export default function AdminJobs() {
             .text-black { color: #000; }
             .text-gray-500 { color: #6b7280; }
             .text-gray-600 { color: #4b5563; }
+            .text-\\[\\#0077B6\\] { color: #0077B6; }
             .p-1 { padding: 0.25rem; }
             .p-3 { padding: 0.75rem; }
             .pb-3 { padding-bottom: 0.75rem; }
