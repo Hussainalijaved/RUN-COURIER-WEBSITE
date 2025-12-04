@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { PublicLayout } from '@/components/layout/PublicLayout';
+import { SiTrustpilot } from 'react-icons/si';
 import {
   Truck,
   Clock,
@@ -282,6 +283,31 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="py-12 bg-card border-y border-border">
+        <div className="container mx-auto px-4">
+          <a 
+            href="https://uk.trustpilot.com/review/runcourier.co.uk" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 group"
+            data-testid="trustpilot-section"
+          >
+            <div className="flex items-center gap-3">
+              <SiTrustpilot className="h-8 w-8 text-green-500" />
+              <span className="text-2xl font-bold text-green-500">Trustpilot</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star key={star} className="h-6 w-6 fill-green-500 text-green-500" />
+              ))}
+            </div>
+            <span className="text-muted-foreground group-hover:text-foreground transition-colors">
+              Rated Excellent - See our reviews
+            </span>
+          </a>
+        </div>
+      </section>
+
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -365,10 +391,16 @@ export default function Home() {
               <CheckCircle className="h-5 w-5 text-green-500" />
               <span>24/7 Support</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-yellow-500" />
-              <span>4.9/5 Rating</span>
-            </div>
+            <a 
+              href="https://uk.trustpilot.com/review/runcourier.co.uk" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 hover:text-foreground transition-colors"
+              data-testid="trustpilot-badge"
+            >
+              <SiTrustpilot className="h-5 w-5 text-green-500" />
+              <span>Excellent on Trustpilot</span>
+            </a>
           </div>
         </div>
       </section>

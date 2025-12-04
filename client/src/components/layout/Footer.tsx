@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
-import { SiWhatsapp, SiFacebook } from 'react-icons/si';
+import { SiWhatsapp, SiFacebook, SiTrustpilot } from 'react-icons/si';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
 const footerLinks = {
@@ -165,6 +165,15 @@ export function Footer() {
               data-testid="facebook-link"
             >
               <SiFacebook className="h-5 w-5" />
+            </a>
+            <a 
+              href="https://uk.trustpilot.com/review/runcourier.co.uk" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-green-500 hover:text-green-600 transition-colors"
+              data-testid="trustpilot-link"
+            >
+              <SiTrustpilot className="h-5 w-5" />
             </a>
           </div>
         </div>
