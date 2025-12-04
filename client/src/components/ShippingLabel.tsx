@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { Package, Truck, MapPin, Phone, Calendar, Scale } from 'lucide-react';
+import { MapPin, Phone } from 'lucide-react';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import type { Job } from '@shared/schema';
 
@@ -30,7 +30,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             key={i}
             style={{
               width: `${width}px`,
-              height: '50px',
+              height: '40px',
               backgroundColor: isBlack ? '#000' : '#fff',
             }}
           />
@@ -42,7 +42,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
     return (
       <div
         ref={ref}
-        className="bg-white text-black p-6"
+        className="bg-white text-black p-4"
         style={{
           width: '4in',
           height: '6in',
@@ -52,13 +52,13 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
         data-testid="shipping-label"
       >
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-3">
+          <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-2">
             <div className="flex items-center gap-2">
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-12 w-auto object-contain"
-                style={{ filter: 'grayscale(100%)' }}
+                className="h-10 w-auto object-contain"
+                style={{ filter: 'grayscale(100%) contrast(200%) brightness(0)' }}
               />
               <div>
                 <p className="text-xl font-bold text-black leading-tight">RUN</p>
@@ -71,15 +71,15 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             </div>
           </div>
 
-          <div className="flex justify-center items-center mb-2">
+          <div className="flex justify-center items-center mb-1">
             <div className="flex">{generateBarcode(job.trackingNumber)}</div>
           </div>
-          <p className="text-center font-mono text-lg font-bold tracking-widest mb-4">
+          <p className="text-center font-mono text-base font-bold tracking-widest mb-2">
             {job.trackingNumber}
           </p>
 
-          <div className="flex-1 space-y-3">
-            <div className="border-2 border-black rounded p-3">
+          <div className="flex-1 space-y-2">
+            <div className="border border-black rounded p-2">
               <div className="flex items-center gap-2 mb-2">
                 <div className="bg-black text-white rounded-full p-1">
                   <MapPin className="h-3 w-3" />
@@ -93,25 +93,26 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
               )}
             </div>
 
-            <div className="border-2 border-black rounded p-3 bg-gray-100">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="border-2 border-black rounded p-2 bg-gray-100">
+              <div className="flex items-center gap-2 mb-1">
                 <div className="bg-black text-white rounded-full p-1">
                   <MapPin className="h-3 w-3" />
                 </div>
                 <span className="text-xs font-bold uppercase text-black">To / Delivery</span>
               </div>
               <p className="text-sm font-semibold leading-tight">{job.deliveryAddress}</p>
-              <p className="text-2xl font-bold font-mono mt-1">{job.deliveryPostcode}</p>
+              <p className="text-xl font-bold font-mono mt-1">{job.deliveryPostcode}</p>
               {job.recipientName && (
-                <div className="flex items-center gap-2 mt-2 text-sm">
+                <div className="flex items-center gap-2 mt-1 text-sm">
                   <span className="font-semibold">Recipient:</span>
                   <span>{job.recipientName}</span>
-                </div>
-              )}
-              {job.recipientPhone && (
-                <div className="flex items-center gap-1 text-xs text-gray-600">
-                  <Phone className="h-3 w-3" />
-                  <span>{job.recipientPhone}</span>
+                  {job.recipientPhone && (
+                    <>
+                      <span className="text-gray-400">|</span>
+                      <Phone className="h-3 w-3" />
+                      <span className="text-xs">{job.recipientPhone}</span>
+                    </>
+                  )}
                 </div>
               )}
               {job.deliveryInstructions && (
@@ -120,42 +121,30 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 border-t-2 border-black pt-3 mt-3">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
-                <Scale className="h-3 w-3" />
-              </div>
-              <p className="text-xs text-gray-500">Weight</p>
-              <p className="font-bold text-sm">{job.weight} kg</p>
+          <div className="grid grid-cols-4 gap-1 border-t border-black pt-2 mt-1 text-center">
+            <div>
+              <p className="text-[10px] text-gray-500">Weight</p>
+              <p className="font-bold text-xs">{job.weight} kg</p>
             </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
-                <Truck className="h-3 w-3" />
-              </div>
-              <p className="text-xs text-gray-500">Vehicle</p>
-              <p className="font-bold text-sm capitalize">{job.vehicleType?.replace('_', ' ')}</p>
+            <div>
+              <p className="text-[10px] text-gray-500">Vehicle</p>
+              <p className="font-bold text-xs capitalize">{job.vehicleType?.replace('_', ' ')}</p>
             </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
-                <Package className="h-3 w-3" />
-              </div>
-              <p className="text-xs text-gray-500">Type</p>
-              <p className="font-bold text-sm">
-                {job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Standard'}
+            <div>
+              <p className="text-[10px] text-gray-500">Type</p>
+              <p className="font-bold text-xs">
+                {job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Std'}
               </p>
             </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
-                <Calendar className="h-3 w-3" />
-              </div>
-              <p className="text-xs text-gray-500">Date</p>
-              <p className="font-bold text-sm">{formatDate(job.createdAt)}</p>
+            <div>
+              <p className="text-[10px] text-gray-500">Date</p>
+              <p className="font-bold text-xs">{formatDate(job.createdAt)}</p>
             </div>
           </div>
 
-          <div className="border-t border-dashed border-gray-400 pt-2 mt-2 text-center">
-            <p className="text-xs text-gray-500">
-              Same Day Delivery | Tracked & Insured
+          <div className="border-t border-dashed border-gray-400 pt-1 mt-1 text-center">
+            <p className="text-[10px] text-gray-500">
+              Same Day Delivery | Tracked & Insured | www.runcourier.co.uk
             </p>
           </div>
         </div>
