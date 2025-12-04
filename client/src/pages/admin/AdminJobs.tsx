@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -26,6 +28,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -44,12 +47,26 @@ import {
   Package,
   Loader2,
   Plus,
+  Edit3,
+  Save,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { Job, Driver, JobStatus } from '@shared/schema';
+
+const JOB_STATUSES: { value: JobStatus; label: string }[] = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'assigned', label: 'Assigned' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'on_the_way_pickup', label: 'On the Way to Pickup' },
+  { value: 'arrived_pickup', label: 'Arrived at Pickup' },
+  { value: 'collected', label: 'Collected' },
+  { value: 'on_the_way_delivery', label: 'On the Way to Delivery' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
 const getStatusBadge = (status: JobStatus) => {
   const statusConfig: Record<JobStatus, { label: string; className: string }> = {
@@ -73,6 +90,12 @@ export default function AdminJobs() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [jobToAssign, setJobToAssign] = useState<Job | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [jobToEdit, setJobToEdit] = useState<Job | null>(null);
+  const [editStatus, setEditStatus] = useState<JobStatus>('pending');
+  const [editDriverId, setEditDriverId] = useState<string>('');
+  const [editTotalPrice, setEditTotalPrice] = useState<string>('');
+  const [editDriverPrice, setEditDriverPrice] = useState<string>('');
   const { toast } = useToast();
 
   const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
@@ -111,6 +134,54 @@ export default function AdminJobs() {
     },
   });
 
+  const updateJobMutation = useMutation({
+    mutationFn: async ({ jobId, updates }: { jobId: string; updates: Partial<Job> }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: 'Job updated successfully' });
+      setEditDialogOpen(false);
+      setJobToEdit(null);
+    },
+    onError: () => {
+      toast({ title: 'Failed to update job', variant: 'destructive' });
+    },
+  });
+
+  const openEditDialog = (job: Job) => {
+    setJobToEdit(job);
+    setEditStatus(job.status);
+    setEditDriverId(job.driverId || 'unassigned');
+    setEditTotalPrice(job.totalPrice?.toString() || '0');
+    setEditDriverPrice(job.driverPrice?.toString() || '');
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!jobToEdit) return;
+
+    const updates: Partial<Job> = {
+      status: editStatus,
+      totalPrice: editTotalPrice,
+      driverPrice: editDriverPrice || null,
+    };
+
+    if (editDriverId !== 'unassigned' && editDriverId !== jobToEdit.driverId) {
+      updates.driverId = editDriverId;
+      if (editStatus === 'pending') {
+        updates.status = 'assigned';
+      }
+    } else if (editDriverId === 'unassigned' && jobToEdit.driverId) {
+      updates.driverId = null;
+      if (editStatus === 'assigned') {
+        updates.status = 'pending';
+      }
+    }
+
+    updateJobMutation.mutate({ jobId: jobToEdit.id, updates });
+  };
+
   const filteredJobs = jobs?.filter((job) => {
     const matchesSearch =
       job.trackingNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -127,8 +198,10 @@ export default function AdminJobs() {
   };
 
   const availableDrivers = drivers?.filter((d) => d.isAvailable && d.isVerified) || [];
+  const allDrivers = drivers || [];
 
-  const formatPrice = (price: string | number) => {
+  const formatPrice = (price: string | number | null | undefined) => {
+    if (price === null || price === undefined) return '—';
     const num = typeof price === 'string' ? parseFloat(price) : price;
     return `£${num.toFixed(2)}`;
   };
@@ -181,7 +254,9 @@ export default function AdminJobs() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
                   <SelectItem value="on_the_way_pickup">To Pickup</SelectItem>
+                  <SelectItem value="arrived_pickup">At Pickup</SelectItem>
                   <SelectItem value="collected">Collected</SelectItem>
                   <SelectItem value="on_the_way_delivery">Delivering</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
@@ -244,6 +319,10 @@ export default function AdminJobs() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditDialog(job)} data-testid={`menu-edit-${job.id}`}>
+                              <Edit3 className="mr-2 h-4 w-4" />
+                              Edit Job
+                            </DropdownMenuItem>
                             {!job.driverId && job.status === 'pending' && (
                               <DropdownMenuItem 
                                 onClick={() => { setJobToAssign(job); setAssignDialogOpen(true); }}
@@ -279,6 +358,7 @@ export default function AdminJobs() {
           </CardContent>
         </Card>
 
+        {/* View Job Details Dialog */}
         <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -315,10 +395,16 @@ export default function AdminJobs() {
                     <p className="font-medium">{selectedJob.distance || '—'} miles</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Amount</p>
+                    <p className="text-sm text-muted-foreground">Customer Amount</p>
                     <p className="font-medium">{formatPrice(selectedJob.totalPrice)}</p>
                   </div>
                 </div>
+                {selectedJob.driverPrice && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Driver Payment</p>
+                    <p className="font-medium text-green-600">{formatPrice(selectedJob.driverPrice)}</p>
+                  </div>
+                )}
                 <div className="flex gap-2 flex-wrap">
                   {getStatusBadge(selectedJob.status)}
                   {selectedJob.driverId && (
@@ -346,6 +432,7 @@ export default function AdminJobs() {
           </DialogContent>
         </Dialog>
 
+        {/* Assign Driver Dialog */}
         <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -376,6 +463,128 @@ export default function AdminJobs() {
                 <p className="text-center text-muted-foreground py-4">No available drivers</p>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Job Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Job</DialogTitle>
+              <DialogDescription>
+                Update job {jobToEdit?.trackingNumber}
+              </DialogDescription>
+            </DialogHeader>
+            {jobToEdit && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Pickup</p>
+                    <p className="font-mono">{jobToEdit.pickupPostcode}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Delivery</p>
+                    <p className="font-mono">{jobToEdit.deliveryPostcode}</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-status">Job Status</Label>
+                    <Select value={editStatus} onValueChange={(val) => setEditStatus(val as JobStatus)}>
+                      <SelectTrigger id="edit-status" data-testid="select-edit-status">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {JOB_STATUSES.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-driver">Assigned Driver</Label>
+                    <Select value={editDriverId} onValueChange={setEditDriverId}>
+                      <SelectTrigger id="edit-driver" data-testid="select-edit-driver">
+                        <SelectValue placeholder="Select driver" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">No Driver (Unassigned)</SelectItem>
+                        {allDrivers.map((driver) => (
+                          <SelectItem key={driver.id} value={driver.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{driver.vehicleRegistration || driver.userId}</span>
+                              {driver.isAvailable && driver.isVerified && (
+                                <Badge variant="secondary" className="text-xs">Available</Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-total-price">Customer Price (£)</Label>
+                      <Input
+                        id="edit-total-price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editTotalPrice}
+                        onChange={(e) => setEditTotalPrice(e.target.value)}
+                        data-testid="input-edit-total-price"
+                      />
+                      <p className="text-xs text-muted-foreground">Total amount customer pays</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-driver-price">Driver Payment (£)</Label>
+                      <Input
+                        id="edit-driver-price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editDriverPrice}
+                        onChange={(e) => setEditDriverPrice(e.target.value)}
+                        placeholder="Optional"
+                        data-testid="input-edit-driver-price"
+                      />
+                      <p className="text-xs text-muted-foreground">Amount driver receives</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveEdit} 
+                disabled={updateJobMutation.isPending}
+                data-testid="button-save-edit"
+              >
+                {updateJobMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
