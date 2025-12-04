@@ -465,6 +465,15 @@ export default function AdminJobs() {
                                 Assign Driver
                               </DropdownMenuItem>
                             )}
+                            {job.driverId && job.status !== 'delivered' && job.status !== 'cancelled' && (
+                              <DropdownMenuItem 
+                                onClick={() => { setJobToAssign(job); setAssignDialogOpen(true); }}
+                                data-testid={`menu-reassign-${job.id}`}
+                              >
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                Reassign Driver
+                              </DropdownMenuItem>
+                            )}
                             {job.status !== 'delivered' && job.status !== 'cancelled' && (
                               <DropdownMenuItem 
                                 className="text-destructive"
@@ -569,31 +578,37 @@ export default function AdminJobs() {
         <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Assign Driver</DialogTitle>
+              <DialogTitle>{jobToAssign?.driverId ? 'Reassign Driver' : 'Assign Driver'}</DialogTitle>
               <DialogDescription>
-                Select an available driver for job {jobToAssign?.trackingNumber}
+                {jobToAssign?.driverId ? (
+                  <>Currently assigned to: <span className="font-medium">{getDriverName(jobToAssign.driverId)}</span>. Select a new driver for job {jobToAssign?.trackingNumber}</>
+                ) : (
+                  <>Select an available driver for job {jobToAssign?.trackingNumber}</>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              {availableDrivers.length > 0 ? (
-                availableDrivers.map((driver) => (
+              {allDrivers.filter(d => d.isVerified).length > 0 ? (
+                allDrivers.filter(d => d.isVerified).map((driver) => (
                   <Button
                     key={driver.id}
-                    variant="outline"
+                    variant={driver.id === jobToAssign?.driverId ? "default" : "outline"}
                     className="w-full justify-between"
                     onClick={() => jobToAssign && assignDriverMutation.mutate({ jobId: jobToAssign.id, driverId: driver.id })}
-                    disabled={assignDriverMutation.isPending}
+                    disabled={assignDriverMutation.isPending || driver.id === jobToAssign?.driverId}
                     data-testid={`button-assign-driver-${driver.id}`}
                   >
                     <div className="flex items-center gap-2">
                       <span>{driver.vehicleRegistration}</span>
                       <Badge variant="secondary" className="capitalize">{driver.vehicleType?.replace('_', ' ')}</Badge>
+                      {driver.isAvailable && <Badge variant="outline" className="text-green-600">Online</Badge>}
+                      {driver.id === jobToAssign?.driverId && <Badge>Current</Badge>}
                     </div>
                     {assignDriverMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                   </Button>
                 ))
               ) : (
-                <p className="text-center text-muted-foreground py-4">No available drivers</p>
+                <p className="text-center text-muted-foreground py-4">No verified drivers available</p>
               )}
             </div>
           </DialogContent>
