@@ -47,7 +47,11 @@ export function Footer() {
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <Phone className="h-4 w-4 text-primary" />
-                <span>0800 123 4567</span>
+                <span>+44 7311 112 17</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <Phone className="h-4 w-4 text-primary" />
+                <span>+44 7862 771 999</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="h-4 w-4 text-primary" />
