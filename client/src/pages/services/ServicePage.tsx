@@ -23,6 +23,7 @@ import medicalHeroImage from '@assets/WhatsApp_Image_2025-09-03_at_19.11.49_c1db
 import sameDayHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.06.18_8ff558b5_1764877634513.jpg';
 import multiDropHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.07.21_17b4d701_1764877686495.jpg';
 import retailHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.19.15_47cde5e4_1764877777467.jpg';
+import returnTripHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.14.32_790bffe7_1764877840111.jpg';
 
 interface ServicePageProps {
   type: 'same-day' | 'medical' | 'legal' | 'retail' | 'multi-drop' | 'return-trip' | 'scheduled' | 'restaurants';
@@ -154,6 +155,7 @@ const serviceData = {
     subtitle: 'There and back again',
     description: 'Need items picked up and brought back? Our return trip service is perfect for exchanges, repairs, or collecting signatures.',
     color: 'bg-purple-500',
+    heroImage: returnTripHeroImage,
     features: [
       'Same driver throughout',
       'Waiting time options',
