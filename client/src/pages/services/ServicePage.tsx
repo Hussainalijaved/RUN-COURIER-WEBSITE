@@ -26,6 +26,7 @@ import retailHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.19.15_47cde
 import returnTripHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.14.32_790bffe7_1764877840111.jpg';
 import scheduledHeroImage from '@assets/generated_images/scheduled_delivery_courier_service.png';
 import restaurantsHeroImage from '@assets/generated_images/restaurant_catering_delivery_service.png';
+import legalHeroImage from '@assets/WhatsApp_Image_2025-09-03_at_19.25.37_64396f5e_1764883001684.jpg';
 
 interface ServicePageProps {
   type: 'same-day' | 'medical' | 'legal' | 'retail' | 'multi-drop' | 'return-trip' | 'scheduled' | 'restaurants';
@@ -86,6 +87,7 @@ const serviceData = {
     subtitle: 'Secure legal courier services',
     description: 'Confidential and secure delivery service for legal documents, court filings, and sensitive paperwork. Chain of custody maintained throughout.',
     color: 'bg-indigo-500',
+    heroImage: legalHeroImage,
     features: [
       'Tamper-evident packaging',
       'Signature verification',
