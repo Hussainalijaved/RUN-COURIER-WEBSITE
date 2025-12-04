@@ -296,8 +296,7 @@ export default function AdminJobs() {
             .rounded-full { border-radius: 9999px; }
             .bg-white { background-color: #fff; }
             .bg-gray-50 { background-color: #f9fafb; }
-            .bg-green-500 { background-color: #22c55e; }
-            .bg-red-500 { background-color: #ef4444; }
+            .bg-gray-100 { background-color: #f3f4f6; }
             .text-white { color: #fff; }
             .text-black { color: #000; }
             .text-gray-500 { color: #6b7280; }

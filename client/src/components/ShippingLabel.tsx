@@ -22,15 +22,15 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
     const generateBarcode = (trackingNumber: string) => {
       const bars = [];
       const code = trackingNumber.toUpperCase();
-      for (let i = 0; i < code.length * 3; i++) {
-        const width = (i % 3 === 0) ? 2 : 1;
+      for (let i = 0; i < code.length * 5; i++) {
+        const width = (i % 3 === 0) ? 3 : (i % 2 === 0) ? 2 : 1;
         const isBlack = i % 2 === 0;
         bars.push(
           <div
             key={i}
             style={{
               width: `${width}px`,
-              height: '40px',
+              height: '50px',
               backgroundColor: isBlack ? '#000' : '#fff',
             }}
           />
@@ -58,10 +58,11 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                 src={logoImage} 
                 alt="Run Courier" 
                 className="h-12 w-auto object-contain"
+                style={{ filter: 'grayscale(100%)' }}
               />
               <div>
-                <p className="text-xl font-bold text-[#0077B6] leading-tight">RUN</p>
-                <p className="text-xl font-bold text-[#0077B6] leading-tight">COURIER</p>
+                <p className="text-xl font-bold text-black leading-tight">RUN</p>
+                <p className="text-xl font-bold text-black leading-tight">COURIER</p>
               </div>
             </div>
             <div className="text-right">
@@ -78,12 +79,12 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
           </p>
 
           <div className="flex-1 space-y-3">
-            <div className="border-2 border-gray-300 rounded p-3">
+            <div className="border-2 border-black rounded p-3">
               <div className="flex items-center gap-2 mb-2">
-                <div className="bg-green-500 text-white rounded-full p-1">
+                <div className="bg-black text-white rounded-full p-1">
                   <MapPin className="h-3 w-3" />
                 </div>
-                <span className="text-xs font-bold uppercase text-gray-500">From / Pickup</span>
+                <span className="text-xs font-bold uppercase text-black">From / Pickup</span>
               </div>
               <p className="text-sm font-semibold leading-tight">{job.pickupAddress}</p>
               <p className="text-lg font-bold font-mono mt-1">{job.pickupPostcode}</p>
@@ -92,12 +93,12 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
               )}
             </div>
 
-            <div className="border-2 border-black rounded p-3 bg-gray-50">
+            <div className="border-2 border-black rounded p-3 bg-gray-100">
               <div className="flex items-center gap-2 mb-2">
-                <div className="bg-red-500 text-white rounded-full p-1">
+                <div className="bg-black text-white rounded-full p-1">
                   <MapPin className="h-3 w-3" />
                 </div>
-                <span className="text-xs font-bold uppercase text-gray-500">To / Delivery</span>
+                <span className="text-xs font-bold uppercase text-black">To / Delivery</span>
               </div>
               <p className="text-sm font-semibold leading-tight">{job.deliveryAddress}</p>
               <p className="text-2xl font-bold font-mono mt-1">{job.deliveryPostcode}</p>
