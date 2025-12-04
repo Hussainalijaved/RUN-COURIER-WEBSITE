@@ -40,56 +40,56 @@ const services = [
   {
     icon: Zap,
     title: 'Same Day Delivery',
-    description: 'Urgent deliveries within hours',
+    description: 'Time-critical deliveries collected within 60 minutes and delivered the same day. Perfect for urgent documents, contracts, and last-minute shipments across London and the UK.',
     href: '/services/same-day',
     color: 'bg-blue-500',
   },
   {
     icon: Layers,
     title: 'Multi-Drop',
-    description: 'Multiple delivery points in one trip',
+    description: 'Efficient route-optimised deliveries to multiple locations in a single journey. Ideal for businesses distributing to several clients, saving you time and money.',
     href: '/services/multi-drop',
     color: 'bg-green-500',
   },
   {
     icon: RotateCcw,
     title: 'Return Trip',
-    description: 'Round-trip delivery service',
+    description: 'Complete round-trip service with collection and return to your original location. Perfect for signed documents, equipment loans, or items requiring acknowledgement.',
     href: '/services/return-trip',
     color: 'bg-purple-500',
   },
   {
     icon: Calendar,
     title: 'Scheduled',
-    description: 'Plan deliveries in advance',
+    description: 'Pre-book your deliveries for a specific date and time that suits your schedule. Reliable, punctual service for planned shipments and regular business needs.',
     href: '/services/scheduled',
     color: 'bg-orange-500',
   },
   {
     icon: Heart,
     title: 'Medical',
-    description: 'Safe medical specimen transport',
+    description: 'Temperature-controlled, secure transport for medical specimens, pharmaceuticals, and healthcare supplies. Fully compliant with NHS and healthcare industry standards.',
     href: '/services/medical',
     color: 'bg-red-500',
   },
   {
     icon: Scale,
     title: 'Legal',
-    description: 'Secure legal document delivery',
+    description: 'Confidential, chain-of-custody delivery for legal documents, court filings, and sensitive contracts. Proof of delivery and signature capture as standard.',
     href: '/services/legal',
     color: 'bg-indigo-500',
   },
   {
     icon: ShoppingBag,
     title: 'Retail',
-    description: 'E-commerce & retail logistics',
+    description: 'Seamless last-mile delivery solutions for e-commerce and retail businesses. Same-day dispatch, branded tracking, and exceptional customer experience.',
     href: '/services/retail',
     color: 'bg-pink-500',
   },
   {
     icon: Utensils,
     title: 'Restaurants',
-    description: 'Food & catering delivery',
+    description: 'Fast, reliable food and catering delivery that keeps your meals fresh. Insulated transport and dedicated drivers for restaurants, caterers, and food businesses.',
     href: '/services/restaurants',
     color: 'bg-yellow-500',
   },
@@ -99,22 +99,22 @@ const features = [
   {
     icon: Clock,
     title: 'Lightning Fast',
-    description: 'Same-day delivery across London and UK-wide express service',
+    description: 'Collection within 60 minutes of booking. Same-day delivery across London and express nationwide service when time matters most.',
   },
   {
     icon: Shield,
     title: 'Fully Insured',
-    description: 'All deliveries covered with comprehensive goods-in-transit insurance',
+    description: 'Complete peace of mind with comprehensive goods-in-transit insurance up to £50,000. Your items are protected from collection to delivery.',
   },
   {
     icon: MapPin,
     title: 'Real-Time Tracking',
-    description: 'Track your delivery live on the map with accurate ETA updates',
+    description: 'Follow your delivery every step of the way with live GPS tracking, instant notifications, and accurate arrival time predictions.',
   },
   {
     icon: Package,
     title: 'Any Size',
-    description: 'From documents to large packages - we handle it all',
+    description: 'From urgent documents to bulky equipment, our diverse fleet handles everything. Motorbikes, cars, and vans ready for any job.',
   },
 ];
 
@@ -150,7 +150,7 @@ export default function Home() {
               <span className="block">Delivery Across the UK.</span>
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-10 max-w-2xl mx-auto">
-              Trusted by businesses and individuals for urgent deliveries.
+              Professional courier services trusted by thousands of businesses. Collection within 60 minutes, real-time tracking, and guaranteed same-day delivery.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/quote">
