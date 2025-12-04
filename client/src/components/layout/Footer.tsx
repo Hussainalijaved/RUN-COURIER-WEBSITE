@@ -85,6 +85,37 @@ export function Footer() {
                 <span>24/7 Service Available</span>
               </div>
             </div>
+            
+            <div className="flex items-center gap-4 mt-6 pt-4 border-t border-border">
+              <span className="text-sm text-muted-foreground">Follow us:</span>
+              <a 
+                href="https://www.facebook.com/profile.php?id=61576739843460" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 transition-colors"
+                data-testid="facebook-link-top"
+              >
+                <SiFacebook className="h-6 w-6" />
+              </a>
+              <a 
+                href="https://uk.trustpilot.com/review/runcourier.co.uk" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-green-500 hover:text-green-600 transition-colors"
+                data-testid="trustpilot-link-top"
+              >
+                <SiTrustpilot className="h-6 w-6" />
+              </a>
+              <a 
+                href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
+                data-testid="appstore-link-top"
+              >
+                <SiAppstore className="h-6 w-6" />
+              </a>
+            </div>
           </div>
 
           <div>
@@ -153,38 +184,9 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Run Courier. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
-            <span className="text-xs text-muted-foreground">
-              Trusted by 10,000+ businesses across the UK
-            </span>
-            <a 
-              href="https://www.facebook.com/profile.php?id=61576739843460" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 transition-colors"
-              data-testid="facebook-link"
-            >
-              <SiFacebook className="h-5 w-5" />
-            </a>
-            <a 
-              href="https://uk.trustpilot.com/review/runcourier.co.uk" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-green-500 hover:text-green-600 transition-colors"
-              data-testid="trustpilot-link"
-            >
-              <SiTrustpilot className="h-5 w-5" />
-            </a>
-            <a 
-              href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-              data-testid="appstore-link"
-            >
-              <SiAppstore className="h-5 w-5" />
-            </a>
-          </div>
+          <span className="text-xs text-muted-foreground">
+            Trusted by 10,000+ businesses across the UK
+          </span>
         </div>
       </div>
     </footer>

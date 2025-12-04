@@ -16,6 +16,7 @@ import {
   Phone,
   Loader2,
 } from 'lucide-react';
+import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept.png';
 import type { JobStatus } from '@shared/schema';
 
 const statusSteps: { status: JobStatus; label: string; icon: any }[] = [
@@ -112,11 +113,16 @@ export default function Track() {
 
   return (
     <PublicLayout>
-      <section className="py-20 bg-gradient-to-b from-primary/5 to-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
+      <section className="relative min-h-[400px] flex items-center">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${trackingHeroImage})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/70 via-[#0077B6]/60 to-[#00B4D8]/50" />
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-3xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">Track Your Parcel</h1>
-            <p className="text-lg text-muted-foreground mb-8">
+            <p className="text-lg text-white/90 mb-8">
               Enter your tracking number to see real-time updates on your delivery
             </p>
             <div className="max-w-md mx-auto flex gap-2">
@@ -126,10 +132,10 @@ export default function Track() {
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleTrack()}
-                className="flex-1"
+                className="flex-1 bg-white/95 border-white/20 text-gray-900 placeholder:text-gray-500"
                 data-testid="input-tracking"
               />
-              <Button onClick={handleTrack} disabled={isLoading} data-testid="button-track">
+              <Button onClick={handleTrack} disabled={isLoading} className="bg-white text-[#0077B6] hover:bg-white/90" data-testid="button-track">
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -138,7 +144,7 @@ export default function Track() {
               </Button>
             </div>
             {error && (
-              <p className="text-destructive mt-4 text-sm">{error}</p>
+              <p className="text-red-200 mt-4 text-sm bg-red-500/20 py-2 px-4 rounded-lg inline-block">{error}</p>
             )}
           </div>
         </div>
