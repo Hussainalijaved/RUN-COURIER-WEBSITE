@@ -40,7 +40,7 @@ const contactInfo: {
     icon: Phone,
     title: 'Phone',
     details: [
-      { text: '+44 7311 112 17', whatsapp: 'https://wa.me/4473111217' },
+      { text: '+44 7311 121 217', whatsapp: 'https://wa.me/447311121217' },
       { text: '+44 7862 771 999', whatsapp: 'https://wa.me/447862771999' },
     ],
     subtext: 'Available 24/7',
