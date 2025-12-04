@@ -190,10 +190,10 @@ export class MemStorage implements IStorage {
     this.users.set(adminUser.id, adminUser);
 
     const drivers = [
-      { id: "driver-1", userId: "user-d1", name: "John Smith", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278" },
-      { id: "driver-2", userId: "user-d2", name: "Sarah Wilson", vehicle: "small_van" as VehicleType, lat: "51.5155", lng: "-0.1420" },
-      { id: "driver-3", userId: "user-d3", name: "Mike Johnson", vehicle: "motorbike" as VehicleType, lat: "51.4995", lng: "-0.1248" },
-      { id: "driver-4", userId: "user-d4", name: "Emma Brown", vehicle: "medium_van" as VehicleType, lat: "51.5225", lng: "-0.0800" },
+      { id: "driver-1", userId: "user-d1", name: "John Smith", code: "JS01", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278" },
+      { id: "driver-2", userId: "user-d2", name: "Sarah Wilson", code: "SW02", vehicle: "small_van" as VehicleType, lat: "51.5155", lng: "-0.1420" },
+      { id: "driver-3", userId: "user-d3", name: "Mike Johnson", code: "MJ03", vehicle: "motorbike" as VehicleType, lat: "51.4995", lng: "-0.1248" },
+      { id: "driver-4", userId: "user-d4", name: "Emma Brown", code: "EB04", vehicle: "medium_van" as VehicleType, lat: "51.5225", lng: "-0.0800" },
     ];
 
     drivers.forEach((d, i) => {
@@ -218,6 +218,7 @@ export class MemStorage implements IStorage {
       const driver: Driver = {
         id: d.id,
         userId: d.userId,
+        driverCode: d.code,
         vehicleType: d.vehicle,
         vehicleRegistration: `AB${i + 1}0 XYZ`,
         vehicleMake: d.vehicle === "motorbike" ? "Honda" : d.vehicle === "car" ? "Toyota" : "Ford",
@@ -508,12 +509,43 @@ export class MemStorage implements IStorage {
     return drivers;
   }
 
+  private generateDriverCode(): string {
+    const existingCodes = new Set(
+      Array.from(this.drivers.values())
+        .map(d => d.driverCode)
+        .filter(Boolean)
+    );
+    
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let attempts = 0;
+    const maxAttempts = 1000;
+    
+    while (attempts < maxAttempts) {
+      const l1 = letters[Math.floor(Math.random() * letters.length)];
+      const l2 = letters[Math.floor(Math.random() * letters.length)];
+      const n1 = Math.floor(Math.random() * 10);
+      const n2 = Math.floor(Math.random() * 10);
+      const code = `${l1}${l2}${n1}${n2}`;
+      
+      if (!existingCodes.has(code)) {
+        return code;
+      }
+      attempts++;
+    }
+    
+    // Fallback: use timestamp-based code
+    const ts = Date.now().toString(36).toUpperCase().slice(-4);
+    return ts;
+  }
+
   async createDriver(insertDriver: InsertDriver): Promise<Driver> {
     // Use the Supabase userId as the driver ID for consistency with mobile app
     const id = insertDriver.userId;
+    const driverCode = insertDriver.driverCode || this.generateDriverCode();
     const driver: Driver = {
       ...insertDriver,
       id,
+      driverCode,
       vehicleRegistration: insertDriver.vehicleRegistration || null,
       vehicleMake: insertDriver.vehicleMake || null,
       vehicleModel: insertDriver.vehicleModel || null,

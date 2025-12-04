@@ -32,6 +32,7 @@ export const users = pgTable("users", {
 export const drivers = pgTable("drivers", {
   id: varchar("id", { length: 36 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }).notNull(),
+  driverCode: text("driver_code").unique(),
   fullName: text("full_name"),
   email: text("email"),
   phone: text("phone"),

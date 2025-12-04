@@ -66,6 +66,7 @@ interface SupabaseDriver {
   fullName: string;
   phone: string | null;
   role: string;
+  driverCode: string | null;
   createdAt: string;
 }
 
@@ -215,12 +216,29 @@ export default function AdminJobs() {
 
   const getDriverName = (driverId: string | null) => {
     if (!driverId) return '—';
-    // First try Supabase drivers for the real name
+    // First try Supabase drivers for the code and name
     const supabaseDriver = supabaseDrivers?.find((d) => d.id === driverId);
-    if (supabaseDriver?.fullName) return supabaseDriver.fullName;
-    // Fall back to local drivers for vehicle registration
+    if (supabaseDriver) {
+      const code = supabaseDriver.driverCode || '';
+      const name = supabaseDriver.fullName || 'Unknown';
+      return code ? `${code} · ${name}` : name;
+    }
+    // Fall back to local drivers
     const driver = drivers?.find((d) => d.id === driverId);
-    return driver?.vehicleRegistration || driverId.substring(0, 8) + '...';
+    if (driver) {
+      const code = driver.driverCode || '';
+      return code ? `${code} · ${driver.vehicleRegistration || 'Driver'}` : driver.vehicleRegistration || 'Driver';
+    }
+    return driverId.substring(0, 8) + '...';
+  };
+
+  // Get driver code only
+  const getDriverCode = (driverId: string | null) => {
+    if (!driverId) return null;
+    const supabaseDriver = supabaseDrivers?.find((d) => d.id === driverId);
+    if (supabaseDriver?.driverCode) return supabaseDriver.driverCode;
+    const driver = drivers?.find((d) => d.id === driverId);
+    return driver?.driverCode || null;
   };
 
   // Get driver info combining Supabase (name) and local (vehicle) data
@@ -231,6 +249,7 @@ export default function AdminJobs() {
       name: supabaseDriver?.fullName || 'Unknown',
       email: supabaseDriver?.email || '',
       phone: supabaseDriver?.phone || localDriver?.phone || '',
+      driverCode: supabaseDriver?.driverCode || localDriver?.driverCode || null,
       vehicleType: localDriver?.vehicleType || 'car',
       vehicleRegistration: localDriver?.vehicleRegistration || '',
       isVerified: localDriver?.isVerified || false,
@@ -246,6 +265,7 @@ export default function AdminJobs() {
       name: sd.fullName,
       email: sd.email,
       phone: sd.phone || localInfo.phone,
+      driverCode: sd.driverCode || localInfo.driverCode,
       vehicleType: localInfo.vehicleType,
       vehicleRegistration: localInfo.vehicleRegistration,
       isVerified: localInfo.isVerified,
@@ -648,14 +668,16 @@ export default function AdminJobs() {
                     disabled={assignDriverMutation.isPending || driver.id === jobToAssign?.driverId}
                     data-testid={`button-assign-driver-${driver.id}`}
                   >
-                    <div className="flex flex-col items-start gap-1">
-                      <span className="font-medium">{driver.name}</span>
-                      <span className="text-xs text-muted-foreground">{driver.email}</span>
+                    <div className="flex items-center gap-3">
+                      {driver.driverCode && (
+                        <Badge className="bg-blue-600 text-white font-mono text-sm px-2">{driver.driverCode}</Badge>
+                      )}
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="font-medium">{driver.name}</span>
+                        <span className="text-xs text-muted-foreground">{driver.email}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {driver.vehicleRegistration && (
-                        <Badge variant="secondary">{driver.vehicleRegistration}</Badge>
-                      )}
                       <Badge variant="outline" className="capitalize">{driver.vehicleType?.replace('_', ' ')}</Badge>
                       {driver.isAvailable && <Badge variant="outline" className="text-green-600 border-green-600">Online</Badge>}
                       {driver.id === jobToAssign?.driverId && <Badge>Current</Badge>}
@@ -722,10 +744,10 @@ export default function AdminJobs() {
                         {allDriversWithInfo.map((driver) => (
                           <SelectItem key={driver.id} value={driver.id}>
                             <div className="flex items-center gap-2">
-                              <span>{driver.name}</span>
-                              {driver.vehicleRegistration && (
-                                <span className="text-muted-foreground text-xs">({driver.vehicleRegistration})</span>
+                              {driver.driverCode && (
+                                <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
                               )}
+                              <span>{driver.name}</span>
                               {driver.isAvailable && (
                                 <Badge variant="secondary" className="text-xs">Online</Badge>
                               )}

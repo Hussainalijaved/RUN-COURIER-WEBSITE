@@ -215,17 +215,42 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to fetch users from Supabase" });
       }
 
-      // Filter for driver role users
-      const driverUsers = users
-        .filter(user => user.user_metadata?.role === 'driver')
-        .map(user => ({
-          id: user.id,
-          email: user.email,
-          fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || 'Unknown Driver',
-          phone: user.user_metadata?.phone || null,
-          role: user.user_metadata?.role || 'driver',
-          createdAt: user.created_at,
-        }));
+      // Get local drivers for driver codes
+      const localDrivers = await storage.getDrivers();
+      const driverCodeMap = new Map(localDrivers.map(d => [d.userId || d.id, d.driverCode]));
+
+      // Filter for driver role users and include driver code
+      const driverUsers = await Promise.all(
+        users
+          .filter(user => user.user_metadata?.role === 'driver')
+          .map(async user => {
+            // Check if driver exists locally, if not create one with a code
+            let localDriver = localDrivers.find(d => d.userId === user.id || d.id === user.id);
+            
+            if (!localDriver) {
+              // Create a local driver record with auto-generated code
+              localDriver = await storage.createDriver({
+                userId: user.id,
+                fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || null,
+                email: user.email || null,
+                phone: user.user_metadata?.phone || null,
+                vehicleType: 'car',
+                isAvailable: false,
+                isVerified: false,
+              });
+            }
+
+            return {
+              id: user.id,
+              email: user.email,
+              fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || 'Unknown Driver',
+              phone: user.user_metadata?.phone || null,
+              role: user.user_metadata?.role || 'driver',
+              driverCode: localDriver?.driverCode || driverCodeMap.get(user.id) || null,
+              createdAt: user.created_at,
+            };
+          })
+      );
 
       res.json(driverUsers);
     } catch (err) {
