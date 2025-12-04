@@ -22,6 +22,7 @@ import {
 import medicalHeroImage from '@assets/WhatsApp_Image_2025-09-03_at_19.11.49_c1dbfbad_1764877241699.jpg';
 import sameDayHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.06.18_8ff558b5_1764877634513.jpg';
 import multiDropHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.07.21_17b4d701_1764877686495.jpg';
+import retailHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.19.15_47cde5e4_1764877777467.jpg';
 
 interface ServicePageProps {
   type: 'same-day' | 'medical' | 'legal' | 'retail' | 'multi-drop' | 'return-trip' | 'scheduled' | 'restaurants';
@@ -105,6 +106,7 @@ const serviceData = {
     subtitle: 'Seamless e-commerce logistics',
     description: 'End-to-end delivery solutions for online retailers. From warehouse to doorstep, we help you delight your customers with fast, reliable delivery.',
     color: 'bg-pink-500',
+    heroImage: retailHeroImage,
     features: [
       'Same-day and next-day options',
       'Branded delivery experience',
