@@ -18,6 +18,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Phone, MapPin, Clock, Loader2, Send } from 'lucide-react';
 import { SiWhatsapp } from 'react-icons/si';
+import contactHeroImage from '@assets/generated_images/customer_service_lady_with_headphones.png';
 
 const contactSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -100,11 +101,17 @@ export default function Contact() {
 
   return (
     <PublicLayout>
-      <section className="py-20 bg-gradient-to-b from-primary/5 to-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
+      <section className="relative min-h-[400px] lg:min-h-[450px] flex items-center">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${contactHeroImage})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/90 via-[#0096C7]/85 to-[#00B4D8]/75" />
+        
+        <div className="relative container mx-auto px-4 py-20">
+          <div className="max-w-3xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">Contact Us</h1>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-lg text-white/90">
               Have a question or need assistance? We're here to help.
               Get in touch with our team.
             </p>
