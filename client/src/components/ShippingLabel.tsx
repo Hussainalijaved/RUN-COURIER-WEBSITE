@@ -1,6 +1,5 @@
 import { forwardRef } from 'react';
-import { MapPin, Phone } from 'lucide-react';
-import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
+import { MapPin, Phone, Truck } from 'lucide-react';
 import type { Job } from '@shared/schema';
 
 interface ShippingLabelProps {
@@ -54,24 +53,27 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-2">
             <div className="flex items-center gap-2">
-              <img 
-                src={logoImage} 
-                alt="Run Courier" 
-                className="h-10 w-auto object-contain"
-                style={{ 
-                  filter: 'grayscale(100%) contrast(1000%) brightness(0)',
-                  mixBlendMode: 'multiply',
-                  opacity: 0.9
+              <div 
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  border: '2px solid black',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
-              />
-              <div>
-                <p className="text-xl font-bold text-black leading-tight">RUN</p>
-                <p className="text-xl font-bold text-black leading-tight">COURIER</p>
+              >
+                <Truck style={{ width: '20px', height: '20px', color: 'black' }} />
+              </div>
+              <div style={{ lineHeight: '1' }}>
+                <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>RUN</p>
+                <p style={{ fontSize: '18px', fontWeight: '800', color: 'black', letterSpacing: '1px' }}>COURIER</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-600">www.runcourier.co.uk</p>
-              <p className="text-xs text-gray-600">+44 7311 121 217</p>
+              <p style={{ fontSize: '10px', color: '#444' }}>www.runcourier.co.uk</p>
+              <p style={{ fontSize: '10px', color: '#444' }}>+44 7311 121 217</p>
             </div>
           </div>
 
