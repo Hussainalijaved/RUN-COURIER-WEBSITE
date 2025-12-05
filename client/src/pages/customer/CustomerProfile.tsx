@@ -36,6 +36,9 @@ export default function CustomerProfile() {
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
   const [buildingName, setBuildingName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
 
   const { data: profile, isLoading } = useQuery<UserType>({
     queryKey: ['/api/users', user?.id],
@@ -49,9 +52,14 @@ export default function CustomerProfile() {
       setPostcode(profile.postcode || '');
       setAddress(profile.address || '');
       setBuildingName(profile.buildingName || '');
+      setCompanyName(profile.companyName || '');
+      setRegistrationNumber(profile.registrationNumber || '');
+      setBusinessAddress(profile.businessAddress || '');
     } else if (user) {
       setFullName(user.fullName || '');
       setPhone(user.phone || '');
+      setCompanyName(user.companyName || '');
+      setRegistrationNumber(user.registrationNumber || '');
     }
   }, [profile, user]);
 
@@ -76,13 +84,22 @@ export default function CustomerProfile() {
   });
 
   const handleSave = () => {
-    updateProfileMutation.mutate({
+    const data: Partial<UserType> = {
       fullName,
       phone,
       postcode,
       address,
       buildingName,
-    });
+    };
+    
+    // Include business fields if user is a business account
+    if ((profile?.userType || user?.userType) === 'business') {
+      data.companyName = companyName;
+      data.registrationNumber = registrationNumber;
+      data.businessAddress = businessAddress;
+    }
+    
+    updateProfileMutation.mutate(data);
   };
 
   const getInitials = (name: string) => {
@@ -261,7 +278,7 @@ export default function CustomerProfile() {
                   </div>
                 </div>
 
-                {(profile?.userType || user?.userType) === 'business' && (profile?.companyName || user?.companyName) && (
+                {(profile?.userType || user?.userType) === 'business' && (
                   <>
                     <Separator />
                     <div className="space-y-4">
@@ -271,13 +288,41 @@ export default function CustomerProfile() {
                       </h3>
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Company Name</Label>
-                          <Input 
-                            value={profile?.companyName || user?.companyName || ''} 
-                            disabled 
-                            data-testid="input-company-name" 
-                          />
+                          <Label htmlFor="companyName">Company Name</Label>
+                          <div className="relative">
+                            <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="companyName"
+                              value={companyName}
+                              onChange={(e) => setCompanyName(e.target.value)}
+                              className="pl-10"
+                              placeholder="Your Company Ltd"
+                              data-testid="input-company-name"
+                            />
+                          </div>
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="registrationNumber">Company Registration Number</Label>
+                          <Input
+                            id="registrationNumber"
+                            value={registrationNumber}
+                            onChange={(e) => setRegistrationNumber(e.target.value)}
+                            placeholder="e.g. 12345678"
+                            data-testid="input-registration-number"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Companies House registration number
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="businessAddress">Business Address (if different)</Label>
+                        <PostcodeAutocomplete
+                          value={businessAddress}
+                          onChange={(value, fullAddress) => setBusinessAddress(fullAddress || value)}
+                          placeholder="Business address if different from contact address"
+                          data-testid="input-business-address"
+                        />
                       </div>
                     </div>
                   </>

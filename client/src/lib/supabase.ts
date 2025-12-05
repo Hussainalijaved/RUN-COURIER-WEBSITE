@@ -19,6 +19,7 @@ export type AuthUser = {
   role: 'admin' | 'driver' | 'customer' | 'dispatcher' | 'vendor';
   userType?: 'individual' | 'business';
   companyName?: string;
+  registrationNumber?: string;
   phone?: string;
   isActive: boolean;
 };
