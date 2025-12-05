@@ -40,7 +40,8 @@ import {
   X,
   User,
   Calculator,
-  Lock
+  Lock,
+  Calendar
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
@@ -96,6 +97,21 @@ export default function Book() {
     enabled: !!user?.id,
   });
 
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  const getCurrentTime = () => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = Math.ceil(now.getMinutes() / 15) * 15;
+    if (minutes === 60) {
+      return `${(parseInt(hours) + 1).toString().padStart(2, '0')}:00`;
+    }
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+  };
+
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
     defaultValues: {
@@ -107,6 +123,10 @@ export default function Book() {
       isReturnTrip: false,
       returnToSameLocation: true,
       returnPostcode: '',
+      pickupDate: getTodayDate(),
+      pickupTime: getCurrentTime(),
+      deliveryDate: '',
+      deliveryTime: '',
     },
   });
 
@@ -492,6 +512,96 @@ export default function Book() {
                           />
                         </div>
 
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <Label className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-primary" />
+                              Pickup Date & Time
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <FormField
+                                control={form.control}
+                                name="pickupDate"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        type="date"
+                                        min={getTodayDate()}
+                                        {...field}
+                                        data-testid="input-pickup-date"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="pickupTime"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        type="time"
+                                        step="900"
+                                        {...field}
+                                        data-testid="input-pickup-time"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-primary" />
+                              Delivery Date & Time (optional)
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <FormField
+                                control={form.control}
+                                name="deliveryDate"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        type="date"
+                                        min={form.watch('pickupDate') || getTodayDate()}
+                                        {...field}
+                                        data-testid="input-delivery-date"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="deliveryTime"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        type="time"
+                                        step="900"
+                                        {...field}
+                                        data-testid="input-delivery-time"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <FormDescription className="text-xs">
+                              Leave empty for ASAP delivery
+                            </FormDescription>
+                          </div>
+                        </div>
+
                         <FormField
                           control={form.control}
                           name="vehicleType"
@@ -668,6 +778,32 @@ export default function Book() {
                           <span className="text-muted-foreground">Return trip</span>
                           <span>
                             <CheckCircle className="h-4 w-4 text-green-500 inline" />
+                          </span>
+                        </div>
+                      )}
+                      {form.watch('pickupDate') && form.watch('pickupTime') && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Pickup</span>
+                          <span className="font-medium">
+                            {new Date(form.watch('pickupDate') + 'T' + form.watch('pickupTime')).toLocaleString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      {form.watch('deliveryDate') && form.watch('deliveryTime') && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Delivery</span>
+                          <span className="font-medium">
+                            {new Date(form.watch('deliveryDate') + 'T' + form.watch('deliveryTime')).toLocaleString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </span>
                         </div>
                       )}
@@ -1055,6 +1191,18 @@ export default function Book() {
 
                       setIsProcessingPayment(true);
                       try {
+                        const pickupDateVal = form.getValues('pickupDate');
+                        const pickupTimeVal = form.getValues('pickupTime');
+                        const deliveryDateVal = form.getValues('deliveryDate');
+                        const deliveryTimeVal = form.getValues('deliveryTime');
+                        
+                        const scheduledPickupTime = pickupDateVal && pickupTimeVal 
+                          ? new Date(`${pickupDateVal}T${pickupTimeVal}`).toISOString()
+                          : null;
+                        const scheduledDeliveryTime = deliveryDateVal && deliveryTimeVal
+                          ? new Date(`${deliveryDateVal}T${deliveryTimeVal}`).toISOString()
+                          : null;
+                        
                         const bookingData = {
                           pickupPostcode,
                           pickupAddress: pickupAddress || pickupFullAddress,
@@ -1078,6 +1226,8 @@ export default function Book() {
                           multiDropStops: multiDropStops.join(','),
                           customerId: user?.id || undefined,
                           customerEmail: customerEmail || user?.email,
+                          scheduledPickupTime,
+                          scheduledDeliveryTime,
                         };
 
                         const response = await fetch('/api/booking/checkout', {

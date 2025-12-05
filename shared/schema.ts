@@ -123,6 +123,7 @@ export const jobs = pgTable("jobs", {
   returnPostcode: text("return_postcode"),
   isScheduled: boolean("is_scheduled").default(false),
   scheduledPickupTime: timestamp("scheduled_pickup_time"),
+  scheduledDeliveryTime: timestamp("scheduled_delivery_time"),
   isCentralLondon: boolean("is_central_london").default(false),
   isRushHour: boolean("is_rush_hour").default(false),
   basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
@@ -309,7 +310,10 @@ export const bookingQuoteSchema = z.object({
   isReturnTrip: z.boolean().default(false),
   returnToSameLocation: z.boolean().default(true),
   returnPostcode: z.string().optional(),
-  scheduledPickupTime: z.string().optional(),
+  pickupDate: z.string().min(1, "Pickup date is required"),
+  pickupTime: z.string().min(1, "Pickup time is required"),
+  deliveryDate: z.string().optional(),
+  deliveryTime: z.string().optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
