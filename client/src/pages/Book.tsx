@@ -866,14 +866,6 @@ export default function Book() {
                               </>
                             )}
                           </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Est. Time</span>
-                            <span className="font-medium">
-                              {estimatedTime >= 60 
-                                ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
-                                : `${estimatedTime} mins`}
-                            </span>
-                          </div>
                           <Button 
                             className="w-full" 
                             onClick={handleContinue}
@@ -1145,14 +1137,6 @@ export default function Book() {
                         <span>Yes</span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Est. Time</span>
-                      <span>
-                        {estimatedTime >= 60 
-                          ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
-                          : `${estimatedTime} mins`}
-                      </span>
-                    </div>
                     <Separator className="my-4" />
                     {quote && (
                       <>
