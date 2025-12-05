@@ -49,6 +49,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
       role: role,
       userType: 'individual',
       companyName: '',
+      registrationNumber: '',
       businessAddress: '',
     },
   });
@@ -68,6 +69,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
         role: data.role,
         userType: data.userType,
         companyName: data.companyName,
+        registrationNumber: data.registrationNumber,
         businessAddress: data.businessAddress,
       });
 
@@ -127,12 +129,130 @@ export default function Signup({ role = 'customer' }: SignupProps) {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                {role === 'customer' && (
+                  <FormField
+                    control={form.control}
+                    name="userType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Account Type</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="grid grid-cols-2 gap-4"
+                          >
+                            <div>
+                              <RadioGroupItem
+                                value="individual"
+                                id="individual"
+                                className="peer sr-only"
+                              />
+                              <label
+                                htmlFor="individual"
+                                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                              >
+                                <User className="mb-2 h-6 w-6" />
+                                <span className="font-medium">Individual</span>
+                              </label>
+                            </div>
+                            <div>
+                              <RadioGroupItem
+                                value="business"
+                                id="business"
+                                className="peer sr-only"
+                              />
+                              <label
+                                htmlFor="business"
+                                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                              >
+                                <Building2 className="mb-2 h-6 w-6" />
+                                <span className="font-medium">Business</span>
+                              </label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {(userType === 'business' || role === 'vendor') && (
+                  <>
+                    <div className="border-b pb-4 mb-4">
+                      <h3 className="font-medium text-sm text-muted-foreground mb-3">Company Details</h3>
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="companyName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Company Name</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Your Company Ltd"
+                                  {...field}
+                                  data-testid="input-company"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="registrationNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Company Registration Number</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g. 12345678"
+                                  {...field}
+                                  data-testid="input-registration-number"
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Your Companies House registration number
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="businessAddress"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Business Address (if different)</FormLabel>
+                              <FormControl>
+                                <PostcodeAutocomplete
+                                  value={field.value || ''}
+                                  onChange={(value, fullAddress) => field.onChange(fullAddress || value)}
+                                  placeholder="Business address if different from contact"
+                                  data-testid="input-business-address"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <h3 className="font-medium text-sm text-muted-foreground">Contact Person</h3>
+                  </>
+                )}
+
                 <FormField
                   control={form.control}
                   name="fullName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name</FormLabel>
+                      <FormLabel>{userType === 'business' || role === 'vendor' ? 'Contact Person Name' : 'Full Name'}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="John Smith"
@@ -264,96 +384,6 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                     </FormItem>
                   )}
                 />
-
-                {role === 'customer' && (
-                  <FormField
-                    control={form.control}
-                    name="userType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Account Type</FormLabel>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            className="grid grid-cols-2 gap-4"
-                          >
-                            <div>
-                              <RadioGroupItem
-                                value="individual"
-                                id="individual"
-                                className="peer sr-only"
-                              />
-                              <label
-                                htmlFor="individual"
-                                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                              >
-                                <User className="mb-2 h-6 w-6" />
-                                <span className="font-medium">Individual</span>
-                              </label>
-                            </div>
-                            <div>
-                              <RadioGroupItem
-                                value="business"
-                                id="business"
-                                className="peer sr-only"
-                              />
-                              <label
-                                htmlFor="business"
-                                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                              >
-                                <Building2 className="mb-2 h-6 w-6" />
-                                <span className="font-medium">Business</span>
-                              </label>
-                            </div>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {(userType === 'business' || role === 'vendor') && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="companyName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Company Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Your Company Ltd"
-                              {...field}
-                              data-testid="input-company"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="businessAddress"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Business Address (if different)</FormLabel>
-                          <FormControl>
-                            <PostcodeAutocomplete
-                              value={field.value || ''}
-                              onChange={(value, fullAddress) => field.onChange(fullAddress || value)}
-                              placeholder="Business address if different from above"
-                              data-testid="input-business-address"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
 
                 <Button
                   type="submit"

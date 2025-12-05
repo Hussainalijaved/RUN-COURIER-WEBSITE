@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   role: text("role").$type<UserRole>().notNull().default("customer"),
   userType: text("user_type").$type<UserType>().default("individual"),
   companyName: text("company_name"),
+  registrationNumber: text("registration_number"),
   businessAddress: text("business_address"),
   vatNumber: text("vat_number"),
   stripeCustomerId: text("stripe_customer_id"),
@@ -301,6 +302,7 @@ export const registerSchema = z.object({
   role: z.enum(["customer", "driver", "vendor"]).default("customer"),
   userType: z.enum(["individual", "business"]).default("individual"),
   companyName: z.string().optional(),
+  registrationNumber: z.string().optional(),
   businessAddress: z.string().optional(),
 });
 
