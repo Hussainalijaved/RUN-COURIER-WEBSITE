@@ -127,6 +127,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 data-testid="sidebar-logo-image"
               />
               <div className="flex flex-col">
+                <span className="font-bold text-sm tracking-tight">
+                  RUN COURIER<sup className="text-[8px] ml-0.5">™</sup>
+                </span>
                 <span className="text-xs text-muted-foreground">{roleLabel} Panel</span>
               </div>
             </Link>

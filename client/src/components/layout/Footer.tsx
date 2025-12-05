@@ -34,13 +34,16 @@ export function Footer() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <Link href="/" className="flex items-center gap-2 mb-4" data-testid="footer-logo-link">
+            <Link href="/" className="flex items-center gap-3 mb-4" data-testid="footer-logo-link">
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
                 className="h-12 w-auto object-contain"
                 data-testid="footer-logo-image"
               />
+              <span className="font-bold text-xl tracking-tight">
+                RUN COURIER<sup className="text-xs ml-0.5">™</sup>
+              </span>
             </Link>
             <p className="text-muted-foreground mb-6 max-w-sm">
               Fast, reliable courier services across the UK. Same-day delivery, medical transport, and more.

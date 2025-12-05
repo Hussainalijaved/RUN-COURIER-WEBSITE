@@ -60,13 +60,16 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
-        <Link href="/" className="flex items-center gap-2" data-testid="logo-link">
+        <Link href="/" className="flex items-center gap-3" data-testid="logo-link">
           <img 
             src={logoImage} 
             alt="Run Courier" 
             className="h-10 w-auto object-contain"
             data-testid="logo-image"
           />
+          <span className="font-bold text-lg tracking-tight">
+            RUN COURIER<sup className="text-xs ml-0.5">™</sup>
+          </span>
         </Link>
 
         <nav className="hidden lg:flex items-center gap-1">
