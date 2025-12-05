@@ -606,7 +606,9 @@ export class MemStorage implements IStorage {
   async updateDriver(id: string, data: Partial<Driver>): Promise<Driver | undefined> {
     const driver = this.drivers.get(id);
     if (!driver) return undefined;
-    const updated = { ...driver, ...data };
+    // Never allow updating driverCode or id - these are permanent identifiers
+    const { driverCode: _, id: __, ...safeData } = data;
+    const updated = { ...driver, ...safeData };
     this.drivers.set(id, updated);
     return updated;
   }
