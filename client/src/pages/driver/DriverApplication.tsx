@@ -393,7 +393,7 @@ export default function DriverApplication() {
                         <FormItem>
                           <FormLabel>Phone Number *</FormLabel>
                           <FormControl>
-                            <Input type="tel" placeholder="07123 456789" {...field} data-testid="input-phone" />
+                            <Input type="tel" placeholder="+44 7XXX XXX XXX" {...field} data-testid="input-phone" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

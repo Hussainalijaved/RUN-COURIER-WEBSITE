@@ -439,7 +439,7 @@ export default function AdminCreateJob() {
                                 <Input
                                   {...field}
                                   className="pl-10"
-                                  placeholder="07700 900000"
+                                  placeholder="+44 7XXX XXX XXX"
                                   data-testid="input-recipient-phone"
                                 />
                               </div>

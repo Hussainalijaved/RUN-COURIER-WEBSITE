@@ -200,7 +200,7 @@ export default function CustomerProfile() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         className="pl-10"
-                        placeholder="e.g., 07700 900000"
+                        placeholder="+44 7XXX XXX XXX"
                         data-testid="input-phone"
                       />
                     </div>

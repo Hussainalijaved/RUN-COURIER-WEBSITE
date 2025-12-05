@@ -941,7 +941,7 @@ export default function Book() {
                     <div className="space-y-2">
                       <Label>Phone Number</Label>
                       <Input 
-                        placeholder="Phone number" 
+                        placeholder="+44 7XXX XXX XXX" 
                         value={pickupPhone}
                         onChange={(e) => setPickupPhone(e.target.value)}
                         data-testid="input-pickup-phone" 
@@ -989,7 +989,7 @@ export default function Book() {
                     <div className="space-y-2">
                       <Label>Phone Number</Label>
                       <Input 
-                        placeholder="Phone number" 
+                        placeholder="+44 7XXX XXX XXX" 
                         value={recipientPhone}
                         onChange={(e) => setRecipientPhone(e.target.value)}
                         data-testid="input-recipient-phone" 
@@ -1051,7 +1051,7 @@ export default function Book() {
                             <div className="space-y-2">
                               <Label>Phone Number</Label>
                               <Input 
-                                placeholder="Phone number" 
+                                placeholder="+44 7XXX XXX XXX" 
                                 value={stopDetail.phone}
                                 onChange={(e) => updateStopDetail(index, 'phone', e.target.value)}
                                 data-testid={`input-stop-${index}-phone`} 

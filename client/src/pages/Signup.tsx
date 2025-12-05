@@ -173,7 +173,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                       <FormControl>
                         <Input
                           type="tel"
-                          placeholder="07XXX XXXXXX"
+                          placeholder="+44 7XXX XXX XXX"
                           {...field}
                           data-testid="input-phone"
                         />

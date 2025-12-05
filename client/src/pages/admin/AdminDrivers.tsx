@@ -671,7 +671,7 @@ export default function AdminDrivers() {
                           <Input
                             value={editPhone}
                             onChange={(e) => setEditPhone(e.target.value)}
-                            placeholder="Phone number"
+                            placeholder="+44 7XXX XXX XXX"
                           />
                         </div>
                       ) : (
