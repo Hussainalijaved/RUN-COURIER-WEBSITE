@@ -1071,17 +1071,19 @@ export default function AdminDrivers() {
                 <FileText className="h-5 w-5" />
                 Driver Documents
               </DialogTitle>
-              <DialogDescription>
-                {selectedDriver && (
-                  <>
-                    {getDriverInfo(selectedDriver).driverCode && (
-                      <Badge className="bg-blue-600 text-white font-mono mr-2">
-                        {getDriverInfo(selectedDriver).driverCode}
-                      </Badge>
-                    )}
-                    {getDriverInfo(selectedDriver).name}
-                  </>
-                )}
+              <DialogDescription asChild>
+                <div className="flex items-center gap-2">
+                  {selectedDriver && (
+                    <>
+                      {getDriverInfo(selectedDriver).driverCode && (
+                        <Badge className="bg-blue-600 text-white font-mono">
+                          {getDriverInfo(selectedDriver).driverCode}
+                        </Badge>
+                      )}
+                      <span>{getDriverInfo(selectedDriver).name}</span>
+                    </>
+                  )}
+                </div>
               </DialogDescription>
             </DialogHeader>
             {selectedDriver && (

@@ -215,42 +215,89 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to fetch users from Supabase" });
       }
 
+      // Get existing drivers from Supabase database (for permanent driver codes)
+      const { data: supabaseDrivers } = await supabaseAdmin
+        .from('drivers')
+        .select('id, user_id, driver_code');
+      
+      // Build a map: user_id -> { id, driver_code }
+      const supabaseDriverMap = new Map<string, { id: string; driver_code: string | null }>();
+      for (const d of (supabaseDrivers || [])) {
+        const key = d.user_id || d.id;
+        supabaseDriverMap.set(key, { id: d.id, driver_code: d.driver_code });
+      }
+
       // Get local drivers for driver codes
       const localDrivers = await storage.getDrivers();
-      const driverCodeMap = new Map(localDrivers.map(d => [d.userId || d.id, d.driverCode]));
+      const localDriverMap = new Map(localDrivers.map(d => [d.userId || d.id, d]));
 
-      // Filter for driver role users and include driver code
-      const driverUsers = await Promise.all(
-        users
-          .filter(user => user.user_metadata?.role === 'driver')
-          .map(async user => {
-            // Check if driver exists locally, if not create one with a code
-            let localDriver = localDrivers.find(d => d.userId === user.id || d.id === user.id);
-            
-            if (!localDriver) {
-              // Create a local driver record with auto-generated code
-              localDriver = await storage.createDriver({
-                userId: user.id,
-                fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || null,
-                email: user.email || null,
-                phone: user.user_metadata?.phone || null,
-                vehicleType: 'car',
-                isAvailable: false,
-                isVerified: false,
-              });
-            }
+      // Filter for driver role users
+      const driverUsersList = users.filter(user => user.user_metadata?.role === 'driver');
+      
+      // Process drivers sequentially to avoid race conditions
+      const driverUsers = [];
+      for (const user of driverUsersList) {
+        const supabaseDriver = supabaseDriverMap.get(user.id);
+        let driverCode = supabaseDriver?.driver_code || null;
+        
+        // Check if driver exists locally
+        let localDriver = localDriverMap.get(user.id);
+        
+        if (!localDriver) {
+          // Create a local driver record - will generate code if not in Supabase
+          localDriver = await storage.createDriver({
+            userId: user.id,
+            fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || null,
+            email: user.email || null,
+            phone: user.user_metadata?.phone || null,
+            vehicleType: 'car',
+            isAvailable: false,
+            isVerified: false,
+            driverCode: driverCode || undefined, // Use existing Supabase code if available
+          });
+          localDriverMap.set(user.id, localDriver);
+        }
 
-            return {
-              id: user.id,
-              email: user.email,
-              fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || 'Unknown Driver',
+        // If no code in Supabase yet, save the generated code permanently using upsert
+        if (!driverCode && localDriver?.driverCode) {
+          driverCode = localDriver.driverCode;
+          
+          // Use upsert with onConflict to prevent race conditions
+          // This ensures the driver_code is only set if not already present
+          const { error: upsertError } = await supabaseAdmin
+            .from('drivers')
+            .upsert({
+              id: supabaseDriver?.id || user.id,
+              user_id: user.id,
+              driver_code: driverCode,
+              full_name: user.user_metadata?.fullName || user.user_metadata?.full_name || null,
+              email: user.email || null,
               phone: user.user_metadata?.phone || null,
-              role: user.user_metadata?.role || 'driver',
-              driverCode: localDriver?.driverCode || driverCodeMap.get(user.id) || null,
-              createdAt: user.created_at,
-            };
-          })
-      );
+              vehicle_type: localDriver.vehicleType || 'car',
+              is_available: localDriver.isAvailable || false,
+              is_verified: localDriver.isVerified || false,
+            }, { 
+              onConflict: 'user_id',
+              ignoreDuplicates: false 
+            });
+
+          if (upsertError) {
+            console.error(`Error upserting driver ${user.id}:`, upsertError);
+          } else {
+            console.log(`Saved permanent driver code ${driverCode} to Supabase for user ${user.id}`);
+          }
+        }
+
+        driverUsers.push({
+          id: user.id,
+          email: user.email,
+          fullName: user.user_metadata?.fullName || user.user_metadata?.full_name || 'Unknown Driver',
+          phone: user.user_metadata?.phone || null,
+          role: user.user_metadata?.role || 'driver',
+          driverCode: driverCode || localDriver?.driverCode || null,
+          createdAt: user.created_at,
+        });
+      }
 
       res.json(driverUsers);
     } catch (err) {
