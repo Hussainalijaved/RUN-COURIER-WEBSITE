@@ -290,12 +290,18 @@ export const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   fullName: z.string().min(2, "Name must be at least 2 characters"),
-  phone: z.string().optional(),
+  phone: z.string()
+    .min(10, "Phone number must be at least 10 digits")
+    .regex(/^(\+44|0044|0)?[1-9]\d{8,10}$/, "Please enter a valid UK phone number"),
+  postcode: z.string()
+    .min(5, "Please enter a valid UK postcode")
+    .regex(/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, "Please enter a valid UK postcode"),
+  address: z.string().min(5, "Please enter your full address"),
+  buildingName: z.string().optional(),
   role: z.enum(["customer", "driver", "vendor"]).default("customer"),
   userType: z.enum(["individual", "business"]).default("individual"),
   companyName: z.string().optional(),
   businessAddress: z.string().optional(),
-  buildingName: z.string().optional(),
 });
 
 export const bookingQuoteSchema = z.object({

@@ -43,11 +43,13 @@ export default function Signup({ role = 'customer' }: SignupProps) {
       password: '',
       fullName: '',
       phone: '',
+      postcode: '',
+      address: '',
+      buildingName: '',
       role: role,
       userType: 'individual',
       companyName: '',
       businessAddress: '',
-      buildingName: '',
     },
   });
 
@@ -60,11 +62,13 @@ export default function Signup({ role = 'customer' }: SignupProps) {
         fullName: data.fullName,
         full_name: data.fullName,
         phone: data.phone,
+        postcode: data.postcode,
+        address: data.address,
+        buildingName: data.buildingName,
         role: data.role,
         userType: data.userType,
         companyName: data.companyName,
         businessAddress: data.businessAddress,
-        buildingName: data.buildingName,
       });
 
       if (error) {
@@ -165,13 +169,76 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>UK Phone Number</FormLabel>
                       <FormControl>
                         <Input
                           type="tel"
                           placeholder="07XXX XXXXXX"
                           {...field}
                           data-testid="input-phone"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter your UK mobile or landline number
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="postcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Postcode</FormLabel>
+                      <FormControl>
+                        <PostcodeAutocomplete
+                          value={field.value}
+                          onChange={(value, fullAddress) => {
+                            field.onChange(value);
+                            if (fullAddress) {
+                              form.setValue('address', fullAddress);
+                            }
+                          }}
+                          placeholder="Enter your postcode"
+                          data-testid="input-postcode"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Address</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Your full address"
+                          {...field}
+                          data-testid="input-address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="buildingName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Building Name / Flat Number (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Flat 2, Rose Building"
+                          {...field}
+                          data-testid="input-building"
                         />
                       </FormControl>
                       <FormMessage />
@@ -272,31 +339,13 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                       name="businessAddress"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Business Address</FormLabel>
+                          <FormLabel>Business Address (if different)</FormLabel>
                           <FormControl>
                             <PostcodeAutocomplete
                               value={field.value || ''}
                               onChange={(value, fullAddress) => field.onChange(fullAddress || value)}
-                              placeholder="Start typing your business address"
+                              placeholder="Business address if different from above"
                               data-testid="input-business-address"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="buildingName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Building Name / Number</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Building name or number"
-                              {...field}
-                              data-testid="input-building-name"
                             />
                           </FormControl>
                           <FormMessage />

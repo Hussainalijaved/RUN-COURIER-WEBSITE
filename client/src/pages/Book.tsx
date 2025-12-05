@@ -154,6 +154,7 @@ export default function Book() {
   useEffect(() => {
     if (userProfile) {
       setPickupAddress(userProfile.address || '');
+      setPickupBuildingName(userProfile.buildingName || '');
       setPickupName(userProfile.fullName || '');
       setPickupPhone(userProfile.phone || '');
       setCustomerEmail(userProfile.email || '');
