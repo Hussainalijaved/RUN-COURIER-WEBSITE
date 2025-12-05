@@ -324,11 +324,28 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/users/:id", asyncHandler(async (req, res) => {
-    const user = await storage.updateUser(req.params.id, req.body);
+    let user = await storage.getUser(req.params.id);
+    
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      // User doesn't exist in local DB, create them first
+      const createData = {
+        id: req.params.id,
+        email: req.body.email || '',
+        fullName: req.body.fullName || '',
+        phone: req.body.phone || null,
+        postcode: req.body.postcode || null,
+        address: req.body.address || null,
+        buildingName: req.body.buildingName || null,
+        role: req.body.role || 'customer',
+        userType: req.body.userType || 'individual',
+        isActive: true,
+      };
+      user = await storage.createUser(createData);
     }
-    res.json(user);
+    
+    // Now update with the provided data
+    const updatedUser = await storage.updateUser(req.params.id, req.body);
+    res.json(updatedUser);
   }));
 
   app.get("/api/documents", asyncHandler(async (req, res) => {
