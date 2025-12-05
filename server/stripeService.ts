@@ -15,6 +15,9 @@ export interface BookingData {
   deliveryInstructions: string;
   vehicleType: string;
   weight: number;
+  originalPrice?: number;
+  discountAmount?: number;
+  discountApplied?: boolean;
   totalPrice: number;
   distance: number;
   estimatedTime: number;
@@ -115,6 +118,9 @@ export class StripeService {
       deliveryInstructions: (bookingData.deliveryInstructions || '').substring(0, 200),
       vehicleType: bookingData.vehicleType,
       weight: bookingData.weight.toString(),
+      originalPrice: (bookingData.originalPrice || bookingData.totalPrice).toString(),
+      discountAmount: (bookingData.discountAmount || 0).toString(),
+      discountApplied: (bookingData.discountApplied || false).toString(),
       totalPrice: bookingData.totalPrice.toString(),
       distance: bookingData.distance.toString(),
       estimatedTime: bookingData.estimatedTime.toString(),

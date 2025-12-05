@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   vatNumber: text("vat_number"),
   stripeCustomerId: text("stripe_customer_id"),
   payLaterEnabled: boolean("pay_later_enabled").default(false),
+  completedBookingsCount: integer("completed_bookings_count").default(0).notNull(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

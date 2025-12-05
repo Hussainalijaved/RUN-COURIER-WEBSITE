@@ -24,6 +24,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   createUserWithId(id: string, user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  incrementCompletedBookings(id: string): Promise<User | undefined>;
 
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByUserId(userId: string): Promise<Driver | undefined>;
@@ -523,6 +524,17 @@ export class MemStorage implements IStorage {
     const user = this.users.get(id);
     if (!user) return undefined;
     const updated = { ...user, ...data };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  async incrementCompletedBookings(id: string): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    const updated = { 
+      ...user, 
+      completedBookingsCount: (user.completedBookingsCount || 0) + 1 
+    };
     this.users.set(id, updated);
     return updated;
   }

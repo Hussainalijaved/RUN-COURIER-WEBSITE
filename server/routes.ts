@@ -645,6 +645,11 @@ export async function registerRoutes(
 
     const job = await storage.createJob(jobData);
     
+    if (metadata.customerId) {
+      await storage.incrementCompletedBookings(metadata.customerId);
+      console.log(`[Booking] Incremented completed bookings count for user ${metadata.customerId}. Discount was ${metadata.discountApplied === 'true' ? 'applied' : 'not applied'}`);
+    }
+    
     res.json({ 
       success: true, 
       trackingNumber: job.trackingNumber,

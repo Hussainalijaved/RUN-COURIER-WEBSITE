@@ -97,6 +97,18 @@ export default function Book() {
     enabled: !!user?.id,
   });
 
+  const isEligibleForNewCustomerDiscount = !!(
+    user && 
+    userProfile && 
+    (userProfile.completedBookingsCount ?? 0) < 3
+  );
+  
+  const newCustomerDiscountPercent = 0.20;
+  const discountAmount = isEligibleForNewCustomerDiscount && quote 
+    ? quote.totalPrice * newCustomerDiscountPercent 
+    : 0;
+  const finalPrice = quote ? quote.totalPrice - discountAmount : 0;
+
   const getTodayDate = () => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -831,12 +843,28 @@ export default function Book() {
                         <>
                           <Separator />
                           <div className="bg-primary/10 rounded-lg p-4 text-center">
-                            <p className="text-2xl font-bold text-primary">
-                              £{quote.totalPrice.toFixed(2)}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Total delivery cost
-                            </p>
+                            {isEligibleForNewCustomerDiscount ? (
+                              <>
+                                <p className="text-sm line-through text-muted-foreground">
+                                  £{quote.totalPrice.toFixed(2)}
+                                </p>
+                                <p className="text-2xl font-bold text-primary" data-testid="text-final-price">
+                                  £{finalPrice.toFixed(2)}
+                                </p>
+                                <p className="text-xs text-green-600 font-medium mt-1" data-testid="text-discount-label">
+                                  New customer discount (20% off first 3 bookings)
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-2xl font-bold text-primary" data-testid="text-final-price">
+                                  £{quote.totalPrice.toFixed(2)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Total delivery cost
+                                </p>
+                              </>
+                            )}
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Est. Time</span>
@@ -1127,10 +1155,28 @@ export default function Book() {
                     </div>
                     <Separator className="my-4" />
                     {quote && (
-                      <div className="flex justify-between font-bold text-lg text-primary">
-                        <span>Total to Pay</span>
-                        <span>£{quote.totalPrice.toFixed(2)}</span>
-                      </div>
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Subtotal</span>
+                          <span>£{quote.totalPrice.toFixed(2)}</span>
+                        </div>
+                        {isEligibleForNewCustomerDiscount && (
+                          <div className="flex justify-between text-green-600" data-testid="order-discount-line">
+                            <span>New customer discount (20% off)</span>
+                            <span>-£{discountAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <Separator className="my-2" />
+                        <div className="flex justify-between font-bold text-lg text-primary" data-testid="order-total">
+                          <span>Total to Pay</span>
+                          <span>£{finalPrice.toFixed(2)}</span>
+                        </div>
+                        {isEligibleForNewCustomerDiscount && (
+                          <p className="text-xs text-green-600 text-right mt-1" data-testid="discount-remaining-text">
+                            {3 - (userProfile?.completedBookingsCount ?? 0)} discount booking{(3 - (userProfile?.completedBookingsCount ?? 0)) !== 1 ? 's' : ''} remaining
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1218,7 +1264,10 @@ export default function Book() {
                           deliveryInstructions,
                           vehicleType,
                           weight,
-                          totalPrice: quote.totalPrice,
+                          originalPrice: quote.totalPrice,
+                          discountAmount: isEligibleForNewCustomerDiscount ? discountAmount : 0,
+                          discountApplied: isEligibleForNewCustomerDiscount,
+                          totalPrice: finalPrice,
                           distance,
                           estimatedTime,
                           isMultiDrop,
@@ -1268,7 +1317,7 @@ export default function Book() {
                     ) : (
                       <>
                         <CreditCard className="mr-2 h-4 w-4" />
-                        Pay £{quote?.totalPrice.toFixed(2) || '0.00'} Now
+                        Pay £{finalPrice.toFixed(2)} Now
                       </>
                     )}
                   </Button>
