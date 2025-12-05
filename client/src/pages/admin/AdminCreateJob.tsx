@@ -50,6 +50,8 @@ import {
   Banknote,
   CheckCircle,
   RefreshCw,
+  Calendar,
+  Clock,
 } from 'lucide-react';
 
 const createJobSchema = z.object({
@@ -66,7 +68,26 @@ const createJobSchema = z.object({
   isMultiDrop: z.boolean().default(false),
   isReturnTrip: z.boolean().default(false),
   driverId: z.string().optional(),
+  pickupDate: z.string().min(1, 'Pickup date is required'),
+  pickupTime: z.string().min(1, 'Pickup time is required'),
+  deliveryDate: z.string().optional(),
+  deliveryTime: z.string().optional(),
 });
+
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+};
+
+const getCurrentTime = () => {
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = Math.ceil(now.getMinutes() / 15) * 15;
+  if (minutes === 60) {
+    return `${(parseInt(hours) + 1).toString().padStart(2, '0')}:00`;
+  }
+  return `${hours}:${minutes.toString().padStart(2, '0')}`;
+};
 
 type CreateJobInput = z.infer<typeof createJobSchema>;
 
@@ -97,6 +118,10 @@ export default function AdminCreateJob() {
       isMultiDrop: false,
       isReturnTrip: false,
       driverId: '',
+      pickupDate: getTodayDate(),
+      pickupTime: getCurrentTime(),
+      deliveryDate: '',
+      deliveryTime: '',
     },
   });
 
@@ -157,6 +182,13 @@ export default function AdminCreateJob() {
     mutationFn: async (data: CreateJobInput) => {
       const finalPrice = priceOverride !== null ? priceOverride : (quote?.totalPrice || 0);
       
+      const scheduledPickupTime = data.pickupDate && data.pickupTime 
+        ? new Date(`${data.pickupDate}T${data.pickupTime}`).toISOString()
+        : null;
+      const scheduledDeliveryTime = data.deliveryDate && data.deliveryTime
+        ? new Date(`${data.deliveryDate}T${data.deliveryTime}`).toISOString()
+        : null;
+      
       const jobData = {
         ...data,
         customerId: 'admin-created',
@@ -170,6 +202,9 @@ export default function AdminCreateJob() {
         driverPrice: driverPrice !== null ? driverPrice.toString() : null,
         paymentStatus: 'pending',
         status: data.driverId ? 'assigned' : 'pending',
+        scheduledPickupTime,
+        scheduledDeliveryTime,
+        isScheduled: !!scheduledPickupTime,
       };
 
       const res = await apiRequest('POST', '/api/jobs', jobData);
@@ -431,6 +466,107 @@ export default function AdminCreateJob() {
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
+
+                {/* Schedule Details */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-purple-500" />
+                      Schedule
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-primary" />
+                          Pickup Date & Time *
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <FormField
+                            control={form.control}
+                            name="pickupDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input
+                                    type="date"
+                                    min={getTodayDate()}
+                                    {...field}
+                                    data-testid="input-pickup-date"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="pickupTime"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input
+                                    type="time"
+                                    step="900"
+                                    {...field}
+                                    data-testid="input-pickup-time"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-primary" />
+                          Delivery Date & Time (optional)
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <FormField
+                            control={form.control}
+                            name="deliveryDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input
+                                    type="date"
+                                    min={form.watch('pickupDate') || getTodayDate()}
+                                    {...field}
+                                    data-testid="input-delivery-date"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="deliveryTime"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input
+                                    type="time"
+                                    step="900"
+                                    {...field}
+                                    data-testid="input-delivery-time"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <FormDescription className="text-xs">
+                          Leave empty for ASAP delivery
+                        </FormDescription>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 

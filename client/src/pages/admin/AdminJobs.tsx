@@ -571,7 +571,7 @@ export default function AdminJobs() {
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Driver</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Pickup Time</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>

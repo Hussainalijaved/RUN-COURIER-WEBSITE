@@ -638,6 +638,9 @@ export async function registerRoutes(
       isMultiDrop: metadata.isMultiDrop === 'true',
       isReturnTrip: metadata.isReturnTrip === 'true',
       multiDropStops: metadata.multiDropStops ? metadata.multiDropStops.split(',') : null,
+      scheduledPickupTime: metadata.scheduledPickupTime ? new Date(metadata.scheduledPickupTime) : null,
+      scheduledDeliveryTime: metadata.scheduledDeliveryTime ? new Date(metadata.scheduledDeliveryTime) : null,
+      isScheduled: !!metadata.scheduledPickupTime,
     };
 
     const job = await storage.createJob(jobData);

@@ -23,6 +23,8 @@ export interface BookingData {
   multiDropStops?: string;
   customerId?: string;
   customerEmail?: string;
+  scheduledPickupTime?: string | null;
+  scheduledDeliveryTime?: string | null;
 }
 
 export class StripeService {
@@ -124,6 +126,14 @@ export class StripeService {
 
     if (bookingData.multiDropStops) {
       metadataForStripe.multiDropStops = bookingData.multiDropStops.substring(0, 500);
+    }
+
+    if (bookingData.scheduledPickupTime) {
+      metadataForStripe.scheduledPickupTime = bookingData.scheduledPickupTime;
+    }
+
+    if (bookingData.scheduledDeliveryTime) {
+      metadataForStripe.scheduledDeliveryTime = bookingData.scheduledDeliveryTime;
     }
 
     return await stripe.checkout.sessions.create({
