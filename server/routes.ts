@@ -139,8 +139,29 @@ export async function registerRoutes(
   app.get("/api/drivers/user/:userId", asyncHandler(async (req, res) => {
     let driver = await storage.getDriverByUserId(req.params.userId);
     if (!driver) {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      let fullName: string | null = null;
+      let email: string | null = null;
+      let phone: string | null = null;
+      
+      if (supabaseAdmin) {
+        try {
+          const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(req.params.userId);
+          if (!error && user) {
+            fullName = user.user_metadata?.fullName || user.user_metadata?.full_name || null;
+            email = user.email || null;
+            phone = user.user_metadata?.phone || null;
+          }
+        } catch (e) {
+          console.error("Failed to fetch user metadata from Supabase:", e);
+        }
+      }
+      
       driver = await storage.createDriver({
         userId: req.params.userId,
+        fullName,
+        email,
+        phone,
         vehicleType: "car",
         vehicleRegistration: null,
         vehicleMake: null,
@@ -153,6 +174,46 @@ export async function registerRoutes(
         rating: "5.00",
         totalJobs: 0,
       });
+      
+      // Insert into PostgreSQL database directly via Drizzle ORM (bypassing Supabase REST API schema cache)
+      if (driver) {
+        try {
+          const { db } = await import("./db");
+          const { drivers } = await import("@shared/schema");
+          
+          await db.insert(drivers).values({
+            id: driver.id,
+            userId: driver.userId,
+            driverCode: driver.driverCode,
+            fullName: driver.fullName,
+            email: driver.email,
+            phone: driver.phone,
+            vehicleType: driver.vehicleType,
+            vehicleRegistration: driver.vehicleRegistration,
+            vehicleMake: driver.vehicleMake,
+            vehicleModel: driver.vehicleModel,
+            vehicleColor: driver.vehicleColor,
+            isAvailable: driver.isAvailable ?? false,
+            isVerified: driver.isVerified ?? false,
+            rating: driver.rating ?? "5.00",
+            totalJobs: driver.totalJobs ?? 0,
+            createdAt: driver.createdAt ?? new Date(),
+          }).onConflictDoUpdate({
+            target: drivers.id,
+            set: {
+              driverCode: driver.driverCode,
+              fullName: driver.fullName,
+              email: driver.email,
+              phone: driver.phone,
+              vehicleType: driver.vehicleType,
+            }
+          });
+          
+          console.log("Driver successfully inserted/updated in PostgreSQL:", driver.id);
+        } catch (e) {
+          console.error("Failed to insert driver into PostgreSQL:", e);
+        }
+      }
     }
     res.json(driver);
   }));
@@ -168,6 +229,35 @@ export async function registerRoutes(
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
+    
+    // Sync update to PostgreSQL database via Drizzle
+    try {
+      const { db } = await import("./db");
+      const { drivers } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const updateData: Partial<typeof drivers.$inferSelect> = {};
+      if (req.body.vehicleType !== undefined) updateData.vehicleType = req.body.vehicleType;
+      if (req.body.vehicleRegistration !== undefined) updateData.vehicleRegistration = req.body.vehicleRegistration;
+      if (req.body.vehicleMake !== undefined) updateData.vehicleMake = req.body.vehicleMake;
+      if (req.body.vehicleModel !== undefined) updateData.vehicleModel = req.body.vehicleModel;
+      if (req.body.vehicleColor !== undefined) updateData.vehicleColor = req.body.vehicleColor;
+      if (req.body.fullName !== undefined) updateData.fullName = req.body.fullName;
+      if (req.body.email !== undefined) updateData.email = req.body.email;
+      if (req.body.phone !== undefined) updateData.phone = req.body.phone;
+      if (req.body.postcode !== undefined) updateData.postcode = req.body.postcode;
+      if (req.body.address !== undefined) updateData.address = req.body.address;
+      if (req.body.isAvailable !== undefined) updateData.isAvailable = req.body.isAvailable;
+      if (req.body.isVerified !== undefined) updateData.isVerified = req.body.isVerified;
+      
+      if (Object.keys(updateData).length > 0) {
+        await db.update(drivers).set(updateData).where(eq(drivers.id, req.params.id));
+        console.log("Driver successfully updated in PostgreSQL:", req.params.id);
+      }
+    } catch (e) {
+      console.error("Failed to update driver in PostgreSQL:", e);
+    }
+    
     res.json(driver);
   }));
 

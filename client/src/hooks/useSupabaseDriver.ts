@@ -19,6 +19,11 @@ export function useDriver() {
 
       if (error) {
         if (error.code === 'PGRST116') {
+          const response = await fetch(`/api/drivers/user/${user.id}`);
+          if (response.ok) {
+            const driver = await response.json();
+            return driver as Driver;
+          }
           return null;
         }
         throw error;
