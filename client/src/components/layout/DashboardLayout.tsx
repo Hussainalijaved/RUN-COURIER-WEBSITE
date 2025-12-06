@@ -79,6 +79,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/customer', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/customer/book', label: 'New Booking', icon: Package },
     { href: '/customer/orders', label: 'My Orders', icon: Clock },
+    { href: '/customer/invoices', label: 'Invoices', icon: FileText },
     { href: '/customer/track', label: 'Track Order', icon: MapPin },
     { href: '/customer/profile', label: 'Profile', icon: User },
   ],
