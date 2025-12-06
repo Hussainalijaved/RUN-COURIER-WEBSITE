@@ -39,7 +39,7 @@ export const defaultPricingConfig: PricingConfig = {
     },
     small_van: {
       name: "Small Van",
-      baseCharge: 30,
+      baseCharge: 19,
       perMileRate: 1.30,
       rushHourRate: 1.50,
       maxWeight: 400,
