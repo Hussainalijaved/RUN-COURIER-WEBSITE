@@ -103,6 +103,8 @@ export default function Book() {
     (userProfile.completedBookingsCount ?? 0) < 3
   );
   
+  const isPayLaterEnabled = !!(user && userProfile?.payLaterEnabled);
+  
   const newCustomerDiscountPercent = 0.20;
   const discountAmount = isEligibleForNewCustomerDiscount && quote 
     ? quote.totalPrice * newCustomerDiscountPercent 
@@ -1183,17 +1185,31 @@ export default function Book() {
                   </div>
                 )}
                 
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <Lock className="h-5 w-5 text-green-600" />
-                    <div>
-                      <p className="font-medium text-green-700 dark:text-green-400">Secure Payment</p>
-                      <p className="text-sm text-green-600 dark:text-green-500">
-                        Your payment is processed securely via Stripe
-                      </p>
+                {isPayLaterEnabled ? (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium text-blue-700 dark:text-blue-400">Pay Later Enabled</p>
+                        <p className="text-sm text-blue-600 dark:text-blue-500">
+                          Your account is approved for weekly invoicing. No payment required now.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <Lock className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="font-medium text-green-700 dark:text-green-400">Secure Payment</p>
+                        <p className="text-sm text-green-600 dark:text-green-500">
+                          Your payment is processed securely via Stripe
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-4">
                   <Button variant="outline" onClick={() => setStep(2)} data-testid="button-back-step2" disabled={isProcessingPayment}>
@@ -1252,6 +1268,8 @@ export default function Book() {
                           originalPrice: quote.totalPrice,
                           discountAmount: isEligibleForNewCustomerDiscount ? discountAmount : 0,
                           discountApplied: isEligibleForNewCustomerDiscount,
+                          basePrice: quote.baseFare,
+                          distancePrice: quote.distanceCharge,
                           totalPrice: finalPrice,
                           distance,
                           estimatedTime,
@@ -1262,30 +1280,52 @@ export default function Book() {
                           customerEmail: customerEmail || user?.email,
                           scheduledPickupTime,
                           scheduledDeliveryTime,
+                          payLater: isPayLaterEnabled,
                         };
 
-                        const response = await fetch('/api/booking/checkout', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(bookingData),
-                        });
+                        if (isPayLaterEnabled) {
+                          const response = await fetch('/api/booking/pay-later', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(bookingData),
+                          });
 
-                        const result = await response.json();
+                          const result = await response.json();
 
-                        if (!response.ok) {
-                          throw new Error(result.error || 'Failed to create checkout session');
-                        }
+                          if (!response.ok) {
+                            throw new Error(result.error || 'Failed to create booking');
+                          }
 
-                        if (result.url) {
-                          window.location.href = result.url;
+                          toast({
+                            title: 'Booking Confirmed',
+                            description: `Your booking has been created. Tracking number: ${result.trackingNumber}`,
+                          });
+                          
+                          setLocation(`/payment/success?tracking=${result.trackingNumber}&payLater=true`);
                         } else {
-                          throw new Error('No checkout URL received');
+                          const response = await fetch('/api/booking/checkout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(bookingData),
+                          });
+
+                          const result = await response.json();
+
+                          if (!response.ok) {
+                            throw new Error(result.error || 'Failed to create checkout session');
+                          }
+
+                          if (result.url) {
+                            window.location.href = result.url;
+                          } else {
+                            throw new Error('No checkout URL received');
+                          }
                         }
                       } catch (error: any) {
-                        console.error('Payment error:', error);
+                        console.error('Booking error:', error);
                         toast({
-                          title: 'Payment Error',
-                          description: error.message || 'Failed to process payment. Please try again.',
+                          title: 'Booking Error',
+                          description: error.message || 'Failed to process booking. Please try again.',
                           variant: 'destructive',
                         });
                         setIsProcessingPayment(false);
@@ -1298,6 +1338,11 @@ export default function Book() {
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Processing...
+                      </>
+                    ) : isPayLaterEnabled ? (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Confirm Booking (Pay Later)
                       </>
                     ) : (
                       <>

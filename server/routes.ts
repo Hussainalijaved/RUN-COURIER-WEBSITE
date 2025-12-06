@@ -316,7 +316,35 @@ export async function registerRoutes(
   }));
 
   app.get("/api/users/:id", asyncHandler(async (req, res) => {
-    const user = await storage.getUser(req.params.id);
+    let user = await storage.getUser(req.params.id);
+    if (!user) {
+      const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
+      try {
+        const { data: authUser, error } = await supabaseAdmin.auth.admin.getUserById(req.params.id);
+        if (!error && authUser?.user) {
+          const metadata = authUser.user.user_metadata || {};
+          const createData = {
+            id: req.params.id,
+            email: authUser.user.email || '',
+            fullName: metadata.fullName || metadata.full_name || '',
+            phone: metadata.phone || null,
+            postcode: metadata.postcode || null,
+            address: metadata.address || null,
+            buildingName: metadata.buildingName || null,
+            role: metadata.role || 'customer',
+            userType: metadata.userType || 'individual',
+            companyName: metadata.companyName || null,
+            registrationNumber: metadata.registrationNumber || null,
+            isActive: true,
+            payLaterEnabled: metadata.payLaterEnabled || false,
+          };
+          user = await storage.createUserWithId(req.params.id, createData);
+          console.log(`[Users] Auto-created user ${req.params.id} from Supabase auth`);
+        }
+      } catch (syncError) {
+        console.error('Error syncing user from Supabase:', syncError);
+      }
+    }
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -345,6 +373,20 @@ export async function registerRoutes(
     
     // Now update with the provided data
     const updatedUser = await storage.updateUser(req.params.id, req.body);
+    
+    // Sync payLaterEnabled to Supabase user_metadata so it survives server restarts
+    if (req.body.payLaterEnabled !== undefined) {
+      try {
+        const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
+        await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
+          user_metadata: { payLaterEnabled: req.body.payLaterEnabled }
+        });
+        console.log(`[Users] Synced payLaterEnabled=${req.body.payLaterEnabled} to Supabase for user ${req.params.id}`);
+      } catch (syncError) {
+        console.error('Error syncing payLaterEnabled to Supabase:', syncError);
+      }
+    }
+    
     res.json(updatedUser);
   }));
 
@@ -607,6 +649,70 @@ export async function registerRoutes(
     res.json({ url: session.url, sessionId: session.id });
   }));
 
+  app.post("/api/booking/pay-later", asyncHandler(async (req, res) => {
+    const bookingData: BookingData = req.body;
+    
+    if (!bookingData.pickupPostcode || !bookingData.deliveryPostcode || !bookingData.vehicleType) {
+      return res.status(400).json({ error: "Missing required booking information" });
+    }
+
+    if (!bookingData.customerId) {
+      return res.status(400).json({ error: "Customer account required for Pay Later bookings" });
+    }
+
+    const customer = await storage.getUser(bookingData.customerId);
+    if (!customer || !customer.payLaterEnabled) {
+      return res.status(403).json({ error: "Pay Later is not enabled for this account" });
+    }
+
+    const trackingNumber = generateTrackingNumber();
+    const basePrice = bookingData.basePrice || bookingData.totalPrice * 0.3;
+    const distancePrice = bookingData.distancePrice || bookingData.totalPrice * 0.7;
+    
+    const jobData = {
+      trackingNumber,
+      pickupPostcode: bookingData.pickupPostcode,
+      pickupAddress: bookingData.pickupAddress || '',
+      pickupBuildingName: bookingData.pickupBuildingName || '',
+      pickupContactName: bookingData.pickupName || '',
+      pickupContactPhone: bookingData.pickupPhone || '',
+      pickupInstructions: bookingData.pickupInstructions || null,
+      deliveryPostcode: bookingData.deliveryPostcode,
+      deliveryAddress: bookingData.deliveryAddress || '',
+      deliveryBuildingName: bookingData.deliveryBuildingName || '',
+      recipientName: bookingData.recipientName || '',
+      recipientPhone: bookingData.recipientPhone || '',
+      deliveryInstructions: bookingData.deliveryInstructions || null,
+      vehicleType: bookingData.vehicleType as VehicleType,
+      weight: String(bookingData.weight || 1),
+      basePrice: String(basePrice),
+      distancePrice: String(distancePrice),
+      totalPrice: String(bookingData.totalPrice || 0),
+      distance: String(bookingData.distance || 0),
+      customerId: bookingData.customerId,
+      customerEmail: bookingData.customerEmail || customer.email,
+      paymentStatus: 'pay_later',
+      status: 'pending' as JobStatus,
+      isMultiDrop: bookingData.isMultiDrop || false,
+      isReturnTrip: bookingData.isReturnTrip || false,
+      scheduledPickupTime: bookingData.scheduledPickupTime ? new Date(bookingData.scheduledPickupTime) : null,
+      scheduledDeliveryTime: bookingData.scheduledDeliveryTime ? new Date(bookingData.scheduledDeliveryTime) : null,
+      isScheduled: !!bookingData.scheduledPickupTime,
+    };
+
+    const job = await storage.createJob(jobData);
+    
+    await storage.incrementCompletedBookings(bookingData.customerId);
+    console.log(`[Pay Later Booking] Created job ${trackingNumber} for customer ${bookingData.customerId} - payment to be invoiced weekly`);
+    
+    res.json({ 
+      success: true, 
+      trackingNumber: job.trackingNumber,
+      jobId: job.id,
+      payLater: true
+    });
+  }));
+
   app.post("/api/booking/confirm-payment", asyncHandler(async (req, res) => {
     const { sessionId } = req.body;
     
@@ -627,6 +733,10 @@ export async function registerRoutes(
     }
 
     const trackingNumber = generateTrackingNumber();
+    const totalPrice = parseFloat(metadata.totalPrice || '0');
+    const basePrice = parseFloat(metadata.basePrice || String(totalPrice * 0.3));
+    const distancePrice = parseFloat(metadata.distancePrice || String(totalPrice * 0.7));
+    
     const jobData = {
       trackingNumber,
       pickupPostcode: metadata.pickupPostcode || '',
@@ -642,19 +752,19 @@ export async function registerRoutes(
       recipientPhone: metadata.recipientPhone || '',
       deliveryInstructions: metadata.deliveryInstructions || null,
       vehicleType: metadata.vehicleType as VehicleType,
-      weight: parseFloat(metadata.weight || '1'),
-      quotedPrice: parseFloat(metadata.totalPrice || '0'),
-      distanceMiles: parseFloat(metadata.distance || '0'),
-      estimatedMinutes: parseInt(metadata.estimatedTime || '30'),
+      weight: metadata.weight || '1',
+      basePrice: String(basePrice),
+      distancePrice: String(distancePrice),
+      totalPrice: String(totalPrice),
+      distance: metadata.distance || '0',
       customerId: metadata.customerId || null,
       customerEmail: metadata.customerEmail || session.customer_email || '',
       stripePaymentIntentId: session.payment_intent as string || null,
       stripeSessionId: session.id,
-      paymentStatus: 'paid' as const,
+      paymentStatus: 'paid',
       status: 'pending' as JobStatus,
       isMultiDrop: metadata.isMultiDrop === 'true',
       isReturnTrip: metadata.isReturnTrip === 'true',
-      multiDropStops: metadata.multiDropStops ? metadata.multiDropStops.split(',') : null,
       scheduledPickupTime: metadata.scheduledPickupTime ? new Date(metadata.scheduledPickupTime) : null,
       scheduledDeliveryTime: metadata.scheduledDeliveryTime ? new Date(metadata.scheduledDeliveryTime) : null,
       isScheduled: !!metadata.scheduledPickupTime,

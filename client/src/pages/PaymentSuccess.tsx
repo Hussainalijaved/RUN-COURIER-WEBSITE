@@ -3,7 +3,7 @@ import { useSearch, Link } from 'wouter';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Package, Home, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle, Package, Home, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function PaymentSuccess() {
@@ -12,12 +12,19 @@ export default function PaymentSuccess() {
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPayLater, setIsPayLater] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     const sessionId = params.get('session_id');
+    const tracking = params.get('tracking');
+    const payLater = params.get('payLater');
     
-    if (sessionId) {
+    if (payLater === 'true' && tracking) {
+      setIsPayLater(true);
+      setTrackingNumber(tracking);
+      setIsLoading(false);
+    } else if (sessionId) {
       confirmPayment(sessionId);
     } else {
       setError('No payment session found');
@@ -65,6 +72,12 @@ export default function PaymentSuccess() {
                 <CardTitle className="text-2xl">Payment Issue</CardTitle>
                 <CardDescription>{error}</CardDescription>
               </>
+            ) : isPayLater ? (
+              <>
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <CardTitle className="text-2xl">Booking Confirmed!</CardTitle>
+                <CardDescription>Your delivery has been booked successfully - payment will be invoiced weekly</CardDescription>
+              </>
             ) : (
               <>
                 <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
@@ -90,8 +103,17 @@ export default function PaymentSuccess() {
 
                 <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
                   <div className="flex items-start gap-3">
-                    <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Payment received - your booking is confirmed</span>
+                    {isPayLater ? (
+                      <>
+                        <Clock className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                        <span>Pay Later - you will be invoiced weekly for this booking</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Payment received - your booking is confirmed</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-start gap-3">
                     <Package className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />

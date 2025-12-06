@@ -18,6 +18,8 @@ export interface BookingData {
   originalPrice?: number;
   discountAmount?: number;
   discountApplied?: boolean;
+  basePrice?: number;
+  distancePrice?: number;
   totalPrice: number;
   distance: number;
   estimatedTime: number;
@@ -28,6 +30,7 @@ export interface BookingData {
   customerEmail?: string;
   scheduledPickupTime?: string | null;
   scheduledDeliveryTime?: string | null;
+  payLater?: boolean;
 }
 
 export class StripeService {
