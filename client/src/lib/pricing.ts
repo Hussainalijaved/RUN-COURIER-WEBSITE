@@ -31,14 +31,14 @@ export const defaultPricingConfig: PricingConfig = {
     },
     car: {
       name: "Car",
-      baseCharge: 12,
+      baseCharge: 17,
       perMileRate: 1.20,
       rushHourRate: 1.40,
       maxWeight: 50,
     },
     small_van: {
       name: "Small Van",
-      baseCharge: 19,
+      baseCharge: 21,
       perMileRate: 1.30,
       rushHourRate: 1.50,
       maxWeight: 400,
