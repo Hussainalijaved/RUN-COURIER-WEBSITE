@@ -81,3 +81,28 @@ React Hook Form is used for form state management, integrated with Zod schemas f
 -   **Supabase Services**: Utilized for authentication, user management, and storage for document uploads (e.g., driver licenses, DBS certificates).
 -   **Neon Database**: Provides serverless PostgreSQL hosting.
 -   **Stripe**: Integrated for immediate payment processing and managing customer IDs for the "Pay Later" invoicing feature.
+## Email Notifications (Resend Integration)
+
+All website notifications are now automatically sent to **info@runcourier.co.uk** via the Resend email service.
+
+**Integrated Notification Triggers:**
+- **New Job Created**: Admin notified when a new job is booked in the system
+- **Driver Application Review**: Admin notified when a driver application is reviewed (approved/rejected)
+- **Document Upload**: Admin notified when drivers upload documents for verification
+- **Invoice Generated**: Admin notified when new invoices are created for Pay Later customers
+
+**Email Service Features:**
+- Uses Resend's reliable transactional email API
+- Credentials managed through Replit's secure integrations (no API keys exposed)
+- All emails sent with HTML formatting and fallback text content
+- Non-blocking: notifications sent asynchronously without delaying API responses
+- Graceful fallback: If Resend is not configured, system logs warning but continues operating
+
+**Email Service Functions** (in `server/emailService.ts`):
+- `sendAdminNotification()` - Send any email to info@runcourier.co.uk
+- `sendNewJobNotification()` - Notify admin of new bookings
+- `sendDriverApplicationNotification()` - Notify admin of application reviews
+- `sendDocumentUploadNotification()` - Notify admin of document uploads
+- `sendPaymentNotification()` - Notify admin of invoice generation
+
+All functions include comprehensive job/application details in both HTML and plain text formats.

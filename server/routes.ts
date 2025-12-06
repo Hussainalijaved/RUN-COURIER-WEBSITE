@@ -18,6 +18,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification } from "./emailService";
 
 function generateTrackingNumber(): string {
   const prefix = "RC";
@@ -75,6 +76,8 @@ export async function registerRoutes(
       trackingNumber: generateTrackingNumber(),
     });
     const job = await storage.createJob(data);
+    // Send admin notification
+    await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send job notification:', err));
     res.status(201).json(job);
   }));
 
@@ -941,6 +944,9 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Application not found" });
     }
 
+    // Send admin notification for driver application review
+    await sendDriverApplicationNotification(application.fullName, status).catch(err => console.error('Failed to send application notification:', err));
+
     res.json(application);
   }));
 
@@ -972,6 +978,10 @@ export async function registerRoutes(
 
   app.patch("/api/invoices/:id", asyncHandler(async (req, res) => {
     const invoice = await storage.updateInvoice(req.params.id, req.body);
+    // Send admin notification if invoice was created
+    if (invoice && req.body.status) {
+      await sendPaymentNotification(invoice.invoiceNumber, invoice.totalAmount, new Date(invoice.dueDate).toLocaleDateString()).catch(err => console.error('Failed to send payment notification:', err));
+    }
     if (!invoice) {
       return res.status(404).json({ error: "Invoice not found" });
     }

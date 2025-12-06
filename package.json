@@ -73,6 +73,7 @@
     "react-resizable-panels": "^2.1.7",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^2.15.2",
+    "resend": "^4.0.0",
     "stripe": "^18.5.0",
     "stripe-replit-sync": "^0.0.12",
     "tailwind-merge": "^2.6.0",

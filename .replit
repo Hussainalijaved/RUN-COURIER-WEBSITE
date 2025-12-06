@@ -35,6 +35,10 @@ localPort = 40485
 externalPort = 5173
 
 [[ports]]
+localPort = 40875
+externalPort = 8081
+
+[[ports]]
 localPort = 40997
 externalPort = 4200
 
@@ -87,4 +91,4 @@ args = "npm run dev"
 waitForPort = 5000
 
 [agent]
-integrations = ["stripe:1.0.0"]
+integrations = ["stripe:1.0.0", "resend:1.0.0"]
