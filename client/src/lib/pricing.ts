@@ -32,7 +32,7 @@ export const defaultPricingConfig: PricingConfig = {
     },
     car: {
       name: "Car",
-      baseCharge: 25,
+      baseCharge: 12,
       perMileRate: 1.20,
       rushHourRate: 1.40,
       maxWeight: 50,

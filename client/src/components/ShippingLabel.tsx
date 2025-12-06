@@ -63,6 +63,9 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                   objectFit: 'contain',
                 }}
               />
+              <div style={{ lineHeight: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0', color: '#000' }}>RUN COURIER™</p>
+              </div>
             </div>
             <div className="text-right">
               <p style={{ fontSize: '10px', color: '#444' }}>www.runcourier.co.uk</p>
