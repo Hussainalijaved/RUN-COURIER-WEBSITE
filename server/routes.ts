@@ -18,7 +18,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission } from "./emailService";
 
 function generateTrackingNumber(): string {
   const prefix = "RC";
@@ -986,6 +986,20 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Invoice not found" });
     }
     res.json(invoice);
+  }));
+
+  // Contact form endpoint
+  app.post("/api/contact", asyncHandler(async (req, res) => {
+    const { name, email, phone, subject, message } = req.body;
+    
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Send contact form email
+    await sendContactFormSubmission(name, email, phone, subject, message).catch(err => console.error('Failed to send contact form:', err));
+    
+    res.status(200).json({ success: true, message: "Your message has been sent successfully" });
   }));
 
   registerMobileRoutes(app);

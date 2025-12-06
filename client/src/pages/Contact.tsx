@@ -90,13 +90,31 @@ export default function Contact() {
 
   const onSubmit = async (data: ContactInput) => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    toast({
-      title: 'Message Sent',
-      description: 'Thank you for contacting us. We will get back to you shortly.',
-    });
-    form.reset();
-    setIsLoading(false);
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Message Sent',
+          description: 'Thank you for contacting us. We will get back to you shortly.',
+        });
+        form.reset();
+      } else {
+        throw new Error('Failed to send message');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send your message. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

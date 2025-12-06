@@ -151,3 +151,25 @@ export async function sendPaymentNotification(
 
   return sendAdminNotification('New Invoice Generated', htmlContent, textContent);
 }
+
+export async function sendContactFormSubmission(
+  name: string,
+  email: string,
+  phone: string | undefined,
+  subject: string,
+  message: string
+): Promise<boolean> {
+  const htmlContent = `
+    <h2>New Contact Form Submission</h2>
+    <p><strong>Name:</strong> ${name}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
+    <p><strong>Subject:</strong> ${subject}</p>
+    <p><strong>Message:</strong></p>
+    <p>${message.replace(/\n/g, '<br>')}</p>
+  `;
+
+  const textContent = `New Contact Form Submission\n\nName: ${name}\nEmail: ${email}\n${phone ? `Phone: ${phone}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`;
+
+  return sendEmailNotification('support@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
+}
