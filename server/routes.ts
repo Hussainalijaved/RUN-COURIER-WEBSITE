@@ -412,6 +412,9 @@ export async function registerRoutes(
     let user = await storage.getUser(req.params.id);
     if (!user) {
       const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Supabase admin not configured" });
+      }
       try {
         const { data: authUser, error } = await supabaseAdmin.auth.admin.getUserById(req.params.id);
         if (!error && authUser?.user) {
@@ -471,10 +474,14 @@ export async function registerRoutes(
     if (req.body.payLaterEnabled !== undefined) {
       try {
         const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
-        await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
-          user_metadata: { payLaterEnabled: req.body.payLaterEnabled }
-        });
-        console.log(`[Users] Synced payLaterEnabled=${req.body.payLaterEnabled} to Supabase for user ${req.params.id}`);
+        if (!supabaseAdmin) {
+          console.warn('Supabase admin not configured, skipping payLaterEnabled sync');
+        } else {
+          await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
+            user_metadata: { payLaterEnabled: req.body.payLaterEnabled }
+          });
+          console.log(`[Users] Synced payLaterEnabled=${req.body.payLaterEnabled} to Supabase for user ${req.params.id}`);
+        }
       } catch (syncError) {
         console.error('Error syncing payLaterEnabled to Supabase:', syncError);
       }
@@ -850,7 +857,7 @@ export async function registerRoutes(
       distancePrice: String(distancePrice),
       totalPrice: String(totalPrice),
       distance: metadata.distance || '0',
-      customerId: metadata.customerId || null,
+      customerId: metadata.customerId || `guest-${session.id}`,
       customerEmail: metadata.customerEmail || session.customer_email || '',
       stripePaymentIntentId: session.payment_intent as string || null,
       stripeSessionId: session.id,
@@ -980,7 +987,7 @@ export async function registerRoutes(
     const invoice = await storage.updateInvoice(req.params.id, req.body);
     // Send admin notification if invoice was created
     if (invoice && req.body.status) {
-      await sendPaymentNotification(invoice.invoiceNumber, invoice.totalAmount, new Date(invoice.dueDate).toLocaleDateString()).catch(err => console.error('Failed to send payment notification:', err));
+      await sendPaymentNotification(invoice.invoiceNumber, invoice.total, new Date(invoice.dueDate).toLocaleDateString()).catch(err => console.error('Failed to send payment notification:', err));
     }
     if (!invoice) {
       return res.status(404).json({ error: "Invoice not found" });
