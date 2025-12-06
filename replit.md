@@ -42,6 +42,31 @@ A dedicated mobile API under `/api/mobile/v1/driver/*` provides endpoints for dr
 
 For approved business customers, a "Pay Later" option allows bookings without immediate payment, with weekly invoicing instead. This feature is enabled by administrators and reflected in the customer's booking flow, bypassing Stripe checkout.
 
+### Business Customer Invoices
+
+Business customers with Pay Later enabled have access to an Invoices section at `/customer/invoices` that provides:
+
+**Features:**
+- Invoice history with all past invoices listed
+- Status tracking (Pending, Paid, Overdue)
+- Dashboard stats: Total Invoices, Pending Payment, Paid This Month, Overdue count
+- View invoice details with full breakdown of deliveries
+- Download PDF of any invoice
+- Print invoices directly from browser
+
+**Invoice Structure:**
+- Invoice number (unique identifier)
+- Billing period (weekly)
+- List of all deliveries made during the period
+- Subtotal, VAT (20%), and Total
+- Due date (typically 7 days from invoice generation)
+- Payment information with bank details
+
+**Key Files:**
+- `client/src/pages/customer/CustomerInvoices.tsx` - Invoice history page
+- `shared/schema.ts` - Invoice table schema
+- `server/routes.ts` - `/api/invoices` endpoints
+
 ### Pricing Engine
 
 The pricing engine, implemented in TypeScript, calculates delivery costs based on vehicle type, distance, rush hour surcharges, weight surcharges, Central London congestion charge, multi-drop fees, return trip multipliers, and waiting times. It allows for client-side quote generation with server-side validation.
