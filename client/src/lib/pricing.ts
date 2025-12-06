@@ -28,7 +28,6 @@ export const defaultPricingConfig: PricingConfig = {
       perMileRate: 1.3,
       rushHourRate: 1.5,
       maxWeight: 5,
-      maxDistance: 10,
     },
     car: {
       name: "Car",
