@@ -204,6 +204,29 @@ export const vendorApiKeys = pgTable("vendor_api_keys", {
 });
 
 export type DriverApplicationStatus = "pending" | "approved" | "rejected";
+export type InvoiceStatus = "pending" | "paid" | "overdue" | "cancelled";
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  customerId: varchar("customer_id", { length: 36 }).notNull(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  companyName: text("company_name"),
+  businessAddress: text("business_address"),
+  vatNumber: text("vat_number"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  vat: decimal("vat", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").$type<InvoiceStatus>().notNull().default("pending"),
+  dueDate: timestamp("due_date").notNull(),
+  paidAt: timestamp("paid_at"),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  jobIds: text("job_ids").array(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 export const driverApplications = pgTable("driver_applications", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -260,6 +283,7 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({ id: tru
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertVendorApiKeySchema = createInsertSchema(vendorApiKeys).omit({ id: true, createdAt: true });
 export const insertDriverApplicationSchema = createInsertSchema(driverApplications).omit({ id: true, submittedAt: true, reviewedAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -281,6 +305,8 @@ export type InsertVendorApiKey = z.infer<typeof insertVendorApiKeySchema>;
 export type VendorApiKey = typeof vendorApiKeys.$inferSelect;
 export type InsertDriverApplication = z.infer<typeof insertDriverApplicationSchema>;
 export type DriverApplication = typeof driverApplications.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
