@@ -86,7 +86,7 @@ export async function sendAdminNotification(
 
 export async function sendNewJobNotification(jobId: string, jobDetails: any): Promise<boolean> {
   const htmlContent = `
-    <h2>New Job Assignment</h2>
+    <h2>New Booking</h2>
     <p><strong>Job ID:</strong> ${jobId}</p>
     <p><strong>Tracking Number:</strong> ${jobDetails.trackingNumber || 'N/A'}</p>
     <p><strong>Pickup Location:</strong> ${jobDetails.pickupPostcode || 'N/A'}</p>
@@ -94,12 +94,12 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
     <p><strong>Vehicle Type:</strong> ${jobDetails.vehicleType || 'N/A'}</p>
     <p><strong>Price:</strong> £${jobDetails.totalPrice || '0.00'}</p>
     <p><strong>Status:</strong> ${jobDetails.status || 'Pending'}</p>
-    <p>Please log in to the admin dashboard to review and manage this job.</p>
+    <p>Please log in to the sales dashboard to review and manage this booking.</p>
   `;
 
-  const textContent = `New Job Assignment\n\nJob ID: ${jobId}\nTracking Number: ${jobDetails.trackingNumber || 'N/A'}\nPickup: ${jobDetails.pickupPostcode || 'N/A'}\nDelivery: ${jobDetails.deliveryPostcode || 'N/A'}\nVehicle: ${jobDetails.vehicleType || 'N/A'}\nPrice: £${jobDetails.totalPrice || '0.00'}\n\nPlease log in to the admin dashboard to review.`;
+  const textContent = `New Booking\n\nJob ID: ${jobId}\nTracking Number: ${jobDetails.trackingNumber || 'N/A'}\nPickup: ${jobDetails.pickupPostcode || 'N/A'}\nDelivery: ${jobDetails.deliveryPostcode || 'N/A'}\nVehicle: ${jobDetails.vehicleType || 'N/A'}\nPrice: £${jobDetails.totalPrice || '0.00'}\n\nPlease log in to the sales dashboard to review.`;
 
-  return sendAdminNotification('New Job Assignment', htmlContent, textContent);
+  return sendEmailNotification('sales@runcourier.co.uk', 'New Booking', htmlContent, textContent);
 }
 
 export async function sendDriverApplicationNotification(
