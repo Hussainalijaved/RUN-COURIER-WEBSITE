@@ -42,19 +42,23 @@ async function initStripe() {
     );
     console.log(`Webhook configured: ${webhook.url}`);
 
-    console.log('Syncing Stripe data...');
-    stripeSync.syncBackfill()
-      .then(() => {
-        console.log('Stripe data synced');
-      })
-      .catch((err: Error) => {
-        console.error('Error syncing Stripe data:', err);
-      });
+    // Run Stripe sync in background after server starts (non-blocking)
+    setImmediate(() => {
+      console.log('Syncing Stripe data in background...');
+      stripeSync.syncBackfill()
+        .then(() => {
+          console.log('Stripe data synced');
+        })
+        .catch((err: Error) => {
+          console.error('Error syncing Stripe data:', err);
+        });
+    });
   } catch (error) {
     console.error('Failed to initialize Stripe:', error);
   }
 }
 
+// Initialize Stripe but don't wait for it
 initStripe().catch(console.error);
 
 app.post(
