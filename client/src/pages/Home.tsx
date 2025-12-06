@@ -428,6 +428,23 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* TrustBox widget - Review Collector */}
+      <section className="py-8 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div 
+            className="trustpilot-widget" 
+            data-locale="en-US" 
+            data-template-id="56278e9abfbbba0bdcd568bc" 
+            data-businessunit-id="680d6e40f2df4b8e0dcdb1fa" 
+            data-style-height="52px" 
+            data-style-width="100%"
+            data-token="53adaaec-ffbe-4b55-aa14-7fa6b09646da"
+          >
+            <a href="https://www.trustpilot.com/review/runcourier.co.uk" target="_blank" rel="noopener noreferrer">Trustpilot</a>
+          </div>
+        </div>
+      </section>
     </PublicLayout>
   );
 }
