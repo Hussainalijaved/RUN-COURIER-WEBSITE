@@ -854,6 +854,40 @@ export async function registerRoutes(
     res.json(application);
   }));
 
+  // Invoice routes for Pay Later customers
+  app.get("/api/invoices", asyncHandler(async (req, res) => {
+    const { customerId, status } = req.query;
+    const invoices = await storage.getInvoices({
+      customerId: customerId as string,
+      status: status as any,
+    });
+    res.json(invoices);
+  }));
+
+  app.get("/api/invoices/:id", asyncHandler(async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    res.json(invoice);
+  }));
+
+  app.get("/api/invoices/:id/details", asyncHandler(async (req, res) => {
+    const result = await storage.getInvoiceWithJobs(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    res.json(result);
+  }));
+
+  app.patch("/api/invoices/:id", asyncHandler(async (req, res) => {
+    const invoice = await storage.updateInvoice(req.params.id, req.body);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    res.json(invoice);
+  }));
+
   registerMobileRoutes(app);
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
