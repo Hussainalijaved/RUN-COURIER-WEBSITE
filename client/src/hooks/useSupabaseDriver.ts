@@ -27,6 +27,12 @@ export function useDriver() {
       return {
         id: data.id,
         userId: data.user_id,
+        driverCode: data.driver_code,
+        fullName: data.full_name,
+        email: data.email,
+        phone: data.phone,
+        postcode: data.postcode,
+        address: data.address,
         vehicleType: data.vehicle_type,
         vehicleRegistration: data.vehicle_registration,
         vehicleMake: data.vehicle_make,
