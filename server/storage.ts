@@ -6,7 +6,9 @@ import {
   type Notification, type InsertNotification,
   type VendorApiKey, type InsertVendorApiKey,
   type DriverApplication, type InsertDriverApplication,
+  type Invoice, type InsertInvoice,
   type DriverApplicationStatus,
+  type InvoiceStatus,
   type DocumentType,
   type DocumentStatus,
   type PricingSettings,
@@ -80,6 +82,13 @@ export interface IStorage {
   createDriverApplication(application: InsertDriverApplication): Promise<DriverApplication>;
   updateDriverApplication(id: string, data: Partial<DriverApplication>): Promise<DriverApplication | undefined>;
   reviewDriverApplication(id: string, status: DriverApplicationStatus, reviewedBy: string, reviewNotes?: string, rejectionReason?: string): Promise<DriverApplication | undefined>;
+
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoiceByNumber(invoiceNumber: string): Promise<Invoice | undefined>;
+  getInvoices(filters?: { customerId?: string; status?: InvoiceStatus }): Promise<Invoice[]>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice | undefined>;
+  getInvoiceWithJobs(id: string): Promise<{ invoice: Invoice; jobs: Job[] } | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -90,6 +99,7 @@ export class MemStorage implements IStorage {
   private notifications: Map<string, Notification>;
   private vendorApiKeys: Map<string, VendorApiKey>;
   private driverApplications: Map<string, DriverApplication>;
+  private invoices: Map<string, Invoice>;
   private pricingSettings: PricingSettings;
   private vehicles: Map<VehicleType, Vehicle>;
 
@@ -101,6 +111,7 @@ export class MemStorage implements IStorage {
     this.notifications = new Map();
     this.vendorApiKeys = new Map();
     this.driverApplications = new Map();
+    this.invoices = new Map();
     
     this.pricingSettings = {
       id: "default",
@@ -1171,6 +1182,84 @@ export class MemStorage implements IStorage {
     };
     this.driverApplications.set(id, updated);
     return updated;
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    return this.invoices.get(id);
+  }
+
+  async getInvoiceByNumber(invoiceNumber: string): Promise<Invoice | undefined> {
+    return Array.from(this.invoices.values()).find(
+      (inv) => inv.invoiceNumber === invoiceNumber
+    );
+  }
+
+  async getInvoices(filters?: { customerId?: string; status?: InvoiceStatus }): Promise<Invoice[]> {
+    let invoices = Array.from(this.invoices.values());
+    if (filters?.customerId) {
+      invoices = invoices.filter((inv) => inv.customerId === filters.customerId);
+    }
+    if (filters?.status) {
+      invoices = invoices.filter((inv) => inv.status === filters.status);
+    }
+    return invoices.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  }
+
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    const id = randomUUID();
+    const newInvoice: Invoice = {
+      id,
+      ...invoice,
+      invoiceNumber: invoice.invoiceNumber,
+      customerId: invoice.customerId,
+      customerName: invoice.customerName,
+      customerEmail: invoice.customerEmail,
+      companyName: invoice.companyName || null,
+      businessAddress: invoice.businessAddress || null,
+      vatNumber: invoice.vatNumber || null,
+      subtotal: invoice.subtotal,
+      vat: invoice.vat || "0",
+      total: invoice.total,
+      status: (invoice.status || "pending") as InvoiceStatus,
+      dueDate: invoice.dueDate,
+      paidAt: invoice.paidAt || null,
+      periodStart: invoice.periodStart,
+      periodEnd: invoice.periodEnd,
+      jobIds: invoice.jobIds || null,
+      notes: invoice.notes || null,
+      createdAt: new Date(),
+    };
+    this.invoices.set(id, newInvoice);
+    return newInvoice;
+  }
+
+  async updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice | undefined> {
+    const invoice = this.invoices.get(id);
+    if (!invoice) return undefined;
+    const updated = { ...invoice, ...data };
+    this.invoices.set(id, updated);
+    return updated;
+  }
+
+  async getInvoiceWithJobs(id: string): Promise<{ invoice: Invoice; jobs: Job[] } | undefined> {
+    const invoice = this.invoices.get(id);
+    if (!invoice) return undefined;
+    
+    const jobs: Job[] = [];
+    if (invoice.jobIds && Array.isArray(invoice.jobIds)) {
+      for (const jobId of invoice.jobIds) {
+        const job = this.jobs.get(jobId);
+        if (job) {
+          jobs.push(job);
+        }
+      }
+    }
+    
+    return { invoice, jobs };
   }
 }
 
