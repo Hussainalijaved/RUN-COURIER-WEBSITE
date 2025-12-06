@@ -415,15 +415,6 @@ export default function Book() {
       return;
     }
 
-    if (!user) {
-      toast({
-        title: 'Login Required',
-        description: 'Please login or create an account to continue booking.',
-      });
-      setLocation('/login');
-      return;
-    }
-
     setStep(2);
   };
 
