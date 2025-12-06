@@ -1,9 +1,11 @@
+import { useRef, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 import {
   FileText,
   Upload,
@@ -16,10 +18,12 @@ import {
   CreditCard,
   User,
   Package,
+  Loader2,
 } from 'lucide-react';
 import {
   useDriver,
   useDriverDocuments,
+  useUploadDocument,
 } from '@/hooks/useSupabaseDriver';
 
 const baseDocumentTypes = [
@@ -119,6 +123,9 @@ const getStatusBadge = (status: string | undefined) => {
 export default function DriverDocuments() {
   const { data: driver, isLoading: driverLoading } = useDriver();
   const { data: documents, isLoading: docsLoading } = useDriverDocuments(driver?.id);
+  const uploadDocumentMutation = useUploadDocument();
+  const { toast } = useToast();
+  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   const vehicleType = driver?.vehicleType || 'car';
   
@@ -138,6 +145,49 @@ export default function DriverDocuments() {
   const getDocument = (docType: string) => {
     return documents?.find((d) => d.type === docType);
   };
+
+  const handleUploadClick = useCallback((docType: string) => {
+    const input = fileInputRefs.current[docType];
+    if (input) {
+      input.click();
+    }
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
+    const file = e.target.files?.[0];
+    if (!file || !driver?.id) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select a file smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    uploadDocumentMutation.mutate(
+      { driverId: driver.id, file, documentType: docType },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Document uploaded",
+            description: "Your document has been uploaded and is pending review.",
+          });
+          if (fileInputRefs.current[docType]) {
+            fileInputRefs.current[docType]!.value = '';
+          }
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Upload failed",
+            description: error.message || "Failed to upload document. Please try again.",
+            variant: "destructive",
+          });
+        },
+      }
+    );
+  }, [driver?.id, uploadDocumentMutation, toast]);
 
   const approvedCount = documents?.filter((d) => d.status === 'approved').length || 0;
   const totalRequired = documentTypes.length + vehiclePhotos.length;
@@ -223,12 +273,26 @@ export default function DriverDocuments() {
                         </div>
                         <div className="flex items-center gap-3">
                           {getStatusBadge(status)}
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            ref={(el) => { fileInputRefs.current[docType.type] = el; }}
+                            onChange={(e) => handleFileChange(e, docType.type)}
+                            data-testid={`input-file-${docType.type}`}
+                          />
                           <Button 
                             variant={status === 'approved' ? 'outline' : 'default'}
                             size="sm"
+                            onClick={() => handleUploadClick(docType.type)}
+                            disabled={uploadDocumentMutation.isPending}
                             data-testid={`button-upload-${docType.type}`}
                           >
-                            <Upload className="mr-2 h-4 w-4" />
+                            {uploadDocumentMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Upload className="mr-2 h-4 w-4" />
+                            )}
                             {status ? 'Re-upload' : 'Upload'}
                           </Button>
                         </div>
@@ -287,12 +351,25 @@ export default function DriverDocuments() {
                             {doc?.reviewNotes && status === 'rejected' && (
                               <span className="text-xs text-destructive">{doc.reviewNotes}</span>
                             )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              ref={(el) => { fileInputRefs.current[photo.type] = el; }}
+                              onChange={(e) => handleFileChange(e, photo.type)}
+                              data-testid={`input-file-${photo.type}`}
+                            />
                             <Button 
                               variant={status === 'approved' ? 'outline' : 'default'}
                               size="sm"
                               className="mt-2"
+                              onClick={() => handleUploadClick(photo.type)}
+                              disabled={uploadDocumentMutation.isPending}
                               data-testid={`button-upload-${photo.type}`}
                             >
+                              {uploadDocumentMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : null}
                               {status ? 'Re-upload' : 'Upload'}
                             </Button>
                           </div>

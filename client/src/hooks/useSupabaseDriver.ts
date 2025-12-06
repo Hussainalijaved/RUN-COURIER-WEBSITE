@@ -297,3 +297,87 @@ export function useDriverStats(driverId: string | undefined) {
 
   return stats;
 }
+
+export function useUploadDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      driverId, 
+      file, 
+      documentType 
+    }: { 
+      driverId: string; 
+      file: File; 
+      documentType: string; 
+    }) => {
+      const timestamp = Date.now();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `drivers/${driverId}/${documentType}_${timestamp}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('documents')
+        .getPublicUrl(fileName);
+
+      const { data: existingDocs } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('driver_id', driverId)
+        .eq('type', documentType)
+        .limit(1);
+
+      let result;
+      if (existingDocs && existingDocs.length > 0) {
+        const { data, error } = await supabase
+          .from('documents')
+          .update({
+            file_name: file.name,
+            file_url: publicUrl,
+            status: 'pending',
+            uploaded_at: new Date().toISOString(),
+            reviewed_by: null,
+            review_notes: null,
+            reviewed_at: null,
+          })
+          .eq('id', existingDocs[0].id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      } else {
+        const newId = crypto.randomUUID();
+        const { data, error } = await supabase
+          .from('documents')
+          .insert({
+            id: newId,
+            driver_id: driverId,
+            type: documentType,
+            file_name: file.name,
+            file_url: publicUrl,
+            status: 'pending',
+            uploaded_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        result = data;
+      }
+
+      return result;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'documents', { driverId: variables.driverId }] });
+    },
+  });
+}
