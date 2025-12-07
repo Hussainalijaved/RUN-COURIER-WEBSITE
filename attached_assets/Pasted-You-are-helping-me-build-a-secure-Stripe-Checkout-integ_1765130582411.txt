@@ -1,0 +1,118 @@
+You are helping me build a secure Stripe Checkout integration for my courier website Run Courier (https://runcourier.co.uk
+).
+
+Tech setup
+
+Backend: Supabase Edge Function (TypeScript / Deno).
+
+Database: Supabase (jobs table already exists).
+
+Frontend: Custom website (not using Stripe products or payment links).
+
+Currency: GBP.
+
+Prices are dynamic (distance, weight, rush hour, etc.) and are calculated in my own code, NOT in Stripe.
+
+What I need you to build
+
+A Supabase Edge Function called create-stripe-checkout that:
+
+Accepts a POST request with JSON body:
+
+{
+  "jobId": "JOB123",
+  "amountGBP": 27.50,
+  "customerEmail": "test@example.com",
+  "stripeCustomerId": "optional-string-or-null"
+}
+
+
+Validates:
+
+amountGBP is a positive number.
+
+jobId and customerEmail are non-empty strings.
+
+Converts amountGBP → pence (integer) for Stripe (e.g. 27.5 → 2750).
+
+Uses the official Stripe SDK (ESM import for Deno) and a secret key from an environment variable:
+
+STRIPE_SECRET_KEY
+
+Creates a Stripe Checkout Session in payment mode with:
+
+currency: "gbp"
+
+Single line item:
+
+name: "Run Courier Delivery"
+
+unit_amount = amountInPence
+
+quantity: 1
+
+customer_email = provided email (and if stripeCustomerId is provided, use it as customer and still set customer_email).
+
+metadata including:
+
+jobId
+
+stripeCustomerId (if provided)
+
+success_url = https://runcourier.co.uk/payment-success?jobId={JOB_ID_PLACEHOLDER}
+
+cancel_url = https://runcourier.co.uk/payment-cancel?jobId={JOB_ID_PLACEHOLDER}
+(Replace {JOB_ID_PLACEHOLDER} in code with the actual jobId.)
+
+Returns JSON:
+
+{ "checkoutUrl": "https://checkout.stripe.com/..." }
+
+
+Uses proper CORS headers so my website can call it from the browser.
+
+Handles errors cleanly and returns:
+
+{ "error": "message here" }
+
+
+with a 4xx/5xx status.
+
+Show exactly how to call this function from my frontend using fetch in JavaScript:
+
+Example call after the user clicks “Pay Now” on my booking page.
+
+The frontend already knows jobId, amountGBP, and customerEmail.
+
+After getting checkoutUrl from the Edge Function, redirect the browser:
+
+window.location.href = checkoutUrl;
+
+
+Explain where to configure environment variables for Supabase Edge Functions:
+
+STRIPE_SECRET_KEY
+
+Optionally FRONTEND_BASE_URL = "https://runcourier.co.uk"
+
+Do NOT use:
+
+Stripe Products
+
+Stripe Prices
+
+Stripe Payment Links
+
+Subscriptions
+
+Any dashboard-created products
+
+Everything must use Stripe Checkout Sessions with a custom amount sent from my backend.
+
+Output format
+
+First, generate the complete TypeScript code for the Supabase Edge Function create-stripe-checkout (ready to paste into supabase/functions/create-stripe-checkout/index.ts).
+
+Then, provide the frontend JavaScript example (the fetch call + redirect).
+
+Add short comments in the code so I understand what each part does.
