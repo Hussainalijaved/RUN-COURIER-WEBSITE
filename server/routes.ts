@@ -459,27 +459,35 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Driver not found" });
     }
     
-    // If driver has a userId, also delete the user account from Supabase Auth first
-    if (driver.userId) {
+    // Helper function to check if a string is a valid UUID
+    const isValidUUID = (str: string) => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(str);
+    };
+    
+    // If driver has a userId that is a valid UUID, delete from Supabase Auth
+    if (driver.userId && isValidUUID(driver.userId)) {
       const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
-      if (!supabaseAdmin) {
-        console.error('[Drivers] Supabase admin not configured, cannot delete driver');
-        return res.status(500).json({ error: "Account deletion service unavailable" });
-      }
-      
-      try {
-        const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(driver.userId);
-        if (supabaseError) {
+      if (supabaseAdmin) {
+        try {
+          const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(driver.userId);
+          if (supabaseError) {
+            console.error('Error deleting user from Supabase:', supabaseError);
+            // Continue with local deletion even if Supabase fails
+          } else {
+            console.log(`[Drivers] Deleted user ${driver.userId} from Supabase Auth`);
+          }
+        } catch (supabaseError) {
           console.error('Error deleting user from Supabase:', supabaseError);
-          return res.status(500).json({ error: "Failed to delete account from authentication service" });
+          // Continue with local deletion even if Supabase fails
         }
-        console.log(`[Drivers] Deleted user ${driver.userId} from Supabase Auth`);
-      } catch (supabaseError) {
-        console.error('Error deleting user from Supabase:', supabaseError);
-        return res.status(500).json({ error: "Failed to delete account from authentication service" });
       }
-      
-      // Delete user from local storage
+    } else {
+      console.log(`[Drivers] Skipping Supabase Auth deletion for non-UUID userId: ${driver.userId}`);
+    }
+    
+    // Delete user from local storage if userId exists
+    if (driver.userId) {
       await storage.deleteUser(driver.userId);
     }
     
