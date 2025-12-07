@@ -641,6 +641,56 @@ export async function registerRoutes(
 
   app.get("/api/documents", asyncHandler(async (req, res) => {
     const { driverId, status, type } = req.query;
+    
+    // First try to get documents from PostgreSQL database for persistence
+    try {
+      const { db } = await import("./db");
+      const { documents: documentsTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      let dbDocuments;
+      
+      // Build query with proper condition handling
+      if (driverId && status && type) {
+        dbDocuments = await db.select().from(documentsTable)
+          .where(and(
+            eq(documentsTable.driverId, driverId as string),
+            eq(documentsTable.status, status as any),
+            eq(documentsTable.type, type as any)
+          ));
+      } else if (driverId && status) {
+        dbDocuments = await db.select().from(documentsTable)
+          .where(and(
+            eq(documentsTable.driverId, driverId as string),
+            eq(documentsTable.status, status as any)
+          ));
+      } else if (driverId && type) {
+        dbDocuments = await db.select().from(documentsTable)
+          .where(and(
+            eq(documentsTable.driverId, driverId as string),
+            eq(documentsTable.type, type as any)
+          ));
+      } else if (driverId) {
+        dbDocuments = await db.select().from(documentsTable)
+          .where(eq(documentsTable.driverId, driverId as string));
+      } else if (status) {
+        dbDocuments = await db.select().from(documentsTable)
+          .where(eq(documentsTable.status, status as any));
+      } else if (type) {
+        dbDocuments = await db.select().from(documentsTable)
+          .where(eq(documentsTable.type, type as any));
+      } else {
+        dbDocuments = await db.select().from(documentsTable);
+      }
+      
+      if (dbDocuments && dbDocuments.length > 0) {
+        return res.json(dbDocuments);
+      }
+    } catch (e) {
+      console.error("Failed to fetch documents from PostgreSQL, falling back to memory:", e);
+    }
+    
+    // Fallback to in-memory storage
     const documents = await storage.getDocuments({
       driverId: driverId as string | undefined,
       status: status as string | undefined,
@@ -698,19 +748,65 @@ export async function registerRoutes(
     const relativePath = `/uploads/documents/${safeDriverId}/${file.filename}`;
     const fileUrl = relativePath;
 
-    const existingDocs = await storage.getDocuments({ driverId: rawDriverId, type: rawDocumentType as any });
+    // Check for existing documents in both memory and database
+    let existingDocId: string | null = null;
+    
+    // First check in-memory storage
+    const memoryDocs = await storage.getDocuments({ driverId: rawDriverId, type: rawDocumentType as any });
+    if (memoryDocs && memoryDocs.length > 0) {
+      existingDocId = memoryDocs[0].id;
+    }
+    
+    // If not in memory, check database
+    if (!existingDocId) {
+      try {
+        const { db } = await import("./db");
+        const { documents: documentsTable } = await import("@shared/schema");
+        const { eq, and } = await import("drizzle-orm");
+        
+        const dbDocs = await db.select().from(documentsTable)
+          .where(and(
+            eq(documentsTable.driverId, rawDriverId),
+            eq(documentsTable.type, rawDocumentType as any)
+          ));
+        
+        if (dbDocs && dbDocs.length > 0) {
+          existingDocId = dbDocs[0].id;
+        }
+      } catch (e) {
+        console.error("Failed to check existing documents in database:", e);
+      }
+    }
     
     let document;
-    if (existingDocs && existingDocs.length > 0) {
-      document = await storage.updateDocument(existingDocs[0].id, {
+    const uploadedAt = new Date();
+    
+    if (existingDocId) {
+      // Update existing document in memory
+      document = await storage.updateDocument(existingDocId, {
         fileName: file.originalname,
         fileUrl,
         status: 'pending' as const,
-        uploadedAt: new Date(),
+        uploadedAt,
         reviewedBy: null,
         reviewNotes: null,
         reviewedAt: null,
       });
+      
+      // If not in memory, create in memory with existing ID
+      if (!document) {
+        document = await storage.createDocument({
+          driverId: rawDriverId,
+          type: safeDocumentType,
+          fileName: file.originalname,
+          fileUrl,
+          status: 'pending',
+        });
+        // Override ID to match existing
+        if (document) {
+          (document as any).id = existingDocId;
+        }
+      }
     } else {
       document = await storage.createDocument({
         driverId: rawDriverId,
@@ -719,6 +815,42 @@ export async function registerRoutes(
         fileUrl,
         status: 'pending',
       });
+    }
+
+    // Sync document to PostgreSQL database
+    try {
+      const { db } = await import("./db");
+      const { documents } = await import("@shared/schema");
+      
+      if (document) {
+        await db.insert(documents).values({
+          id: document.id,
+          driverId: document.driverId,
+          type: document.type,
+          fileName: document.fileName,
+          fileUrl: document.fileUrl,
+          status: document.status,
+          reviewedBy: document.reviewedBy,
+          reviewNotes: document.reviewNotes,
+          expiryDate: document.expiryDate,
+          uploadedAt: document.uploadedAt,
+          reviewedAt: document.reviewedAt,
+        }).onConflictDoUpdate({
+          target: documents.id,
+          set: {
+            fileName: document.fileName,
+            fileUrl: document.fileUrl,
+            status: document.status,
+            reviewedBy: document.reviewedBy,
+            reviewNotes: document.reviewNotes,
+            uploadedAt: document.uploadedAt,
+            reviewedAt: document.reviewedAt,
+          }
+        });
+        console.log("Document successfully synced to PostgreSQL:", document.id);
+      }
+    } catch (e) {
+      console.error("Failed to sync document to PostgreSQL:", e);
     }
 
     await sendDocumentUploadNotification(rawDriverId, safeDocumentType).catch(err => 
@@ -734,6 +866,24 @@ export async function registerRoutes(
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
     }
+    
+    // Sync review status to PostgreSQL database
+    try {
+      const { db } = await import("./db");
+      const { documents } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.update(documents).set({
+        status: document.status,
+        reviewedBy: document.reviewedBy,
+        reviewNotes: document.reviewNotes,
+        reviewedAt: document.reviewedAt,
+      }).where(eq(documents.id, req.params.id));
+      console.log("Document review synced to PostgreSQL:", req.params.id);
+    } catch (e) {
+      console.error("Failed to sync document review to PostgreSQL:", e);
+    }
+    
     res.json(document);
   }));
 
