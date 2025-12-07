@@ -243,6 +243,9 @@ export function useUpdateDriverProfile() {
     mutationFn: async ({ driverId, data }: { driverId: string; data: Partial<Driver> }) => {
       const updateData: Record<string, any> = {};
       
+      if (data.phone !== undefined) updateData.phone = data.phone;
+      if (data.postcode !== undefined) updateData.postcode = data.postcode;
+      if (data.address !== undefined) updateData.address = data.address;
       if (data.vehicleType !== undefined) updateData.vehicle_type = data.vehicleType;
       if (data.vehicleRegistration !== undefined) updateData.vehicle_registration = data.vehicleRegistration;
       if (data.vehicleMake !== undefined) updateData.vehicle_make = data.vehicleMake;

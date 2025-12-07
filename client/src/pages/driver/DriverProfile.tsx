@@ -65,6 +65,9 @@ export default function DriverProfile() {
   const { data: driver, isLoading } = useDriver();
   const updateProfileMutation = useUpdateDriverProfile();
 
+  const [phone, setPhone] = useState('');
+  const [postcode, setPostcode] = useState('');
+  const [address, setAddress] = useState('');
   const [vehicleType, setVehicleType] = useState<VehicleType>('car');
   const [vehicleRegistration, setVehicleRegistration] = useState('');
   const [vehicleMake, setVehicleMake] = useState('');
@@ -80,6 +83,9 @@ export default function DriverProfile() {
 
   useEffect(() => {
     if (driver) {
+      setPhone(driver.phone || '');
+      setPostcode(driver.postcode || '');
+      setAddress(driver.address || '');
       setVehicleType(driver.vehicleType || 'car');
       setVehicleRegistration(driver.vehicleRegistration || '');
       setVehicleMake(driver.vehicleMake || '');
@@ -94,6 +100,9 @@ export default function DriverProfile() {
       {
         driverId: driver.id,
         data: {
+          phone,
+          postcode,
+          address,
           vehicleType,
           vehicleRegistration,
           vehicleMake,
@@ -227,7 +236,7 @@ export default function DriverProfile() {
                   <User className="h-5 w-5" />
                   Personal Information
                 </CardTitle>
-                <CardDescription>Your account details (synced from mobile app registration)</CardDescription>
+                <CardDescription>Update your contact details and address</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -237,6 +246,7 @@ export default function DriverProfile() {
                       Full Name
                     </Label>
                     <Input value={driver?.fullName || user?.fullName || ''} disabled data-testid="input-fullname" />
+                    <p className="text-xs text-muted-foreground">Name cannot be changed</p>
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
@@ -244,6 +254,7 @@ export default function DriverProfile() {
                       Email
                     </Label>
                     <Input value={driver?.email || user?.email || ''} disabled data-testid="input-email" />
+                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
                   </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -252,14 +263,24 @@ export default function DriverProfile() {
                       <Phone className="h-4 w-4" />
                       Phone Number
                     </Label>
-                    <Input value={driver?.phone || user?.phone || 'Not set'} disabled data-testid="input-phone" />
+                    <Input 
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+44 7XXX XXX XXX"
+                      data-testid="input-phone" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
                       <MapPin className="h-4 w-4" />
                       Postcode
                     </Label>
-                    <Input value={driver?.postcode || 'Not set'} disabled data-testid="input-postcode" />
+                    <Input 
+                      value={postcode}
+                      onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+                      placeholder="e.g., SW1A 1AA"
+                      data-testid="input-postcode" 
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -267,7 +288,12 @@ export default function DriverProfile() {
                     <MapPin className="h-4 w-4" />
                     Full Address
                   </Label>
-                  <Input value={driver?.address || 'Not set'} disabled data-testid="input-address" />
+                  <Input 
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Your full home address"
+                    data-testid="input-address" 
+                  />
                 </div>
               </CardContent>
             </Card>
