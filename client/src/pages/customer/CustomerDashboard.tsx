@@ -91,21 +91,21 @@ export default function CustomerDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">My Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}! Here's your delivery overview.</p>
+            <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-page-title">My Dashboard</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">Welcome back{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}! Here's your delivery overview.</p>
           </div>
           <Link href="/book">
-            <Button data-testid="button-new-booking">
+            <Button data-testid="button-new-booking" className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               New Booking
             </Button>
           </Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card data-testid="stat-total-orders">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Orders</CardTitle>

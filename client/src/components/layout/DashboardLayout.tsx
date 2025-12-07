@@ -227,15 +227,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </Sidebar>
 
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex h-14 items-center gap-4 border-b border-border bg-background px-4">
+          <header className="flex h-12 sm:h-14 items-center gap-2 sm:gap-4 border-b border-border bg-background px-3 sm:px-4">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex-1" />
-            <Button variant="ghost" size="icon" data-testid="button-notifications">
-              <Bell className="h-5 w-5" />
+            <Button variant="ghost" size="icon" data-testid="button-notifications" className="h-9 w-9 sm:h-10 sm:w-10">
+              <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </header>
 
-          <main className="flex-1 overflow-auto bg-background p-6">
+          <main className="flex-1 overflow-auto bg-background p-3 sm:p-4 lg:p-6">
             {children}
           </main>
         </div>
