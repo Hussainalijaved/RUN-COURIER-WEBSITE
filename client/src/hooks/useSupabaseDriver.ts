@@ -5,6 +5,7 @@ import type { Driver, Job, Document as DriverDocument } from '@shared/schema';
 
 export function useDriver() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: ['supabase', 'driver', user?.id],
@@ -19,10 +20,34 @@ export function useDriver() {
 
       if (error) {
         if (error.code === 'PGRST116') {
+          // Driver doesn't exist, try to auto-create one
           const response = await fetch(`/api/drivers/user/${user.id}`);
           if (response.ok) {
             const driver = await response.json();
             return driver as Driver;
+          }
+          
+          // If no driver exists, create one automatically
+          const createResponse = await fetch('/api/drivers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user.id,
+              fullName: user.fullName || 'Driver',
+              email: user.email || '',
+              phone: user.phone || '',
+              vehicleType: 'car',
+              isAvailable: false,
+              isVerified: false,
+              rating: '5.00',
+              totalJobs: 0,
+            }),
+          });
+          
+          if (createResponse.ok) {
+            const newDriver = await createResponse.json();
+            queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user.id] });
+            return newDriver as Driver;
           }
           return null;
         }
