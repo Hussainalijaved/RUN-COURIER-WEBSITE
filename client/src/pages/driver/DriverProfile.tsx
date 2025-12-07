@@ -38,11 +38,13 @@ import {
   MapPin,
   Trash2,
   AlertTriangle,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import {
   useDriver,
@@ -60,7 +62,9 @@ const vehicleTypes: { value: VehicleType; label: string }[] = [
 export default function DriverProfile() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
 
   const { data: driver, isLoading } = useDriver();
   const updateProfileMutation = useUpdateDriverProfile();
@@ -91,6 +95,7 @@ export default function DriverProfile() {
       setVehicleMake(driver.vehicleMake || '');
       setVehicleModel(driver.vehicleModel || '');
       setVehicleColor(driver.vehicleColor || '');
+      setIsAvailable(driver.isAvailable ?? false);
     }
   }, [driver]);
 
@@ -123,6 +128,20 @@ export default function DriverProfile() {
       }
     );
   };
+
+  const toggleAvailabilityMutation = useMutation({
+    mutationFn: async (newState: boolean) => {
+      return apiRequest('PATCH', `/api/drivers/${driver?.id}/availability`, { isAvailable: newState });
+    },
+    onSuccess: (data) => {
+      setIsAvailable(!isAvailable);
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'driver'] });
+      toast({ title: isAvailable ? 'You are now offline' : 'You are now online' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update availability', variant: 'destructive' });
+    },
+  });
 
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
@@ -186,11 +205,25 @@ export default function DriverProfile() {
                           Pending Verification
                         </Badge>
                       )}
-                      {driver?.isAvailable && (
-                        <Badge variant="outline" className="border-green-500 text-green-600">
-                          Online
-                        </Badge>
-                      )}
+                      <Button
+                        size="sm"
+                        variant={isAvailable ? 'default' : 'outline'}
+                        onClick={() => toggleAvailabilityMutation.mutate(!isAvailable)}
+                        disabled={toggleAvailabilityMutation.isPending}
+                        data-testid="button-toggle-availability"
+                      >
+                        {isAvailable ? (
+                          <>
+                            <Wifi className="mr-1 h-3 w-3" />
+                            Online
+                          </>
+                        ) : (
+                          <>
+                            <WifiOff className="mr-1 h-3 w-3" />
+                            Offline
+                          </>
+                        )}
+                      </Button>
                     </div>
                     
                     <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border" data-testid="driver-id-container">
