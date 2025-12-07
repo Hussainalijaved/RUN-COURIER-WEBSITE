@@ -7,8 +7,10 @@ import {
   type VendorApiKey, type InsertVendorApiKey,
   type DriverApplication, type InsertDriverApplication,
   type Invoice, type InsertInvoice,
+  type JobAssignment, type InsertJobAssignment,
   type DriverApplicationStatus,
   type InvoiceStatus,
+  type JobAssignmentStatus,
   type DocumentType,
   type DocumentStatus,
   type PricingSettings,
@@ -94,6 +96,13 @@ export interface IStorage {
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice | undefined>;
   getInvoiceWithJobs(id: string): Promise<{ invoice: Invoice; jobs: Job[] } | undefined>;
+
+  getJobAssignment(id: string): Promise<JobAssignment | undefined>;
+  getJobAssignments(filters?: { jobId?: string; driverId?: string; status?: JobAssignmentStatus }): Promise<JobAssignment[]>;
+  createJobAssignment(assignment: InsertJobAssignment): Promise<JobAssignment>;
+  updateJobAssignment(id: string, data: Partial<JobAssignment>): Promise<JobAssignment | undefined>;
+  cancelJobAssignment(id: string, reason?: string): Promise<JobAssignment | undefined>;
+  getActiveAssignmentForJob(jobId: string): Promise<JobAssignment | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -105,6 +114,7 @@ export class MemStorage implements IStorage {
   private vendorApiKeys: Map<string, VendorApiKey>;
   private driverApplications: Map<string, DriverApplication>;
   private invoices: Map<string, Invoice>;
+  private jobAssignments: Map<string, JobAssignment>;
   private pricingSettings: PricingSettings;
   private vehicles: Map<VehicleType, Vehicle>;
 
@@ -117,6 +127,7 @@ export class MemStorage implements IStorage {
     this.vendorApiKeys = new Map();
     this.driverApplications = new Map();
     this.invoices = new Map();
+    this.jobAssignments = new Map();
     
     this.pricingSettings = {
       id: "default",
@@ -1378,6 +1389,79 @@ export class MemStorage implements IStorage {
     }
     
     return { invoice, jobs };
+  }
+
+  async getJobAssignment(id: string): Promise<JobAssignment | undefined> {
+    return this.jobAssignments.get(id);
+  }
+
+  async getJobAssignments(filters?: { jobId?: string; driverId?: string; status?: JobAssignmentStatus }): Promise<JobAssignment[]> {
+    let assignments = Array.from(this.jobAssignments.values());
+    
+    if (filters?.jobId) {
+      assignments = assignments.filter(a => a.jobId === filters.jobId);
+    }
+    if (filters?.driverId) {
+      assignments = assignments.filter(a => a.driverId === filters.driverId);
+    }
+    if (filters?.status) {
+      assignments = assignments.filter(a => a.status === filters.status);
+    }
+    
+    return assignments.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  }
+
+  async createJobAssignment(assignment: InsertJobAssignment): Promise<JobAssignment> {
+    const id = randomUUID();
+    const newAssignment: JobAssignment = {
+      id,
+      jobId: assignment.jobId,
+      driverId: assignment.driverId,
+      assignedBy: assignment.assignedBy,
+      driverPrice: assignment.driverPrice,
+      status: (assignment.status || "pending") as JobAssignmentStatus,
+      sentAt: assignment.sentAt || null,
+      respondedAt: assignment.respondedAt || null,
+      cancelledAt: assignment.cancelledAt || null,
+      cancellationReason: assignment.cancellationReason || null,
+      expiresAt: assignment.expiresAt || null,
+      createdAt: new Date(),
+    };
+    this.jobAssignments.set(id, newAssignment);
+    return newAssignment;
+  }
+
+  async updateJobAssignment(id: string, data: Partial<JobAssignment>): Promise<JobAssignment | undefined> {
+    const assignment = this.jobAssignments.get(id);
+    if (!assignment) return undefined;
+    const updated = { ...assignment, ...data };
+    this.jobAssignments.set(id, updated);
+    return updated;
+  }
+
+  async cancelJobAssignment(id: string, reason?: string): Promise<JobAssignment | undefined> {
+    const assignment = this.jobAssignments.get(id);
+    if (!assignment) return undefined;
+    const updated: JobAssignment = {
+      ...assignment,
+      status: "cancelled" as JobAssignmentStatus,
+      cancelledAt: new Date(),
+      cancellationReason: reason || null,
+    };
+    this.jobAssignments.set(id, updated);
+    return updated;
+  }
+
+  async getActiveAssignmentForJob(jobId: string): Promise<JobAssignment | undefined> {
+    const assignments = Array.from(this.jobAssignments.values());
+    return assignments.find(a => 
+      a.jobId === jobId && 
+      (a.status === "pending" || a.status === "sent" || a.status === "accepted")
+    );
   }
 }
 
