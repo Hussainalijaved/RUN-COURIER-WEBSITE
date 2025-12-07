@@ -974,7 +974,23 @@ export async function registerRoutes(
       console.error("Failed to sync document to PostgreSQL:", e);
     }
 
-    await sendDocumentUploadNotification(rawDriverId, safeDocumentType).catch(err => 
+    // Get driver name for email notification
+    let driverName = rawDriverId;
+    try {
+      const driver = await storage.getDriver(rawDriverId);
+      if (driver?.fullName) {
+        driverName = driver.fullName;
+      } else if (driver?.email) {
+        driverName = driver.email;
+      }
+    } catch (e) {
+      console.error('Failed to get driver name for notification:', e);
+    }
+    
+    // Format document type for email
+    const formattedDocType = safeDocumentType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    
+    await sendDocumentUploadNotification(driverName, formattedDocType).catch(err => 
       console.error('Failed to send document upload notification:', err)
     );
 

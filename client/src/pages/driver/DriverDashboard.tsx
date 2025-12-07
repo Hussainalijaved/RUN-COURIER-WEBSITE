@@ -17,7 +17,12 @@ import {
   Truck,
   ArrowRight,
   Loader2,
+  FileText,
+  XCircle,
+  AlertTriangle,
+  Upload,
 } from 'lucide-react';
+import { Link } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -27,6 +32,7 @@ import {
   useUpdateDriverAvailability,
   useUpdateJobStatus,
   useAcceptJob,
+  useDriverDocuments,
 } from '@/hooks/useSupabaseDriver';
 import type { Job, JobStatus } from '@shared/schema';
 
@@ -76,12 +82,19 @@ export default function DriverDashboard() {
 
   const { data: driver, isLoading: driverLoading } = useDriver();
   const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
+  const { data: documents } = useDriverDocuments(driver?.id);
   const stats = useDriverStats(driver?.id);
   const statsLoading = jobsLoading;
 
   const availabilityMutation = useUpdateDriverAvailability();
   const updateStatusMutation = useUpdateJobStatus();
   const acceptJobMutation = useAcceptJob();
+  
+  // Calculate document statistics
+  const approvedDocs = documents?.filter(d => d.status === 'approved').length || 0;
+  const pendingDocs = documents?.filter(d => d.status === 'pending').length || 0;
+  const rejectedDocs = documents?.filter(d => d.status === 'rejected').length || 0;
+  const totalDocs = documents?.length || 0;
 
   const handleAvailabilityChange = (isAvailable: boolean) => {
     if (!driver) return;
@@ -343,20 +356,69 @@ export default function DriverDashboard() {
         )}
 
         {!driver?.isVerified && (
-          <Card className="border-yellow-500">
+          <Card className="border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20" data-testid="card-verification-pending">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-600">
-                <Clock className="h-5 w-5" />
-                Verification Pending
+              <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-500">
+                <AlertTriangle className="h-5 w-5" />
+                Account Verification Required
               </CardTitle>
+              <CardDescription>
+                Your account requires document verification before you can accept jobs
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Your account is pending verification. Please upload all required documents to start accepting jobs.
-              </p>
-              <Button variant="outline" className="mt-4" data-testid="button-upload-documents">
-                Upload Documents
-              </Button>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-white dark:bg-black/20 p-4 border">
+                <h4 className="font-medium mb-3">Document Status</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">{approvedDocs} Approved</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm">{pendingDocs} Pending Review</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-600" />
+                    <span className="text-sm">{rejectedDocs} Rejected</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{totalDocs} Total</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-4 border border-blue-200 dark:border-blue-800">
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">How Verification Works</h4>
+                <ol className="text-sm text-blue-700 dark:text-blue-400 space-y-1 list-decimal list-inside">
+                  <li>Upload all required documents on the Documents page</li>
+                  <li>Our admin team reviews each document</li>
+                  <li>Once all documents are approved, your account is activated</li>
+                  <li>You can then start accepting and completing deliveries</li>
+                </ol>
+              </div>
+              
+              {rejectedDocs > 0 && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-950/30 p-4 border border-red-200 dark:border-red-800">
+                  <div className="flex items-center gap-2 text-red-800 dark:text-red-300">
+                    <XCircle className="h-4 w-4" />
+                    <span className="font-medium">Action Required</span>
+                  </div>
+                  <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                    Some documents have been rejected. Please check the Documents page for details and re-upload.
+                  </p>
+                </div>
+              )}
+              
+              <div className="flex gap-2">
+                <Button asChild data-testid="button-upload-documents">
+                  <Link href="/driver/documents">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Go to Documents
+                  </Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

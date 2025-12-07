@@ -658,8 +658,8 @@ export default function AdminDrivers() {
                               >
                                 <FileText className="mr-2 h-4 w-4" />
                                 View Documents
-                                {pendingDocs > 0 && (
-                                  <Badge variant="secondary" className="ml-2 text-xs">{pendingDocs}</Badge>
+                                {docStatus.pending > 0 && (
+                                  <Badge variant="secondary" className="ml-2 text-xs">{docStatus.pending}</Badge>
                                 )}
                               </DropdownMenuItem>
                               {!driver.isVerified ? (

@@ -134,6 +134,9 @@ export default function AdminDashboard() {
     return `£${num.toFixed(2)}`;
   };
 
+  const pendingDocCount = documents?.filter(d => d.status === 'pending').length || 0;
+  const unverifiedDrivers = drivers?.filter(d => !d.isVerified).length || 0;
+
   return (
     <DashboardLayout>
       <div className="space-y-4 sm:space-y-6">
@@ -141,6 +144,46 @@ export default function AdminDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Overview of your courier operations</p>
         </div>
+
+        {(pendingDocCount > 0 || unverifiedDrivers > 0) && (
+          <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30" data-testid="alert-pending-actions">
+            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-yellow-800 dark:text-yellow-200">Action Required</p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    {pendingDocCount > 0 && (
+                      <span>{pendingDocCount} document{pendingDocCount > 1 ? 's' : ''} awaiting review</span>
+                    )}
+                    {pendingDocCount > 0 && unverifiedDrivers > 0 && <span> • </span>}
+                    {unverifiedDrivers > 0 && (
+                      <span>{unverifiedDrivers} driver{unverifiedDrivers > 1 ? 's' : ''} pending verification</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {pendingDocCount > 0 && (
+                  <Button size="sm" variant="outline" className="border-yellow-600 text-yellow-700 hover:bg-yellow-100" asChild data-testid="button-review-docs">
+                    <Link href="/admin/documents">
+                      <FileText className="mr-1 h-4 w-4" />
+                      Review Docs
+                    </Link>
+                  </Button>
+                )}
+                {unverifiedDrivers > 0 && (
+                  <Button size="sm" variant="outline" className="border-yellow-600 text-yellow-700 hover:bg-yellow-100" asChild data-testid="button-review-drivers">
+                    <Link href="/admin/drivers?filter=unverified">
+                      <Users className="mr-1 h-4 w-4" />
+                      Review Drivers
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
