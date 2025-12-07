@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -8,6 +9,8 @@ import { WebhookHandlers } from './webhookHandlers';
 import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
+
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const httpServer = createServer(app);
 
 declare module "http" {

@@ -146,31 +146,17 @@ export function useAvailableJobs(enabled: boolean) {
 
 export function useDriverDocuments(driverId: string | undefined) {
   return useQuery({
-    queryKey: ['supabase', 'documents', { driverId }],
+    queryKey: ['/api/documents', { driverId }],
     queryFn: async () => {
       if (!driverId) return [];
       
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('driver_id', driverId)
-        .order('uploaded_at', { ascending: false });
-
-      if (error) throw error;
-
-      return (data || []).map(doc => ({
-        id: doc.id,
-        driverId: doc.driver_id,
-        type: doc.type,
-        fileName: doc.file_name,
-        fileUrl: doc.file_url,
-        status: doc.status,
-        reviewedBy: doc.reviewed_by,
-        reviewNotes: doc.review_notes,
-        expiryDate: doc.expiry_date,
-        uploadedAt: doc.uploaded_at,
-        reviewedAt: doc.reviewed_at,
-      })) as DriverDocument[];
+      const response = await fetch(`/api/documents?driverId=${driverId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+      
+      const data = await response.json();
+      return data as DriverDocument[];
     },
     enabled: !!driverId,
   });
@@ -311,73 +297,26 @@ export function useUploadDocument() {
       file: File; 
       documentType: string; 
     }) => {
-      const timestamp = Date.now();
-      const fileExt = file.name.split('.').pop();
-      const fileName = `drivers/${driverId}/${documentType}_${timestamp}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-      
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('driverId', driverId);
+      formData.append('documentType', documentType);
 
-      const { data: existingDocs } = await supabase
-        .from('documents')
-        .select('id')
-        .eq('driver_id', driverId)
-        .eq('type', documentType)
-        .limit(1);
+      const response = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-      let result;
-      if (existingDocs && existingDocs.length > 0) {
-        const { data, error } = await supabase
-          .from('documents')
-          .update({
-            file_name: file.name,
-            file_url: publicUrl,
-            status: 'pending',
-            uploaded_at: new Date().toISOString(),
-            reviewed_by: null,
-            review_notes: null,
-            reviewed_at: null,
-          })
-          .eq('id', existingDocs[0].id)
-          .select()
-          .single();
-        
-        if (error) throw error;
-        result = data;
-      } else {
-        const newId = crypto.randomUUID();
-        const { data, error } = await supabase
-          .from('documents')
-          .insert({
-            id: newId,
-            driver_id: driverId,
-            type: documentType,
-            file_name: file.name,
-            file_url: publicUrl,
-            status: 'pending',
-            uploaded_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        result = data;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload document');
       }
 
-      return result;
+      return response.json();
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['supabase', 'documents', { driverId: variables.driverId }] });
+      queryClient.invalidateQueries({ queryKey: ['/api/documents', { driverId: variables.driverId }] });
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
     },
   });
 }

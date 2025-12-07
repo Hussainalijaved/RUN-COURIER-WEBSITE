@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import {
   insertJobSchema,
   insertDriverSchema,
@@ -19,6 +22,41 @@ import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission } from "./emailService";
+
+const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const documentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const driverId = req.body.driverId || 'unknown';
+    const driverDir = path.join(uploadsDir, driverId);
+    if (!fs.existsSync(driverDir)) {
+      fs.mkdirSync(driverDir, { recursive: true });
+    }
+    cb(null, driverDir);
+  },
+  filename: (req, file, cb) => {
+    const documentType = req.body.documentType || 'document';
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    cb(null, `${documentType}_${timestamp}${ext}`);
+  }
+});
+
+const uploadDocument = multer({
+  storage: documentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images and PDFs are allowed.'));
+    }
+  }
+});
 
 function generateTrackingNumber(): string {
   const prefix = "RC";
@@ -593,6 +631,70 @@ export async function registerRoutes(
   app.post("/api/documents", asyncHandler(async (req, res) => {
     const data = insertDocumentSchema.parse(req.body);
     const document = await storage.createDocument(data);
+    res.status(201).json(document);
+  }));
+
+  app.post("/api/documents/upload", (req, res, next) => {
+    uploadDocument.single('file')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "File size exceeds 10MB limit" });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: err.message || "Invalid file" });
+      }
+      next();
+    });
+  }, asyncHandler(async (req, res) => {
+    const { driverId, documentType } = req.body;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    if (!driverId) {
+      return res.status(400).json({ error: "Driver ID is required" });
+    }
+
+    if (!documentType) {
+      return res.status(400).json({ error: "Document type is required" });
+    }
+
+    const relativePath = `/uploads/documents/${driverId}/${file.filename}`;
+    const fileUrl = relativePath;
+
+    const existingDocs = await storage.getDocuments({ driverId, type: documentType as any });
+    
+    let document;
+    if (existingDocs && existingDocs.length > 0) {
+      document = await storage.updateDocument(existingDocs[0].id, {
+        fileName: file.originalname,
+        fileUrl,
+        status: 'pending' as const,
+        uploadedAt: new Date(),
+        reviewedBy: null,
+        reviewNotes: null,
+        reviewedAt: null,
+      });
+    } else {
+      document = await storage.createDocument({
+        id: randomUUID(),
+        driverId,
+        type: documentType,
+        fileName: file.originalname,
+        fileUrl,
+        status: 'pending',
+        uploadedAt: new Date(),
+      });
+    }
+
+    await sendDocumentUploadNotification(driverId, documentType, file.originalname).catch(err => 
+      console.error('Failed to send document upload notification:', err)
+    );
+
     res.status(201).json(document);
   }));
 

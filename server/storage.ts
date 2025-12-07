@@ -54,6 +54,7 @@ export interface IStorage {
   getDocument(id: string): Promise<Document | undefined>;
   getDocuments(filters?: { driverId?: string; status?: string; type?: string }): Promise<Document[]>;
   createDocument(document: InsertDocument): Promise<Document>;
+  updateDocument(id: string, data: Partial<Document>): Promise<Document | undefined>;
   reviewDocument(id: string, status: string, reviewedBy: string, reviewNotes?: string): Promise<Document | undefined>;
 
   getNotifications(filters?: { userId?: string; isRead?: boolean }): Promise<Notification[]>;
@@ -895,6 +896,14 @@ export class MemStorage implements IStorage {
     };
     this.documents.set(id, document);
     return document;
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document | undefined> {
+    const document = this.documents.get(id);
+    if (!document) return undefined;
+    const updated = { ...document, ...data };
+    this.documents.set(id, updated);
+    return updated;
   }
 
   async reviewDocument(id: string, status: string, reviewedBy: string, reviewNotes?: string): Promise<Document | undefined> {
