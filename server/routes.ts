@@ -291,6 +291,46 @@ export async function registerRoutes(
     res.json(driver);
   }));
 
+  app.delete("/api/drivers/:id", asyncHandler(async (req, res) => {
+    const driverId = req.params.id;
+    
+    // Check if driver exists
+    const driver = await storage.getDriver(driverId);
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+    
+    // If driver has a userId, also delete the user account from Supabase Auth first
+    if (driver.userId) {
+      const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
+      if (!supabaseAdmin) {
+        console.error('[Drivers] Supabase admin not configured, cannot delete driver');
+        return res.status(500).json({ error: "Account deletion service unavailable" });
+      }
+      
+      try {
+        const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(driver.userId);
+        if (supabaseError) {
+          console.error('Error deleting user from Supabase:', supabaseError);
+          return res.status(500).json({ error: "Failed to delete account from authentication service" });
+        }
+        console.log(`[Drivers] Deleted user ${driver.userId} from Supabase Auth`);
+      } catch (supabaseError) {
+        console.error('Error deleting user from Supabase:', supabaseError);
+        return res.status(500).json({ error: "Failed to delete account from authentication service" });
+      }
+      
+      // Delete user from local storage
+      await storage.deleteUser(driver.userId);
+    }
+    
+    // Delete driver record
+    await storage.deleteDriver(driverId);
+    console.log(`[Drivers] Deleted driver ${driverId}`);
+    
+    res.json({ success: true, message: "Driver account deleted successfully" });
+  }));
+
   // Fetch all drivers from Supabase (users with role=driver)
   app.get("/api/supabase-drivers", asyncHandler(async (req, res) => {
     const { supabaseAdmin } = await import("./supabaseAdmin");
@@ -488,6 +528,48 @@ export async function registerRoutes(
     }
     
     res.json(updatedUser);
+  }));
+
+  app.delete("/api/users/:id", asyncHandler(async (req, res) => {
+    const userId = req.params.id;
+    
+    // Check if user exists
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Delete from Supabase Auth first - this must succeed before we delete local data
+    const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
+    if (!supabaseAdmin) {
+      console.error('[Users] Supabase admin not configured, cannot delete user');
+      return res.status(500).json({ error: "Account deletion service unavailable" });
+    }
+    
+    try {
+      const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (supabaseError) {
+        console.error('Error deleting user from Supabase:', supabaseError);
+        return res.status(500).json({ error: "Failed to delete account from authentication service" });
+      }
+      console.log(`[Users] Deleted user ${userId} from Supabase Auth`);
+    } catch (supabaseError) {
+      console.error('Error deleting user from Supabase:', supabaseError);
+      return res.status(500).json({ error: "Failed to delete account from authentication service" });
+    }
+    
+    // If user is a driver, delete driver record too
+    const driver = await storage.getDriverByUserId(userId);
+    if (driver) {
+      await storage.deleteDriver(driver.id);
+      console.log(`[Users] Deleted driver record for user ${userId}`);
+    }
+    
+    // Delete user from local storage
+    await storage.deleteUser(userId);
+    console.log(`[Users] Deleted user ${userId} from local storage`);
+    
+    res.json({ success: true, message: "Account deleted successfully" });
   }));
 
   app.get("/api/documents", asyncHandler(async (req, res) => {

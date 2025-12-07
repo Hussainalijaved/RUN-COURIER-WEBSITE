@@ -14,6 +14,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   User,
   Mail,
   Phone,
@@ -25,10 +36,14 @@ import {
   Loader2,
   Copy,
   MapPin,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import {
   useDriver,
   useUpdateDriverProfile,
@@ -43,8 +58,9 @@ const vehicleTypes: { value: VehicleType; label: string }[] = [
 ];
 
 export default function DriverProfile() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: driver, isLoading } = useDriver();
   const updateProfileMutation = useUpdateDriverProfile();
@@ -90,6 +106,31 @@ export default function DriverProfile() {
         onError: () => toast({ title: 'Failed to update profile', variant: 'destructive' }),
       }
     );
+  };
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('DELETE', `/api/drivers/${driver?.id}`);
+    },
+    onSuccess: async () => {
+      toast({
+        title: 'Account Deleted',
+        description: 'Your driver account has been permanently deleted.',
+      });
+      await signOut();
+    },
+    onError: () => {
+      toast({
+        title: 'Delete Failed',
+        description: 'Could not delete your account. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteAccount = () => {
+    deleteAccountMutation.mutate();
+    setShowDeleteDialog(false);
   };
 
   return (
@@ -308,6 +349,70 @@ export default function DriverProfile() {
                     )}
                     Save Changes
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Danger Zone
+                </CardTitle>
+                <CardDescription>
+                  Permanent actions that cannot be undone
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="font-medium">Delete Account</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently delete your driver account and all associated data. This action cannot be undone.
+                    </p>
+                  </div>
+                  <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive"
+                        data-testid="button-delete-account"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Account
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete your
+                          driver account and remove all your data from our servers, including:
+                          <ul className="list-disc list-inside mt-2 space-y-1">
+                            <li>Your driver profile and documents</li>
+                            <li>Your job history and earnings records</li>
+                            <li>Your vehicle information</li>
+                            <li>All associated data</li>
+                          </ul>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteAccount}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          disabled={deleteAccountMutation.isPending}
+                          data-testid="button-confirm-delete"
+                        >
+                          {deleteAccountMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="mr-2 h-4 w-4" />
+                          )}
+                          Yes, Delete My Account
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>

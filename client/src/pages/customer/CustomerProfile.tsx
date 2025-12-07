@@ -10,6 +10,17 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -23,13 +34,16 @@ import {
   CheckCircle,
   Home,
   Loader2,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import type { User as UserType } from '@shared/schema';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 
 export default function CustomerProfile() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -100,6 +114,31 @@ export default function CustomerProfile() {
     }
     
     updateProfileMutation.mutate(data);
+  };
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('DELETE', `/api/users/${user?.id}`);
+    },
+    onSuccess: async () => {
+      toast({
+        title: 'Account Deleted',
+        description: 'Your account has been permanently deleted.',
+      });
+      await signOut();
+    },
+    onError: () => {
+      toast({
+        title: 'Delete Failed',
+        description: 'Could not delete your account. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteAccount = () => {
+    deleteAccountMutation.mutate();
+    setShowDeleteDialog(false);
   };
 
   const getInitials = (name: string) => {
@@ -341,6 +380,70 @@ export default function CustomerProfile() {
                     )}
                     {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Danger Zone
+                </CardTitle>
+                <CardDescription>
+                  Permanent actions that cannot be undone
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="font-medium">Delete Account</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently delete your account and all associated data. This action cannot be undone.
+                    </p>
+                  </div>
+                  <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive"
+                        data-testid="button-delete-account"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Account
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete your
+                          account and remove all your data from our servers, including:
+                          <ul className="list-disc list-inside mt-2 space-y-1">
+                            <li>Your profile information</li>
+                            <li>Your booking history</li>
+                            <li>Your saved addresses</li>
+                            <li>All associated data</li>
+                          </ul>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteAccount}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          disabled={deleteAccountMutation.isPending}
+                          data-testid="button-confirm-delete"
+                        >
+                          {deleteAccountMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="mr-2 h-4 w-4" />
+                          )}
+                          Yes, Delete My Account
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>

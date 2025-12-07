@@ -29,6 +29,7 @@ export interface IStorage {
   createUserWithId(id: string, user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
   incrementCompletedBookings(id: string): Promise<User | undefined>;
+  deleteUser(id: string): Promise<void>;
 
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByUserId(userId: string): Promise<Driver | undefined>;
@@ -38,6 +39,7 @@ export interface IStorage {
   updateDriverAvailability(id: string, isAvailable: boolean): Promise<Driver | undefined>;
   updateDriverLocation(id: string, latitude: string, longitude: string): Promise<Driver | undefined>;
   verifyDriver(id: string, isVerified: boolean): Promise<Driver | undefined>;
+  deleteDriver(id: string): Promise<void>;
 
   getJob(id: string): Promise<Job | undefined>;
   getJobByTrackingNumber(trackingNumber: string): Promise<Job | undefined>;
@@ -588,6 +590,16 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteUser(id: string): Promise<void> {
+    this.users.delete(id);
+    const notifEntries = Array.from(this.notifications.entries());
+    for (const [notifId, notif] of notifEntries) {
+      if (notif.userId === id) {
+        this.notifications.delete(notifId);
+      }
+    }
+  }
+
   async getDriver(id: string): Promise<Driver | undefined> {
     return this.drivers.get(id);
   }
@@ -701,6 +713,19 @@ export class MemStorage implements IStorage {
 
   async verifyDriver(id: string, isVerified: boolean): Promise<Driver | undefined> {
     return this.updateDriver(id, { isVerified });
+  }
+
+  async deleteDriver(id: string): Promise<void> {
+    const driver = this.drivers.get(id);
+    if (driver) {
+      this.drivers.delete(id);
+      const docEntries = Array.from(this.documents.entries());
+      for (const [docId, doc] of docEntries) {
+        if (doc.driverId === id) {
+          this.documents.delete(docId);
+        }
+      }
+    }
   }
 
   async getJob(id: string): Promise<Job | undefined> {
