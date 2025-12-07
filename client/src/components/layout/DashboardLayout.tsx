@@ -183,21 +183,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <DropdownMenuTrigger asChild>
                     <SidebarMenuButton
                       size="lg"
-                      className="data-[state=open]:bg-sidebar-accent"
+                      className="data-[state=open]:bg-sidebar-accent hover:bg-sidebar-accent/80 transition-all duration-200 cursor-pointer rounded-lg border border-transparent hover:border-border/50"
                       data-testid="user-menu"
                     >
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                      <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                           {user.fullName.split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col text-left text-sm">
-                        <span className="font-medium truncate">{user.fullName}</span>
+                        <span className="font-semibold truncate">{user.fullName}</span>
                         <span className="text-xs text-muted-foreground truncate">
                           {user.email}
                         </span>
                       </div>
-                      <ChevronUp className="ml-auto h-4 w-4" />
+                      <ChevronUp className="ml-auto h-4 w-4 text-muted-foreground" />
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -205,19 +205,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     className="w-[--radix-popper-anchor-width]"
                   >
                     <DropdownMenuItem asChild>
-                      <Link href={`/${user.role}/profile`} className="cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        Profile
+                      <Link href={`/${user.role}/profile`} className="cursor-pointer" data-testid="menu-profile-settings">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Profile Settings
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={signOut}
                       className="text-destructive cursor-pointer"
-                      data-testid="button-signout"
+                      data-testid="button-logout"
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      Sign Out
+                      Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
