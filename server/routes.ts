@@ -17,6 +17,7 @@ import {
   type JobStatus,
   type VehicleType,
   type DriverApplicationStatus,
+  type JobAssignmentStatus,
 } from "@shared/schema";
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
@@ -1251,6 +1252,159 @@ export async function registerRoutes(
       console.error('Password reset error:', error);
       res.status(500).json({ error: "An error occurred. Please try again later." });
     }
+  }));
+
+  // Job Assignment Routes - Admin assigns jobs to drivers
+  app.get("/api/job-assignments", asyncHandler(async (req, res) => {
+    const { jobId, driverId, status } = req.query;
+    const assignments = await storage.getJobAssignments({
+      jobId: jobId as string,
+      driverId: driverId as string,
+      status: status as any,
+    });
+    res.json(assignments);
+  }));
+
+  app.get("/api/job-assignments/:id", asyncHandler(async (req, res) => {
+    const assignment = await storage.getJobAssignment(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+    res.json(assignment);
+  }));
+
+  app.get("/api/jobs/:id/active-assignment", asyncHandler(async (req, res) => {
+    const assignment = await storage.getActiveAssignmentForJob(req.params.id);
+    res.json(assignment || null);
+  }));
+
+  app.post("/api/job-assignments", asyncHandler(async (req, res) => {
+    const { jobId, driverId, assignedBy, driverPrice, expiresAt } = req.body;
+    
+    if (!jobId || !driverId || !assignedBy || !driverPrice) {
+      return res.status(400).json({ error: "Missing required fields: jobId, driverId, assignedBy, driverPrice" });
+    }
+
+    // Check if job exists
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    // Check if driver exists
+    const driver = await storage.getDriver(driverId);
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Check for existing active assignment
+    const existingAssignment = await storage.getActiveAssignmentForJob(jobId);
+    if (existingAssignment) {
+      return res.status(400).json({ error: "Job already has an active assignment. Cancel it first before reassigning." });
+    }
+
+    // Create the assignment
+    const assignment = await storage.createJobAssignment({
+      jobId,
+      driverId,
+      assignedBy,
+      driverPrice,
+      status: "sent",
+      sentAt: new Date(),
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
+
+    // Create notification for driver
+    if (driver.userId) {
+      await storage.createNotification({
+        userId: driver.userId,
+        title: "New Job Assignment",
+        message: `You have been assigned a new job (${job.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
+        type: "job_assigned",
+        data: { assignmentId: assignment.id, jobId },
+      });
+    }
+
+    res.status(201).json(assignment);
+  }));
+
+  app.patch("/api/job-assignments/:id", asyncHandler(async (req, res) => {
+    const assignment = await storage.updateJobAssignment(req.params.id, req.body);
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+    res.json(assignment);
+  }));
+
+  app.patch("/api/job-assignments/:id/respond", asyncHandler(async (req, res) => {
+    const { accepted } = req.body;
+    
+    if (accepted === undefined) {
+      return res.status(400).json({ error: "Response (accepted) is required" });
+    }
+
+    const assignment = await storage.getJobAssignment(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    if (assignment.status !== "sent") {
+      return res.status(400).json({ error: "Assignment is no longer pending response" });
+    }
+
+    const newStatus: JobAssignmentStatus = accepted ? "accepted" : "rejected";
+    const updated = await storage.updateJobAssignment(req.params.id, {
+      status: newStatus,
+      respondedAt: new Date(),
+    });
+
+    // If accepted, assign the driver to the job
+    if (accepted && updated) {
+      await storage.assignDriver(assignment.jobId, assignment.driverId);
+      
+      // Update job status to assigned
+      await storage.updateJobStatus(assignment.jobId, "assigned" as any);
+    }
+
+    // Notify admin of response
+    await storage.createNotification({
+      userId: assignment.assignedBy,
+      title: `Job Assignment ${accepted ? "Accepted" : "Rejected"}`,
+      message: `Driver has ${accepted ? "accepted" : "rejected"} the job assignment for job ${assignment.jobId}`,
+      type: "assignment_response",
+      data: { assignmentId: assignment.id, jobId: assignment.jobId },
+    });
+
+    res.json(updated);
+  }));
+
+  app.patch("/api/job-assignments/:id/cancel", asyncHandler(async (req, res) => {
+    const { reason } = req.body;
+    
+    const assignment = await storage.getJobAssignment(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    if (assignment.status === "cancelled") {
+      return res.status(400).json({ error: "Assignment is already cancelled" });
+    }
+
+    const cancelled = await storage.cancelJobAssignment(req.params.id, reason);
+
+    // Notify driver of cancellation
+    const driver = await storage.getDriver(assignment.driverId);
+    if (driver?.userId) {
+      await storage.createNotification({
+        userId: driver.userId,
+        title: "Job Assignment Cancelled",
+        message: `Your job assignment has been cancelled.${reason ? ` Reason: ${reason}` : ""}`,
+        type: "assignment_cancelled",
+        data: { assignmentId: assignment.id, jobId: assignment.jobId },
+      });
+    }
+
+    res.json(cancelled);
   }));
 
   registerMobileRoutes(app);
