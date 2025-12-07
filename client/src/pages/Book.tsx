@@ -153,6 +153,11 @@ export default function Book() {
   const returnToSameLocation = form.watch('returnToSameLocation');
   const returnPostcode = form.watch('returnPostcode');
 
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
+
   useEffect(() => {
     if (userProfile) {
       setPickupAddress(userProfile.address || '');
