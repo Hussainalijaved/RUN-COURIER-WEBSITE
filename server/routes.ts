@@ -1635,10 +1635,30 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
 
-    // Check if driver exists
-    const driver = await storage.getDriver(driverId);
+    // Check if driver exists - first in local storage, then in Supabase
+    let driver = await storage.getDriver(driverId);
+    let driverUserId = driver?.userId || driverId; // For Supabase drivers, the driverId IS the userId
+    
     if (!driver) {
-      return res.status(404).json({ error: "Driver not found" });
+      // Check if this is a Supabase driver (UUID format)
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        try {
+          const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(driverId);
+          if (!error && user && user.user_metadata?.role === 'driver') {
+            // Valid Supabase driver - create a temporary driver object for the assignment
+            console.log(`[Job Assignment] Found Supabase driver: ${user.email}`);
+            driverUserId = user.id;
+          } else {
+            return res.status(404).json({ error: "Driver not found" });
+          }
+        } catch (e) {
+          console.error('[Job Assignment] Error checking Supabase driver:', e);
+          return res.status(404).json({ error: "Driver not found" });
+        }
+      } else {
+        return res.status(404).json({ error: "Driver not found" });
+      }
     }
 
     // Check for existing active assignment
@@ -1659,15 +1679,13 @@ export async function registerRoutes(
     });
 
     // Create notification for driver
-    if (driver.userId) {
-      await storage.createNotification({
-        userId: driver.userId,
-        title: "New Job Assignment",
-        message: `You have been assigned a new job (${job.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
-        type: "job_assigned",
-        data: { assignmentId: assignment.id, jobId },
-      });
-    }
+    await storage.createNotification({
+      userId: driverUserId,
+      title: "New Job Assignment",
+      message: `You have been assigned a new job (${job.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
+      type: "job_assigned",
+      data: { assignmentId: assignment.id, jobId },
+    });
 
     res.status(201).json(assignment);
   }));
