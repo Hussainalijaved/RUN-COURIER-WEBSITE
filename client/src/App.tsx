@@ -27,6 +27,8 @@ import Privacy from "@/pages/Privacy";
 import Login, { AdminLogin } from "@/pages/Login";
 import Signup, { DriverSignup, VendorSignup } from "@/pages/Signup";
 import AdminSignup from "@/pages/AdminSignup";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Book from "@/pages/Book";
 import Quote from "@/pages/Quote";
 import PaymentSuccess from "@/pages/PaymentSuccess";
@@ -116,6 +118,8 @@ function Router() {
           <AdminLogin />
         </PublicOnlyRoute>
       </Route>
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/driver/apply" component={DriverApplication} />
       <Route path="/driver/application-success" component={DriverApplicationSuccess} />
       
