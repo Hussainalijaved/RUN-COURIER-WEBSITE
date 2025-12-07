@@ -115,6 +115,8 @@ export default function AdminJobs() {
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [jobForLabel, setJobForLabel] = useState<Job | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
+  const [assignDriverPrice, setAssignDriverPrice] = useState<string>('');
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
@@ -156,17 +158,25 @@ export default function AdminJobs() {
   });
 
   const assignDriverMutation = useMutation({
-    mutationFn: async ({ jobId, driverId }: { jobId: string; driverId: string }) => {
-      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId });
+    mutationFn: async ({ jobId, driverId, driverPrice, assignedBy }: { jobId: string; driverId: string; driverPrice: string; assignedBy: string }) => {
+      return apiRequest('POST', '/api/job-assignments', { 
+        jobId, 
+        driverId, 
+        driverPrice,
+        assignedBy 
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      toast({ title: 'Driver assigned successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      toast({ title: 'Assignment sent to driver', description: 'The driver will receive a notification to accept or decline.' });
       setAssignDialogOpen(false);
       setJobToAssign(null);
+      setSelectedDriverForAssign('');
+      setAssignDriverPrice('');
     },
-    onError: () => {
-      toast({ title: 'Failed to assign driver', variant: 'destructive' });
+    onError: (error: any) => {
+      toast({ title: 'Failed to send assignment', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 
@@ -736,50 +746,137 @@ export default function AdminJobs() {
         </Dialog>
 
         {/* Assign Driver Dialog */}
-        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-          <DialogContent>
+        <Dialog open={assignDialogOpen} onOpenChange={(open) => {
+          setAssignDialogOpen(open);
+          if (!open) {
+            setSelectedDriverForAssign('');
+            setAssignDriverPrice('');
+          }
+        }}>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>{jobToAssign?.driverId ? 'Reassign Driver' : 'Assign Driver'}</DialogTitle>
               <DialogDescription>
                 {jobToAssign?.driverId ? (
                   <>Currently assigned to: <span className="font-medium">{getDriverName(jobToAssign.driverId)}</span>. Select a new driver for job {jobToAssign?.trackingNumber}</>
                 ) : (
-                  <>Select a driver for job {jobToAssign?.trackingNumber}</>
+                  <>Select a driver and set the driver payment for job {jobToAssign?.trackingNumber}</>
                 )}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto">
-              {allDriversWithInfo.length > 0 ? (
-                allDriversWithInfo.map((driver) => (
-                  <Button
-                    key={driver.id}
-                    variant={driver.id === jobToAssign?.driverId ? "default" : "outline"}
-                    className="w-full justify-between h-auto py-3"
-                    onClick={() => jobToAssign && assignDriverMutation.mutate({ jobId: jobToAssign.id, driverId: driver.id })}
-                    disabled={assignDriverMutation.isPending || driver.id === jobToAssign?.driverId}
-                    data-testid={`button-assign-driver-${driver.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {driver.driverCode && (
-                        <Badge className="bg-blue-600 text-white font-mono text-sm px-2">{driver.driverCode}</Badge>
-                      )}
-                      <div className="flex flex-col items-start gap-0.5">
-                        <span className="font-medium">{driver.name}</span>
-                        <span className="text-xs text-muted-foreground">{driver.email}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="capitalize">{driver.vehicleType?.replace('_', ' ')}</Badge>
-                      {driver.isAvailable && <Badge variant="outline" className="text-green-600 border-green-600">Online</Badge>}
-                      {driver.id === jobToAssign?.driverId && <Badge>Current</Badge>}
-                    </div>
-                    {assignDriverMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  </Button>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-4">No drivers found in Supabase</p>
-              )}
-            </div>
+
+            {jobToAssign && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded-md">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Customer Price</p>
+                    <p className="font-semibold">{formatPrice(jobToAssign.totalPrice)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Route</p>
+                    <p className="font-mono text-sm">{jobToAssign.pickupPostcode} → {jobToAssign.deliveryPostcode}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assign-driver-select">Select Driver</Label>
+                  <Select value={selectedDriverForAssign} onValueChange={setSelectedDriverForAssign}>
+                    <SelectTrigger id="assign-driver-select" data-testid="select-assign-driver">
+                      <SelectValue placeholder="Choose a driver..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allDriversWithInfo.map((driver) => (
+                        <SelectItem 
+                          key={driver.id} 
+                          value={driver.id}
+                          disabled={driver.id === jobToAssign?.driverId}
+                        >
+                          <div className="flex items-center gap-2">
+                            {driver.driverCode && (
+                              <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                            )}
+                            <span>{driver.name}</span>
+                            <Badge variant="outline" className="capitalize text-xs">{driver.vehicleType?.replace('_', ' ')}</Badge>
+                            {driver.isAvailable && (
+                              <Badge variant="secondary" className="text-xs text-green-600">Online</Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assign-driver-price">Driver Payment (£)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                    <Input
+                      id="assign-driver-price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={assignDriverPrice}
+                      onChange={(e) => setAssignDriverPrice(e.target.value)}
+                      className="pl-7"
+                      data-testid="input-assign-driver-price"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This is the amount the driver will receive for completing this job.
+                  </p>
+                </div>
+
+                {selectedDriverForAssign && assignDriverPrice && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm">
+                      <span className="font-medium">Summary:</span> Assign to{' '}
+                      <span className="font-semibold">
+                        {allDriversWithInfo.find(d => d.id === selectedDriverForAssign)?.name}
+                      </span>{' '}
+                      for <span className="font-semibold">£{parseFloat(assignDriverPrice).toFixed(2)}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Driver will receive a notification to accept or decline this assignment.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setAssignDialogOpen(false)}
+                data-testid="button-cancel-assign"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (jobToAssign && selectedDriverForAssign && assignDriverPrice) {
+                    assignDriverMutation.mutate({
+                      jobId: jobToAssign.id,
+                      driverId: selectedDriverForAssign,
+                      driverPrice: assignDriverPrice,
+                      assignedBy: 'admin', // This would be the actual admin user ID
+                    });
+                  }
+                }}
+                disabled={!selectedDriverForAssign || !assignDriverPrice || assignDriverMutation.isPending}
+                data-testid="button-send-assignment"
+              >
+                {assignDriverMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Assignment'
+                )}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
