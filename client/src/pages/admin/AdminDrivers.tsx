@@ -70,6 +70,7 @@ import {
   Upload,
   ChevronsUpDown,
   Check,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -131,6 +132,8 @@ export default function AdminDrivers() {
   const [nationalitySearch, setNationalitySearch] = useState('');
   const [nationalityOpen, setNationalityOpen] = useState(false);
   const [uploadingDbs, setUploadingDbs] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -197,6 +200,29 @@ export default function AdminDrivers() {
     },
     onError: () => {
       toast({ title: 'Failed to update driver', variant: 'destructive' });
+    },
+  });
+
+  const deleteDriverMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/drivers/${id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete driver');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      toast({ title: 'Driver deleted successfully' });
+      setDeleteDialogOpen(false);
+      setDriverToDelete(null);
+      setProfileDialogOpen(false);
+      setSelectedDriver(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || 'Failed to delete driver', variant: 'destructive' });
     },
   });
 
@@ -687,6 +713,17 @@ export default function AdminDrivers() {
                                   Revoke Verification
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => {
+                                  setDriverToDelete(driver);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                data-testid={`menu-delete-${driver.id}`}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Driver
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -1125,34 +1162,50 @@ export default function AdminDrivers() {
                   </Button>
                 </>
               ) : (
-                <div className="flex gap-2">
-                  {!selectedDriver?.isVerified ? (
-                    <Button 
-                      className="bg-green-600 hover:bg-green-700"
-                      onClick={() => {
-                        if (selectedDriver) {
-                          verifyDriverMutation.mutate({ id: selectedDriver.id, isVerified: true });
-                          setProfileDialogOpen(false);
-                        }
-                      }}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Approve Driver
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="destructive"
-                      onClick={() => {
-                        if (selectedDriver) {
-                          verifyDriverMutation.mutate({ id: selectedDriver.id, isVerified: false });
-                          setProfileDialogOpen(false);
-                        }
-                      }}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Revoke Verification
-                    </Button>
-                  )}
+                <div className="flex justify-between w-full">
+                  <Button 
+                    variant="outline"
+                    className="text-red-600 border-red-600 hover:bg-red-50"
+                    onClick={() => {
+                      if (selectedDriver) {
+                        setDriverToDelete(selectedDriver);
+                        setDeleteDialogOpen(true);
+                      }
+                    }}
+                    data-testid="button-delete-driver"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Driver
+                  </Button>
+                  <div className="flex gap-2">
+                    {!selectedDriver?.isVerified ? (
+                      <Button 
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => {
+                          if (selectedDriver) {
+                            verifyDriverMutation.mutate({ id: selectedDriver.id, isVerified: true });
+                            setProfileDialogOpen(false);
+                          }
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve Driver
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="destructive"
+                        onClick={() => {
+                          if (selectedDriver) {
+                            verifyDriverMutation.mutate({ id: selectedDriver.id, isVerified: false });
+                            setProfileDialogOpen(false);
+                          }
+                        }}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Revoke Verification
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </DialogFooter>
@@ -1278,6 +1331,67 @@ export default function AdminDrivers() {
                 )}
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Driver
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this driver? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            {driverToDelete && (
+              <div className="py-4">
+                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {getDriverInfo(driverToDelete).name?.split(' ').map((n) => n[0]).join('') || 'D'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{getDriverInfo(driverToDelete).name}</p>
+                    <p className="text-sm text-muted-foreground">{getDriverInfo(driverToDelete).email}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mt-3">
+                  This will permanently delete the driver profile, their documents, and all associated data.
+                </p>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDriverToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (driverToDelete) {
+                    deleteDriverMutation.mutate(driverToDelete.id);
+                  }
+                }}
+                disabled={deleteDriverMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteDriverMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete Driver
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
