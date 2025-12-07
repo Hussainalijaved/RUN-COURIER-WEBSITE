@@ -147,7 +147,7 @@ export default function CustomerDashboard() {
             </Card>
           </Link>
           <Link 
-            href="/customer/orders?filter=delivered" 
+            href="/customer/delivered" 
             className="block focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded-lg"
             data-testid="stat-completed-orders"
           >
