@@ -12,7 +12,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 import type { Job, Driver, Document } from '@shared/schema';
 import {
   Package,
@@ -79,6 +81,9 @@ function StatCard({ title, value, icon: Icon, color, isLoading }: { title: strin
 }
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ['/api/stats/admin'],
   });
@@ -93,6 +98,24 @@ export default function AdminDashboard() {
 
   const { data: documents } = useQuery<Document[]>({
     queryKey: ['/api/documents', { status: 'pending' }],
+  });
+
+  const reviewDocumentMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' }) => {
+      return apiRequest('PATCH', `/api/documents/${id}/review`, { 
+        status, 
+        reviewedBy: 'admin',
+        reviewNotes: status === 'rejected' ? 'Rejected by admin' : null
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'driver'] });
+      toast({ title: 'Document reviewed successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to review document', variant: 'destructive' });
+    },
   });
 
   const getDriverName = (driverId: string | null) => {
@@ -220,10 +243,24 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" data-testid={`button-approve-doc-${doc.id}`}>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-green-500" 
+                              data-testid={`button-approve-doc-${doc.id}`}
+                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'approved' })}
+                              disabled={reviewDocumentMutation.isPending}
+                            >
                               <CheckCircle className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" data-testid={`button-reject-doc-${doc.id}`}>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-red-500" 
+                              data-testid={`button-reject-doc-${doc.id}`}
+                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'rejected' })}
+                              disabled={reviewDocumentMutation.isPending}
+                            >
                               <XCircle className="h-4 w-4" />
                             </Button>
                           </div>
