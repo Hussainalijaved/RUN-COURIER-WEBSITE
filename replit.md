@@ -78,7 +78,7 @@ React Hook Form is used for form state management, integrated with Zod schemas f
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculation, and route visualization via `@googlemaps/js-api-loader`.
--   **Supabase Services**: Utilized for authentication, user management, and storage for document uploads (e.g., driver licenses, DBS certificates).
+-   **Supabase Services**: Utilized for authentication and user management.
 -   **Neon Database**: Provides serverless PostgreSQL hosting.
 -   **Stripe**: Integrated for immediate payment processing and managing customer IDs for the "Pay Later" invoicing feature.
 ## Email Notifications (Resend Integration)
@@ -139,6 +139,29 @@ Users and drivers can delete their accounts from their profile pages with full G
 - `client/src/pages/driver/DriverProfile.tsx` - Driver delete UI
 
 ## Recent Changes (December 7, 2025)
+
+### Document Upload Backend API (Replaces Supabase Storage)
+Implemented a secure backend API for document uploads using multer, eliminating the Supabase Storage dependency:
+
+**Endpoint:** `POST /api/documents/upload`
+- File types: JPEG, PNG, GIF, WebP, PDF only
+- Max size: 10MB per file
+- Files stored at: `/uploads/documents/{sanitizedDriverId}/{documentType}_{timestamp}.{ext}`
+
+**Security Features:**
+- Path sanitization via `sanitizePath()` function - replaces non-alphanumeric characters (except underscore/hyphen) with underscores
+- Path traversal prevention - `../../../etc` becomes `_________etc`
+- Path resolution check to ensure files stay within uploads directory
+- File extension sanitization to prevent malicious extensions
+
+**API Response Codes:**
+- 201: Document created/updated successfully
+- 400: Missing required fields, invalid file type, or file too large
+- 500: Server error
+
+**Key Files:**
+- `server/routes.ts` - Upload endpoint with multer configuration
+- `client/src/hooks/useSupabaseDriver.ts` - Frontend hooks using backend API
 
 ### Account Deletion Implementation
 - Added DELETE /api/users/:id and DELETE /api/drivers/:id endpoints
