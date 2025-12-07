@@ -107,6 +107,46 @@ All website notifications are now automatically sent to **info@runcourier.co.uk*
 
 All functions include comprehensive job/application details in both HTML and plain text formats.
 
+### Account Deletion (GDPR Compliance)
+
+Users and drivers can delete their accounts from their profile pages with full GDPR compliance:
+
+**Customer Account Deletion** (`/customer/profile`):
+- "Danger Zone" section with prominent delete button
+- Confirmation dialog with clear warning about permanent data loss
+- Deletes: User from Supabase Auth, user record, notifications, and associated driver record if exists
+
+**Driver Account Deletion** (`/driver/profile`):
+- "Danger Zone" section with prominent delete button  
+- Confirmation dialog with driver-specific warnings (documents, job history)
+- Deletes: User from Supabase Auth, driver record, documents, user record, and notifications
+
+**API Endpoints:**
+- `DELETE /api/users/:id` - Deletes user account with cascading cleanup
+- `DELETE /api/drivers/:id` - Deletes driver account with cascading cleanup
+
+**Safety Features:**
+- Supabase Auth deletion must succeed before local data cleanup
+- Returns 500 error if Supabase admin not configured or deletion fails
+- Prevents orphaned credentials in authentication system
+- Button disabled during mutation to prevent duplicate submissions
+- Automatic sign-out after successful deletion
+
+**Key Files:**
+- `server/routes.ts` - DELETE endpoints
+- `server/storage.ts` - deleteUser() and deleteDriver() methods
+- `client/src/pages/customer/CustomerProfile.tsx` - Customer delete UI
+- `client/src/pages/driver/DriverProfile.tsx` - Driver delete UI
+
+## Recent Changes (December 7, 2025)
+
+### Account Deletion Implementation
+- Added DELETE /api/users/:id and DELETE /api/drivers/:id endpoints
+- Implemented deleteUser() and deleteDriver() storage methods with cascading deletes
+- Built confirmation dialogs with AlertDialog component in profile pages
+- Ensured Supabase Auth deletion succeeds before local cleanup to maintain data integrity
+- Added proper error handling and pending state for buttons
+
 ## Recent Changes (December 6, 2025)
 
 ### TypeScript Error Fixes - Production Ready
