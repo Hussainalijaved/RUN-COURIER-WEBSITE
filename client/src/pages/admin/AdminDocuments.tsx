@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { FileText, CheckCircle, XCircle, Clock, Eye, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import type { Document, Driver } from '@shared/schema';
@@ -20,6 +29,8 @@ import { apiRequest } from '@/lib/queryClient';
 export default function AdminDocuments() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
   const { data: documents, isLoading: docsLoading } = useQuery<Document[]>({
     queryKey: ['/api/documents'],
@@ -108,6 +119,17 @@ export default function AdminDocuments() {
                             <Button
                               size="sm"
                               variant="outline"
+                              onClick={() => {
+                                setSelectedDoc(doc);
+                                setViewDialogOpen(true);
+                              }}
+                              data-testid={`button-view-${doc.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                               className="text-green-600"
                               onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'approved' })}
                               disabled={reviewDocumentMutation.isPending}
@@ -182,6 +204,87 @@ export default function AdminDocuments() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-screen overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Preview Document</DialogTitle>
+              <DialogDescription>
+                {selectedDoc && (
+                  <div className="space-y-2 mt-2">
+                    <p><strong>Driver:</strong> {getDriverName(selectedDoc.driverId)}</p>
+                    <p><strong>Type:</strong> {selectedDoc.type.replace(/_/g, ' ')}</p>
+                    <p><strong>File:</strong> {selectedDoc.fileName}</p>
+                  </div>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedDoc && (
+              <div className="mt-4">
+                {selectedDoc.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                  <iframe
+                    src={selectedDoc.fileUrl}
+                    className="w-full h-96 border rounded"
+                    title="Document Preview"
+                  />
+                ) : selectedDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                  <img
+                    src={selectedDoc.fileUrl}
+                    alt="Document Preview"
+                    className="max-w-full h-auto max-h-96 rounded border"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-48 bg-muted rounded">
+                    <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Preview not available for this file type</p>
+                    <a
+                      href={selectedDoc.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 text-primary hover:underline"
+                    >
+                      Open in new tab
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              {selectedDoc && (
+                <div className="flex gap-2 w-full">
+                  <Button
+                    variant="outline"
+                    className="text-green-600 flex-1"
+                    onClick={() => {
+                      reviewDocumentMutation.mutate({ id: selectedDoc.id, status: 'approved' });
+                      setViewDialogOpen(false);
+                    }}
+                    disabled={reviewDocumentMutation.isPending}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="text-red-600 flex-1"
+                    onClick={() => {
+                      reviewDocumentMutation.mutate({ id: selectedDoc.id, status: 'rejected' });
+                      setViewDialogOpen(false);
+                    }}
+                    disabled={reviewDocumentMutation.isPending}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Reject
+                  </Button>
+                  <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+                    <X className="mr-2 h-4 w-4" />
+                    Close
+                  </Button>
+                </div>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
