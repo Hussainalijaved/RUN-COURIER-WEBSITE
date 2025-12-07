@@ -29,6 +29,8 @@ import {
   ArrowRight,
   Eye,
   AlertCircle,
+  UserPlus,
+  ClipboardCheck,
 } from 'lucide-react';
 
 interface AdminStats {
@@ -119,6 +121,8 @@ export default function AdminDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
       queryClient.invalidateQueries({ queryKey: ['supabase', 'driver'] });
       toast({ title: 'Document reviewed successfully' });
     },
@@ -155,6 +159,7 @@ export default function AdminDashboard() {
 
   const pendingDocCount = documents?.filter(d => d.status === 'pending').length || 0;
   const unverifiedDrivers = drivers?.filter(d => !d.isVerified).length || 0;
+  const pendingApplications = applications?.filter(a => a.status === 'pending').length || 0;
 
   return (
     <DashboardLayout>
@@ -164,7 +169,7 @@ export default function AdminDashboard() {
           <p className="text-sm sm:text-base text-muted-foreground">Overview of your courier operations</p>
         </div>
 
-        {(pendingDocCount > 0 || unverifiedDrivers > 0) && (
+        {(pendingApplications > 0 || pendingDocCount > 0 || unverifiedDrivers > 0) && (
           <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30" data-testid="alert-pending-actions">
             <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
               <div className="flex items-start gap-3">
@@ -172,6 +177,10 @@ export default function AdminDashboard() {
                 <div>
                   <p className="font-medium text-yellow-800 dark:text-yellow-200">Action Required</p>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    {pendingApplications > 0 && (
+                      <span className="font-semibold">{pendingApplications} new driver application{pendingApplications > 1 ? 's' : ''}</span>
+                    )}
+                    {pendingApplications > 0 && (pendingDocCount > 0 || unverifiedDrivers > 0) && <span> • </span>}
                     {pendingDocCount > 0 && (
                       <span>{pendingDocCount} document{pendingDocCount > 1 ? 's' : ''} awaiting review</span>
                     )}
@@ -182,7 +191,15 @@ export default function AdminDashboard() {
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                {pendingApplications > 0 && (
+                  <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" asChild data-testid="button-review-applications">
+                    <Link href="/admin/applications">
+                      <UserPlus className="mr-1 h-4 w-4" />
+                      Review Applications
+                    </Link>
+                  </Button>
+                )}
                 {pendingDocCount > 0 && (
                   <Button size="sm" variant="outline" className="border-yellow-600 text-yellow-700 hover:bg-yellow-100" asChild data-testid="button-review-docs">
                     <Link href="/admin/documents">
@@ -353,6 +370,19 @@ export default function AdminDashboard() {
                 <CardTitle className="text-base">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <Link href="/admin/applications">
+                  <Button 
+                    variant="outline" 
+                    className={`w-full justify-start ${pendingApplications > 0 ? 'border-yellow-500 bg-yellow-50 hover:bg-yellow-100' : ''}`} 
+                    data-testid="button-driver-applications"
+                  >
+                    <ClipboardCheck className={`mr-2 h-4 w-4 ${pendingApplications > 0 ? 'text-yellow-600' : ''}`} />
+                    Driver Applications
+                    {pendingApplications > 0 && (
+                      <Badge className="ml-auto bg-yellow-500 text-white">{pendingApplications}</Badge>
+                    )}
+                  </Button>
+                </Link>
                 <Link href="/admin/jobs">
                   <Button variant="outline" className="w-full justify-start" data-testid="button-manage-jobs">
                     <Package className="mr-2 h-4 w-4" />

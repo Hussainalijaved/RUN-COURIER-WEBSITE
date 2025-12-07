@@ -149,7 +149,7 @@ export default function DriverDashboard() {
           <div className="flex items-center gap-3">
             {driverLoading ? (
               <Skeleton className="h-6 w-20" />
-            ) : (
+            ) : driver?.isVerified ? (
               <>
                 <Label htmlFor="online-toggle" className="text-sm">
                   {isOnline ? 'Online' : 'Offline'}
@@ -162,6 +162,11 @@ export default function DriverDashboard() {
                   data-testid="switch-online"
                 />
               </>
+            ) : (
+              <Badge variant="outline" className="text-yellow-600 border-yellow-500" data-testid="badge-pending-verification">
+                <Clock className="h-3 w-3 mr-1" />
+                Pending Approval
+              </Badge>
             )}
           </div>
         </div>
@@ -360,15 +365,15 @@ export default function DriverDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-500">
                 <AlertTriangle className="h-5 w-5" />
-                Account Verification Required
+                Admin Approval Required
               </CardTitle>
-              <CardDescription>
-                Your account requires document verification before you can accept jobs
+              <CardDescription className="text-yellow-600 dark:text-yellow-400">
+                Your account is pending admin verification. All new drivers must be approved before accepting jobs.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-white dark:bg-black/20 p-4 border">
-                <h4 className="font-medium mb-3">Document Status</h4>
+                <h4 className="font-medium mb-3">Your Document Status</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-600" />
@@ -376,7 +381,7 @@ export default function DriverDashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm">{pendingDocs} Pending Review</span>
+                    <span className="text-sm">{pendingDocs} Under Review</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4 text-red-600" />
@@ -384,18 +389,33 @@ export default function DriverDashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{totalDocs} Total</span>
+                    <span className="text-sm">{totalDocs} Uploaded</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-primary/5 p-4 border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-primary/10 rounded-full">
+                    <Clock className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-primary">Awaiting Admin Approval</h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Our admin team will review your application and documents. You will receive notification when your account is activated.
+                    </p>
                   </div>
                 </div>
               </div>
               
               <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-4 border border-blue-200 dark:border-blue-800">
-                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">How Verification Works</h4>
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">Approval Process</h4>
                 <ol className="text-sm text-blue-700 dark:text-blue-400 space-y-1 list-decimal list-inside">
                   <li>Upload all required documents on the Documents page</li>
-                  <li>Our admin team reviews each document</li>
-                  <li>Once all documents are approved, your account is activated</li>
-                  <li>You can then start accepting and completing deliveries</li>
+                  <li>Admin reviews your application and each document</li>
+                  <li>All documents must be approved by admin</li>
+                  <li>Admin activates your driver account</li>
+                  <li>You can then go online and receive job assignments</li>
                 </ol>
               </div>
               

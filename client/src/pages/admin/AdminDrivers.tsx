@@ -236,6 +236,8 @@ export default function AdminDrivers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
       toast({ title: 'Document reviewed' });
       setReviewNotes('');
     },
