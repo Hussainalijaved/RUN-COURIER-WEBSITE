@@ -28,19 +28,29 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+function sanitizePath(input: string): string {
+  return input.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+}
+
 const documentStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const driverId = req.body.driverId || 'unknown';
+    const rawDriverId = req.body.driverId || 'unknown';
+    const driverId = sanitizePath(rawDriverId);
     const driverDir = path.join(uploadsDir, driverId);
+    const resolved = path.resolve(driverDir);
+    if (!resolved.startsWith(path.resolve(uploadsDir))) {
+      return cb(new Error('Invalid driver ID'), '');
+    }
     if (!fs.existsSync(driverDir)) {
       fs.mkdirSync(driverDir, { recursive: true });
     }
     cb(null, driverDir);
   },
   filename: (req, file, cb) => {
-    const documentType = req.body.documentType || 'document';
+    const rawDocumentType = req.body.documentType || 'document';
+    const documentType = sanitizePath(rawDocumentType);
     const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     cb(null, `${documentType}_${timestamp}${ext}`);
   }
 });
@@ -648,25 +658,28 @@ export async function registerRoutes(
       next();
     });
   }, asyncHandler(async (req, res) => {
-    const { driverId, documentType } = req.body;
+    const { driverId: rawDriverId, documentType: rawDocumentType } = req.body;
     const file = req.file;
 
     if (!file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    if (!driverId) {
+    if (!rawDriverId) {
       return res.status(400).json({ error: "Driver ID is required" });
     }
 
-    if (!documentType) {
+    if (!rawDocumentType) {
       return res.status(400).json({ error: "Document type is required" });
     }
 
-    const relativePath = `/uploads/documents/${driverId}/${file.filename}`;
+    const safeDriverId = sanitizePath(rawDriverId);
+    const safeDocumentType = sanitizePath(rawDocumentType);
+    
+    const relativePath = `/uploads/documents/${safeDriverId}/${file.filename}`;
     const fileUrl = relativePath;
 
-    const existingDocs = await storage.getDocuments({ driverId, type: documentType as any });
+    const existingDocs = await storage.getDocuments({ driverId: rawDriverId, type: rawDocumentType as any });
     
     let document;
     if (existingDocs && existingDocs.length > 0) {
@@ -682,8 +695,8 @@ export async function registerRoutes(
     } else {
       document = await storage.createDocument({
         id: randomUUID(),
-        driverId,
-        type: documentType,
+        driverId: rawDriverId,
+        type: safeDocumentType,
         fileName: file.originalname,
         fileUrl,
         status: 'pending',
@@ -691,7 +704,7 @@ export async function registerRoutes(
       });
     }
 
-    await sendDocumentUploadNotification(driverId, documentType, file.originalname).catch(err => 
+    await sendDocumentUploadNotification(rawDriverId, safeDocumentType, file.originalname).catch(err => 
       console.error('Failed to send document upload notification:', err)
     );
 
