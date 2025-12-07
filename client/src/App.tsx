@@ -55,6 +55,7 @@ import AdminCreateJob from "@/pages/admin/AdminCreateJob";
 import AdminCustomers from "@/pages/admin/AdminCustomers";
 
 import CustomerDashboard from "@/pages/customer/CustomerDashboard";
+import CustomerOrders from "@/pages/customer/CustomerOrders";
 import CustomerProfile from "@/pages/customer/CustomerProfile";
 import CustomerInvoices from "@/pages/customer/CustomerInvoices";
 import DriverDashboard from "@/pages/driver/DriverDashboard";
@@ -190,7 +191,7 @@ function Router() {
       </Route>
       <Route path="/customer/orders">
         <ProtectedRoute allowedRoles={['customer']}>
-          <CustomerDashboard />
+          <CustomerOrders />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/book">

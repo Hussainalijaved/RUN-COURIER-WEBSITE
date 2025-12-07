@@ -106,58 +106,86 @@ export default function CustomerDashboard() {
         </div>
 
         <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="stat-total-orders">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <Package className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-12" />
-              ) : (
-                <div className="text-2xl font-bold">{stats?.totalOrders || 0}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card data-testid="stat-active-orders">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
-              <Truck className="h-5 w-5 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-12" />
-              ) : (
-                <div className="text-2xl font-bold">{stats?.activeOrders || 0}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card data-testid="stat-completed-orders">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Delivered</CardTitle>
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-12" />
-              ) : (
-                <div className="text-2xl font-bold">{stats?.completedOrders || 0}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card data-testid="stat-total-spent">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
-              <Wallet className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-12" />
-              ) : (
-                <div className="text-2xl font-bold">{formatPrice(stats?.totalSpent || 0)}</div>
-              )}
-            </CardContent>
-          </Card>
+          <Link 
+            href="/customer/orders" 
+            className="block focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
+            data-testid="stat-total-orders"
+          >
+            <Card className="h-full cursor-pointer transition-all duration-200 hover:border-primary/50 hover:shadow-md hover:bg-accent/30">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+                <Package className="h-5 w-5 text-primary" />
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-12" />
+                ) : (
+                  <div className="text-2xl font-bold">{stats?.totalOrders || 0}</div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Click to view all</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link 
+            href="/customer/orders?filter=active" 
+            className="block focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg"
+            data-testid="stat-active-orders"
+          >
+            <Card className="h-full cursor-pointer transition-all duration-200 hover:border-blue-500/50 hover:shadow-md hover:bg-blue-50 dark:hover:bg-blue-950/30">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active</CardTitle>
+                <Truck className="h-5 w-5 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-12" />
+                ) : (
+                  <div className="text-2xl font-bold">{stats?.activeOrders || 0}</div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Click to view active</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link 
+            href="/customer/orders?filter=delivered" 
+            className="block focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded-lg"
+            data-testid="stat-completed-orders"
+          >
+            <Card className="h-full cursor-pointer transition-all duration-200 hover:border-green-500/50 hover:shadow-md hover:bg-green-50 dark:hover:bg-green-950/30">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Delivered</CardTitle>
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-12" />
+                ) : (
+                  <div className="text-2xl font-bold">{stats?.completedOrders || 0}</div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Click to view delivered</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link 
+            href="/customer/invoices" 
+            className="block focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
+            data-testid="stat-total-spent"
+          >
+            <Card className="h-full cursor-pointer transition-all duration-200 hover:border-primary/50 hover:shadow-md hover:bg-accent/30">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
+                <Wallet className="h-5 w-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-12" />
+                ) : (
+                  <div className="text-2xl font-bold">{formatPrice(stats?.totalSpent || 0)}</div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Click to view invoices</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {activeJobs.length > 0 && (
