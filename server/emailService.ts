@@ -152,6 +152,45 @@ export async function sendPaymentNotification(
   return sendAdminNotification('New Invoice Generated', htmlContent, textContent);
 }
 
+export async function sendPasswordResetEmail(
+  email: string,
+  resetLink: string
+): Promise<boolean> {
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #007BFF; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Run Courier</h1>
+      </div>
+      <div style="padding: 30px; background-color: #f9f9f9;">
+        <h2 style="color: #333;">Reset Your Password</h2>
+        <p style="color: #666; font-size: 16px;">
+          You requested to reset your password. Click the button below to create a new password:
+        </p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetLink}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+            Reset Password
+          </a>
+        </div>
+        <p style="color: #666; font-size: 14px;">
+          If you didn't request this, you can safely ignore this email.
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          This link will expire in 1 hour.
+        </p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px;">
+          Run Courier - Same Day Delivery Across the UK<br>
+          www.runcourier.co.uk
+        </p>
+      </div>
+    </div>
+  `;
+
+  const textContent = `Reset Your Password\n\nYou requested to reset your password. Click this link to create a new password:\n\n${resetLink}\n\nIf you didn't request this, you can safely ignore this email.\n\nThis link will expire in 1 hour.\n\nRun Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(email, 'Reset Your Password - Run Courier', htmlContent, textContent);
+}
+
 export async function sendContactFormSubmission(
   name: string,
   email: string,

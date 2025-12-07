@@ -3,7 +3,6 @@ import { Link } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,14 +41,22 @@ export default function ForgotPassword() {
   const onSubmit = async (data: ForgotPasswordInput) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      // Use our backend API which sends emails via Resend for reliable delivery
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: data.email,
+          redirectUrl: `${window.location.origin}/reset-password`,
+        }),
       });
 
-      if (error) {
+      const result = await response.json();
+
+      if (!response.ok) {
         toast({
           title: 'Error',
-          description: error.message,
+          description: result.error || 'Failed to send reset email',
           variant: 'destructive',
         });
       } else {

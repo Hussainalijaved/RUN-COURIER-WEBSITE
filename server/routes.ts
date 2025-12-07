@@ -21,7 +21,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail } from "./emailService";
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 if (!fs.existsSync(uploadsDir)) {
@@ -1202,6 +1202,55 @@ export async function registerRoutes(
     await sendContactFormSubmission(name, email, phone, subject, message).catch(err => console.error('Failed to send contact form:', err));
     
     res.status(200).json({ success: true, message: "Your message has been sent successfully" });
+  }));
+
+  // Password reset endpoint using Resend for reliable email delivery
+  app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
+    const { email, redirectUrl } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Authentication service not configured" });
+      }
+
+      // Generate password reset link using Supabase Admin
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: email,
+        options: {
+          redirectTo: redirectUrl || 'https://www.runcourier.co.uk/reset-password'
+        }
+      });
+
+      if (error) {
+        console.error('Supabase generate link error:', error);
+        // Don't reveal if email exists or not for security
+        return res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
+      }
+
+      if (data?.properties?.action_link) {
+        // Send email using Resend
+        const emailSent = await sendPasswordResetEmail(email, data.properties.action_link);
+        
+        if (!emailSent) {
+          console.error('Failed to send password reset email via Resend');
+          return res.status(500).json({ error: "Failed to send password reset email. Please try again later." });
+        }
+
+        console.log('Password reset email sent successfully to:', email);
+      }
+
+      res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      res.status(500).json({ error: "An error occurred. Please try again later." });
+    }
   }));
 
   registerMobileRoutes(app);
