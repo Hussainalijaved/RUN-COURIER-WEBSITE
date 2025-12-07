@@ -1264,7 +1264,7 @@ export default function Book() {
                           originalPrice: quote.totalPrice,
                           discountAmount: isEligibleForNewCustomerDiscount ? discountAmount : 0,
                           discountApplied: isEligibleForNewCustomerDiscount,
-                          basePrice: quote.baseFare,
+                          basePrice: quote.baseCharge,
                           distancePrice: quote.distanceCharge,
                           totalPrice: finalPrice,
                           distance,
