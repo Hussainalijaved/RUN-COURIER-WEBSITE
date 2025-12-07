@@ -70,7 +70,6 @@ import {
   ChevronsUpDown,
   Check,
 } from 'lucide-react';
-import { uploadFile, getPublicUrl } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -287,18 +286,23 @@ export default function AdminDrivers() {
 
     setUploadingDbs(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `dbs_certificate_${selectedDriver.id}_${Date.now()}.${fileExt}`;
-      const filePath = `drivers/${selectedDriver.id}/dbs/${fileName}`;
-      
-      const { error } = await uploadFile('documents', filePath, file);
-      
-      if (error) {
-        throw error;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('driverId', selectedDriver.id);
+      formData.append('documentType', 'dbs_certificate');
+
+      const response = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
 
-      const publicUrl = getPublicUrl('documents', filePath);
-      setEditDbsCertificateUrl(publicUrl);
+      const data = await response.json();
+      setEditDbsCertificateUrl(data.fileUrl);
       toast({
         title: 'DBS certificate uploaded',
         description: 'File uploaded successfully',

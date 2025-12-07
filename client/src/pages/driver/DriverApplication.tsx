@@ -16,7 +16,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { supabase, uploadFile, getPublicUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { cn } from "@/lib/utils";
 
@@ -124,16 +124,24 @@ export default function DriverApplication() {
   const uploadFileMutation = useMutation({
     mutationFn: async ({ file, type }: { file: File; type: keyof typeof uploadedFiles }) => {
       setIsUploading(true);
-      const timestamp = Date.now();
-      const fileExt = file.name.split('.').pop();
-      const fileName = `driver-applications/${type}_${timestamp}.${fileExt}`;
       
-      const { data, error } = await uploadFile("documents", fileName, file);
-      
-      if (error) throw error;
-      
-      const publicUrl = getPublicUrl("documents", fileName);
-      return { type, url: publicUrl };
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('driverId', 'application-pending');
+      formData.append('documentType', type);
+
+      const response = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload document');
+      }
+
+      const data = await response.json();
+      return { type, url: data.fileUrl };
     },
     onSuccess: ({ type, url }) => {
       setUploadedFiles(prev => ({ ...prev, [type]: url }));
