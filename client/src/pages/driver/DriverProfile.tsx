@@ -144,8 +144,8 @@ export default function DriverProfile() {
   });
 
   const deleteAccountMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest('DELETE', `/api/drivers/${driver?.id}`);
+    mutationFn: async (driverId: string) => {
+      return apiRequest('DELETE', `/api/drivers/${driverId}`);
     },
     onSuccess: async () => {
       toast({
@@ -164,7 +164,11 @@ export default function DriverProfile() {
   });
 
   const handleDeleteAccount = () => {
-    deleteAccountMutation.mutate();
+    if (!driver?.id) {
+      toast({ title: 'Driver ID not available', variant: 'destructive' });
+      return;
+    }
+    deleteAccountMutation.mutate(driver.id);
     setShowDeleteDialog(false);
   };
 

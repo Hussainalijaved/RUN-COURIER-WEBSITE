@@ -117,8 +117,8 @@ export default function CustomerProfile() {
   };
 
   const deleteAccountMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest('DELETE', `/api/users/${user?.id}`);
+    mutationFn: async (userId: string) => {
+      return apiRequest('DELETE', `/api/users/${userId}`);
     },
     onSuccess: async () => {
       toast({
@@ -137,7 +137,11 @@ export default function CustomerProfile() {
   });
 
   const handleDeleteAccount = () => {
-    deleteAccountMutation.mutate();
+    if (!user?.id) {
+      toast({ title: 'User ID not available', variant: 'destructive' });
+      return;
+    }
+    deleteAccountMutation.mutate(user.id);
     setShowDeleteDialog(false);
   };
 
