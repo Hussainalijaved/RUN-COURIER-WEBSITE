@@ -62,21 +62,26 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-function StatCard({ title, value, icon: Icon, color, isLoading }: { title: string; value: string | number; icon: any; color: string; isLoading?: boolean }) {
+function StatCard({ title, value, icon: Icon, color, isLoading, href }: { title: string; value: string | number; icon: any; color: string; isLoading?: boolean; href: string }) {
   return (
-    <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}>
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`h-5 w-5 ${color}`} />
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-8 w-20" />
-        ) : (
-          <div className="text-2xl font-bold">{value}</div>
-        )}
-      </CardContent>
-    </Card>
+    <Link href={href}>
+      <Card 
+        className="cursor-pointer transition-all duration-200 hover-elevate" 
+        data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}
+      >
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          <Icon className={`h-5 w-5 ${color}`} />
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-8 w-20" />
+          ) : (
+            <div className="text-2xl font-bold">{value}</div>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
@@ -144,6 +149,7 @@ export default function AdminDashboard() {
             icon={Package}
             color="text-blue-500"
             isLoading={statsLoading}
+            href="/admin/jobs?filter=today"
           />
           <StatCard
             title="Active Drivers"
@@ -151,6 +157,7 @@ export default function AdminDashboard() {
             icon={Truck}
             color="text-green-500"
             isLoading={statsLoading}
+            href="/admin/drivers?filter=active"
           />
           <StatCard
             title="Today's Revenue"
@@ -158,6 +165,7 @@ export default function AdminDashboard() {
             icon={TrendingUp}
             color="text-primary"
             isLoading={statsLoading}
+            href="/admin/reports/revenue?filter=today"
           />
           <StatCard
             title="Pending Jobs"
@@ -165,6 +173,7 @@ export default function AdminDashboard() {
             icon={Clock}
             color="text-yellow-500"
             isLoading={statsLoading}
+            href="/admin/jobs?filter=pending"
           />
         </div>
 
