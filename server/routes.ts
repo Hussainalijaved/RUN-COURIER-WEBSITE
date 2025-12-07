@@ -25,8 +25,12 @@ import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail } from "./emailService";
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
+const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(tempUploadsDir)) {
+  fs.mkdirSync(tempUploadsDir, { recursive: true });
 }
 
 function sanitizePath(input: string): string {
@@ -35,24 +39,13 @@ function sanitizePath(input: string): string {
 
 const documentStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const rawDriverId = req.body.driverId || 'unknown';
-    const driverId = sanitizePath(rawDriverId);
-    const driverDir = path.join(uploadsDir, driverId);
-    const resolved = path.resolve(driverDir);
-    if (!resolved.startsWith(path.resolve(uploadsDir))) {
-      return cb(new Error('Invalid driver ID'), '');
-    }
-    if (!fs.existsSync(driverDir)) {
-      fs.mkdirSync(driverDir, { recursive: true });
-    }
-    cb(null, driverDir);
+    cb(null, tempUploadsDir);
   },
   filename: (req, file, cb) => {
-    const rawDocumentType = req.body.documentType || 'document';
-    const documentType = sanitizePath(rawDocumentType);
     const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
     const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
-    cb(null, `${documentType}_${timestamp}${ext}`);
+    cb(null, `temp_${timestamp}_${random}${ext}`);
   }
 });
 
@@ -735,17 +728,46 @@ export async function registerRoutes(
     }
 
     if (!rawDriverId) {
+      // Clean up temp file
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
       return res.status(400).json({ error: "Driver ID is required" });
     }
 
     if (!rawDocumentType) {
+      // Clean up temp file
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
       return res.status(400).json({ error: "Document type is required" });
     }
 
     const safeDriverId = sanitizePath(rawDriverId);
     const safeDocumentType = sanitizePath(rawDocumentType);
     
-    const relativePath = `/uploads/documents/${safeDriverId}/${file.filename}`;
+    // Create driver-specific directory and move file from temp
+    const driverDir = path.join(uploadsDir, safeDriverId);
+    if (!fs.existsSync(driverDir)) {
+      fs.mkdirSync(driverDir, { recursive: true });
+    }
+    
+    // Generate final filename
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
+    const finalFilename = `${safeDocumentType}_${timestamp}${ext}`;
+    const finalPath = path.join(driverDir, finalFilename);
+    
+    // Move file from temp to final location
+    try {
+      fs.renameSync(file.path, finalPath);
+    } catch (moveError) {
+      // If rename fails (cross-device), copy and delete
+      fs.copyFileSync(file.path, finalPath);
+      fs.unlinkSync(file.path);
+    }
+    
+    const relativePath = `/uploads/documents/${safeDriverId}/${finalFilename}`;
     const fileUrl = relativePath;
 
     // Check for existing documents in both memory and database
