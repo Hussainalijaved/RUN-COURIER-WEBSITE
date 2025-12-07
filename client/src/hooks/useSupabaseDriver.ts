@@ -342,3 +342,61 @@ export function useUploadDocument() {
     },
   });
 }
+
+export interface JobAssignment {
+  id: string;
+  jobId: string;
+  driverId: string;
+  assignedBy: string;
+  driverPrice: string;
+  status: 'pending' | 'sent' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
+  sentAt: Date | null;
+  respondedAt: Date | null;
+  cancelledAt: Date | null;
+  cancellationReason: string | null;
+  expiresAt: Date | null;
+  createdAt: Date | null;
+}
+
+export function useDriverAssignments(driverId: string | undefined) {
+  return useQuery({
+    queryKey: ['/api/job-assignments', { driverId }],
+    queryFn: async () => {
+      if (!driverId) return [];
+      
+      const response = await fetch(`/api/job-assignments?driverId=${driverId}&status=sent`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch assignments');
+      }
+      
+      return response.json() as Promise<JobAssignment[]>;
+    },
+    enabled: !!driverId,
+    refetchInterval: 30000,
+  });
+}
+
+export function useRespondToAssignment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ assignmentId, accepted }: { assignmentId: string; accepted: boolean }) => {
+      const response = await fetch(`/api/job-assignments/${assignmentId}/respond`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accepted }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to respond to assignment');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'jobs'] });
+    },
+  });
+}
