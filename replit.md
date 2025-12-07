@@ -140,6 +140,32 @@ Users and drivers can delete their accounts from their profile pages with full G
 
 ## Recent Changes (December 7, 2025)
 
+### Stripe Integration Configuration
+Stripe payment processing is now configured using environment variables for API keys:
+
+**Configuration:**
+- `STRIPE_SECRET_KEY` - Your Stripe secret key (sk_test_... for test mode, sk_live_... for production)
+- `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (pk_test_... for test mode, pk_live_... for production)
+
+**Key Files:**
+- `server/stripeClient.ts` - Stripe client configuration using environment variables
+- `server/stripeService.ts` - Stripe service methods for checkout sessions, customers, payments
+- `server/webhookHandlers.ts` - Webhook processing for payment events
+- `server/index.ts` - Stripe initialization with schema migrations and webhook setup
+
+**Features:**
+- Dynamic pricing with custom checkout sessions (not Stripe Products/Prices)
+- Automatic webhook configuration with UUID-based routing
+- Background data sync from Stripe to PostgreSQL `stripe` schema
+- GBP currency for UK courier service
+
+**Payment Flow:**
+1. Customer creates booking with calculated price
+2. Backend creates Stripe Checkout Session with dynamic amount
+3. Customer redirected to Stripe-hosted checkout page
+4. After payment, webhook updates job payment status
+5. Success/cancel URLs redirect back to application
+
 ### Document Upload Backend API (Replaces Supabase Storage)
 Implemented a secure backend API for document uploads using multer, eliminating the Supabase Storage dependency:
 
