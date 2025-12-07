@@ -33,7 +33,7 @@ async function getResendCredentials() {
     
     return {
       apiKey: connectionSettings.settings.api_key,
-      fromEmail: connectionSettings.settings.from_email || 'noreply@runcourier.co.uk'
+      fromEmail: connectionSettings.settings.from_email || 'info@runcourier.co.uk'
     };
   } catch (error) {
     console.error('Failed to fetch Resend credentials:', error);
