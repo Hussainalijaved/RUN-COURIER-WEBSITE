@@ -999,26 +999,57 @@ export async function registerRoutes(
 
   app.patch("/api/documents/:id/review", asyncHandler(async (req, res) => {
     const { status, reviewedBy, reviewNotes } = req.body;
-    const document = await storage.reviewDocument(req.params.id, status, reviewedBy, reviewNotes);
+    const reviewedAt = new Date();
+    
+    // First try in-memory storage
+    let document = await storage.reviewDocument(req.params.id, status, reviewedBy, reviewNotes);
+    
+    // If not found in memory, try updating directly in PostgreSQL
     if (!document) {
-      return res.status(404).json({ error: "Document not found" });
+      try {
+        const { db } = await import("./db");
+        const { documents: documentsTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        
+        // Check if document exists in database
+        const [existingDoc] = await db.select().from(documentsTable).where(eq(documentsTable.id, req.params.id));
+        
+        if (existingDoc) {
+          // Update in database
+          const [updatedDoc] = await db.update(documentsTable).set({
+            status: status,
+            reviewedBy: reviewedBy,
+            reviewNotes: reviewNotes || null,
+            reviewedAt: reviewedAt,
+          }).where(eq(documentsTable.id, req.params.id)).returning();
+          
+          document = updatedDoc;
+          console.log("Document review updated directly in PostgreSQL:", req.params.id);
+        }
+      } catch (e) {
+        console.error("Failed to update document review in PostgreSQL:", e);
+      }
+    } else {
+      // Sync review status to PostgreSQL database
+      try {
+        const { db } = await import("./db");
+        const { documents: documentsTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        
+        await db.update(documentsTable).set({
+          status: document.status,
+          reviewedBy: document.reviewedBy,
+          reviewNotes: document.reviewNotes,
+          reviewedAt: document.reviewedAt,
+        }).where(eq(documentsTable.id, req.params.id));
+        console.log("Document review synced to PostgreSQL:", req.params.id);
+      } catch (e) {
+        console.error("Failed to sync document review to PostgreSQL:", e);
+      }
     }
     
-    // Sync review status to PostgreSQL database
-    try {
-      const { db } = await import("./db");
-      const { documents } = await import("@shared/schema");
-      const { eq } = await import("drizzle-orm");
-      
-      await db.update(documents).set({
-        status: document.status,
-        reviewedBy: document.reviewedBy,
-        reviewNotes: document.reviewNotes,
-        reviewedAt: document.reviewedAt,
-      }).where(eq(documents.id, req.params.id));
-      console.log("Document review synced to PostgreSQL:", req.params.id);
-    } catch (e) {
-      console.error("Failed to sync document review to PostgreSQL:", e);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
     }
     
     res.json(document);
