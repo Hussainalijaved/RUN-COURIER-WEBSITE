@@ -59,7 +59,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ShippingLabel } from '@/components/ShippingLabel';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
-import type { Job, Driver, JobStatus } from '@shared/schema';
+import type { Job, Driver, JobStatus, JobAssignment } from '@shared/schema';
 
 // Type for drivers from Supabase
 interface SupabaseDriver {
@@ -190,6 +190,20 @@ export default function AdminJobs() {
     },
     onError: () => {
       toast({ title: 'Failed to cancel job', variant: 'destructive' });
+    },
+  });
+
+  const cancelAssignmentMutation = useMutation({
+    mutationFn: async ({ assignmentId, reason }: { assignmentId: string; reason?: string }) => {
+      return apiRequest('PATCH', `/api/job-assignments/${assignmentId}/cancel`, { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      toast({ title: 'Assignment cancelled', description: 'You can now reassign the job to another driver.' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to cancel assignment', variant: 'destructive' });
     },
   });
 
