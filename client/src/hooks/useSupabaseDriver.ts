@@ -241,26 +241,20 @@ export function useUpdateDriverProfile() {
 
   return useMutation({
     mutationFn: async ({ driverId, data }: { driverId: string; data: Partial<Driver> }) => {
-      const updateData: Record<string, any> = {};
-      
-      if (data.phone !== undefined) updateData.phone = data.phone;
-      if (data.postcode !== undefined) updateData.postcode = data.postcode;
-      if (data.address !== undefined) updateData.address = data.address;
-      if (data.vehicleType !== undefined) updateData.vehicle_type = data.vehicleType;
-      if (data.vehicleRegistration !== undefined) updateData.vehicle_registration = data.vehicleRegistration;
-      if (data.vehicleMake !== undefined) updateData.vehicle_make = data.vehicleMake;
-      if (data.vehicleModel !== undefined) updateData.vehicle_model = data.vehicleModel;
-      if (data.vehicleColor !== undefined) updateData.vehicle_color = data.vehicleColor;
+      const response = await fetch(`/api/drivers/${driverId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
 
-      const { data: result, error } = await supabase
-        .from('drivers')
-        .update(updateData)
-        .eq('id', driverId)
-        .select()
-        .single();
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update profile');
+      }
 
-      if (error) throw error;
-      return result;
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });

@@ -694,17 +694,15 @@ export async function registerRoutes(
       });
     } else {
       document = await storage.createDocument({
-        id: randomUUID(),
         driverId: rawDriverId,
         type: safeDocumentType,
         fileName: file.originalname,
         fileUrl,
         status: 'pending',
-        uploadedAt: new Date(),
       });
     }
 
-    await sendDocumentUploadNotification(rawDriverId, safeDocumentType, file.originalname).catch(err => 
+    await sendDocumentUploadNotification(rawDriverId, safeDocumentType).catch(err => 
       console.error('Failed to send document upload notification:', err)
     );
 

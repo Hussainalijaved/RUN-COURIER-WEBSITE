@@ -95,7 +95,14 @@ export default function DriverProfile() {
   }, [driver]);
 
   const handleSave = () => {
-    if (!driver) return;
+    if (!driver) {
+      toast({ title: 'No driver profile found', variant: 'destructive' });
+      return;
+    }
+    if (!driver.id) {
+      toast({ title: 'Driver ID not available. Please try refreshing the page.', variant: 'destructive' });
+      return;
+    }
     updateProfileMutation.mutate(
       {
         driverId: driver.id,
@@ -112,7 +119,7 @@ export default function DriverProfile() {
       },
       {
         onSuccess: () => toast({ title: 'Profile updated successfully' }),
-        onError: () => toast({ title: 'Failed to update profile', variant: 'destructive' }),
+        onError: (error) => toast({ title: error instanceof Error ? error.message : 'Failed to update profile', variant: 'destructive' }),
       }
     );
   };
