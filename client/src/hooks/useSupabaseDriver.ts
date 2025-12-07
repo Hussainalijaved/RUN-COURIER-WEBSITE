@@ -281,8 +281,9 @@ export function useUpdateDriverProfile() {
 
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });
+      await queryClient.refetchQueries({ queryKey: ['supabase', 'driver', user?.id] });
     },
   });
 }
