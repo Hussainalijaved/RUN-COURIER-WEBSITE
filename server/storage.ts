@@ -8,6 +8,7 @@ import {
   type DriverApplication, type InsertDriverApplication,
   type Invoice, type InsertInvoice,
   type JobAssignment, type InsertJobAssignment,
+  type DeliveryContact, type InsertDeliveryContact,
   type DriverApplicationStatus,
   type InvoiceStatus,
   type JobAssignmentStatus,
@@ -103,6 +104,12 @@ export interface IStorage {
   updateJobAssignment(id: string, data: Partial<JobAssignment>): Promise<JobAssignment | undefined>;
   cancelJobAssignment(id: string, reason?: string): Promise<JobAssignment | undefined>;
   getActiveAssignmentForJob(jobId: string): Promise<JobAssignment | undefined>;
+
+  getDeliveryContact(id: string): Promise<DeliveryContact | undefined>;
+  getDeliveryContacts(customerId: string): Promise<DeliveryContact[]>;
+  createDeliveryContact(contact: InsertDeliveryContact): Promise<DeliveryContact>;
+  updateDeliveryContact(id: string, data: Partial<DeliveryContact>): Promise<DeliveryContact | undefined>;
+  deleteDeliveryContact(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -115,6 +122,7 @@ export class MemStorage implements IStorage {
   private driverApplications: Map<string, DriverApplication>;
   private invoices: Map<string, Invoice>;
   private jobAssignments: Map<string, JobAssignment>;
+  private deliveryContacts: Map<string, DeliveryContact>;
   private pricingSettings: PricingSettings;
   private vehicles: Map<VehicleType, Vehicle>;
 
@@ -128,6 +136,7 @@ export class MemStorage implements IStorage {
     this.driverApplications = new Map();
     this.invoices = new Map();
     this.jobAssignments = new Map();
+    this.deliveryContacts = new Map();
     
     this.pricingSettings = {
       id: "default",
@@ -1462,6 +1471,55 @@ export class MemStorage implements IStorage {
       a.jobId === jobId && 
       (a.status === "pending" || a.status === "sent" || a.status === "accepted")
     );
+  }
+
+  async getDeliveryContact(id: string): Promise<DeliveryContact | undefined> {
+    return this.deliveryContacts.get(id);
+  }
+
+  async getDeliveryContacts(customerId: string): Promise<DeliveryContact[]> {
+    const contacts = Array.from(this.deliveryContacts.values());
+    return contacts
+      .filter(c => c.customerId === customerId)
+      .sort((a, b) => {
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+  }
+
+  async createDeliveryContact(contact: InsertDeliveryContact): Promise<DeliveryContact> {
+    const id = randomUUID();
+    const newContact: DeliveryContact = {
+      id,
+      customerId: contact.customerId,
+      label: contact.label,
+      recipientName: contact.recipientName,
+      recipientPhone: contact.recipientPhone,
+      deliveryAddress: contact.deliveryAddress,
+      deliveryPostcode: contact.deliveryPostcode,
+      buildingName: contact.buildingName || null,
+      deliveryInstructions: contact.deliveryInstructions || null,
+      isDefault: contact.isDefault || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.deliveryContacts.set(id, newContact);
+    return newContact;
+  }
+
+  async updateDeliveryContact(id: string, data: Partial<DeliveryContact>): Promise<DeliveryContact | undefined> {
+    const contact = this.deliveryContacts.get(id);
+    if (!contact) return undefined;
+    const updated: DeliveryContact = { ...contact, ...data, updatedAt: new Date() };
+    this.deliveryContacts.set(id, updated);
+    return updated;
+  }
+
+  async deleteDeliveryContact(id: string): Promise<void> {
+    this.deliveryContacts.delete(id);
   }
 }
 

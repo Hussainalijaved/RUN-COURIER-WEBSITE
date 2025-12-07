@@ -289,6 +289,21 @@ export const jobAssignments = pgTable("job_assignments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const deliveryContacts = pgTable("delivery_contacts", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  customerId: varchar("customer_id", { length: 36 }).notNull(),
+  label: text("label").notNull(),
+  recipientName: text("recipient_name").notNull(),
+  recipientPhone: text("recipient_phone").notNull(),
+  deliveryAddress: text("delivery_address").notNull(),
+  deliveryPostcode: text("delivery_postcode").notNull(),
+  buildingName: text("building_name"),
+  deliveryInstructions: text("delivery_instructions"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertDriverSchema = createInsertSchema(drivers).omit({ id: true, createdAt: true });
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true });
@@ -301,6 +316,7 @@ export const insertVendorApiKeySchema = createInsertSchema(vendorApiKeys).omit({
 export const insertDriverApplicationSchema = createInsertSchema(driverApplications).omit({ id: true, submittedAt: true, reviewedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true });
 export const insertJobAssignmentSchema = createInsertSchema(jobAssignments).omit({ id: true, createdAt: true });
+export const insertDeliveryContactSchema = createInsertSchema(deliveryContacts).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -326,6 +342,8 @@ export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertJobAssignment = z.infer<typeof insertJobAssignmentSchema>;
 export type JobAssignment = typeof jobAssignments.$inferSelect;
+export type InsertDeliveryContact = z.infer<typeof insertDeliveryContactSchema>;
+export type DeliveryContact = typeof deliveryContacts.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
