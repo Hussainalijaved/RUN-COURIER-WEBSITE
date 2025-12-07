@@ -218,6 +218,7 @@ export class MemStorage implements IStorage {
       { id: "driver-2", userId: "user-d2", name: "Sarah Wilson", code: "SW02", vehicle: "small_van" as VehicleType, lat: "51.5155", lng: "-0.1420" },
       { id: "driver-3", userId: "user-d3", name: "Mike Johnson", code: "MJ03", vehicle: "motorbike" as VehicleType, lat: "51.4995", lng: "-0.1248" },
       { id: "driver-4", userId: "user-d4", name: "Emma Brown", code: "EB04", vehicle: "medium_van" as VehicleType, lat: "51.5225", lng: "-0.0800" },
+      { id: "driver-5", userId: "user-d5", name: "Rachel Davies", code: "RD05", vehicle: "car" as VehicleType, lat: "51.5100", lng: "-0.1150" },
     ];
 
     drivers.forEach((d, i) => {
@@ -287,12 +288,13 @@ export class MemStorage implements IStorage {
         { type: "hire_reward", name: "Hire_Reward_Policy.pdf" },
       ];
 
-      // First driver has all approved docs, second has mix, third has pending, fourth has rejected
+      // First driver has all approved docs, second has mix, third has pending, fourth has rejected, fifth has all approved
       const docStatuses: DocumentStatus[][] = [
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "pending", "approved", "pending", "pending", "pending"],
         ["pending", "pending", "pending", "pending", "pending", "pending", "pending"],
         ["approved", "approved", "rejected", "approved", "pending", "rejected", "pending"],
+        ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
       ];
 
       docTypes.forEach((docType, docIndex) => {
