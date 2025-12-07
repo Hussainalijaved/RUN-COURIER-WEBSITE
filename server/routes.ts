@@ -120,10 +120,28 @@ export async function registerRoutes(
   }));
 
   app.post("/api/jobs", asyncHandler(async (req, res) => {
-    const data = insertJobSchema.parse({
+    // Preprocess data to handle type coercion
+    const preprocessedBody = {
       ...req.body,
       trackingNumber: generateTrackingNumber(),
-    });
+      // Convert weight to string if it's a number (schema expects decimal as string)
+      weight: typeof req.body.weight === 'number' ? String(req.body.weight) : req.body.weight,
+      // Convert date strings to Date objects
+      scheduledPickupTime: req.body.scheduledPickupTime ? new Date(req.body.scheduledPickupTime) : undefined,
+      scheduledDeliveryTime: req.body.scheduledDeliveryTime ? new Date(req.body.scheduledDeliveryTime) : undefined,
+      // Convert numeric fields to strings for decimal columns
+      distance: typeof req.body.distance === 'number' ? String(req.body.distance) : req.body.distance,
+      basePrice: typeof req.body.basePrice === 'number' ? String(req.body.basePrice) : req.body.basePrice,
+      distancePrice: typeof req.body.distancePrice === 'number' ? String(req.body.distancePrice) : req.body.distancePrice,
+      weightSurcharge: typeof req.body.weightSurcharge === 'number' ? String(req.body.weightSurcharge) : req.body.weightSurcharge,
+      multiDropCharge: typeof req.body.multiDropCharge === 'number' ? String(req.body.multiDropCharge) : req.body.multiDropCharge,
+      returnTripCharge: typeof req.body.returnTripCharge === 'number' ? String(req.body.returnTripCharge) : req.body.returnTripCharge,
+      centralLondonCharge: typeof req.body.centralLondonCharge === 'number' ? String(req.body.centralLondonCharge) : req.body.centralLondonCharge,
+      waitingTimeCharge: typeof req.body.waitingTimeCharge === 'number' ? String(req.body.waitingTimeCharge) : req.body.waitingTimeCharge,
+      totalPrice: typeof req.body.totalPrice === 'number' ? String(req.body.totalPrice) : req.body.totalPrice,
+    };
+    
+    const data = insertJobSchema.parse(preprocessedBody);
     const job = await storage.createJob(data);
     // Send admin notification
     await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send job notification:', err));
