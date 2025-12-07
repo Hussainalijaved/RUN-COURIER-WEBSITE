@@ -1425,6 +1425,86 @@ export async function registerRoutes(
     res.json(cancelled);
   }));
 
+  // Delivery Contacts routes (for business customers to save delivery details)
+  app.get("/api/delivery-contacts", asyncHandler(async (req, res) => {
+    const customerId = req.query.customerId as string;
+    if (!customerId) {
+      return res.status(400).json({ error: "customerId is required" });
+    }
+    const contacts = await storage.getDeliveryContacts(customerId);
+    res.json(contacts);
+  }));
+
+  app.get("/api/delivery-contacts/:id", asyncHandler(async (req, res) => {
+    const contact = await storage.getDeliveryContact(req.params.id);
+    if (!contact) {
+      return res.status(404).json({ error: "Delivery contact not found" });
+    }
+    res.json(contact);
+  }));
+
+  app.post("/api/delivery-contacts", asyncHandler(async (req, res) => {
+    const { customerId, label, recipientName, recipientPhone, deliveryAddress, deliveryPostcode, buildingName, deliveryInstructions, isDefault } = req.body;
+    
+    if (!customerId || !label || !recipientName || !recipientPhone || !deliveryAddress || !deliveryPostcode) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // If setting as default, unset other defaults for this customer
+    if (isDefault) {
+      const existingContacts = await storage.getDeliveryContacts(customerId);
+      for (const contact of existingContacts) {
+        if (contact.isDefault) {
+          await storage.updateDeliveryContact(contact.id, { isDefault: false });
+        }
+      }
+    }
+
+    const contact = await storage.createDeliveryContact({
+      customerId,
+      label,
+      recipientName,
+      recipientPhone,
+      deliveryAddress,
+      deliveryPostcode,
+      buildingName: buildingName || null,
+      deliveryInstructions: deliveryInstructions || null,
+      isDefault: isDefault || false,
+    });
+    res.status(201).json(contact);
+  }));
+
+  app.patch("/api/delivery-contacts/:id", asyncHandler(async (req, res) => {
+    const contact = await storage.getDeliveryContact(req.params.id);
+    if (!contact) {
+      return res.status(404).json({ error: "Delivery contact not found" });
+    }
+
+    const { isDefault, ...otherData } = req.body;
+
+    // If setting as default, unset other defaults for this customer
+    if (isDefault) {
+      const existingContacts = await storage.getDeliveryContacts(contact.customerId);
+      for (const existingContact of existingContacts) {
+        if (existingContact.isDefault && existingContact.id !== contact.id) {
+          await storage.updateDeliveryContact(existingContact.id, { isDefault: false });
+        }
+      }
+    }
+
+    const updated = await storage.updateDeliveryContact(req.params.id, { ...otherData, isDefault });
+    res.json(updated);
+  }));
+
+  app.delete("/api/delivery-contacts/:id", asyncHandler(async (req, res) => {
+    const contact = await storage.getDeliveryContact(req.params.id);
+    if (!contact) {
+      return res.status(404).json({ error: "Delivery contact not found" });
+    }
+    await storage.deleteDeliveryContact(req.params.id);
+    res.status(204).end();
+  }));
+
   registerMobileRoutes(app);
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
