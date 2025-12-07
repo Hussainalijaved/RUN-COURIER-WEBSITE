@@ -205,6 +205,7 @@ export const vendorApiKeys = pgTable("vendor_api_keys", {
 
 export type DriverApplicationStatus = "pending" | "approved" | "rejected";
 export type InvoiceStatus = "pending" | "paid" | "overdue" | "cancelled";
+export type JobAssignmentStatus = "pending" | "sent" | "accepted" | "rejected" | "cancelled" | "expired";
 
 export const invoices = pgTable("invoices", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -273,6 +274,21 @@ export const driverApplications = pgTable("driver_applications", {
   reviewedAt: timestamp("reviewed_at"),
 });
 
+export const jobAssignments = pgTable("job_assignments", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  jobId: varchar("job_id", { length: 36 }).notNull(),
+  driverId: varchar("driver_id", { length: 36 }).notNull(),
+  assignedBy: varchar("assigned_by", { length: 36 }).notNull(),
+  driverPrice: decimal("driver_price", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").$type<JobAssignmentStatus>().notNull().default("pending"),
+  sentAt: timestamp("sent_at"),
+  respondedAt: timestamp("responded_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertDriverSchema = createInsertSchema(drivers).omit({ id: true, createdAt: true });
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true });
@@ -284,6 +300,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export const insertVendorApiKeySchema = createInsertSchema(vendorApiKeys).omit({ id: true, createdAt: true });
 export const insertDriverApplicationSchema = createInsertSchema(driverApplications).omit({ id: true, submittedAt: true, reviewedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true });
+export const insertJobAssignmentSchema = createInsertSchema(jobAssignments).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -307,6 +324,8 @@ export type InsertDriverApplication = z.infer<typeof insertDriverApplicationSche
 export type DriverApplication = typeof driverApplications.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
+export type InsertJobAssignment = z.infer<typeof insertJobAssignmentSchema>;
+export type JobAssignment = typeof jobAssignments.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
