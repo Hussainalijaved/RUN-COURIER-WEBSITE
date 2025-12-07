@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearch, Link } from 'wouter';
+import { useSearch, Link, useLocation } from 'wouter';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,12 @@ import { useAuth } from '@/context/AuthContext';
 export default function PaymentSuccess() {
   const searchParams = useSearch();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPayLater, setIsPayLater] = useState(false);
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
@@ -31,6 +33,26 @@ export default function PaymentSuccess() {
       setIsLoading(false);
     }
   }, [searchParams]);
+
+  // Auto-redirect countdown after booking is confirmed
+  useEffect(() => {
+    if (!isLoading && !error && trackingNumber) {
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // Redirect to customer dashboard if logged in, otherwise to tracking page
+            const redirectUrl = user ? '/customer' : `/track?q=${trackingNumber}`;
+            setLocation(redirectUrl);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [isLoading, error, trackingNumber, user, setLocation]);
 
   const confirmPayment = async (sessionId: string) => {
     try {
@@ -127,6 +149,11 @@ export default function PaymentSuccess() {
                     <Package className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <span>Track your delivery in real-time using your tracking number</span>
                   </div>
+                </div>
+
+                {/* Auto-redirect countdown */}
+                <div className="text-center text-sm text-muted-foreground" data-testid="text-redirect-countdown">
+                  Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4">
