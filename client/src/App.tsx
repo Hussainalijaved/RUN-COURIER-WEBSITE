@@ -44,6 +44,7 @@ import {
 } from "@/pages/services/ServicePage";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminDocuments from "@/pages/admin/AdminDocuments";
 import AdminJobs from "@/pages/admin/AdminJobs";
 import AdminDrivers from "@/pages/admin/AdminDrivers";
 import AdminApplications from "@/pages/admin/AdminApplications";
@@ -169,7 +170,7 @@ function Router() {
       </Route>
       <Route path="/admin/documents">
         <ProtectedRoute allowedRoles={['admin']}>
-          <AdminDashboard />
+          <AdminDocuments />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/analytics">
