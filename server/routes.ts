@@ -343,11 +343,110 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/drivers/:id/verify", asyncHandler(async (req, res) => {
-    const { isVerified } = req.body;
-    const driver = await storage.verifyDriver(req.params.id, isVerified);
+    const { isVerified, bypassDocumentCheck } = req.body;
+    const driverId = req.params.id;
+    
+    // Get driver first to check vehicle type
+    const existingDriver = await storage.getDriver(driverId);
+    if (!existingDriver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+    
+    // If trying to verify (activate) the driver, check that all required documents are approved
+    if (isVerified === true && !bypassDocumentCheck) {
+      const vehicleType = existingDriver.vehicleType || 'car';
+      
+      // Define required document types based on vehicle type
+      const baseRequiredDocs = [
+        'driving_license',
+        'hire_and_reward_insurance',
+        'goods_in_transit_insurance',
+        'proof_of_identity',
+        'proof_of_address',
+      ];
+      
+      // Define vehicle photo requirements based on vehicle type
+      const vehiclePhotoRequirements: Record<string, string[]> = {
+        'motorbike': ['vehicle_photo_front', 'vehicle_photo_back'],
+        'car': ['vehicle_photo_front', 'vehicle_photo_back'],
+        'small_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+        'medium_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+      };
+      
+      const requiredPhotos = vehiclePhotoRequirements[vehicleType] || ['vehicle_photo_front', 'vehicle_photo_back'];
+      const allRequiredDocs = [...baseRequiredDocs, ...requiredPhotos];
+      
+      // Fetch driver's documents from database
+      let driverDocuments: any[] = [];
+      try {
+        const { db } = await import("./db");
+        const { documents: documentsTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        
+        driverDocuments = await db.select().from(documentsTable)
+          .where(eq(documentsTable.driverId, driverId));
+      } catch (e) {
+        console.error("Failed to fetch documents from PostgreSQL:", e);
+        // Fallback to memory storage
+        driverDocuments = await storage.getDocuments({ driverId });
+      }
+      
+      // Check each required document is approved
+      const missingDocs: string[] = [];
+      const pendingDocs: string[] = [];
+      const rejectedDocs: string[] = [];
+      
+      for (const docType of allRequiredDocs) {
+        const doc = driverDocuments.find((d: any) => d.type === docType);
+        if (!doc) {
+          missingDocs.push(docType.replace(/_/g, ' '));
+        } else if (doc.status === 'pending') {
+          pendingDocs.push(docType.replace(/_/g, ' '));
+        } else if (doc.status === 'rejected') {
+          rejectedDocs.push(docType.replace(/_/g, ' '));
+        }
+      }
+      
+      // If any documents are not approved, prevent verification
+      if (missingDocs.length > 0 || pendingDocs.length > 0 || rejectedDocs.length > 0) {
+        const issues: string[] = [];
+        if (missingDocs.length > 0) {
+          issues.push(`Missing: ${missingDocs.join(', ')}`);
+        }
+        if (pendingDocs.length > 0) {
+          issues.push(`Pending approval: ${pendingDocs.join(', ')}`);
+        }
+        if (rejectedDocs.length > 0) {
+          issues.push(`Rejected: ${rejectedDocs.join(', ')}`);
+        }
+        
+        return res.status(400).json({ 
+          error: "Cannot verify driver until all required documents are approved",
+          details: issues,
+          missingCount: missingDocs.length,
+          pendingCount: pendingDocs.length,
+          rejectedCount: rejectedDocs.length
+        });
+      }
+    }
+    
+    const driver = await storage.verifyDriver(driverId, isVerified);
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
+    
+    // Sync to PostgreSQL
+    try {
+      const { db } = await import("./db");
+      const { drivers } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.update(drivers).set({ isVerified }).where(eq(drivers.id, driverId));
+      console.log("Driver verification synced to PostgreSQL:", driverId, isVerified);
+    } catch (e) {
+      console.error("Failed to sync driver verification to PostgreSQL:", e);
+    }
+    
     res.json(driver);
   }));
 

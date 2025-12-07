@@ -62,6 +62,7 @@ import {
   Calendar,
   ExternalLink,
   AlertCircle,
+  AlertTriangle,
   Clock,
   Shield,
   Globe,
@@ -151,14 +152,33 @@ export default function AdminDrivers() {
 
   const verifyDriverMutation = useMutation({
     mutationFn: async ({ id, isVerified }: { id: string; isVerified: boolean }) => {
-      return apiRequest('PATCH', `/api/drivers/${id}/verify`, { isVerified });
+      const response = await apiRequest('PATCH', `/api/drivers/${id}/verify`, { isVerified });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(JSON.stringify(errorData));
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
-      toast({ title: 'Driver status updated' });
+      toast({ title: 'Driver status updated successfully' });
     },
-    onError: () => {
-      toast({ title: 'Failed to update driver', variant: 'destructive' });
+    onError: (error: Error) => {
+      try {
+        const errorData = JSON.parse(error.message);
+        if (errorData.details && Array.isArray(errorData.details)) {
+          toast({ 
+            title: 'Cannot activate driver', 
+            description: errorData.details.join('. '),
+            variant: 'destructive',
+            duration: 8000
+          });
+        } else {
+          toast({ title: errorData.error || 'Failed to update driver', variant: 'destructive' });
+        }
+      } catch {
+        toast({ title: 'Failed to update driver', variant: 'destructive' });
+      }
     },
   });
 
@@ -208,6 +228,57 @@ export default function AdminDrivers() {
 
   const getDriverDocuments = (driverId: string) => {
     return documents?.filter((d) => d.driverId === driverId) || [];
+  };
+
+  const getDocumentStatusSummary = (driver: Driver) => {
+    const driverDocs = getDriverDocuments(driver.id);
+    const vehicleType = driver.vehicleType || 'car';
+    
+    const baseRequiredDocs = [
+      'driving_license',
+      'hire_and_reward_insurance',
+      'goods_in_transit_insurance',
+      'proof_of_identity',
+      'proof_of_address',
+    ];
+    
+    const vehiclePhotoRequirements: Record<string, string[]> = {
+      'motorbike': ['vehicle_photo_front', 'vehicle_photo_back'],
+      'car': ['vehicle_photo_front', 'vehicle_photo_back'],
+      'small_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+      'medium_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+    };
+    
+    const requiredPhotos = vehiclePhotoRequirements[vehicleType] || ['vehicle_photo_front', 'vehicle_photo_back'];
+    const allRequiredDocs = [...baseRequiredDocs, ...requiredPhotos];
+    
+    let approved = 0;
+    let pending = 0;
+    let rejected = 0;
+    let missing = 0;
+    
+    for (const docType of allRequiredDocs) {
+      const doc = driverDocs.find(d => d.type === docType);
+      if (!doc) {
+        missing++;
+      } else if (doc.status === 'approved') {
+        approved++;
+      } else if (doc.status === 'pending') {
+        pending++;
+      } else if (doc.status === 'rejected') {
+        rejected++;
+      }
+    }
+    
+    return {
+      total: allRequiredDocs.length,
+      approved,
+      pending,
+      rejected,
+      missing,
+      isComplete: approved === allRequiredDocs.length,
+      needsAttention: pending > 0 || rejected > 0,
+    };
   };
 
   const getDriverInfo = (driver: Driver) => {
@@ -486,8 +557,7 @@ export default function AdminDrivers() {
                   {filteredDrivers.map((driver) => {
                     const info = getDriverInfo(driver);
                     const initials = info.name?.split(' ').map((n) => n[0]).join('') || 'D';
-                    const docCount = getDriverDocuments(driver.id).length;
-                    const pendingDocs = getDriverDocuments(driver.id).filter(d => d.status === 'pending').length;
+                    const docStatus = getDocumentStatusSummary(driver);
                     return (
                       <TableRow key={driver.id} data-testid={`row-driver-${driver.id}`}>
                         <TableCell>
@@ -527,10 +597,32 @@ export default function AdminDrivers() {
                             {driver.isAvailable && (
                               <Badge className="bg-blue-500 text-white w-fit" data-testid={`badge-available-${driver.id}`}>Online</Badge>
                             )}
-                            {pendingDocs > 0 && (
-                              <Badge variant="outline" className="text-yellow-600 border-yellow-600 w-fit">
-                                {pendingDocs} doc pending
+                            {docStatus.isComplete ? (
+                              <Badge className="bg-green-100 text-green-700 border-green-300 w-fit" data-testid={`badge-docs-complete-${driver.id}`}>
+                                <CheckCircle className="mr-1 h-3 w-3" />
+                                Docs Complete
                               </Badge>
+                            ) : (
+                              <>
+                                {docStatus.pending > 0 && (
+                                  <Badge variant="outline" className="text-yellow-600 border-yellow-600 w-fit" data-testid={`badge-docs-pending-${driver.id}`}>
+                                    <Clock className="mr-1 h-3 w-3" />
+                                    {docStatus.pending} pending review
+                                  </Badge>
+                                )}
+                                {docStatus.rejected > 0 && (
+                                  <Badge variant="outline" className="text-red-600 border-red-600 w-fit" data-testid={`badge-docs-rejected-${driver.id}`}>
+                                    <XCircle className="mr-1 h-3 w-3" />
+                                    {docStatus.rejected} rejected
+                                  </Badge>
+                                )}
+                                {docStatus.missing > 0 && (
+                                  <Badge variant="outline" className="text-gray-500 border-gray-400 w-fit" data-testid={`badge-docs-missing-${driver.id}`}>
+                                    <AlertTriangle className="mr-1 h-3 w-3" />
+                                    {docStatus.missing} missing
+                                  </Badge>
+                                )}
+                              </>
                             )}
                           </div>
                         </TableCell>
