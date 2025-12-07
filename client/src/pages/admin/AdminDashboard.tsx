@@ -15,7 +15,7 @@ import { Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import type { Job, Driver, Document } from '@shared/schema';
+import type { Job, Driver, Document, DriverApplication } from '@shared/schema';
 import {
   Package,
   Users,
@@ -105,6 +105,10 @@ export default function AdminDashboard() {
     queryKey: ['/api/documents', { status: 'pending' }],
   });
 
+  const { data: applications } = useQuery<DriverApplication[]>({
+    queryKey: ['/api/driver-applications'],
+  });
+
   const reviewDocumentMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' }) => {
       return apiRequest('PATCH', `/api/documents/${id}/review`, { 
@@ -124,9 +128,24 @@ export default function AdminDashboard() {
   });
 
   const getDriverName = (driverId: string | null) => {
-    if (!driverId || !drivers) return '—';
-    const driver = drivers.find((d) => d.id === driverId);
-    return driver ? driver.vehicleRegistration : driverId;
+    if (!driverId) return '—';
+    
+    // First check registered drivers
+    const driver = drivers?.find(d => d.id === driverId);
+    if (driver?.fullName) return driver.fullName;
+    if (driver?.vehicleRegistration) return driver.vehicleRegistration;
+    
+    // Then check driver applications
+    const application = applications?.find(a => a.id === driverId);
+    if (application?.fullName) return `${application.fullName} (Applicant)`;
+    
+    // Format the ID for display if not found
+    if (driverId.startsWith('application-')) {
+      return `Pending Application`;
+    }
+    
+    // Return formatted driver ID
+    return driverId.length > 20 ? `${driverId.substring(0, 8)}...` : driverId;
   };
 
   const formatPrice = (price: string | number) => {

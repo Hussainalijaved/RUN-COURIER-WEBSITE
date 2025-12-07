@@ -23,7 +23,7 @@ import {
 import { FileText, CheckCircle, XCircle, Clock, Eye, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import type { Document, Driver } from '@shared/schema';
+import type { Document, Driver, DriverApplication } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 
 export default function AdminDocuments() {
@@ -38,6 +38,10 @@ export default function AdminDocuments() {
 
   const { data: drivers } = useQuery<Driver[]>({
     queryKey: ['/api/drivers'],
+  });
+
+  const { data: applications } = useQuery<DriverApplication[]>({
+    queryKey: ['/api/driver-applications'],
   });
 
   const reviewDocumentMutation = useMutation({
@@ -58,7 +62,21 @@ export default function AdminDocuments() {
   });
 
   const getDriverName = (driverId: string) => {
-    return drivers?.find(d => d.id === driverId)?.fullName || 'Unknown Driver';
+    // First check registered drivers
+    const driver = drivers?.find(d => d.id === driverId);
+    if (driver?.fullName) return driver.fullName;
+    
+    // Then check driver applications
+    const application = applications?.find(a => a.id === driverId);
+    if (application?.fullName) return `${application.fullName} (Applicant)`;
+    
+    // Format the ID for display if not found
+    if (driverId.startsWith('application-')) {
+      return `Pending Application`;
+    }
+    
+    // Return formatted driver ID
+    return driverId.length > 20 ? `Driver: ${driverId.substring(0, 8)}...` : `Driver: ${driverId}`;
   };
 
   const getStatusBadge = (status: string) => {
