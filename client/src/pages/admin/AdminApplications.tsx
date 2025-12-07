@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -238,53 +239,68 @@ export default function AdminApplications() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <Card data-testid="stat-pending-applications">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12" />
-                  ) : (
-                    <div className="text-2xl font-bold">{pendingApplications.length}</div>
-                  )}
-                  <p className="text-sm text-muted-foreground">Pending Review</p>
+          <Link href="/admin/applications?status=pending">
+            <Card 
+              className="cursor-pointer transition-all duration-200 hover-elevate" 
+              data-testid="stat-pending-applications"
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12" />
+                    ) : (
+                      <div className="text-2xl font-bold">{pendingApplications.length}</div>
+                    )}
+                    <p className="text-sm text-muted-foreground">Pending Review</p>
+                  </div>
+                  <Clock className="h-8 w-8 text-yellow-500" />
                 </div>
-                <Clock className="h-8 w-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card data-testid="stat-approved-applications">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12" />
-                  ) : (
-                    <div className="text-2xl font-bold">{approvedApplications.length}</div>
-                  )}
-                  <p className="text-sm text-muted-foreground">Approved</p>
+          <Link href="/admin/applications?status=approved">
+            <Card 
+              className="cursor-pointer transition-all duration-200 hover-elevate" 
+              data-testid="stat-approved-applications"
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12" />
+                    ) : (
+                      <div className="text-2xl font-bold">{approvedApplications.length}</div>
+                    )}
+                    <p className="text-sm text-muted-foreground">Approved</p>
+                  </div>
+                  <CheckCircle className="h-8 w-8 text-green-500" />
                 </div>
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card data-testid="stat-rejected-applications">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12" />
-                  ) : (
-                    <div className="text-2xl font-bold">{rejectedApplications.length}</div>
-                  )}
-                  <p className="text-sm text-muted-foreground">Rejected</p>
+          <Link href="/admin/applications?status=rejected">
+            <Card 
+              className="cursor-pointer transition-all duration-200 hover-elevate" 
+              data-testid="stat-rejected-applications"
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12" />
+                    ) : (
+                      <div className="text-2xl font-bold">{rejectedApplications.length}</div>
+                    )}
+                    <p className="text-sm text-muted-foreground">Rejected</p>
+                  </div>
+                  <XCircle className="h-8 w-8 text-red-500" />
                 </div>
-                <XCircle className="h-8 w-8 text-red-500" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         <Card>
