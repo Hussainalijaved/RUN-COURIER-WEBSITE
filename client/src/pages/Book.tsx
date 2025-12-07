@@ -2,13 +2,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -43,7 +51,7 @@ import {
   Lock,
   Calendar
 } from 'lucide-react';
-import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType } from '@shared/schema';
+import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType, type DeliveryContact } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance, calculateETA } from '@/lib/maps';
 
@@ -91,11 +99,86 @@ export default function Book() {
     instructions: string;
   }
   const [multiDropStopDetails, setMultiDropStopDetails] = useState<StopDetails[]>([]);
+  
+  const [selectedContactId, setSelectedContactId] = useState<string>('');
+  const [saveDeliveryContact, setSaveDeliveryContact] = useState(false);
+  const [savedContactLabel, setSavedContactLabel] = useState('');
 
   const { data: userProfile } = useQuery<UserType>({
     queryKey: ['/api/users', user?.id],
     enabled: !!user?.id,
   });
+
+  const isBusinessUser = userProfile?.userType === 'business';
+
+  const { data: savedContacts = [] } = useQuery<DeliveryContact[]>({
+    queryKey: ['/api/delivery-contacts', { customerId: user?.id }],
+    enabled: !!user?.id && isBusinessUser,
+  });
+
+  const saveContactMutation = useMutation({
+    mutationFn: async (contactData: {
+      customerId: string;
+      label: string;
+      recipientName: string;
+      recipientPhone: string;
+      deliveryAddress: string;
+      deliveryPostcode: string;
+      buildingName?: string;
+      deliveryInstructions?: string;
+    }) => {
+      const response = await apiRequest('POST', '/api/delivery-contacts', contactData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/delivery-contacts', { customerId: user?.id }] });
+      toast({
+        title: 'Contact Saved',
+        description: 'Delivery contact saved for future bookings.',
+      });
+    },
+  });
+
+  const handleSelectSavedContact = (contactId: string) => {
+    setSelectedContactId(contactId);
+    if (contactId === 'new') {
+      setDeliveryAddress('');
+      setDeliveryBuildingName('');
+      setRecipientName('');
+      setRecipientPhone('');
+      setDeliveryInstructions('');
+      return;
+    }
+    const contact = savedContacts.find(c => c.id === contactId);
+    if (contact) {
+      setDeliveryAddress(contact.deliveryAddress);
+      setDeliveryBuildingName(contact.buildingName || '');
+      setRecipientName(contact.recipientName);
+      setRecipientPhone(contact.recipientPhone);
+      setDeliveryInstructions(contact.deliveryInstructions || '');
+      form.setValue('deliveryPostcode', contact.deliveryPostcode);
+    }
+  };
+
+  const handleProceedToPayment = async () => {
+    if (saveDeliveryContact && user && savedContactLabel && recipientName && recipientPhone && (deliveryAddress || deliveryFullAddress) && deliveryPostcode) {
+      try {
+        await saveContactMutation.mutateAsync({
+          customerId: user.id,
+          label: savedContactLabel,
+          recipientName,
+          recipientPhone,
+          deliveryAddress: deliveryAddress || deliveryFullAddress,
+          deliveryPostcode,
+          buildingName: deliveryBuildingName || undefined,
+          deliveryInstructions: deliveryInstructions || undefined,
+        });
+      } catch (error) {
+        console.error('Failed to save contact:', error);
+      }
+    }
+    setStep(3);
+  };
 
   const isEligibleForNewCustomerDiscount = !!(
     user && 
@@ -956,7 +1039,35 @@ export default function Book() {
                     </div>
                   </div>
                   <div className="space-y-4">
-                    <h3 className="font-semibold">Delivery Details (Stop 1)</h3>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <h3 className="font-semibold">Delivery Details (Stop 1)</h3>
+                      {isBusinessUser && savedContacts.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          <User className="h-3 w-3 mr-1" />
+                          Business Account
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {isBusinessUser && savedContacts.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Saved Contacts</Label>
+                        <Select value={selectedContactId} onValueChange={handleSelectSavedContact}>
+                          <SelectTrigger data-testid="select-saved-contact">
+                            <SelectValue placeholder="Select a saved contact or enter new" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="new">Enter new details</SelectItem>
+                            {savedContacts.map((contact) => (
+                              <SelectItem key={contact.id} value={contact.id}>
+                                {contact.label} - {contact.recipientName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    
                     <div className="space-y-2">
                       <Label>Full Address</Label>
                       <Input 
@@ -1002,6 +1113,60 @@ export default function Book() {
                         data-testid="input-delivery-instructions" 
                       />
                     </div>
+                    
+                    {isBusinessUser && selectedContactId !== '' && !savedContacts.find(c => c.id === selectedContactId) && (
+                      <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="save-contact" 
+                            checked={saveDeliveryContact}
+                            onCheckedChange={(checked) => setSaveDeliveryContact(checked as boolean)}
+                            data-testid="checkbox-save-contact"
+                          />
+                          <Label htmlFor="save-contact" className="text-sm cursor-pointer">
+                            Save this contact for future bookings
+                          </Label>
+                        </div>
+                        {saveDeliveryContact && (
+                          <div className="space-y-2">
+                            <Label>Contact Label</Label>
+                            <Input 
+                              placeholder="e.g., Head Office, Warehouse A" 
+                              value={savedContactLabel}
+                              onChange={(e) => setSavedContactLabel(e.target.value)}
+                              data-testid="input-contact-label"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {isBusinessUser && savedContacts.length === 0 && (
+                      <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="save-first-contact" 
+                            checked={saveDeliveryContact}
+                            onCheckedChange={(checked) => setSaveDeliveryContact(checked as boolean)}
+                            data-testid="checkbox-save-first-contact"
+                          />
+                          <Label htmlFor="save-first-contact" className="text-sm cursor-pointer">
+                            Save this contact for future bookings
+                          </Label>
+                        </div>
+                        {saveDeliveryContact && (
+                          <div className="space-y-2">
+                            <Label>Contact Label</Label>
+                            <Input 
+                              placeholder="e.g., Head Office, Warehouse A" 
+                              value={savedContactLabel}
+                              onChange={(e) => setSavedContactLabel(e.target.value)}
+                              data-testid="input-first-contact-label"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -1072,9 +1237,22 @@ export default function Book() {
                 )}
                 <div className="flex gap-4">
                   <Button variant="outline" onClick={() => setStep(1)} data-testid="button-back-step1">Back</Button>
-                  <Button onClick={() => setStep(3)} data-testid="button-to-payment">
-                    Continue to Payment
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                  <Button 
+                    onClick={handleProceedToPayment} 
+                    disabled={saveContactMutation.isPending}
+                    data-testid="button-to-payment"
+                  >
+                    {saveContactMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        Continue to Payment
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
