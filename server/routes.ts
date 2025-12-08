@@ -1010,6 +1010,85 @@ export async function registerRoutes(
     res.status(201).json(document);
   }));
 
+  // Profile picture upload endpoint
+  app.post("/api/drivers/:driverId/profile-picture", (req, res, next) => {
+    uploadDocument.single('file')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "File size exceeds 10MB limit" });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: err.message || "Invalid file" });
+      }
+      next();
+    });
+  }, asyncHandler(async (req, res) => {
+    const { driverId } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Validate file is an image
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedImageTypes.includes(file.mimetype)) {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      return res.status(400).json({ error: "Only image files are allowed for profile pictures" });
+    }
+
+    const safeDriverId = sanitizePath(driverId);
+    
+    // Create driver-specific directory
+    const driverDir = path.join(uploadsDir, safeDriverId);
+    if (!fs.existsSync(driverDir)) {
+      fs.mkdirSync(driverDir, { recursive: true });
+    }
+    
+    // Generate final filename
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
+    const finalFilename = `profile_picture_${timestamp}${ext}`;
+    const finalPath = path.join(driverDir, finalFilename);
+    
+    // Move file from temp to final location
+    try {
+      fs.renameSync(file.path, finalPath);
+    } catch (moveError) {
+      fs.copyFileSync(file.path, finalPath);
+      fs.unlinkSync(file.path);
+    }
+    
+    const profilePictureUrl = `/uploads/documents/${safeDriverId}/${finalFilename}`;
+
+    // Update driver profile with profile picture URL in storage
+    await storage.updateDriver(driverId, { profilePictureUrl });
+
+    // Update driver in PostgreSQL database
+    try {
+      const { db } = await import("./db");
+      const { drivers } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.update(drivers).set({
+        profilePictureUrl: profilePictureUrl,
+      }).where(eq(drivers.id, driverId));
+      console.log("Profile picture URL updated in PostgreSQL for driver:", driverId);
+    } catch (e) {
+      console.error("Failed to update profile picture in PostgreSQL:", e);
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      profilePictureUrl,
+      message: "Profile picture uploaded successfully" 
+    });
+  }));
+
   app.patch("/api/documents/:id/review", asyncHandler(async (req, res) => {
     const { status, reviewedBy, reviewNotes } = req.body;
     const reviewedAt = new Date();

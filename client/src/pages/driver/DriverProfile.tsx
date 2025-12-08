@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -40,10 +40,11 @@ import {
   AlertTriangle,
   Wifi,
   WifiOff,
+  Camera,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import {
@@ -77,6 +78,55 @@ export default function DriverProfile() {
   const [vehicleMake, setVehicleMake] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleColor, setVehicleColor] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+
+  const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !driver?.id) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: 'Please upload a valid image file (JPEG, PNG, GIF, or WebP)', variant: 'destructive' });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'File size must be less than 10MB', variant: 'destructive' });
+      return;
+    }
+
+    setIsUploadingPicture(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/drivers/${driver.id}/profile-picture`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload profile picture');
+      }
+
+      toast({ title: 'Profile picture updated successfully' });
+      await queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });
+      await queryClient.refetchQueries({ queryKey: ['supabase', 'driver', user?.id] });
+    } catch (error) {
+      toast({ 
+        title: error instanceof Error ? error.message : 'Failed to upload profile picture', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsUploadingPicture(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const copyDriverId = () => {
     if (driver?.id) {
@@ -190,11 +240,39 @@ export default function DriverProfile() {
             <Card className="border-primary/20">
               <CardHeader className="pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                  <Avatar className="h-20 w-20">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                      {driver?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || user?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'D'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative group">
+                    <Avatar className="h-20 w-20">
+                      {driver?.profilePictureUrl && (
+                        <AvatarImage 
+                          src={driver.profilePictureUrl} 
+                          alt={driver?.fullName || 'Driver'} 
+                        />
+                      )}
+                      <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                        {driver?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || user?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'D'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingPicture}
+                      className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      data-testid="button-upload-profile-picture"
+                    >
+                      {isUploadingPicture ? (
+                        <Loader2 className="h-6 w-6 text-white animate-spin" />
+                      ) : (
+                        <Camera className="h-6 w-6 text-white" />
+                      )}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleProfilePictureUpload}
+                      className="hidden"
+                      data-testid="input-profile-picture"
+                    />
+                  </div>
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <CardTitle className="text-xl">{driver?.fullName || user?.fullName}</CardTitle>

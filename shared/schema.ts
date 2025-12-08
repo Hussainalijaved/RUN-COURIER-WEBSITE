@@ -64,6 +64,7 @@ export const drivers = pgTable("drivers", {
   lastLocationUpdate: timestamp("last_location_update"),
   rating: decimal("rating", { precision: 3, scale: 2 }).default("5.00"),
   totalJobs: integer("total_jobs").default(0),
+  profilePictureUrl: text("profile_picture_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
