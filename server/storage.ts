@@ -23,8 +23,11 @@ import {
   type UserType,
   type UserRole,
   type BookingQuoteInput,
+  driverApplications,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -1246,25 +1249,24 @@ export class MemStorage implements IStorage {
   }
 
   async getDriverApplication(id: string): Promise<DriverApplication | undefined> {
-    return this.driverApplications.get(id);
+    // Use PostgreSQL database for persistence
+    const [application] = await db.select().from(driverApplications).where(eq(driverApplications.id, id));
+    return application;
   }
 
   async getDriverApplicationByEmail(email: string): Promise<DriverApplication | undefined> {
-    return Array.from(this.driverApplications.values()).find(
-      (app) => app.email.toLowerCase() === email.toLowerCase()
-    );
+    // Use PostgreSQL database for persistence
+    const results = await db.select().from(driverApplications);
+    return results.find((app) => app.email.toLowerCase() === email.toLowerCase());
   }
 
   async getDriverApplications(filters?: { status?: DriverApplicationStatus }): Promise<DriverApplication[]> {
-    let applications = Array.from(this.driverApplications.values());
+    // Use PostgreSQL database for persistence
+    let results = await db.select().from(driverApplications).orderBy(desc(driverApplications.submittedAt));
     if (filters?.status) {
-      applications = applications.filter((app) => app.status === filters.status);
+      results = results.filter((app) => app.status === filters.status);
     }
-    return applications.sort((a, b) => {
-      const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-      const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    return results;
   }
 
   async createDriverApplication(application: InsertDriverApplication): Promise<DriverApplication> {
@@ -1272,7 +1274,7 @@ export class MemStorage implements IStorage {
     const newApplication: DriverApplication = {
       id,
       fullName: application.fullName,
-      email: application.email,
+      email: application.email.toLowerCase(),
       phone: application.phone,
       postcode: application.postcode,
       fullAddress: application.fullAddress,
@@ -1299,15 +1301,37 @@ export class MemStorage implements IStorage {
       submittedAt: new Date(),
       reviewedAt: null,
     };
+    
+    console.log('[DriverApplication] Creating application in PostgreSQL:', { 
+      id, 
+      fullName: newApplication.fullName, 
+      fullAddress: newApplication.fullAddress,
+      postcode: newApplication.postcode 
+    });
+    
+    // Insert into PostgreSQL database
+    await db.insert(driverApplications).values(newApplication);
+    
+    // Also keep in memory for backwards compatibility
     this.driverApplications.set(id, newApplication);
     return newApplication;
   }
 
   async updateDriverApplication(id: string, data: Partial<DriverApplication>): Promise<DriverApplication | undefined> {
-    const application = this.driverApplications.get(id);
-    if (!application) return undefined;
-    const updated = { ...application, ...data };
-    this.driverApplications.set(id, updated);
+    // Check PostgreSQL database first
+    const [existing] = await db.select().from(driverApplications).where(eq(driverApplications.id, id));
+    if (!existing) return undefined;
+    
+    // Update in PostgreSQL
+    await db.update(driverApplications).set(data).where(eq(driverApplications.id, id));
+    
+    // Fetch updated record
+    const [updated] = await db.select().from(driverApplications).where(eq(driverApplications.id, id));
+    
+    // Also update in-memory cache
+    if (updated) {
+      this.driverApplications.set(id, updated);
+    }
     return updated;
   }
 
@@ -1318,17 +1342,28 @@ export class MemStorage implements IStorage {
     reviewNotes?: string, 
     rejectionReason?: string
   ): Promise<DriverApplication | undefined> {
-    const application = this.driverApplications.get(id);
-    if (!application) return undefined;
-    const updated: DriverApplication = {
-      ...application,
+    // Check PostgreSQL database first
+    const [existing] = await db.select().from(driverApplications).where(eq(driverApplications.id, id));
+    if (!existing) return undefined;
+    
+    const updateData = {
       status,
       reviewedBy,
       reviewNotes: reviewNotes || null,
       rejectionReason: status === "rejected" ? rejectionReason || null : null,
       reviewedAt: new Date(),
     };
-    this.driverApplications.set(id, updated);
+    
+    // Update in PostgreSQL
+    await db.update(driverApplications).set(updateData).where(eq(driverApplications.id, id));
+    
+    // Fetch updated record
+    const [updated] = await db.select().from(driverApplications).where(eq(driverApplications.id, id));
+    
+    // Also update in-memory cache
+    if (updated) {
+      this.driverApplications.set(id, updated);
+    }
     return updated;
   }
 
