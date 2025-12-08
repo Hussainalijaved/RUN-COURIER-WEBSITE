@@ -1065,6 +1065,79 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Document not found" });
     }
     
+    // If document was approved, check if all required documents are now approved
+    // and automatically verify the driver if so
+    if (status === 'approved' && document.driverId) {
+      try {
+        const { db } = await import("./db");
+        const { documents: documentsTable, drivers: driversTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        
+        // Get driver to check vehicle type - try memory first, then PostgreSQL
+        let driver = await storage.getDriver(document.driverId);
+        if (!driver) {
+          // Try fetching from PostgreSQL directly
+          const [dbDriver] = await db.select().from(driversTable).where(eq(driversTable.id, document.driverId));
+          driver = dbDriver;
+        }
+        
+        if (driver && !driver.isVerified) {
+          const vehicleType = driver.vehicleType || 'car';
+          
+          // Define required document types based on vehicle type
+          const baseRequiredDocs = [
+            'driving_license',
+            'hire_and_reward_insurance',
+            'goods_in_transit_insurance',
+            'proof_of_identity',
+            'proof_of_address',
+          ];
+          
+          // Define vehicle photo requirements based on vehicle type
+          const vehiclePhotoRequirements: Record<string, string[]> = {
+            'motorbike': ['vehicle_photo_front', 'vehicle_photo_back'],
+            'car': ['vehicle_photo_front', 'vehicle_photo_back'],
+            'small_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+            'medium_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+          };
+          
+          const requiredPhotos = vehiclePhotoRequirements[vehicleType] || ['vehicle_photo_front', 'vehicle_photo_back'];
+          const allRequiredDocs = [...baseRequiredDocs, ...requiredPhotos];
+          
+          // Fetch all driver's documents
+          const driverDocuments = await db.select().from(documentsTable)
+            .where(eq(documentsTable.driverId, document.driverId));
+          
+          // Check if all required documents are approved
+          const allApproved = allRequiredDocs.every(docType => {
+            const doc = driverDocuments.find((d: any) => d.type === docType);
+            return doc && doc.status === 'approved';
+          });
+          
+          if (allApproved) {
+            // Automatically verify the driver - PostgreSQL is source of truth
+            const [updatedDriver] = await db.update(driversTable).set({
+              isVerified: true,
+            }).where(eq(driversTable.id, document.driverId)).returning();
+            
+            if (updatedDriver) {
+              // Also try to update in-memory storage for consistency
+              try {
+                await storage.verifyDriver(document.driverId, true);
+              } catch (memError) {
+                // Memory update failed, but PostgreSQL update succeeded - this is OK
+                console.log(`Driver ${document.driverId} verified in database (memory sync skipped)`);
+              }
+              
+              console.log(`Driver ${document.driverId} automatically verified - all documents approved`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to auto-verify driver after document approval:", e);
+      }
+    }
+    
     res.json(document);
   }));
 
