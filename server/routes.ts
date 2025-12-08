@@ -1588,6 +1588,153 @@ export async function registerRoutes(
     });
   }));
 
+  // Create Payment Intent for embedded checkout (no redirect)
+  app.post("/api/booking/create-payment-intent", asyncHandler(async (req, res) => {
+    const bookingData: BookingData = req.body;
+    
+    if (!bookingData.pickupPostcode || !bookingData.deliveryPostcode || !bookingData.vehicleType) {
+      return res.status(400).json({ error: "Missing required booking information" });
+    }
+
+    if (!bookingData.customerEmail && !bookingData.pickupPhone) {
+      return res.status(400).json({ error: "Customer email or phone is required" });
+    }
+
+    const customerEmail = bookingData.customerEmail || `${bookingData.pickupPhone}@guest.runcourier.co.uk`;
+    const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+    
+    // Create or retrieve customer
+    let customerId: string;
+    const existingCustomers = await stripe.customers.list({ email: customerEmail, limit: 1 });
+    if (existingCustomers.data.length > 0) {
+      customerId = existingCustomers.data[0].id;
+    } else {
+      const newCustomer = await stripe.customers.create({
+        email: customerEmail,
+        name: bookingData.pickupName,
+        metadata: { 
+          userId: bookingData.customerId || 'guest',
+          phone: bookingData.pickupPhone 
+        },
+      });
+      customerId = newCustomer.id;
+    }
+
+    const vehicleName = bookingData.vehicleType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const description = `Run Courier Delivery - ${vehicleName} - ${bookingData.pickupPostcode} to ${bookingData.deliveryPostcode}`;
+
+    const metadataForStripe: Record<string, string> = {
+      bookingType: 'courier_delivery',
+      pickupPostcode: bookingData.pickupPostcode,
+      pickupAddress: (bookingData.pickupAddress || '').substring(0, 500),
+      pickupBuildingName: (bookingData.pickupBuildingName || '').substring(0, 100),
+      pickupName: (bookingData.pickupName || '').substring(0, 100),
+      pickupPhone: bookingData.pickupPhone || '',
+      pickupInstructions: (bookingData.pickupInstructions || '').substring(0, 200),
+      deliveryPostcode: bookingData.deliveryPostcode,
+      deliveryAddress: (bookingData.deliveryAddress || '').substring(0, 500),
+      deliveryBuildingName: (bookingData.deliveryBuildingName || '').substring(0, 100),
+      recipientName: (bookingData.recipientName || '').substring(0, 100),
+      recipientPhone: bookingData.recipientPhone || '',
+      deliveryInstructions: (bookingData.deliveryInstructions || '').substring(0, 200),
+      vehicleType: bookingData.vehicleType,
+      weight: String(bookingData.weight || 1),
+      totalPrice: String(bookingData.totalPrice),
+      distance: String(bookingData.distance || 0),
+      estimatedTime: String(bookingData.estimatedTime || 0),
+      isMultiDrop: String(bookingData.isMultiDrop || false),
+      isReturnTrip: String(bookingData.isReturnTrip || false),
+      customerId: bookingData.customerId || '',
+      customerEmail: customerEmail,
+    };
+
+    // Create Payment Intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(bookingData.totalPrice * 100),
+      currency: 'gbp',
+      customer: customerId,
+      description,
+      metadata: metadataForStripe,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    res.json({ 
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      customerId 
+    });
+  }));
+
+  // Confirm payment and create job after successful embedded payment
+  app.post("/api/booking/confirm-embedded-payment", asyncHandler(async (req, res) => {
+    const { paymentIntentId, bookingData } = req.body;
+    
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: "Payment Intent ID is required" });
+    }
+
+    const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ error: "Payment not completed", status: paymentIntent.status });
+    }
+
+    const metadata = paymentIntent.metadata || bookingData || {};
+    const trackingNumber = generateTrackingNumber();
+    const totalPrice = parseFloat(metadata.totalPrice) || (paymentIntent.amount / 100);
+    const basePrice = totalPrice * 0.3;
+    const distancePrice = totalPrice * 0.7;
+
+    const jobData = {
+      trackingNumber,
+      pickupPostcode: metadata.pickupPostcode || '',
+      pickupAddress: metadata.pickupAddress || '',
+      pickupBuildingName: metadata.pickupBuildingName || '',
+      pickupContactName: metadata.pickupName || '',
+      pickupContactPhone: metadata.pickupPhone || '',
+      pickupInstructions: metadata.pickupInstructions || null,
+      deliveryPostcode: metadata.deliveryPostcode || '',
+      deliveryAddress: metadata.deliveryAddress || '',
+      deliveryBuildingName: metadata.deliveryBuildingName || '',
+      recipientName: metadata.recipientName || '',
+      recipientPhone: metadata.recipientPhone || '',
+      deliveryInstructions: metadata.deliveryInstructions || null,
+      vehicleType: (metadata.vehicleType || 'car') as VehicleType,
+      weight: metadata.weight || '1',
+      basePrice: String(basePrice),
+      distancePrice: String(distancePrice),
+      totalPrice: String(totalPrice),
+      distance: metadata.distance || '0',
+      customerId: metadata.customerId || null,
+      customerEmail: metadata.customerEmail || '',
+      paymentStatus: 'paid',
+      stripePaymentIntentId: paymentIntentId,
+      status: 'pending' as JobStatus,
+      isMultiDrop: metadata.isMultiDrop === 'true',
+      isReturnTrip: metadata.isReturnTrip === 'true',
+      scheduledPickupTime: metadata.scheduledPickupTime ? new Date(metadata.scheduledPickupTime) : null,
+      scheduledDeliveryTime: metadata.scheduledDeliveryTime ? new Date(metadata.scheduledDeliveryTime) : null,
+      isScheduled: !!metadata.scheduledPickupTime,
+    };
+
+    const job = await storage.createJob(jobData);
+    
+    if (metadata.customerId) {
+      await storage.incrementCompletedBookings(metadata.customerId);
+    }
+    
+    console.log(`[Embedded Payment] Created job ${trackingNumber} with payment ${paymentIntentId}`);
+
+    res.json({ 
+      success: true, 
+      trackingNumber: job.trackingNumber,
+      jobId: job.id
+    });
+  }));
+
   app.post("/api/booking/checkout", asyncHandler(async (req, res) => {
     const bookingData: BookingData = req.body;
     
