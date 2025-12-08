@@ -1733,9 +1733,7 @@ export async function registerRoutes(
       console.log(`[Job Assignment] Driver accepted - Job ${assignment.jobId} status updated to 'accepted'`);
     } else if (!accepted) {
       // Driver declined - reset job status to "pending" so it can be reassigned
-      await storage.updateJobStatus(assignment.jobId, "pending" as any);
-      // Also unassign the driver from the job
-      await storage.assignDriver(assignment.jobId, null);
+      await storage.updateJob(assignment.jobId, { status: "pending", driverId: null });
       console.log(`[Job Assignment] Driver declined - Job ${assignment.jobId} status reset to 'pending'`);
     }
 
@@ -1764,6 +1762,10 @@ export async function registerRoutes(
     }
 
     const cancelled = await storage.cancelJobAssignment(req.params.id, reason);
+
+    // Reset job status to "pending" so it can be reassigned
+    await storage.updateJob(assignment.jobId, { status: "pending", driverId: null });
+    console.log(`[Job Assignment] Assignment cancelled - Job ${assignment.jobId} status reset to 'pending'`);
 
     // Notify driver of cancellation
     const driver = await storage.getDriver(assignment.driverId);
