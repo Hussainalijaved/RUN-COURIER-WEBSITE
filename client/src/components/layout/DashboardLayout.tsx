@@ -235,7 +235,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
           </header>
 
-          <main className="flex-1 overflow-auto bg-background p-3 sm:p-4 lg:p-6">
+          <main className="flex-1 overflow-auto bg-background p-3 sm:p-4 lg:p-6" data-scroll-container>
             {children}
           </main>
         </div>

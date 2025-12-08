@@ -11,7 +11,20 @@ function ScrollToTop() {
   const [location] = useLocation();
   
   useEffect(() => {
+    // Scroll the window to top
     window.scrollTo(0, 0);
+    
+    // Also scroll any dashboard/layout content containers to top
+    const scrollContainers = document.querySelectorAll('[data-scroll-container]');
+    scrollContainers.forEach(container => {
+      container.scrollTop = 0;
+    });
+    
+    // Fallback: scroll main elements with overflow-auto
+    const mainElements = document.querySelectorAll('main');
+    mainElements.forEach(main => {
+      main.scrollTop = 0;
+    });
   }, [location]);
   
   return null;
