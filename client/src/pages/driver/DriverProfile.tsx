@@ -319,14 +319,19 @@ export default function DriverProfile() {
                       <User className="h-4 w-4 text-primary" />
                       <span className="text-sm text-muted-foreground">Driver ID:</span>
                       <code className="font-mono text-sm font-semibold text-primary" data-testid="text-driver-id">
-                        {driver?.id || 'Not assigned'}
+                        {driver?.driverCode || 'Not assigned'}
                       </code>
-                      {driver?.id && (
+                      {driver?.driverCode && (
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           className="h-6 w-6 ml-auto"
-                          onClick={copyDriverId}
+                          onClick={() => {
+                            if (driver?.driverCode) {
+                              navigator.clipboard.writeText(driver.driverCode);
+                              toast({ title: 'Driver ID copied to clipboard' });
+                            }
+                          }}
                           data-testid="button-copy-driver-id"
                         >
                           <Copy className="h-3 w-3" />
