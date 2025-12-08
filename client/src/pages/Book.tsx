@@ -54,6 +54,7 @@ import {
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType, type DeliveryContact } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance, calculateETA } from '@/lib/maps';
+import { EmbeddedPayment } from '@/components/EmbeddedPayment';
 
 const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: number }[] = [
   { type: 'motorbike', icon: Bike, name: 'Motorbike', maxWeight: 5 },
@@ -71,6 +72,8 @@ export default function Book() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
+  const [showEmbeddedPayment, setShowEmbeddedPayment] = useState(false);
+  const [pendingBookingData, setPendingBookingData] = useState<any>(null);
   const [distance, setDistance] = useState<number>(0);
   const [estimatedTime, setEstimatedTime] = useState<number>(0);
   const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
@@ -1477,23 +1480,9 @@ export default function Book() {
                           
                           setLocation(`/payment/success?tracking=${result.trackingNumber}&payLater=true`);
                         } else {
-                          const response = await fetch('/api/booking/checkout', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(bookingData),
-                          });
-
-                          const result = await response.json();
-
-                          if (!response.ok) {
-                            throw new Error(result.error || 'Failed to create checkout session');
-                          }
-
-                          if (result.url) {
-                            window.location.href = result.url;
-                          } else {
-                            throw new Error('No checkout URL received');
-                          }
+                          setPendingBookingData(bookingData);
+                          setShowEmbeddedPayment(true);
+                          setIsProcessingPayment(false);
                         }
                       } catch (error: any) {
                         console.error('Booking error:', error);
@@ -1526,6 +1515,37 @@ export default function Book() {
                     )}
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Embedded Payment Step */}
+          {showEmbeddedPayment && pendingBookingData && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Secure Payment
+                </CardTitle>
+                <CardDescription>
+                  Complete your booking by entering your payment details below
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EmbeddedPayment
+                  bookingData={pendingBookingData}
+                  onSuccess={(trackingNumber, jobId) => {
+                    toast({
+                      title: 'Payment Successful!',
+                      description: `Your booking has been confirmed. Tracking number: ${trackingNumber}`,
+                    });
+                    setLocation(`/payment/success?tracking=${trackingNumber}`);
+                  }}
+                  onCancel={() => {
+                    setShowEmbeddedPayment(false);
+                    setPendingBookingData(null);
+                  }}
+                />
               </CardContent>
             </Card>
           )}

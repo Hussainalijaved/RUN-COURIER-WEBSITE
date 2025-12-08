@@ -1708,7 +1708,7 @@ export async function registerRoutes(
       distancePrice: String(distancePrice),
       totalPrice: String(totalPrice),
       distance: metadata.distance || '0',
-      customerId: metadata.customerId || null,
+      customerId: metadata.customerId || '',
       customerEmail: metadata.customerEmail || '',
       paymentStatus: 'paid',
       stripePaymentIntentId: paymentIntentId,
