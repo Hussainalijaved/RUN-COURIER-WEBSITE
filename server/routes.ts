@@ -652,34 +652,10 @@ export async function registerRoutes(
           localDriverMap.set(user.id, localDriver);
         }
 
-        // If no code in Supabase yet, save the generated code permanently using upsert
+        // Driver codes are stored in our PostgreSQL database (via Drizzle), not in Supabase
+        // Use the local driver code for display purposes
         if (!driverCode && localDriver?.driverCode) {
           driverCode = localDriver.driverCode;
-          
-          // Use upsert with onConflict to prevent race conditions
-          // This ensures the driver_code is only set if not already present
-          const { error: upsertError } = await supabaseAdmin
-            .from('drivers')
-            .upsert({
-              id: supabaseDriver?.id || user.id,
-              user_id: user.id,
-              driver_code: driverCode,
-              full_name: user.user_metadata?.fullName || user.user_metadata?.full_name || null,
-              email: user.email || null,
-              phone: user.user_metadata?.phone || null,
-              vehicle_type: localDriver.vehicleType || 'car',
-              is_available: localDriver.isAvailable || false,
-              is_verified: localDriver.isVerified || false,
-            }, { 
-              onConflict: 'user_id',
-              ignoreDuplicates: false 
-            });
-
-          if (upsertError) {
-            console.error(`Error upserting driver ${user.id}:`, upsertError);
-          } else {
-            console.log(`Saved permanent driver code ${driverCode} to Supabase for user ${user.id}`);
-          }
         }
 
         driverUsers.push({
