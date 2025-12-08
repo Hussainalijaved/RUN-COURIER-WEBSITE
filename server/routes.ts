@@ -330,6 +330,19 @@ export async function registerRoutes(
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
+    
+    // Sync availability update to PostgreSQL/Supabase
+    try {
+      const { db } = await import("./db");
+      const { drivers } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.update(drivers).set({ isAvailable }).where(eq(drivers.id, req.params.id));
+      console.log("Driver availability synced to PostgreSQL:", req.params.id, isAvailable);
+    } catch (e) {
+      console.error("Failed to sync driver availability to PostgreSQL:", e);
+    }
+    
     res.json(driver);
   }));
 

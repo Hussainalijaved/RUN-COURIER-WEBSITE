@@ -183,9 +183,10 @@ export default function DriverProfile() {
     mutationFn: async (newState: boolean) => {
       return apiRequest('PATCH', `/api/drivers/${driver?.id}/availability`, { isAvailable: newState });
     },
-    onSuccess: (data, newState) => {
+    onSuccess: async (data, newState) => {
       setIsAvailable(newState);
-      queryClient.invalidateQueries({ queryKey: ['supabase', 'driver'] });
+      await queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });
+      await queryClient.refetchQueries({ queryKey: ['supabase', 'driver', user?.id] });
       toast({ title: newState ? 'You are now online' : 'You are now offline' });
     },
     onError: () => {
