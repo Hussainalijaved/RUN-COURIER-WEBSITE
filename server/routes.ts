@@ -200,7 +200,52 @@ export async function registerRoutes(
   }));
 
   app.get("/api/drivers/user/:userId", asyncHandler(async (req, res) => {
-    let driver = await storage.getDriverByUserId(req.params.userId);
+    const userId = req.params.userId;
+    
+    // First check PostgreSQL for existing driver (permanent storage with permanent driverCode)
+    let dbDriver = null;
+    try {
+      const { db } = await import("./db");
+      const { drivers: driversTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const result = await db.select().from(driversTable).where(eq(driversTable.userId, userId)).limit(1);
+      if (result.length > 0) {
+        dbDriver = result[0];
+        console.log(`Found existing driver in PostgreSQL: ${dbDriver.id} with code ${dbDriver.driverCode}`);
+      }
+    } catch (e) {
+      console.error("Error checking PostgreSQL for driver:", e);
+    }
+    
+    // If found in PostgreSQL, return that (with permanent driverCode)
+    if (dbDriver) {
+      // Ensure in-memory storage is synced with PostgreSQL data
+      const memDriver = await storage.getDriverByUserId(userId);
+      if (!memDriver) {
+        // Load from PostgreSQL into memory
+        await storage.createDriver({
+          userId: dbDriver.userId,
+          driverCode: dbDriver.driverCode, // Use the permanent code from DB
+          fullName: dbDriver.fullName,
+          email: dbDriver.email,
+          phone: dbDriver.phone,
+          vehicleType: dbDriver.vehicleType || "car",
+          vehicleRegistration: dbDriver.vehicleRegistration,
+          vehicleMake: dbDriver.vehicleMake,
+          vehicleModel: dbDriver.vehicleModel,
+          vehicleColor: dbDriver.vehicleColor,
+          isAvailable: dbDriver.isAvailable ?? false,
+          isVerified: dbDriver.isVerified ?? false,
+          rating: dbDriver.rating ?? "5.00",
+          totalJobs: dbDriver.totalJobs ?? 0,
+        });
+      }
+      return res.json(dbDriver);
+    }
+    
+    // Check in-memory storage
+    let driver = await storage.getDriverByUserId(userId);
     if (!driver) {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       let fullName: string | null = null;
@@ -209,7 +254,7 @@ export async function registerRoutes(
       
       if (supabaseAdmin) {
         try {
-          const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(req.params.userId);
+          const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(userId);
           if (!error && user) {
             fullName = user.user_metadata?.fullName || user.user_metadata?.full_name || null;
             email = user.email || null;
@@ -221,7 +266,7 @@ export async function registerRoutes(
       }
       
       driver = await storage.createDriver({
-        userId: req.params.userId,
+        userId: userId,
         fullName,
         email,
         phone,
@@ -238,7 +283,7 @@ export async function registerRoutes(
         totalJobs: 0,
       });
       
-      // Insert into PostgreSQL database directly via Drizzle ORM (bypassing Supabase REST API schema cache)
+      // Save new driver to PostgreSQL with permanent driverCode
       if (driver) {
         try {
           const { db } = await import("./db");
@@ -264,7 +309,6 @@ export async function registerRoutes(
           }).onConflictDoUpdate({
             target: drivers.id,
             set: {
-              driverCode: driver.driverCode,
               fullName: driver.fullName,
               email: driver.email,
               phone: driver.phone,
@@ -272,7 +316,7 @@ export async function registerRoutes(
             }
           });
           
-          console.log("Driver successfully inserted/updated in PostgreSQL:", driver.id);
+          console.log("New driver saved to PostgreSQL:", driver.id, "with permanent code:", driver.driverCode);
         } catch (e) {
           console.error("Failed to insert driver into PostgreSQL:", e);
         }
