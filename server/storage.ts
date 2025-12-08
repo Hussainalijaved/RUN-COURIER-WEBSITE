@@ -1565,9 +1565,12 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newPayment: DriverPayment = {
       id,
-      ...payment,
+      driverId: payment.driverId,
+      jobId: payment.jobId || null,
+      amount: payment.amount,
       platformFee: payment.platformFee || "0.00",
-      status: payment.status || "pending",
+      netAmount: payment.netAmount,
+      status: (payment.status || "pending") as DriverPaymentStatus,
       payoutReference: payment.payoutReference || null,
       description: payment.description || null,
       jobTrackingNumber: payment.jobTrackingNumber || null,

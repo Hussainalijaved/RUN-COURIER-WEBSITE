@@ -1255,6 +1255,43 @@ export async function registerRoutes(
     res.json(stats);
   }));
 
+  // Driver Payments Routes
+  app.get("/api/driver-payments", asyncHandler(async (req, res) => {
+    const { driverId, status, jobId } = req.query;
+    const payments = await storage.getDriverPayments({
+      driverId: driverId as string | undefined,
+      status: status as any,
+      jobId: jobId as string | undefined,
+    });
+    res.json(payments);
+  }));
+
+  app.get("/api/driver-payments/stats/:driverId", asyncHandler(async (req, res) => {
+    const stats = await storage.getDriverPaymentStats(req.params.driverId);
+    res.json(stats);
+  }));
+
+  app.get("/api/driver-payments/:id", asyncHandler(async (req, res) => {
+    const payment = await storage.getDriverPayment(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: "Payment not found" });
+    }
+    res.json(payment);
+  }));
+
+  app.post("/api/driver-payments", asyncHandler(async (req, res) => {
+    const payment = await storage.createDriverPayment(req.body);
+    res.status(201).json(payment);
+  }));
+
+  app.patch("/api/driver-payments/:id", asyncHandler(async (req, res) => {
+    const payment = await storage.updateDriverPayment(req.params.id, req.body);
+    if (!payment) {
+      return res.status(404).json({ error: "Payment not found" });
+    }
+    res.json(payment);
+  }));
+
   app.get("/api/stripe/config", asyncHandler(async (req, res) => {
     try {
       const publishableKey = await getStripePublishableKey();
