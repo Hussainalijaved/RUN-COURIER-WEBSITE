@@ -19,6 +19,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+import {
   Package,
   MapPin,
   ArrowRight,
@@ -99,6 +106,8 @@ export default function DriverJobs() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobDeclineReason, setJobDeclineReason] = useState<string>('');
   const [jobCustomReason, setJobCustomReason] = useState('');
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<Job | null>(null);
   const prevAssignedCountRef = useRef<number>(0);
   const prevPendingCountRef = useRef<number>(0);
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.8 });
@@ -256,6 +265,11 @@ export default function DriverJobs() {
         },
       }
     );
+  };
+
+  const handleViewDetails = (job: Job) => {
+    setSelectedJobForDetails(job);
+    setViewDetailsOpen(true);
   };
 
   const activeJobs = myJobs?.filter((j) => !['delivered', 'cancelled', 'assigned', 'pending'].includes(j.status)) || [];
@@ -483,7 +497,12 @@ export default function DriverJobs() {
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-primary text-lg">{formatPrice(getDriverPayment(job))}</div>
-                        <Button size="sm" className="mt-2" data-testid={`button-view-job-${job.id}`}>
+                        <Button 
+                          size="sm" 
+                          className="mt-2" 
+                          onClick={() => handleViewDetails(job)}
+                          data-testid={`button-view-job-${job.id}`}
+                        >
                           View Details
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
@@ -663,6 +682,134 @@ export default function DriverJobs() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Job Details Dialog */}
+      <Dialog open={viewDetailsOpen} onOpenChange={setViewDetailsOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Job Details
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedJobForDetails && (
+            <div className="space-y-4">
+              {/* Status & Tracking */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Tracking #</span>
+                <span className="font-mono font-medium">{selectedJobForDetails.trackingNumber}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status</span>
+                {getStatusBadge(selectedJobForDetails.status)}
+              </div>
+              
+              <Separator />
+              
+              {/* Pickup Details */}
+              <div>
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-green-600" />
+                  Pickup
+                </h4>
+                <div className="bg-muted/50 p-3 rounded-md space-y-1">
+                  <p className="font-medium">{selectedJobForDetails.pickupContactName || 'N/A'}</p>
+                  <p className="text-sm">{selectedJobForDetails.pickupAddress}</p>
+                  {selectedJobForDetails.pickupPostcode && (
+                    <p className="text-sm font-mono">{selectedJobForDetails.pickupPostcode}</p>
+                  )}
+                  {selectedJobForDetails.pickupPhone && (
+                    <p className="text-sm text-muted-foreground">{selectedJobForDetails.pickupPhone}</p>
+                  )}
+                  {selectedJobForDetails.pickupInstructions && (
+                    <p className="text-sm text-muted-foreground italic mt-2">
+                      Note: {selectedJobForDetails.pickupInstructions}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Delivery Details */}
+              <div>
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-red-600" />
+                  Delivery
+                </h4>
+                <div className="bg-muted/50 p-3 rounded-md space-y-1">
+                  <p className="font-medium">{selectedJobForDetails.deliveryContactName || 'N/A'}</p>
+                  <p className="text-sm">{selectedJobForDetails.deliveryAddress}</p>
+                  {selectedJobForDetails.deliveryPostcode && (
+                    <p className="text-sm font-mono">{selectedJobForDetails.deliveryPostcode}</p>
+                  )}
+                  {selectedJobForDetails.deliveryPhone && (
+                    <p className="text-sm text-muted-foreground">{selectedJobForDetails.deliveryPhone}</p>
+                  )}
+                  {selectedJobForDetails.deliveryInstructions && (
+                    <p className="text-sm text-muted-foreground italic mt-2">
+                      Note: {selectedJobForDetails.deliveryInstructions}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              <Separator />
+              
+              {/* Package Details */}
+              <div>
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Package Information
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Distance</span>
+                    <p className="font-medium">{selectedJobForDetails.distance} miles</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Weight</span>
+                    <p className="font-medium">{selectedJobForDetails.weight} kg</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Vehicle</span>
+                    <p className="font-medium capitalize">{selectedJobForDetails.vehicleType?.replace(/_/g, ' ')}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Urgency</span>
+                    <p className="font-medium capitalize">{selectedJobForDetails.urgency}</p>
+                  </div>
+                </div>
+                {selectedJobForDetails.packageDescription && (
+                  <div className="mt-3">
+                    <span className="text-sm text-muted-foreground">Description</span>
+                    <p className="text-sm">{selectedJobForDetails.packageDescription}</p>
+                  </div>
+                )}
+              </div>
+              
+              <Separator />
+              
+              {/* Payment */}
+              <div className="flex items-center justify-between bg-primary/5 p-3 rounded-md">
+                <span className="font-medium">Your Payment</span>
+                <span className="text-xl font-bold text-primary">
+                  {formatPrice(getDriverPayment(selectedJobForDetails))}
+                </span>
+              </div>
+              
+              {/* Close Button */}
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => setViewDetailsOpen(false)}
+                data-testid="button-close-details"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
