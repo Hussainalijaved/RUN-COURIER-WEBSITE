@@ -1964,7 +1964,7 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/job-assignments/:id/respond", asyncHandler(async (req, res) => {
-    const { accepted } = req.body;
+    const { accepted, rejectionReason } = req.body;
     
     if (accepted === undefined) {
       return res.status(400).json({ error: "Response (accepted) is required" });
@@ -1983,6 +1983,7 @@ export async function registerRoutes(
     const updated = await storage.updateJobAssignment(req.params.id, {
       status: newStatus,
       respondedAt: new Date(),
+      rejectionReason: !accepted ? (rejectionReason || null) : null,
     });
 
     // If accepted, assign the driver to the job and update status to "accepted"
@@ -1995,16 +1996,18 @@ export async function registerRoutes(
     } else if (!accepted) {
       // Driver declined - reset job status to "pending" so it can be reassigned
       await storage.updateJob(assignment.jobId, { status: "pending", driverId: null });
-      console.log(`[Job Assignment] Driver declined - Job ${assignment.jobId} status reset to 'pending'`);
+      const reasonText = rejectionReason ? ` Reason: ${rejectionReason}` : '';
+      console.log(`[Job Assignment] Driver declined - Job ${assignment.jobId} status reset to 'pending'.${reasonText}`);
     }
 
-    // Notify admin of response
+    // Notify admin of response with rejection reason if applicable
+    const reasonMessage = !accepted && rejectionReason ? `\nReason: ${rejectionReason}` : '';
     await storage.createNotification({
       userId: assignment.assignedBy,
       title: `Job Assignment ${accepted ? "Accepted" : "Rejected"}`,
-      message: `Driver has ${accepted ? "accepted" : "rejected"} the job assignment for job ${assignment.jobId}`,
+      message: `Driver has ${accepted ? "accepted" : "rejected"} the job assignment for job ${assignment.jobId}${reasonMessage}`,
       type: "assignment_response",
-      data: { assignmentId: assignment.id, jobId: assignment.jobId },
+      data: { assignmentId: assignment.id, jobId: assignment.jobId, rejectionReason: rejectionReason || null },
     });
 
     res.json(updated);

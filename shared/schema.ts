@@ -291,6 +291,7 @@ export const jobAssignments = pgTable("job_assignments", {
   respondedAt: timestamp("responded_at"),
   cancelledAt: timestamp("cancelled_at"),
   cancellationReason: text("cancellation_reason"),
+  rejectionReason: text("rejection_reason"),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

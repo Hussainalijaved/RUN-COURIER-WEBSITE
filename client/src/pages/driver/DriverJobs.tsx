@@ -5,6 +5,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Package,
   MapPin,
@@ -13,6 +26,7 @@ import {
   CheckCircle,
   Volume2,
   VolumeX,
+  XCircle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
@@ -24,6 +38,15 @@ import {
   useRespondToAssignment,
 } from '@/hooks/useSupabaseDriver';
 import type { JobStatus, Job } from '@shared/schema';
+
+const REJECTION_REASONS = [
+  'Too far from pickup location',
+  'Vehicle not suitable for this job',
+  'Already on another delivery',
+  'Not available at the scheduled time',
+  'Personal emergency',
+  'Other (please specify)',
+];
 
 const formatPrice = (price: string | number) => {
   const num = typeof price === 'string' ? parseFloat(price) : price;
@@ -66,6 +89,10 @@ const getStatusBadge = (status: JobStatus) => {
 export default function DriverJobs() {
   const { toast } = useToast();
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string>('');
+  const [customReason, setCustomReason] = useState('');
   const prevAssignedCountRef = useRef<number>(0);
   const prevPendingCountRef = useRef<number>(0);
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.8 });

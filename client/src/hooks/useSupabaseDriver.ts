@@ -372,11 +372,11 @@ export function useRespondToAssignment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ assignmentId, accepted }: { assignmentId: string; accepted: boolean }) => {
+    mutationFn: async ({ assignmentId, accepted, rejectionReason }: { assignmentId: string; accepted: boolean; rejectionReason?: string }) => {
       const response = await fetch(`/api/job-assignments/${assignmentId}/respond`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accepted }),
+        body: JSON.stringify({ accepted, rejectionReason }),
       });
 
       if (!response.ok) {
