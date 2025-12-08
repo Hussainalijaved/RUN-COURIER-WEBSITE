@@ -1,10 +1,12 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import {
   FileText,
@@ -19,6 +21,7 @@ import {
   User,
   Package,
   Loader2,
+  Calendar,
 } from 'lucide-react';
 import {
   useDriver,
@@ -35,6 +38,7 @@ const baseDocumentTypes = [
     required: true,
     vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
     isVehiclePhoto: false,
+    requiresExpiryDate: false,
   },
   {
     type: 'hire_and_reward_insurance',
@@ -44,6 +48,7 @@ const baseDocumentTypes = [
     required: true,
     vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
     isVehiclePhoto: false,
+    requiresExpiryDate: true,
   },
   {
     type: 'goods_in_transit_insurance',
@@ -53,6 +58,7 @@ const baseDocumentTypes = [
     required: true,
     vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
     isVehiclePhoto: false,
+    requiresExpiryDate: true,
   },
   {
     type: 'proof_of_identity',
@@ -62,6 +68,7 @@ const baseDocumentTypes = [
     required: true,
     vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
     isVehiclePhoto: false,
+    requiresExpiryDate: false,
   },
   {
     type: 'proof_of_address',
@@ -71,6 +78,7 @@ const baseDocumentTypes = [
     required: true,
     vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
     isVehiclePhoto: false,
+    requiresExpiryDate: false,
   },
 ];
 
@@ -126,6 +134,8 @@ export default function DriverDocuments() {
   const uploadDocumentMutation = useUploadDocument();
   const { toast } = useToast();
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const [expiryDates, setExpiryDates] = useState<{ [key: string]: string }>({});
+  const [pendingFiles, setPendingFiles] = useState<{ [key: string]: File | null }>({});
 
   const vehicleType = driver?.vehicleType || 'car';
   
@@ -146,6 +156,10 @@ export default function DriverDocuments() {
     return documents?.find((d) => d.type === docType);
   };
 
+  const requiresExpiryDate = (docType: string) => {
+    return baseDocumentTypes.find(d => d.type === docType)?.requiresExpiryDate || false;
+  };
+
   const handleUploadClick = useCallback((docType: string) => {
     const input = fileInputRefs.current[docType];
     if (input) {
@@ -153,9 +167,13 @@ export default function DriverDocuments() {
     }
   }, []);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
+  const handleExpiryDateChange = useCallback((docType: string, date: string) => {
+    setExpiryDates(prev => ({ ...prev, [docType]: date }));
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
     const file = e.target.files?.[0];
-    if (!file || !driver?.id) return;
+    if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
       toast({
@@ -166,8 +184,22 @@ export default function DriverDocuments() {
       return;
     }
 
+    if (requiresExpiryDate(docType)) {
+      setPendingFiles(prev => ({ ...prev, [docType]: file }));
+      toast({
+        title: "File selected",
+        description: "Please set the expiry date and click Upload to complete.",
+      });
+    } else {
+      uploadDocument(file, docType);
+    }
+  }, [toast]);
+
+  const uploadDocument = useCallback((file: File, docType: string, expiryDate?: string) => {
+    if (!driver?.id) return;
+
     uploadDocumentMutation.mutate(
-      { driverId: driver.id, file, documentType: docType },
+      { driverId: driver.id, file, documentType: docType, expiryDate },
       {
         onSuccess: () => {
           toast({
@@ -177,6 +209,8 @@ export default function DriverDocuments() {
           if (fileInputRefs.current[docType]) {
             fileInputRefs.current[docType]!.value = '';
           }
+          setPendingFiles(prev => ({ ...prev, [docType]: null }));
+          setExpiryDates(prev => ({ ...prev, [docType]: '' }));
         },
         onError: (error: any) => {
           toast({
@@ -188,6 +222,35 @@ export default function DriverDocuments() {
       }
     );
   }, [driver?.id, uploadDocumentMutation, toast]);
+
+  const handleUploadWithExpiry = useCallback((docType: string) => {
+    const file = pendingFiles[docType];
+    const expiryDate = expiryDates[docType];
+    
+    if (!file) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!expiryDate) {
+      toast({
+        title: "Expiry date required",
+        description: "Please enter the insurance expiry date.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    uploadDocument(file, docType, expiryDate);
+  }, [pendingFiles, expiryDates, uploadDocument, toast]);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
+    handleFileSelect(e, docType);
+  }, [handleFileSelect]);
 
   const approvedCount = documents?.filter((d) => d.status === 'approved').length || 0;
   const totalRequired = documentTypes.length + vehiclePhotos.length;
@@ -242,60 +305,138 @@ export default function DriverDocuments() {
                 const status = getDocumentStatus(docType.type);
                 const doc = getDocument(docType.type);
                 const Icon = docType.icon;
+                const hasPendingFile = !!pendingFiles[docType.type];
+                const needsExpiryDate = docType.requiresExpiryDate;
                 
                 return (
                   <Card key={docType.type} data-testid={`document-${docType.type}`}>
                     <CardContent className="p-4">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                          <div className={`p-3 rounded-lg ${
-                            status === 'approved' ? 'bg-green-100 text-green-600' :
-                            status === 'rejected' ? 'bg-red-100 text-red-600' :
-                            status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            <Icon className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-medium">{docType.label}</h3>
-                              {docType.required && !status && (
-                                <Badge variant="outline" className="text-xs">Required</Badge>
+                      <div className="flex flex-col gap-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex items-start gap-4">
+                            <div className={`p-3 rounded-lg ${
+                              status === 'approved' ? 'bg-green-100 text-green-600' :
+                              status === 'rejected' ? 'bg-red-100 text-red-600' :
+                              status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              <Icon className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-medium">{docType.label}</h3>
+                                {docType.required && !status && (
+                                  <Badge variant="outline" className="text-xs">Required</Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">{docType.description}</p>
+                              {doc?.reviewNotes && status === 'rejected' && (
+                                <p className="text-sm text-destructive mt-1">
+                                  Rejection reason: {doc.reviewNotes}
+                                </p>
+                              )}
+                              {doc?.expiryDate && (
+                                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Expires: {new Date(doc.expiryDate).toLocaleDateString('en-GB')}
+                                </p>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground">{docType.description}</p>
-                            {doc?.reviewNotes && status === 'rejected' && (
-                              <p className="text-sm text-destructive mt-1">
-                                Rejection reason: {doc.reviewNotes}
-                              </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {getStatusBadge(status)}
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="hidden"
+                              ref={(el) => { fileInputRefs.current[docType.type] = el; }}
+                              onChange={(e) => handleFileChange(e, docType.type)}
+                              data-testid={`input-file-${docType.type}`}
+                            />
+                            {!needsExpiryDate && (
+                              <Button 
+                                variant={status === 'approved' ? 'outline' : 'default'}
+                                size="sm"
+                                onClick={() => handleUploadClick(docType.type)}
+                                disabled={uploadDocumentMutation.isPending}
+                                data-testid={`button-upload-${docType.type}`}
+                              >
+                                {uploadDocumentMutation.isPending ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Upload className="mr-2 h-4 w-4" />
+                                )}
+                                {status ? 'Re-upload' : 'Upload'}
+                              </Button>
+                            )}
+                            {needsExpiryDate && !hasPendingFile && (
+                              <Button 
+                                variant={status === 'approved' ? 'outline' : 'default'}
+                                size="sm"
+                                onClick={() => handleUploadClick(docType.type)}
+                                disabled={uploadDocumentMutation.isPending}
+                                data-testid={`button-select-${docType.type}`}
+                              >
+                                <Upload className="mr-2 h-4 w-4" />
+                                Select File
+                              </Button>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          {getStatusBadge(status)}
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            className="hidden"
-                            ref={(el) => { fileInputRefs.current[docType.type] = el; }}
-                            onChange={(e) => handleFileChange(e, docType.type)}
-                            data-testid={`input-file-${docType.type}`}
-                          />
-                          <Button 
-                            variant={status === 'approved' ? 'outline' : 'default'}
-                            size="sm"
-                            onClick={() => handleUploadClick(docType.type)}
-                            disabled={uploadDocumentMutation.isPending}
-                            data-testid={`button-upload-${docType.type}`}
-                          >
-                            {uploadDocumentMutation.isPending ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <Upload className="mr-2 h-4 w-4" />
-                            )}
-                            {status ? 'Re-upload' : 'Upload'}
-                          </Button>
-                        </div>
+                        
+                        {needsExpiryDate && hasPendingFile && (
+                          <div className="ml-0 md:ml-14 p-4 bg-muted/50 rounded-lg border">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+                              <div className="flex-1 w-full sm:w-auto">
+                                <Label htmlFor={`expiry-${docType.type}`} className="text-sm font-medium flex items-center gap-1 mb-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Insurance Expiry Date
+                                </Label>
+                                <Input
+                                  id={`expiry-${docType.type}`}
+                                  type="date"
+                                  value={expiryDates[docType.type] || ''}
+                                  onChange={(e) => handleExpiryDateChange(docType.type, e.target.value)}
+                                  min={new Date().toISOString().split('T')[0]}
+                                  className="w-full sm:w-48"
+                                  data-testid={`input-expiry-${docType.type}`}
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleUploadWithExpiry(docType.type)}
+                                  disabled={uploadDocumentMutation.isPending || !expiryDates[docType.type]}
+                                  data-testid={`button-upload-${docType.type}`}
+                                >
+                                  {uploadDocumentMutation.isPending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Upload className="mr-2 h-4 w-4" />
+                                  )}
+                                  Upload
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setPendingFiles(prev => ({ ...prev, [docType.type]: null }));
+                                    setExpiryDates(prev => ({ ...prev, [docType.type]: '' }));
+                                    if (fileInputRefs.current[docType.type]) {
+                                      fileInputRefs.current[docType.type]!.value = '';
+                                    }
+                                  }}
+                                  data-testid={`button-cancel-${docType.type}`}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Selected file: {pendingFiles[docType.type]?.name}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

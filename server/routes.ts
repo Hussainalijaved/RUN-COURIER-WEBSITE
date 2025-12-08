@@ -827,7 +827,7 @@ export async function registerRoutes(
       next();
     });
   }, asyncHandler(async (req, res) => {
-    const { driverId: rawDriverId, documentType: rawDocumentType } = req.body;
+    const { driverId: rawDriverId, documentType: rawDocumentType, expiryDate: rawExpiryDate } = req.body;
     const file = req.file;
 
     if (!file) {
@@ -909,6 +909,7 @@ export async function registerRoutes(
     
     let document;
     const uploadedAt = new Date();
+    const expiryDate = rawExpiryDate ? new Date(rawExpiryDate) : null;
     
     if (existingDocId) {
       // Update existing document in memory
@@ -917,6 +918,7 @@ export async function registerRoutes(
         fileUrl,
         status: 'pending' as const,
         uploadedAt,
+        expiryDate,
         reviewedBy: null,
         reviewNotes: null,
         reviewedAt: null,
@@ -930,6 +932,7 @@ export async function registerRoutes(
           fileName: file.originalname,
           fileUrl,
           status: 'pending',
+          expiryDate,
         });
         // Override ID to match existing
         if (document) {
@@ -943,6 +946,7 @@ export async function registerRoutes(
         fileName: file.originalname,
         fileUrl,
         status: 'pending',
+        expiryDate,
       });
     }
 
@@ -972,6 +976,7 @@ export async function registerRoutes(
             status: document.status,
             reviewedBy: document.reviewedBy,
             reviewNotes: document.reviewNotes,
+            expiryDate: document.expiryDate,
             uploadedAt: document.uploadedAt,
             reviewedAt: document.reviewedAt,
           }

@@ -314,16 +314,21 @@ export function useUploadDocument() {
     mutationFn: async ({ 
       driverId, 
       file, 
-      documentType 
+      documentType,
+      expiryDate,
     }: { 
       driverId: string; 
       file: File; 
-      documentType: string; 
+      documentType: string;
+      expiryDate?: string;
     }) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('driverId', driverId);
       formData.append('documentType', documentType);
+      if (expiryDate) {
+        formData.append('expiryDate', expiryDate);
+      }
 
       const response = await fetch('/api/documents/upload', {
         method: 'POST',
