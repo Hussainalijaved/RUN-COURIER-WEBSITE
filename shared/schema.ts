@@ -6,7 +6,12 @@ export type UserRole = "admin" | "driver" | "customer" | "dispatcher" | "vendor"
 export type UserType = "individual" | "business";
 export type JobStatus = "pending" | "assigned" | "accepted" | "on_the_way_pickup" | "arrived_pickup" | "collected" | "on_the_way_delivery" | "delivered" | "cancelled";
 export type VehicleType = "motorbike" | "car" | "small_van" | "medium_van";
-export type DocumentType = "id_passport" | "driving_licence" | "right_to_work" | "vehicle_photo" | "insurance" | "goods_in_transit" | "hire_reward";
+export type DocumentType = 
+  | "id_passport" | "driving_licence" | "right_to_work" | "vehicle_photo" | "insurance" | "goods_in_transit" | "hire_reward"
+  | "driving_license" | "hire_and_reward_insurance" | "goods_in_transit_insurance" | "proof_of_identity" | "proof_of_address"
+  | "vehicle_photo_front" | "vehicle_photo_rear" | "vehicle_photo_side"
+  | "profilePicture" | "drivingLicenceFront" | "drivingLicenceBack" | "dbsCertificate" | "goodsInTransitInsurance" | "hireAndReward"
+  | string;
 export type DocumentStatus = "pending" | "approved" | "rejected";
 
 export const users = pgTable("users", {
