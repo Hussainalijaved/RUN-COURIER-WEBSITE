@@ -9,11 +9,13 @@ import {
   type Invoice, type InsertInvoice,
   type JobAssignment, type InsertJobAssignment,
   type DeliveryContact, type InsertDeliveryContact,
+  type DriverPayment, type InsertDriverPayment,
   type DriverApplicationStatus,
   type InvoiceStatus,
   type JobAssignmentStatus,
   type DocumentType,
   type DocumentStatus,
+  type DriverPaymentStatus,
   type PricingSettings,
   type Vehicle,
   type JobStatus,
@@ -110,6 +112,12 @@ export interface IStorage {
   createDeliveryContact(contact: InsertDeliveryContact): Promise<DeliveryContact>;
   updateDeliveryContact(id: string, data: Partial<DeliveryContact>): Promise<DeliveryContact | undefined>;
   deleteDeliveryContact(id: string): Promise<void>;
+
+  getDriverPayment(id: string): Promise<DriverPayment | undefined>;
+  getDriverPayments(filters?: { driverId?: string; status?: DriverPaymentStatus; jobId?: string }): Promise<DriverPayment[]>;
+  getDriverPaymentStats(driverId: string): Promise<{ totalEarnings: number; pendingAmount: number; paidAmount: number; totalJobs: number }>;
+  createDriverPayment(payment: InsertDriverPayment): Promise<DriverPayment>;
+  updateDriverPayment(id: string, data: Partial<DriverPayment>): Promise<DriverPayment | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -123,6 +131,7 @@ export class MemStorage implements IStorage {
   private invoices: Map<string, Invoice>;
   private jobAssignments: Map<string, JobAssignment>;
   private deliveryContacts: Map<string, DeliveryContact>;
+  private driverPayments: Map<string, DriverPayment>;
   private pricingSettings: PricingSettings;
   private vehicles: Map<VehicleType, Vehicle>;
 
@@ -137,6 +146,7 @@ export class MemStorage implements IStorage {
     this.invoices = new Map();
     this.jobAssignments = new Map();
     this.deliveryContacts = new Map();
+    this.driverPayments = new Map();
     
     this.pricingSettings = {
       id: "default",
@@ -1520,6 +1530,60 @@ export class MemStorage implements IStorage {
 
   async deleteDeliveryContact(id: string): Promise<void> {
     this.deliveryContacts.delete(id);
+  }
+
+  async getDriverPayment(id: string): Promise<DriverPayment | undefined> {
+    return this.driverPayments.get(id);
+  }
+
+  async getDriverPayments(filters?: { driverId?: string; status?: DriverPaymentStatus; jobId?: string }): Promise<DriverPayment[]> {
+    let payments = Array.from(this.driverPayments.values());
+    if (filters?.driverId) {
+      payments = payments.filter(p => p.driverId === filters.driverId);
+    }
+    if (filters?.status) {
+      payments = payments.filter(p => p.status === filters.status);
+    }
+    if (filters?.jobId) {
+      payments = payments.filter(p => p.jobId === filters.jobId);
+    }
+    return payments.sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+  }
+
+  async getDriverPaymentStats(driverId: string): Promise<{ totalEarnings: number; pendingAmount: number; paidAmount: number; totalJobs: number }> {
+    const payments = await this.getDriverPayments({ driverId });
+    const totalEarnings = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const pendingAmount = payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + parseFloat(p.netAmount), 0);
+    const paidAmount = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + parseFloat(p.netAmount), 0);
+    const totalJobs = payments.filter(p => p.jobId).length;
+    return { totalEarnings, pendingAmount, paidAmount, totalJobs };
+  }
+
+  async createDriverPayment(payment: InsertDriverPayment): Promise<DriverPayment> {
+    const id = randomUUID();
+    const newPayment: DriverPayment = {
+      id,
+      ...payment,
+      platformFee: payment.platformFee || "0.00",
+      status: payment.status || "pending",
+      payoutReference: payment.payoutReference || null,
+      description: payment.description || null,
+      jobTrackingNumber: payment.jobTrackingNumber || null,
+      paidAt: payment.paidAt || null,
+      createdAt: new Date(),
+    };
+    this.driverPayments.set(id, newPayment);
+    return newPayment;
+  }
+
+  async updateDriverPayment(id: string, data: Partial<DriverPayment>): Promise<DriverPayment | undefined> {
+    const payment = this.driverPayments.get(id);
+    if (!payment) return undefined;
+    const updatedPayment = { ...payment, ...data };
+    this.driverPayments.set(id, updatedPayment);
+    return updatedPayment;
   }
 }
 
