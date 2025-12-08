@@ -78,6 +78,7 @@ import DriverActive from "@/pages/driver/DriverActive";
 import DriverHistory from "@/pages/driver/DriverHistory";
 import DriverDocuments from "@/pages/driver/DriverDocuments";
 import DriverProfile from "@/pages/driver/DriverProfile";
+import DriverPayments from "@/pages/driver/DriverPayments";
 import DriverApplication from "@/pages/driver/DriverApplication";
 import DriverApplicationSuccess from "@/pages/driver/ApplicationSuccess";
 import DispatcherDashboard from "@/pages/dispatcher/DispatcherDashboard";
@@ -262,6 +263,11 @@ function Router() {
       <Route path="/driver/profile">
         <ProtectedRoute allowedRoles={['driver']}>
           <DriverProfile />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/payments">
+        <ProtectedRoute allowedRoles={['driver']}>
+          <DriverPayments />
         </ProtectedRoute>
       </Route>
 
