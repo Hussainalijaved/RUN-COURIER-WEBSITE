@@ -392,3 +392,28 @@ export function useRespondToAssignment() {
     },
   });
 }
+
+export function useDeclineJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ jobId, rejectionReason }: { jobId: string; rejectionReason: string }) => {
+      const response = await fetch(`/api/jobs/${jobId}/decline`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejectionReason }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to decline job');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+    },
+  });
+}

@@ -36,6 +36,7 @@ import {
   useAcceptJob,
   useDriverAssignments,
   useRespondToAssignment,
+  useDeclineJob,
 } from '@/hooks/useSupabaseDriver';
 import type { JobStatus, Job } from '@shared/schema';
 
@@ -94,6 +95,10 @@ export default function DriverJobs() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState('');
+  const [declineJobDialogOpen, setDeclineJobDialogOpen] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [jobDeclineReason, setJobDeclineReason] = useState<string>('');
+  const [jobCustomReason, setJobCustomReason] = useState('');
   const prevAssignedCountRef = useRef<number>(0);
   const prevPendingCountRef = useRef<number>(0);
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.8 });
@@ -103,6 +108,7 @@ export default function DriverJobs() {
   const { data: pendingAssignments, isLoading: assignmentsLoading } = useDriverAssignments(driver?.id);
   const acceptJobMutation = useAcceptJob();
   const respondToAssignmentMutation = useRespondToAssignment();
+  const declineJobMutation = useDeclineJob();
 
   // Detect new assigned jobs and play alert sound
   const assignedJobs = myJobs?.filter((j) => j.status === 'assigned') || [];
@@ -210,6 +216,44 @@ export default function DriverJobs() {
       {
         onSuccess: () => toast({ title: 'Job accepted!' }),
         onError: () => toast({ title: 'Failed to accept job', variant: 'destructive' }),
+      }
+    );
+  };
+
+  const openDeclineJobDialog = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setJobDeclineReason('');
+    setJobCustomReason('');
+    setDeclineJobDialogOpen(true);
+  };
+
+  const handleConfirmDeclineJob = () => {
+    if (!selectedJobId) return;
+    
+    const finalReason = jobDeclineReason === 'Other (please specify)' 
+      ? jobCustomReason 
+      : jobDeclineReason;
+    
+    declineJobMutation.mutate(
+      { jobId: selectedJobId, rejectionReason: finalReason },
+      {
+        onSuccess: () => {
+          toast({ 
+            title: 'Job Declined',
+            description: 'The job has been returned for reassignment.',
+          });
+          setDeclineJobDialogOpen(false);
+          setSelectedJobId(null);
+          setJobDeclineReason('');
+          setJobCustomReason('');
+        },
+        onError: (error: any) => {
+          toast({ 
+            title: 'Failed to decline job', 
+            description: error?.message || 'Please try again',
+            variant: 'destructive' 
+          });
+        },
       }
     );
   };
@@ -366,22 +410,35 @@ export default function DriverJobs() {
                           {job.distance} miles • {job.weight}kg
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="flex flex-col items-end gap-2">
                         <div className="font-bold text-primary text-lg">{formatPrice(getDriverPayment(job))}</div>
-                        <Button 
-                          size="sm" 
-                          className="mt-2" 
-                          onClick={() => handleAcceptJob(job.id)}
-                          disabled={acceptJobMutation.isPending}
-                          data-testid={`button-accept-job-${job.id}`}
-                        >
-                          {acceptJobMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                          )}
-                          Accept Job
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleAcceptJob(job.id)}
+                            disabled={acceptJobMutation.isPending || declineJobMutation.isPending}
+                            data-testid={`button-accept-job-${job.id}`}
+                          >
+                            {acceptJobMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                            )}
+                            Accept
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
+                            onClick={() => openDeclineJobDialog(job.id)}
+                            disabled={acceptJobMutation.isPending || declineJobMutation.isPending}
+                            data-testid={`button-decline-job-${job.id}`}
+                          >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Decline
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -483,7 +540,7 @@ export default function DriverJobs() {
         </Tabs>
       </div>
 
-      {/* Rejection Reason Dialog */}
+      {/* Rejection Reason Dialog for Job Offers */}
       <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
@@ -535,6 +592,68 @@ export default function DriverJobs() {
               data-testid="button-confirm-decline"
             >
               {respondToAssignmentMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="mr-2 h-4 w-4" />
+              )}
+              Confirm Decline
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Decline Job Dialog for Assigned Jobs */}
+      <AlertDialog open={declineJobDialogOpen} onOpenChange={setDeclineJobDialogOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Decline Assigned Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please select a reason for declining this job. The job will be returned to the queue for reassignment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <RadioGroup value={jobDeclineReason} onValueChange={setJobDeclineReason}>
+              {REJECTION_REASONS.map((reason) => (
+                <div key={`job-${reason}`} className="flex items-center space-x-3">
+                  <RadioGroupItem value={reason} id={`job-${reason}`} data-testid={`radio-job-reason-${reason.replace(/\s+/g, '-').toLowerCase()}`} />
+                  <Label htmlFor={`job-${reason}`} className="cursor-pointer text-sm">
+                    {reason}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+            
+            {jobDeclineReason === 'Other (please specify)' && (
+              <Textarea
+                placeholder="Please describe your reason..."
+                value={jobCustomReason}
+                onChange={(e) => setJobCustomReason(e.target.value)}
+                className="mt-2"
+                data-testid="textarea-job-custom-reason"
+              />
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setDeclineJobDialogOpen(false);
+                setSelectedJobId(null);
+                setJobDeclineReason('');
+                setJobCustomReason('');
+              }}
+              data-testid="button-cancel-job-decline"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeclineJob}
+              disabled={!jobDeclineReason || (jobDeclineReason === 'Other (please specify)' && !jobCustomReason.trim()) || declineJobMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-job-decline"
+            >
+              {declineJobMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <XCircle className="mr-2 h-4 w-4" />

@@ -176,6 +176,43 @@ export async function registerRoutes(
     res.json(job);
   }));
 
+  app.patch("/api/jobs/:id/decline", asyncHandler(async (req, res) => {
+    const { rejectionReason } = req.body;
+    const jobId = req.params.id;
+    
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    if (job.status !== 'assigned') {
+      return res.status(400).json({ error: "Can only decline jobs with 'assigned' status" });
+    }
+    
+    // Reset job to pending so it can be reassigned
+    const updatedJob = await storage.updateJob(jobId, { 
+      status: "pending", 
+      driverId: null,
+      rejectionReason: rejectionReason || null,
+    });
+    
+    console.log(`[Jobs] Driver declined job ${jobId}. Reason: ${rejectionReason || 'No reason provided'}`);
+    
+    // Send notification to admin about the decline
+    const admins = await storage.getUsers({ role: 'admin' });
+    for (const admin of admins) {
+      await storage.createNotification({
+        userId: admin.id,
+        title: 'Job Declined by Driver',
+        message: `Job ${job.trackingNumber} was declined by the driver.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+        type: 'job_declined',
+        data: { jobId, rejectionReason },
+      });
+    }
+    
+    res.json(updatedJob);
+  }));
+
   app.delete("/api/jobs/:id", asyncHandler(async (req, res) => {
     await storage.deleteJob(req.params.id);
     res.status(204).send();
