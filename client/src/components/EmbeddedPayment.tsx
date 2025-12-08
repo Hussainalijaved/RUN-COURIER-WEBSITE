@@ -8,7 +8,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, CreditCard, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -54,8 +54,35 @@ function PaymentForm({
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isConfirmingBooking, setIsConfirmingBooking] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [paymentSucceeded, setPaymentSucceeded] = useState(false);
+  const [confirmedPaymentIntentId, setConfirmedPaymentIntentId] = useState<string | null>(null);
+
+  const confirmBooking = async (intentId: string) => {
+    setIsConfirmingBooking(true);
+    setBookingError(null);
+    
+    try {
+      const response = await apiRequest('POST', '/api/booking/confirm-embedded-payment', {
+        paymentIntentId: intentId,
+        bookingData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        onSuccess(result.trackingNumber, result.jobId);
+      } else {
+        setBookingError(result.error || 'Failed to create booking. Your payment was successful - please contact support with your payment reference.');
+        setIsConfirmingBooking(false);
+      }
+    } catch (err: any) {
+      setBookingError('Failed to create booking. Your payment was successful - please contact support.');
+      setIsConfirmingBooking(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,11 +93,12 @@ function PaymentForm({
 
     setIsProcessing(true);
     setPaymentError(null);
+    setBookingError(null);
 
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: window.location.href,
+        return_url: `${window.location.origin}/payment/complete`,
       },
       redirect: 'if_required',
     });
@@ -82,38 +110,59 @@ function PaymentForm({
     }
 
     if (paymentIntent && paymentIntent.status === 'succeeded') {
-      setPaymentSuccess(true);
+      setPaymentSucceeded(true);
+      setConfirmedPaymentIntentId(paymentIntent.id);
+      setIsProcessing(false);
       
-      try {
-        const response = await apiRequest('POST', '/api/booking/confirm-embedded-payment', {
-          paymentIntentId: paymentIntent.id,
-          bookingData,
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-          onSuccess(result.trackingNumber, result.jobId);
-        } else {
-          setPaymentError('Payment successful but booking creation failed. Please contact support.');
-        }
-      } catch (err) {
-        setPaymentError('Payment successful but booking creation failed. Please contact support.');
-      }
+      await confirmBooking(paymentIntent.id);
+    } else if (paymentIntent && paymentIntent.status === 'requires_action') {
+      setPaymentError('Additional authentication required. Please complete the verification.');
+      setIsProcessing(false);
     } else {
       setPaymentError('Payment was not completed. Please try again.');
+      setIsProcessing(false);
     }
-
-    setIsProcessing(false);
   };
 
-  if (paymentSuccess) {
+  if (isConfirmingBooking) {
     return (
-      <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+      <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
         <CardContent className="pt-6 text-center">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-green-600 mb-4" />
-          <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">Payment Successful!</h3>
-          <p className="text-green-700 dark:text-green-300 mt-2">Creating your booking...</p>
+          <Loader2 className="mx-auto h-12 w-12 text-blue-600 animate-spin mb-4" />
+          <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">Payment Successful!</h3>
+          <p className="text-blue-700 dark:text-blue-300 mt-2">Creating your booking...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (bookingError && paymentSucceeded && confirmedPaymentIntentId) {
+    return (
+      <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+        <CardContent className="pt-6 text-center space-y-4">
+          <AlertCircle className="mx-auto h-12 w-12 text-amber-600 mb-4" />
+          <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200">Payment Received</h3>
+          <p className="text-amber-700 dark:text-amber-300">{bookingError}</p>
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            Reference: {confirmedPaymentIntentId}
+          </p>
+          <div className="flex gap-4 justify-center pt-2">
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              data-testid="button-go-back"
+            >
+              Go Back
+            </Button>
+            <Button
+              onClick={() => confirmBooking(confirmedPaymentIntentId)}
+              className="bg-primary hover:bg-primary/90"
+              data-testid="button-retry-booking"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry Booking
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
