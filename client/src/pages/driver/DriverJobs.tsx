@@ -143,21 +143,57 @@ export default function DriverJobs() {
     prevPendingCountRef.current = currentCount;
   }, [pendingAssignments?.length, playAlert, playNotification, toast]);
 
-  const handleRespondToAssignment = (assignmentId: string, accepted: boolean) => {
+  const openRejectDialog = (assignmentId: string) => {
+    setSelectedAssignmentId(assignmentId);
+    setSelectedReason('');
+    setCustomReason('');
+    setRejectDialogOpen(true);
+  };
+
+  const handleConfirmReject = () => {
+    if (!selectedAssignmentId) return;
+    
+    const finalReason = selectedReason === 'Other (please specify)' 
+      ? customReason 
+      : selectedReason;
+    
     respondToAssignmentMutation.mutate(
-      { assignmentId, accepted },
+      { assignmentId: selectedAssignmentId, accepted: false, rejectionReason: finalReason },
       {
         onSuccess: () => {
           toast({ 
-            title: accepted ? 'Job Accepted!' : 'Job Declined',
-            description: accepted 
-              ? 'The job has been assigned to you.' 
-              : 'The dispatcher will find another driver.',
+            title: 'Job Declined',
+            description: 'The dispatcher will find another driver.',
+          });
+          setRejectDialogOpen(false);
+          setSelectedAssignmentId(null);
+          setSelectedReason('');
+          setCustomReason('');
+        },
+        onError: (error: any) => {
+          toast({ 
+            title: 'Failed to decline job', 
+            description: error?.message || 'Please try again',
+            variant: 'destructive' 
+          });
+        },
+      }
+    );
+  };
+
+  const handleAcceptAssignment = (assignmentId: string) => {
+    respondToAssignmentMutation.mutate(
+      { assignmentId, accepted: true },
+      {
+        onSuccess: () => {
+          toast({ 
+            title: 'Job Accepted!',
+            description: 'The job has been assigned to you.',
           });
         },
         onError: (error: any) => {
           toast({ 
-            title: 'Failed to respond', 
+            title: 'Failed to accept job', 
             description: error?.message || 'Please try again',
             variant: 'destructive' 
           });
@@ -268,7 +304,7 @@ export default function DriverJobs() {
                     <div className="flex gap-2">
                       <Button 
                         className="flex-1 bg-green-600 hover:bg-green-700" 
-                        onClick={() => handleRespondToAssignment(assignment.id, true)}
+                        onClick={() => handleAcceptAssignment(assignment.id)}
                         disabled={respondToAssignmentMutation.isPending}
                         data-testid={`button-accept-offer-${assignment.id}`}
                       >
@@ -281,11 +317,12 @@ export default function DriverJobs() {
                       </Button>
                       <Button 
                         variant="outline" 
-                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50" 
-                        onClick={() => handleRespondToAssignment(assignment.id, false)}
+                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950" 
+                        onClick={() => openRejectDialog(assignment.id)}
                         disabled={respondToAssignmentMutation.isPending}
                         data-testid={`button-decline-offer-${assignment.id}`}
                       >
+                        <XCircle className="mr-2 h-4 w-4" />
                         Decline
                       </Button>
                     </div>
@@ -444,6 +481,68 @@ export default function DriverJobs() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Rejection Reason Dialog */}
+      <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Decline Job Offer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please select a reason for declining this job. This helps dispatch understand and find a better match.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <RadioGroup value={selectedReason} onValueChange={setSelectedReason}>
+              {REJECTION_REASONS.map((reason) => (
+                <div key={reason} className="flex items-center space-x-3">
+                  <RadioGroupItem value={reason} id={reason} data-testid={`radio-reason-${reason.replace(/\s+/g, '-').toLowerCase()}`} />
+                  <Label htmlFor={reason} className="cursor-pointer text-sm">
+                    {reason}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+            
+            {selectedReason === 'Other (please specify)' && (
+              <Textarea
+                placeholder="Please describe your reason..."
+                value={customReason}
+                onChange={(e) => setCustomReason(e.target.value)}
+                className="mt-2"
+                data-testid="textarea-custom-reason"
+              />
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setRejectDialogOpen(false);
+                setSelectedAssignmentId(null);
+                setSelectedReason('');
+                setCustomReason('');
+              }}
+              data-testid="button-cancel-decline"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmReject}
+              disabled={!selectedReason || (selectedReason === 'Other (please specify)' && !customReason.trim()) || respondToAssignmentMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-decline"
+            >
+              {respondToAssignmentMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="mr-2 h-4 w-4" />
+              )}
+              Confirm Decline
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
