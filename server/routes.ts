@@ -1724,12 +1724,19 @@ export async function registerRoutes(
       respondedAt: new Date(),
     });
 
-    // If accepted, assign the driver to the job
+    // If accepted, assign the driver to the job and update status to "accepted"
     if (accepted && updated) {
       await storage.assignDriver(assignment.jobId, assignment.driverId);
       
-      // Update job status to assigned
-      await storage.updateJobStatus(assignment.jobId, "assigned" as any);
+      // Update job status to "accepted" - driver has confirmed they will take the job
+      await storage.updateJobStatus(assignment.jobId, "accepted" as any);
+      console.log(`[Job Assignment] Driver accepted - Job ${assignment.jobId} status updated to 'accepted'`);
+    } else if (!accepted) {
+      // Driver declined - reset job status to "pending" so it can be reassigned
+      await storage.updateJobStatus(assignment.jobId, "pending" as any);
+      // Also unassign the driver from the job
+      await storage.assignDriver(assignment.jobId, null);
+      console.log(`[Job Assignment] Driver declined - Job ${assignment.jobId} status reset to 'pending'`);
     }
 
     // Notify admin of response
