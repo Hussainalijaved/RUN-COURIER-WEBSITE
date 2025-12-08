@@ -43,6 +43,7 @@ import {
   Calendar,
   Key,
   Home,
+  Wallet,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -72,6 +73,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/driver/jobs', label: 'My Jobs', icon: Package },
     { href: '/driver/active', label: 'Active Job', icon: MapPin },
     { href: '/driver/history', label: 'History', icon: Clock },
+    { href: '/driver/payments', label: 'Payments', icon: Wallet },
     { href: '/driver/documents', label: 'Documents', icon: FileText },
     { href: '/driver/profile', label: 'Profile', icon: User },
   ],

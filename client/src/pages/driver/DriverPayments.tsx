@@ -19,6 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useDriver } from '@/hooks/useSupabaseDriver';
 import type { DriverPayment, DriverPaymentStatus } from '@shared/schema';
 import { format } from 'date-fns';
+import { apiRequest } from '@/lib/queryClient';
 
 const formatPrice = (price: string | number) => {
   const num = typeof price === 'string' ? parseFloat(price) : price;
@@ -70,6 +71,10 @@ export default function DriverPayments() {
     totalJobs: number;
   }>({
     queryKey: ['/api/driver-payments/stats', driver?.id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/driver-payments/stats/${driver!.id}`);
+      return response.json();
+    },
     enabled: !!driver?.id,
   });
 
