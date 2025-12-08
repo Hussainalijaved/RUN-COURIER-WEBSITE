@@ -40,6 +40,7 @@ import {
 import type { JobStatus, Job } from '@shared/schema';
 
 const REJECTION_REASONS = [
+  'Unacceptable rate',
   'Too far from pickup location',
   'Vehicle not suitable for this job',
   'Already on another delivery',
