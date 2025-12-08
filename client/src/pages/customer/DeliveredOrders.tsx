@@ -203,7 +203,7 @@ function PriceBreakdown({ job }: { job: Job }) {
         <span>{formatPrice(job.basePrice)}</span>
       </div>
       <div className="flex justify-between">
-        <span className="text-muted-foreground">Distance ({job.distance} miles)</span>
+        <span className="text-muted-foreground">Distance Charge</span>
         <span>{formatPrice(job.distancePrice)}</span>
       </div>
       {parseFloat(job.weightSurcharge?.toString() || '0') > 0 && (
