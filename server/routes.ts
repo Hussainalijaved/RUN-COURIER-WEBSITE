@@ -767,6 +767,55 @@ export async function registerRoutes(
     res.json(updatedUser);
   }));
 
+  // Admin endpoint to update Pay Later status by email
+  app.post("/api/admin/update-pay-later", asyncHandler(async (req, res) => {
+    const { email, payLaterEnabled } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+    
+    try {
+      const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Supabase admin not configured" });
+      }
+      
+      // Find user by email
+      const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      if (listError) {
+        return res.status(500).json({ error: "Failed to list users" });
+      }
+      
+      const user = users.users.find((u: any) => u.email === email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Update user metadata
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        user_metadata: { 
+          ...user.user_metadata,
+          payLaterEnabled: payLaterEnabled === true 
+        }
+      });
+      
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+      
+      console.log(`[Admin] Updated payLaterEnabled=${payLaterEnabled} for user ${email} (${user.id})`);
+      res.json({ 
+        success: true, 
+        message: `Pay Later ${payLaterEnabled ? 'enabled' : 'disabled'} for ${email}`,
+        userId: user.id
+      });
+    } catch (e: any) {
+      console.error('Error updating Pay Later status:', e);
+      res.status(500).json({ error: e.message });
+    }
+  }));
+
   app.delete("/api/users/:id", asyncHandler(async (req, res) => {
     const userId = req.params.id;
     
