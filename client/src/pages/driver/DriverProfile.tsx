@@ -291,8 +291,14 @@ export default function DriverProfile() {
                       <Button
                         size="sm"
                         variant={isAvailable ? 'default' : 'outline'}
-                        onClick={() => toggleAvailabilityMutation.mutate(!isAvailable)}
-                        disabled={toggleAvailabilityMutation.isPending}
+                        onClick={() => {
+                          if (!driver?.id) {
+                            toast({ title: 'Driver profile not loaded. Please refresh the page.', variant: 'destructive' });
+                            return;
+                          }
+                          toggleAvailabilityMutation.mutate(!isAvailable);
+                        }}
+                        disabled={toggleAvailabilityMutation.isPending || !driver?.id}
                         data-testid="button-toggle-availability"
                       >
                         {isAvailable ? (
