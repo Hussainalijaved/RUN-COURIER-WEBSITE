@@ -713,13 +713,7 @@ export async function registerRoutes(
   app.delete("/api/users/:id", asyncHandler(async (req, res) => {
     const userId = req.params.id;
     
-    // Check if user exists
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    
-    // Delete from Supabase Auth first - this must succeed before we delete local data
+    // Delete from Supabase Auth first - this is where the actual account lives
     const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
     if (!supabaseAdmin) {
       console.error('[Users] Supabase admin not configured, cannot delete user');
@@ -738,16 +732,32 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Failed to delete account from authentication service" });
     }
     
-    // If user is a driver, delete driver record too
+    // If user is a driver, delete driver record too (from both PostgreSQL and in-memory)
     const driver = await storage.getDriverByUserId(userId);
     if (driver) {
+      // Delete from PostgreSQL
+      try {
+        const { db } = await import("./db");
+        const { drivers: driversTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        await db.delete(driversTable).where(eq(driversTable.userId, userId));
+        console.log(`[Users] Deleted driver record from PostgreSQL for user ${userId}`);
+      } catch (dbError) {
+        console.error('Error deleting driver from PostgreSQL:', dbError);
+      }
+      
+      // Delete from in-memory storage
       await storage.deleteDriver(driver.id);
-      console.log(`[Users] Deleted driver record for user ${userId}`);
+      console.log(`[Users] Deleted driver record from memory for user ${userId}`);
     }
     
-    // Delete user from local storage
-    await storage.deleteUser(userId);
-    console.log(`[Users] Deleted user ${userId} from local storage`);
+    // Delete user from local storage if exists (user may only exist in Supabase)
+    try {
+      await storage.deleteUser(userId);
+      console.log(`[Users] Deleted user ${userId} from local storage`);
+    } catch (e) {
+      console.log(`[Users] User ${userId} not found in local storage (only existed in Supabase)`);
+    }
     
     res.json({ success: true, message: "Account deleted successfully" });
   }));
