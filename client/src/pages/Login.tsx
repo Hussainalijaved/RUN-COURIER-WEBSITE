@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,17 +20,27 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight } from 'lucide-react';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import type { UserRole } from '@shared/schema';
+import { supabase } from '@/lib/supabase';
 
 interface LoginProps {
   role?: UserRole;
 }
 
+const dashboardRoutes: Record<UserRole, string> = {
+  admin: '/admin',
+  customer: '/customer',
+  driver: '/driver',
+  dispatcher: '/dispatcher',
+  vendor: '/vendor',
+};
+
 export default function Login({ role = 'customer' }: LoginProps) {
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
   
   const params = new URLSearchParams(searchParams);
   const redirectUrl = params.get('redirect');
@@ -42,6 +52,15 @@ export default function Login({ role = 'customer' }: LoginProps) {
       password: '',
     },
   });
+
+  useEffect(() => {
+    if (loginSuccess && user) {
+      const targetPath = redirectUrl 
+        ? decodeURIComponent(redirectUrl) 
+        : dashboardRoutes[user.role] || '/customer';
+      setLocation(targetPath);
+    }
+  }, [loginSuccess, user, redirectUrl, setLocation]);
 
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true);
@@ -58,16 +77,7 @@ export default function Login({ role = 'customer' }: LoginProps) {
           title: 'Welcome back!',
           description: 'You have been logged in successfully.',
         });
-        if (redirectUrl) {
-          setLocation(decodeURIComponent(redirectUrl));
-        } else {
-          const redirectPath = role === 'admin' ? '/admin' 
-            : role === 'driver' ? '/driver'
-            : role === 'dispatcher' ? '/dispatcher'
-            : role === 'vendor' ? '/vendor'
-            : '/customer';
-          setLocation(redirectPath);
-        }
+        setLoginSuccess(true);
       }
     } catch (error) {
       toast({
