@@ -212,23 +212,55 @@ export default function Book() {
     return `${hours}:${minutes.toString().padStart(2, '0')}`;
   };
 
+  const BOOKING_STORAGE_KEY = 'runcourier_booking_draft';
+
+  const getSavedBookingData = () => {
+    try {
+      const saved = localStorage.getItem(BOOKING_STORAGE_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        const savedTime = data.savedAt ? new Date(data.savedAt) : null;
+        const now = new Date();
+        if (savedTime && (now.getTime() - savedTime.getTime()) < 24 * 60 * 60 * 1000) {
+          return data;
+        }
+        localStorage.removeItem(BOOKING_STORAGE_KEY);
+      }
+    } catch (e) {
+      console.error('Error loading saved booking:', e);
+    }
+    return null;
+  };
+
+  const savedBooking = getSavedBookingData();
+
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
     defaultValues: {
-      pickupPostcode: '',
-      deliveryPostcode: '',
-      weight: 1,
-      vehicleType: '' as VehicleType,
-      isMultiDrop: false,
-      isReturnTrip: false,
-      returnToSameLocation: true,
-      returnPostcode: '',
+      pickupPostcode: savedBooking?.pickupPostcode || '',
+      deliveryPostcode: savedBooking?.deliveryPostcode || '',
+      weight: savedBooking?.weight || 1,
+      vehicleType: (savedBooking?.vehicleType || '') as VehicleType,
+      isMultiDrop: savedBooking?.isMultiDrop || false,
+      isReturnTrip: savedBooking?.isReturnTrip || false,
+      returnToSameLocation: savedBooking?.returnToSameLocation ?? true,
+      returnPostcode: savedBooking?.returnPostcode || '',
       pickupDate: getTodayDate(),
       pickupTime: getCurrentTime(),
       deliveryDate: '',
       deliveryTime: '',
     },
   });
+
+  useEffect(() => {
+    if (savedBooking) {
+      if (savedBooking.pickupFullAddress) setPickupFullAddress(savedBooking.pickupFullAddress);
+      if (savedBooking.deliveryFullAddress) setDeliveryFullAddress(savedBooking.deliveryFullAddress);
+      if (savedBooking.pickupAddress) setPickupAddress(savedBooking.pickupAddress);
+      if (savedBooking.deliveryAddress) setDeliveryAddress(savedBooking.deliveryAddress);
+      if (savedBooking.multiDropStops) setMultiDropStops(savedBooking.multiDropStops);
+    }
+  }, []);
 
   const pickupPostcode = form.watch('pickupPostcode');
   const deliveryPostcode = form.watch('deliveryPostcode');
@@ -243,6 +275,47 @@ export default function Book() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
+
+  // Auto-save booking data to localStorage
+  useEffect(() => {
+    const saveBookingData = () => {
+      const dataToSave = {
+        pickupPostcode,
+        deliveryPostcode,
+        weight,
+        vehicleType,
+        isMultiDrop,
+        isReturnTrip,
+        returnToSameLocation,
+        returnPostcode,
+        pickupFullAddress,
+        deliveryFullAddress,
+        pickupAddress,
+        deliveryAddress,
+        multiDropStops,
+        savedAt: new Date().toISOString(),
+      };
+      try {
+        localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(dataToSave));
+      } catch (e) {
+        console.error('Error saving booking draft:', e);
+      }
+    };
+
+    // Only save if there's meaningful data
+    if (pickupPostcode || deliveryPostcode || vehicleType) {
+      saveBookingData();
+    }
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, returnPostcode, pickupFullAddress, deliveryFullAddress, pickupAddress, deliveryAddress, multiDropStops]);
+
+  // Clear saved booking data after successful booking
+  const clearSavedBooking = () => {
+    try {
+      localStorage.removeItem(BOOKING_STORAGE_KEY);
+    } catch (e) {
+      console.error('Error clearing saved booking:', e);
+    }
+  };
 
   useEffect(() => {
     if (userProfile) {
@@ -1478,6 +1551,7 @@ export default function Book() {
                             description: `Your booking has been created. Tracking number: ${result.trackingNumber}`,
                           });
                           
+                          clearSavedBooking();
                           setLocation(`/payment/success?tracking=${result.trackingNumber}&payLater=true`);
                         } else {
                           setPendingBookingData(bookingData);
@@ -1539,6 +1613,7 @@ export default function Book() {
                       title: 'Payment Successful!',
                       description: `Your booking has been confirmed. Tracking number: ${trackingNumber}`,
                     });
+                    clearSavedBooking();
                     setLocation(`/payment/success?tracking=${trackingNumber}`);
                   }}
                   onCancel={() => {
