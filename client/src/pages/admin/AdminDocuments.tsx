@@ -255,44 +255,45 @@ export default function AdminDocuments() {
           <DialogContent className="max-w-3xl max-h-screen overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Preview Document</DialogTitle>
-              <DialogDescription>
-                {selectedDoc && (
-                  <div className="space-y-2 mt-2">
-                    <p><strong>Driver:</strong> {getDriverName(selectedDoc.driverId)}</p>
-                    <p><strong>Type:</strong> {selectedDoc.type.replace(/_/g, ' ')}</p>
-                    <p><strong>File:</strong> {selectedDoc.fileName}</p>
-                  </div>
-                )}
-              </DialogDescription>
+              <DialogDescription>View and manage document details</DialogDescription>
             </DialogHeader>
             {selectedDoc && (
-              <div className="mt-4">
-                {selectedDoc.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                  <iframe
-                    src={selectedDoc.fileUrl}
-                    className="w-full h-96 border rounded"
-                    title="Document Preview"
-                  />
-                ) : selectedDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                  <img
-                    src={selectedDoc.fileUrl}
-                    alt="Document Preview"
-                    className="max-w-full h-auto max-h-96 rounded border"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-48 bg-muted rounded">
-                    <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">Preview not available for this file type</p>
-                    <a
-                      href={selectedDoc.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-4 text-primary hover:underline"
-                    >
-                      Open in new tab
-                    </a>
+              <div className="space-y-4">
+                <div className="border-b border-border pb-4">
+                  <div className="space-y-2">
+                    <div><strong>Driver:</strong> {getDriverName(selectedDoc.driverId)}</div>
+                    <div><strong>Type:</strong> {selectedDoc.type.replace(/_/g, ' ')}</div>
+                    <div><strong>File:</strong> {selectedDoc.fileName}</div>
                   </div>
-                )}
+                </div>
+                <div>
+                  {selectedDoc.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                    <iframe
+                      src={selectedDoc.fileUrl}
+                      className="w-full h-96 border rounded"
+                      title="Document Preview"
+                    />
+                  ) : selectedDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                    <img
+                      src={selectedDoc.fileUrl}
+                      alt="Document Preview"
+                      className="max-w-full h-auto max-h-96 rounded border"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-48 bg-muted rounded">
+                      <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">Preview not available for this file type</p>
+                      <a
+                        href={selectedDoc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 text-primary hover:underline"
+                      >
+                        Open in new tab
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             <DialogFooter>
