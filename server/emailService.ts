@@ -101,6 +101,103 @@ export async function sendAdminNotification(
   return sendEmailNotification('info@runcourier.co.uk', subject, htmlContent, textContent);
 }
 
+export async function sendWelcomeEmail(
+  email: string,
+  name: string,
+  role: string
+): Promise<boolean> {
+  const roleText = role === 'business' ? 'Business Account' : 'Customer Account';
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #007BFF; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Welcome to Run Courier!</h1>
+      </div>
+      <div style="padding: 30px; background-color: #f9f9f9;">
+        <h2 style="color: #333;">Hello ${name}!</h2>
+        <p style="color: #666; font-size: 16px;">
+          Thank you for registering with Run Courier. Your ${roleText} has been successfully created.
+        </p>
+        <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">What you can do now:</h3>
+          <ul style="color: #666; line-height: 1.8;">
+            <li>Book same-day deliveries across the UK</li>
+            <li>Track your parcels in real-time</li>
+            <li>View your booking history</li>
+            ${role === 'business' ? '<li>Access Pay Later invoicing options</li>' : ''}
+            <li>Get 24/7 customer support</li>
+          </ul>
+        </div>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="https://www.runcourier.co.uk/book" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+            Book Your First Delivery
+          </a>
+        </div>
+        <p style="color: #666; font-size: 14px;">
+          If you have any questions, our support team is here to help 24/7.
+        </p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">
+          Run Courier - Same Day Delivery Across the UK<br>
+          <a href="https://www.runcourier.co.uk" style="color: #007BFF;">www.runcourier.co.uk</a> | 
+          <a href="tel:+447311121217" style="color: #007BFF;">+44 7311 121 217</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  const textContent = `Welcome to Run Courier!\n\nHello ${name}!\n\nThank you for registering with Run Courier. Your ${roleText} has been successfully created.\n\nWhat you can do now:\n- Book same-day deliveries across the UK\n- Track your parcels in real-time\n- View your booking history\n- Get 24/7 customer support\n\nVisit https://www.runcourier.co.uk/book to book your first delivery.\n\nRun Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(email, 'Welcome to Run Courier!', htmlContent, textContent);
+}
+
+export async function sendNewRegistrationNotification(
+  email: string,
+  name: string,
+  role: string,
+  company?: string
+): Promise<boolean> {
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #007BFF; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Run Courier</h1>
+      </div>
+      <div style="padding: 30px; background-color: #f9f9f9;">
+        <h2 style="color: #333; margin-top: 0;">New User Registration</h2>
+        <div style="background-color: white; border-radius: 8px; padding: 20px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 120px;"><strong>Name:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Email:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><a href="mailto:${email}" style="color: #007BFF;">${email}</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Account Type:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${role === 'business' ? 'Business' : 'Individual'}</td>
+            </tr>
+            ${company ? `
+            <tr>
+              <td style="padding: 10px 0; color: #666;"><strong>Company:</strong></td>
+              <td style="padding: 10px 0; color: #333;">${company}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">
+          Run Courier - Same Day Delivery Across the UK
+        </p>
+      </div>
+    </div>
+  `;
+
+  const textContent = `New User Registration\n\nName: ${name}\nEmail: ${email}\nAccount Type: ${role === 'business' ? 'Business' : 'Individual'}${company ? `\nCompany: ${company}` : ''}\n\nRun Courier`;
+
+  return sendAdminNotification('New User Registration', htmlContent, textContent);
+}
+
 export async function sendNewJobNotification(jobId: string, jobDetails: any): Promise<boolean> {
   const htmlContent = `
     <h2>New Booking</h2>

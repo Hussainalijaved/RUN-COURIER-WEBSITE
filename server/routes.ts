@@ -22,7 +22,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification } from "./emailService";
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
@@ -2017,6 +2017,23 @@ export async function registerRoutes(
     await sendContactFormSubmission(name, email, phone, subject, message).catch(err => console.error('Failed to send contact form:', err));
     
     res.status(200).json({ success: true, message: "Your message has been sent successfully" });
+  }));
+
+  // Send welcome and registration notification emails after signup
+  app.post("/api/auth/registration-email", asyncHandler(async (req, res) => {
+    const { email, name, role, company } = req.body;
+    
+    if (!email || !name) {
+      return res.status(400).json({ error: "Email and name are required" });
+    }
+
+    // Send welcome email to the new user
+    await sendWelcomeEmail(email, name, role || 'customer').catch(err => console.error('Failed to send welcome email:', err));
+    
+    // Send notification to admin about new registration
+    await sendNewRegistrationNotification(email, name, role || 'customer', company).catch(err => console.error('Failed to send registration notification:', err));
+    
+    res.status(200).json({ success: true, message: "Registration emails sent" });
   }));
 
   // Password reset endpoint using Resend for reliable email delivery

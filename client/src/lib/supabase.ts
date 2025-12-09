@@ -32,6 +32,25 @@ export const signUp = async (email: string, password: string, metadata: Record<s
       data: metadata,
     },
   });
+  
+  // Send welcome email and admin notification after successful signup
+  if (data?.user && !error) {
+    try {
+      await fetch('/api/auth/registration-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          name: metadata.full_name || metadata.fullName || email.split('@')[0],
+          role: metadata.user_type || metadata.userType || 'customer',
+          company: metadata.company_name || metadata.companyName
+        })
+      });
+    } catch (err) {
+      console.error('Failed to send registration emails:', err);
+    }
+  }
+  
   return { data, error };
 };
 
