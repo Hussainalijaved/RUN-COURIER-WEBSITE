@@ -301,6 +301,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'same-day' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Same Day Delivery service is designed for businesses requiring fast, reliable, and time-critical transportation of goods within the shortest possible timeframe. Once a booking is made, a dedicated driver is immediately assigned to collect the item and deliver it directly to the destination without unnecessary stops or delays. This point-to-point model ensures maximum speed, full security of the parcel, and complete transparency throughout the journey.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                This service is ideal for urgent documents, medical samples, retail orders, spare parts, and high-value goods where delays are not acceptable. Clients benefit from real-time tracking, live updates, proof of delivery, and full accountability from collection to drop-off. Whether you are a business, organisation, or individual requiring urgent delivery, our Same Day service guarantees priority handling and an unparalleled level of reliability.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
