@@ -376,6 +376,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'legal' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Legal Courier service supports law firms, solicitors, estate agencies, and corporate offices that require secure, confidential, and time-sensitive document transportation. We specialise in the delivery of legal documents, contracts, deeds, evidence files, court bundles, and signed agreements. Each item is handled with the highest level of confidentiality to protect client information and legal integrity.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                This service ensures your documents are collected promptly, delivered directly, and recorded with proof of delivery for full traceability. Our drivers understand the importance of accuracy and punctuality in legal matters, making this service ideal for firms that require dependable, secure, and professional same-day or scheduled document movement.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
