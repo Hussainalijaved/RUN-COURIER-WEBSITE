@@ -71,8 +71,8 @@ export default function Track() {
   const [job, setJob] = useState<MockJob | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleTrack = async () => {
-    if (!trackingNumber.trim()) {
+  const fetchTrackingData = async (number: string) => {
+    if (!number.trim()) {
       setError('Please enter a tracking number');
       return;
     }
@@ -81,7 +81,7 @@ export default function Track() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/jobs/track/${trackingNumber.toUpperCase()}`);
+      const response = await fetch(`/api/jobs/track/${number.toUpperCase()}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -110,9 +110,13 @@ export default function Track() {
     setIsLoading(false);
   };
 
+  const handleTrack = () => {
+    fetchTrackingData(trackingNumber);
+  };
+
   useEffect(() => {
     if (initialId) {
-      handleTrack();
+      fetchTrackingData(initialId);
     }
   }, [initialId]);
 
