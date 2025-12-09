@@ -32,70 +32,36 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-card">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5">
-          <div className="lg:col-span-2">
-            <Link href="/" className="flex items-center gap-3 mb-4" data-testid="footer-logo-link">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
+          <div>
+            <Link href="/" className="flex items-center gap-2 mb-4" data-testid="footer-logo-link">
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-12 w-auto object-contain"
+                className="h-10 w-auto object-contain"
                 data-testid="footer-logo-image"
               />
-              <span className="font-bold text-xl tracking-tight">
+              <span className="font-bold text-sm tracking-tight">
                 RUN COURIER<sup className="text-xs ml-0.5">™</sup>
               </span>
             </Link>
-            <p className="text-muted-foreground mb-6 max-w-sm text-sm">
-              Fast, reliable courier services across the UK.
-            </p>
             
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center gap-3 text-sm">
-                <Phone className="h-4 w-4 text-primary flex-shrink-0" />
-                <div className="flex items-center gap-2">
-                  <span>+44 7311 121 217</span>
-                  <a 
-                    href="https://wa.me/447311121217" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-green-500 hover:text-green-600 transition-colors"
-                    data-testid="whatsapp-link-1"
-                  >
-                    <SiWhatsapp className="h-3.5 w-3.5" />
-                  </a>
-                </div>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-xs">
+                <Phone className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                <span>+44 7311 121 217</span>
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <Phone className="h-4 w-4 text-primary flex-shrink-0" />
-                <div className="flex items-center gap-2">
-                  <span>+44 7862 771 999</span>
-                  <a 
-                    href="https://wa.me/447862771999" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-green-500 hover:text-green-600 transition-colors"
-                    data-testid="whatsapp-link-2"
-                  >
-                    <SiWhatsapp className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <Mail className="h-4 w-4 text-primary flex-shrink-0" />
+              <div className="flex items-center gap-2 text-xs">
+                <Mail className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                 <span>info@runcourier.co.uk</span>
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
-                <span>112 Bridgwater Road, Ruislip, HA4 6LW</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <Clock className="h-4 w-4 text-primary flex-shrink-0" />
-                <span>24/7 Available</span>
+              <div className="flex items-center gap-2 text-xs">
+                <MapPin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                <span>112 Bridgwater Road, Ruislip</span>
               </div>
             </div>
             
-            <div className="flex items-center gap-3 pt-4 border-t border-border">
-              <span className="text-xs text-muted-foreground font-medium">Follow</span>
+            <div className="flex gap-2">
               <a 
                 href="https://www.facebook.com/profile.php?id=61576739843460" 
                 target="_blank" 
@@ -103,7 +69,7 @@ export function Footer() {
                 className="text-blue-600 hover:text-blue-700 transition-colors"
                 data-testid="facebook-link-top"
               >
-                <SiFacebook className="h-5 w-5" />
+                <SiFacebook className="h-4 w-4" />
               </a>
               <a 
                 href="https://uk.trustpilot.com/review/runcourier.co.uk" 
@@ -112,7 +78,7 @@ export function Footer() {
                 className="text-green-500 hover:text-green-600 transition-colors"
                 data-testid="trustpilot-link-top"
               >
-                <SiTrustpilot className="h-5 w-5" />
+                <SiTrustpilot className="h-4 w-4" />
               </a>
               <a 
                 href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
@@ -121,14 +87,14 @@ export function Footer() {
                 className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
                 data-testid="appstore-link-top"
               >
-                <SiAppstore className="h-5 w-5" />
+                <SiAppstore className="h-4 w-4" />
               </a>
             </div>
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4 text-sm">Services</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold mb-3 text-xs">Services</h4>
+            <ul className="space-y-1.5">
               {footerLinks.services.map((link) => (
                 <li key={link.href}>
                   <Link
@@ -143,8 +109,8 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4 text-sm">Company</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold mb-3 text-xs">Company</h4>
+            <ul className="space-y-1.5 mb-4">
               {footerLinks.company.map((link) => (
                 <li key={link.href}>
                   <Link
@@ -156,11 +122,8 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold mb-4 text-sm">Legal</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold mb-3 text-xs">Legal</h4>
+            <ul className="space-y-1.5">
               {footerLinks.legal.map((link) => (
                 <li key={link.href}>
                   <Link
@@ -175,8 +138,8 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4 text-sm">Portals</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold mb-3 text-xs">Portals</h4>
+            <ul className="space-y-1.5">
               {footerLinks.portals.map((link) => (
                 <li key={link.href}>
                   <Link
@@ -191,20 +154,10 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-border mt-12 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} Run Courier. All rights reserved.
-            </p>
-            <div className="flex gap-6 text-xs text-muted-foreground">
-              <Link href="/terms" className="hover:text-foreground transition-colors">
-                Terms
-              </Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">
-                Privacy
-              </Link>
-            </div>
-          </div>
+        <div className="border-t border-border mt-8 pt-4">
+          <p className="text-xs text-muted-foreground text-center">
+            © {new Date().getFullYear()} Run Courier. All rights reserved.
+          </p>
         </div>
       </div>
     </footer>
