@@ -316,6 +316,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'multi-drop' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Multi-Drop Delivery service is specifically designed for businesses that need to distribute multiple parcels or orders across several locations in one coordinated route. Instead of booking separate deliveries, clients can consolidate their shipments into one efficient plan managed by a single dedicated driver. This not only reduces operational costs but also speeds up the entire delivery process, ensuring every drop is completed professionally and on time.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Multi-Drop is the ideal solution for e-commerce businesses, pharmacies, bakeries, florists, and organisations that manage daily outbound orders. We optimise each route for speed, fuel efficiency, and accuracy, ensuring every drop is recorded with real-time tracking and proof of delivery. This service helps businesses streamline operations, improve customer satisfaction, and maintain consistent, dependable distribution.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
