@@ -70,23 +70,16 @@ export default function About() {
               <h2 className="text-3xl font-bold mb-6">Our Story</h2>
               <div className="space-y-4 text-muted-foreground">
                 <p>
-                  Run Courier was founded in 2018 with a simple vision: to provide 
-                  the fastest and most reliable courier service in London and beyond.
+                  Run Courier is a professional same-day delivery and logistics company dedicated to providing fast, secure, and reliable transport services for businesses across London and the UK. Founded on principles of precision, transparency, and uncompromising service quality, we support organisations that depend on time-critical and sensitive deliveries — including healthcare providers, law firms, retail brands, corporate offices, laboratories, restaurants, and e-commerce businesses.
                 </p>
                 <p>
-                  What started as a small team of dedicated drivers has grown into 
-                  a network of over 500 professional couriers, serving thousands of 
-                  businesses and individuals across the UK.
+                  Our mission is to deliver a logistics experience built on trust and operational excellence. Every job is handled with care by trained, vetted drivers who understand the importance of confidentiality, punctuality, and professional conduct. Whether transporting medical samples, confidential documents, fragile goods, retail orders, or large multi-drop routes, we maintain strict standards of safety, accuracy, and reliability from collection to final delivery.
                 </p>
                 <p>
-                  We've embraced technology to transform the delivery experience, 
-                  offering real-time tracking, instant quotes, and seamless booking 
-                  through our platform and mobile apps.
+                  At Run Courier, we combine advanced technology with practical industry expertise to streamline the entire delivery process. Our platform offers real-time tracking, instant notifications, optimised routes, fast booking, proof of delivery, and dedicated support — giving our clients complete visibility and control over every shipment. We operate seven days a week and specialise in same-day, scheduled, multi-drop, and specialist courier services tailored to the unique requirements of modern businesses.
                 </p>
                 <p>
-                  Today, we handle everything from urgent same-day documents to 
-                  large-scale retail logistics, medical specimens, and specialized 
-                  deliveries - all with the same commitment to excellence.
+                  As a growing logistics provider, we remain committed to continuous improvement and building long-term professional partnerships. Our focus is simple: to be the courier service that businesses trust when it matters most — delivering every item with speed, security, and the highest level of professionalism.
                 </p>
               </div>
             </div>
