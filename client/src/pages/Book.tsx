@@ -319,18 +319,19 @@ export default function Book() {
 
   useEffect(() => {
     if (userProfile) {
-      setPickupAddress(userProfile.address || '');
-      setPickupBuildingName(userProfile.buildingName || '');
-      setPickupName(userProfile.fullName || '');
-      setPickupPhone(userProfile.phone || '');
-      setCustomerEmail(userProfile.email || '');
+      // Only set pickup address from profile if not already set from quote/saved data
+      setPickupAddress(prev => prev || userProfile.address || '');
+      setPickupBuildingName(prev => prev || userProfile.buildingName || '');
+      setPickupName(prev => prev || userProfile.fullName || '');
+      setPickupPhone(prev => prev || userProfile.phone || '');
+      setCustomerEmail(prev => prev || userProfile.email || '');
       if (userProfile.postcode && !form.getValues('pickupPostcode')) {
         form.setValue('pickupPostcode', userProfile.postcode);
       }
     } else if (user) {
-      setPickupName(user.fullName || '');
-      setPickupPhone(user.phone || '');
-      setCustomerEmail(user.email || '');
+      setPickupName(prev => prev || user.fullName || '');
+      setPickupPhone(prev => prev || user.phone || '');
+      setCustomerEmail(prev => prev || user.email || '');
     }
   }, [userProfile, user, form]);
 
@@ -425,9 +426,11 @@ export default function Book() {
       if (pickupLocation && deliveryLocation) {
         if (pickupLocation.formattedAddress) {
           setPickupFullAddress(pickupLocation.formattedAddress);
+          setPickupAddress(pickupLocation.formattedAddress);
         }
         if (deliveryLocation.formattedAddress) {
           setDeliveryFullAddress(deliveryLocation.formattedAddress);
+          setDeliveryAddress(deliveryLocation.formattedAddress);
         }
 
         const distanceResult = await calculateDistance(
