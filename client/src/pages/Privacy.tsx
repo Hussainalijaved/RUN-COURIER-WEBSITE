@@ -109,9 +109,9 @@ export default function Privacy() {
               For privacy-related inquiries or to exercise your rights, contact our Data Protection Officer at:
             </p>
             <p className="text-muted-foreground mt-2">
-              Email: privacy@runcourier.co.uk<br />
-              Phone: 0800 123 4567<br />
-              Address: 123 Courier Lane, London, EC1A 1BB
+              Email: info@runcourier.co.uk<br />
+              Phone: +447311121217<br />
+              Address: 112 Bredgwater Road, Ruislip, HA4 6LW
             </p>
           </section>
 
