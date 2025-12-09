@@ -96,8 +96,12 @@ export default function Terms() {
           <section className="mb-8">
             <h2 className="text-2xl font-semibold mb-4">10. Contact Us</h2>
             <p className="text-muted-foreground">
-              For questions about these terms, please contact us at legal@runcourier.co.uk 
-              or call 0800 123 4567.
+              For questions about these terms, please contact us at:
+            </p>
+            <p className="text-muted-foreground mt-2">
+              Email: info@runcourier.co.uk<br />
+              Phone: +447311121217<br />
+              Address: 112 Bredgwater Road, Ruislip, HA4 6LW
             </p>
           </section>
         </div>
