@@ -24,6 +24,7 @@ import {
   type UserRole,
   type BookingQuoteInput,
   driverApplications,
+  jobs,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -853,6 +854,68 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.jobs.set(id, job);
+    
+    // Also persist to database
+    try {
+      await db.insert(jobs).values({
+        id: job.id,
+        trackingNumber: job.trackingNumber,
+        customerId: job.customerId,
+        driverId: job.driverId,
+        dispatcherId: job.dispatcherId,
+        vendorId: job.vendorId,
+        status: job.status,
+        vehicleType: job.vehicleType,
+        pickupAddress: job.pickupAddress,
+        pickupPostcode: job.pickupPostcode,
+        pickupLatitude: job.pickupLatitude,
+        pickupLongitude: job.pickupLongitude,
+        pickupInstructions: job.pickupInstructions,
+        deliveryAddress: job.deliveryAddress,
+        deliveryPostcode: job.deliveryPostcode,
+        deliveryLatitude: job.deliveryLatitude,
+        deliveryLongitude: job.deliveryLongitude,
+        deliveryInstructions: job.deliveryInstructions,
+        recipientName: job.recipientName,
+        recipientPhone: job.recipientPhone,
+        weight: job.weight,
+        distance: job.distance,
+        isMultiDrop: job.isMultiDrop,
+        isReturnTrip: job.isReturnTrip,
+        returnToSameLocation: job.returnToSameLocation,
+        returnAddress: job.returnAddress,
+        returnPostcode: job.returnPostcode,
+        isScheduled: job.isScheduled,
+        scheduledPickupTime: job.scheduledPickupTime,
+        scheduledDeliveryTime: job.scheduledDeliveryTime,
+        isCentralLondon: job.isCentralLondon,
+        isRushHour: job.isRushHour,
+        basePrice: job.basePrice,
+        distancePrice: job.distancePrice,
+        weightSurcharge: job.weightSurcharge,
+        multiDropCharge: job.multiDropCharge,
+        returnTripCharge: job.returnTripCharge,
+        centralLondonCharge: job.centralLondonCharge,
+        waitingTimeCharge: job.waitingTimeCharge,
+        totalPrice: job.totalPrice,
+        driverPrice: job.driverPrice,
+        paymentStatus: job.paymentStatus,
+        paymentIntentId: job.paymentIntentId,
+        podPhotoUrl: job.podPhotoUrl,
+        podSignatureUrl: job.podSignatureUrl,
+        deliveredAt: job.deliveredAt,
+        rejectionReason: job.rejectionReason,
+        estimatedPickupTime: job.estimatedPickupTime,
+        estimatedDeliveryTime: job.estimatedDeliveryTime,
+        actualPickupTime: job.actualPickupTime,
+        actualDeliveryTime: job.actualDeliveryTime,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+      });
+    } catch (err) {
+      console.error('Failed to persist job to database:', err);
+    }
+    
     return job;
   }
 

@@ -97,8 +97,15 @@ export async function registerRoutes(
   }));
 
   // Track by tracking number - must be before :id route
+  // Query database directly for public tracking (doesn't require auth)
   app.get("/api/jobs/track/:trackingNumber", asyncHandler(async (req, res) => {
-    const job = await storage.getJobByTrackingNumber(req.params.trackingNumber);
+    const { db } = await import("./db");
+    const { eq } = await import("drizzle-orm");
+    const { jobs } = await import("@shared/schema");
+    
+    const trackingNumber = req.params.trackingNumber.toUpperCase();
+    const [job] = await db.select().from(jobs).where(eq(jobs.trackingNumber, trackingNumber)).limit(1);
+    
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
