@@ -106,3 +106,4 @@ integrations = ["stripe:1.0.0", "resend:1.0.0", "javascript_stripe:1.0.0"]
 [userenv.shared]
 TESTING_VITE_STRIPE_PUBLIC_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwvoYu7injdGbDVInDb6W8OawVlcwuO2frMNx3y8IuQoXIh2Erq00wayXGWgW"
 TESTING_STRIPE_SECRET_KEY = "sk_live_...sak1"
+VITE_STRIPE_PUBLISHABLE_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwvoYu7injdGbDVInDb6W8OawVlcwuO2frMNx3y8IuQoXIh2Erq00wayXGWgW"
