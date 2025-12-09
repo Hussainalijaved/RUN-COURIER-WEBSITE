@@ -251,48 +251,6 @@ export default function AdminDocuments() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              All Documents
-            </CardTitle>
-            <CardDescription>Complete document history</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {docsLoading ? (
-              <Skeleton className="h-96 w-full" />
-            ) : documents && documents.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Driver</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>File</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Reviewed By</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {documents.map((doc) => (
-                      <TableRow key={doc.id} data-testid={`row-all-doc-${doc.id}`}>
-                        <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
-                        <TableCell className="capitalize text-sm">{doc.type.replace(/_/g, ' ')}</TableCell>
-                        <TableCell className="text-sm">{doc.fileName}</TableCell>
-                        <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                        <TableCell className="text-sm">{doc.reviewedBy || '—'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">No documents found</p>
-            )}
-          </CardContent>
-        </Card>
-
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
           <DialogContent className="max-w-3xl max-h-screen overflow-y-auto">
             <DialogHeader>
