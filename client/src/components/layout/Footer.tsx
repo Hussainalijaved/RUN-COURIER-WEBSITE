@@ -45,52 +45,57 @@ export function Footer() {
                 RUN COURIER<sup className="text-xs ml-0.5">™</sup>
               </span>
             </Link>
-            <p className="text-muted-foreground mb-6 max-w-sm">
-              Fast, reliable courier services across the UK. Same-day delivery, medical transport, and more.
+            <p className="text-muted-foreground mb-6 max-w-sm text-sm">
+              Fast, reliable courier services across the UK.
             </p>
-            <div className="space-y-3">
+            
+            <div className="space-y-3 mb-6">
               <div className="flex items-center gap-3 text-sm">
-                <Phone className="h-4 w-4 text-primary" />
-                <span>+44 7311 121 217</span>
-                <a 
-                  href="https://wa.me/447311121217" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-green-500 hover:text-green-600 transition-colors"
-                  data-testid="whatsapp-link-1"
-                >
-                  <SiWhatsapp className="h-4 w-4" />
-                </a>
+                <Phone className="h-4 w-4 text-primary flex-shrink-0" />
+                <div className="flex items-center gap-2">
+                  <span>+44 7311 121 217</span>
+                  <a 
+                    href="https://wa.me/447311121217" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-green-500 hover:text-green-600 transition-colors"
+                    data-testid="whatsapp-link-1"
+                  >
+                    <SiWhatsapp className="h-3.5 w-3.5" />
+                  </a>
+                </div>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <Phone className="h-4 w-4 text-primary" />
-                <span>+44 7862 771 999</span>
-                <a 
-                  href="https://wa.me/447862771999" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-green-500 hover:text-green-600 transition-colors"
-                  data-testid="whatsapp-link-2"
-                >
-                  <SiWhatsapp className="h-4 w-4" />
-                </a>
+                <Phone className="h-4 w-4 text-primary flex-shrink-0" />
+                <div className="flex items-center gap-2">
+                  <span>+44 7862 771 999</span>
+                  <a 
+                    href="https://wa.me/447862771999" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-green-500 hover:text-green-600 transition-colors"
+                    data-testid="whatsapp-link-2"
+                  >
+                    <SiWhatsapp className="h-3.5 w-3.5" />
+                  </a>
+                </div>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <Mail className="h-4 w-4 text-primary" />
+                <Mail className="h-4 w-4 text-primary flex-shrink-0" />
                 <span>info@runcourier.co.uk</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <MapPin className="h-4 w-4 text-primary" />
-                <span>112 Bridgwater Road, London, UK, HA4 6LW</span>
+                <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
+                <span>112 Bridgwater Road, Ruislip, HA4 6LW</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <Clock className="h-4 w-4 text-primary" />
-                <span>24/7 Service Available</span>
+                <Clock className="h-4 w-4 text-primary flex-shrink-0" />
+                <span>24/7 Available</span>
               </div>
             </div>
             
-            <div className="flex items-center gap-4 mt-6 pt-4 border-t border-border">
-              <span className="text-sm text-muted-foreground">Follow us:</span>
+            <div className="flex items-center gap-3 pt-4 border-t border-border">
+              <span className="text-xs text-muted-foreground font-medium">Follow</span>
               <a 
                 href="https://www.facebook.com/profile.php?id=61576739843460" 
                 target="_blank" 
@@ -98,7 +103,7 @@ export function Footer() {
                 className="text-blue-600 hover:text-blue-700 transition-colors"
                 data-testid="facebook-link-top"
               >
-                <SiFacebook className="h-6 w-6" />
+                <SiFacebook className="h-5 w-5" />
               </a>
               <a 
                 href="https://uk.trustpilot.com/review/runcourier.co.uk" 
@@ -107,7 +112,7 @@ export function Footer() {
                 className="text-green-500 hover:text-green-600 transition-colors"
                 data-testid="trustpilot-link-top"
               >
-                <SiTrustpilot className="h-6 w-6" />
+                <SiTrustpilot className="h-5 w-5" />
               </a>
               <a 
                 href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
@@ -116,7 +121,7 @@ export function Footer() {
                 className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
                 data-testid="appstore-link-top"
               >
-                <SiAppstore className="h-6 w-6" />
+                <SiAppstore className="h-5 w-5" />
               </a>
             </div>
           </div>
