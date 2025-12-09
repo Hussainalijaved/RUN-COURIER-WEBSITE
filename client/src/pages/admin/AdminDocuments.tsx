@@ -93,6 +93,7 @@ export default function AdminDocuments() {
   };
 
   const pendingDocs = documents?.filter(d => d.status === 'pending') || [];
+  const approvedDocs = documents?.filter(d => d.status === 'approved') || [];
 
   return (
     <DashboardLayout>
@@ -176,6 +177,75 @@ export default function AdminDocuments() {
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
                 <p className="text-muted-foreground">All documents have been reviewed</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Approved Documents ({approvedDocs.length})
+            </CardTitle>
+            <CardDescription>Re-review or change approval status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {docsLoading ? (
+              <Skeleton className="h-96 w-full" />
+            ) : approvedDocs.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Document Type</TableHead>
+                      <TableHead>File Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {approvedDocs.map((doc) => (
+                      <TableRow key={doc.id} data-testid={`row-approved-document-${doc.id}`}>
+                        <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
+                        <TableCell className="capitalize">{doc.type.replace(/_/g, ' ')}</TableCell>
+                        <TableCell className="text-sm">{doc.fileName}</TableCell>
+                        <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedDoc(doc);
+                                setViewDialogOpen(true);
+                              }}
+                              data-testid={`button-view-approved-${doc.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'rejected' })}
+                              disabled={reviewDocumentMutation.isPending}
+                              data-testid={`button-reject-approved-${doc.id}`}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                <p className="text-muted-foreground">No approved documents to review</p>
               </div>
             )}
           </CardContent>
