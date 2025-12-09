@@ -188,10 +188,20 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-border mt-12 pt-8 flex justify-center items-center">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Run Courier. All rights reserved.
-          </p>
+        <div className="border-t border-border mt-12 pt-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-muted-foreground">
+              © {new Date().getFullYear()} Run Courier. All rights reserved.
+            </p>
+            <div className="flex gap-6 text-xs text-muted-foreground">
+              <Link href="/terms" className="hover:text-foreground transition-colors">
+                Terms
+              </Link>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
+                Privacy
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </footer>
