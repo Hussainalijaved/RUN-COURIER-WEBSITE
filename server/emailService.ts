@@ -621,55 +621,13 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
         </tr>
       </table>
 
-      <!-- Payment Summary -->
-      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
-        <h3 style="color: #333; margin: 0 0 15px; font-size: 16px;">PAYMENT SUMMARY</h3>
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 5px 0; color: #666;">Base Price</td>
-            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.basePrice || 0).toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 5px 0; color: #666;">Distance</td>
-            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}</td>
-          </tr>
-          ${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `
-          <tr>
-            <td style="padding: 5px 0; color: #666;">Weight Surcharge</td>
-            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.weightSurcharge).toFixed(2)}</td>
-          </tr>
-          ` : ''}
-          ${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `
-          <tr>
-            <td style="padding: 5px 0; color: #666;">Multi-Drop</td>
-            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.multiDropCharge).toFixed(2)}</td>
-          </tr>
-          ` : ''}
-          ${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `
-          <tr>
-            <td style="padding: 5px 0; color: #666;">Return Trip</td>
-            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.returnTripCharge).toFixed(2)}</td>
-          </tr>
-          ` : ''}
-          ${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `
-          <tr>
-            <td style="padding: 5px 0; color: #666;">Central London</td>
-            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}</td>
-          </tr>
-          ` : ''}
-        </table>
-        <hr style="border: none; border-top: 2px solid #ddd; margin: 15px 0;">
-        <table style="width: 100%;">
-          <tr>
-            <td style="padding: 5px 0; color: #333; font-size: 18px; font-weight: bold;">Total Paid</td>
-            <td style="padding: 5px 0; color: #007BFF; text-align: right; font-size: 24px; font-weight: bold;">£${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}</td>
-          </tr>
-        </table>
-        <p style="margin: 15px 0 0; text-align: center;">
-          <span style="background-color: ${jobDetails.paymentStatus === 'paid' ? '#28a745' : jobDetails.paymentStatus === 'pay_later' ? '#ffc107' : '#dc3545'}; color: ${jobDetails.paymentStatus === 'pay_later' ? '#333' : 'white'}; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold;">
-            ${jobDetails.paymentStatus === 'paid' ? 'PAYMENT CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER - INVOICE PENDING' : 'PAYMENT PENDING'}
-          </span>
-        </p>
+      <!-- Total Amount -->
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px; color: #666; font-size: 14px;">Total Amount</p>
+        <p style="margin: 0 0 15px; color: #007BFF; font-size: 32px; font-weight: bold;">£${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}</p>
+        <span style="background-color: ${jobDetails.paymentStatus === 'paid' ? '#28a745' : jobDetails.paymentStatus === 'pay_later' ? '#ffc107' : '#dc3545'}; color: ${jobDetails.paymentStatus === 'pay_later' ? '#333' : 'white'}; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold;">
+          ${jobDetails.paymentStatus === 'paid' ? 'PAYMENT CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER - INVOICE PENDING' : 'PAYMENT PENDING'}
+        </span>
       </div>
     </div>
 
@@ -721,12 +679,7 @@ Weight: ${jobDetails.weight || '0'} kg
 Distance: ${jobDetails.distance || '0'} miles
 ${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 'Return Trip: Yes\n' : ''}
 
-PAYMENT SUMMARY
----------------
-Base Price: £${parseFloat(jobDetails.basePrice || 0).toFixed(2)}
-Distance: £${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}
-${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `Weight Surcharge: £${parseFloat(jobDetails.weightSurcharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `Multi-Drop: £${parseFloat(jobDetails.multiDropCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `Return Trip: £${parseFloat(jobDetails.returnTripCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `Central London: £${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}\n` : ''}
-TOTAL: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
+TOTAL AMOUNT: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
 Payment Status: ${jobDetails.paymentStatus === 'paid' ? 'CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER' : 'PENDING'}
 
 Track your delivery: https://www.runcourier.co.uk/track?ref=${jobDetails.trackingNumber}
