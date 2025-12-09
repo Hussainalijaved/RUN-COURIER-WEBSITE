@@ -49,7 +49,7 @@ async function getResendCredentials() {
     console.log('[Email] Using RESEND_API_KEY from environment');
     return {
       apiKey: process.env.RESEND_API_KEY,
-      fromEmail: process.env.RESEND_FROM_EMAIL || 'info@runcourier.co.uk'
+      fromEmail: process.env.RESEND_FROM_EMAIL || 'RUN COURIER <info@runcourier.co.uk>'
     };
   }
 
@@ -88,7 +88,7 @@ async function getResendCredentials() {
     console.log('[Email] Using Resend credentials from Replit connector');
     return {
       apiKey: connectionSettings.settings.api_key,
-      fromEmail: connectionSettings.settings.from_email || 'info@runcourier.co.uk'
+      fromEmail: connectionSettings.settings.from_email || 'RUN COURIER <info@runcourier.co.uk>'
     };
   } catch (error) {
     console.error('[Email] Failed to fetch Resend credentials:', error);
