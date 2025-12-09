@@ -331,6 +331,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'return-trip' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Return Trip service is tailored for customers who require items to be delivered to a destination and then returned to the original pickup point. This is commonly used by businesses handling document signing, contract exchange, material testing, or any process that requires two-way transportation within the same booking. Instead of creating separate jobs, our Return Trip option ensures seamless handling under one organised workflow.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Clients benefit from reduced costs compared to booking two separate deliveries, as well as improved efficiency and faster turnaround times. With real-time tracking, secure handling, and driver accountability at both ends of the journey, the Return Trip service guarantees complete control and convenience while maintaining the high professional standards expected from business-grade courier services.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
