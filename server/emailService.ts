@@ -5,6 +5,9 @@ let connectionSettings: any;
 // Logo URL - use current deployment or production
 const LOGO_URL = 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev/logo-email.jpg';
 
+// Base URL for tracking links - uses current deployment or production
+const BASE_URL = process.env.APP_URL || 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev';
+
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
   return `
@@ -633,7 +636,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
     <!-- Track Your Delivery CTA -->
     <div style="text-align: center; margin: 30px 0;">
-      <a href="https://www.runcourier.co.uk/track?ref=${jobDetails.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+      <a href="${BASE_URL}/track?ref=${jobDetails.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
         Track Your Delivery
       </a>
     </div>
@@ -682,7 +685,7 @@ ${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 
 TOTAL AMOUNT: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
 Payment Status: ${jobDetails.paymentStatus === 'paid' ? 'CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER' : 'PENDING'}
 
-Track your delivery: https://www.runcourier.co.uk/track?ref=${jobDetails.trackingNumber}
+Track your delivery: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}
 
 Need help? Call +44 7311 121 217 or email info@runcourier.co.uk
 

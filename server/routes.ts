@@ -96,16 +96,17 @@ export async function registerRoutes(
     res.json(jobs);
   }));
 
-  app.get("/api/jobs/:id", asyncHandler(async (req, res) => {
-    const job = await storage.getJob(req.params.id);
+  // Track by tracking number - must be before :id route
+  app.get("/api/jobs/track/:trackingNumber", asyncHandler(async (req, res) => {
+    const job = await storage.getJobByTrackingNumber(req.params.trackingNumber);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
     res.json(job);
   }));
 
-  app.get("/api/jobs/track/:trackingNumber", asyncHandler(async (req, res) => {
-    const job = await storage.getJobByTrackingNumber(req.params.trackingNumber);
+  app.get("/api/jobs/:id", asyncHandler(async (req, res) => {
+    const job = await storage.getJob(req.params.id);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }

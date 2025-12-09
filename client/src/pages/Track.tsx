@@ -64,7 +64,7 @@ interface MockJob {
 export default function Track() {
   const searchParams = useSearch();
   const params = new URLSearchParams(searchParams);
-  const initialId = params.get('id') || '';
+  const initialId = params.get('ref') || params.get('id') || '';
   
   const [trackingNumber, setTrackingNumber] = useState(initialId);
   const [isLoading, setIsLoading] = useState(false);
@@ -80,23 +80,30 @@ export default function Track() {
     setIsLoading(true);
     setError(null);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    if (trackingNumber.toUpperCase().startsWith('RC')) {
-      setJob({
-        id: '1',
-        trackingNumber: trackingNumber.toUpperCase(),
-        status: 'on_the_way_delivery',
-        pickupAddress: '123 High Street, London EC1A 1BB',
-        deliveryAddress: '456 Oxford Road, Manchester M1 2AB',
-        driverName: 'John Smith',
-        driverPhone: '07700 900123',
-        vehicleType: 'Car',
-        estimatedDelivery: '14:30',
-        createdAt: new Date().toISOString(),
-      });
-    } else {
-      setError('Tracking number not found. Please check and try again.');
+    try {
+      const response = await fetch(`/api/jobs/track/${trackingNumber.toUpperCase()}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setJob({
+          id: data.id,
+          trackingNumber: data.trackingNumber,
+          status: data.status,
+          pickupAddress: `${data.pickupAddress}, ${data.pickupPostcode}`,
+          deliveryAddress: `${data.deliveryAddress}, ${data.deliveryPostcode}`,
+          driverName: data.driverName || undefined,
+          driverPhone: data.driverPhone || undefined,
+          vehicleType: data.vehicleType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Standard',
+          estimatedDelivery: data.estimatedDeliveryTime ? new Date(data.estimatedDeliveryTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined,
+          createdAt: data.createdAt,
+        });
+        setError(null);
+      } else {
+        setError('Tracking number not found. Please check and try again.');
+        setJob(null);
+      }
+    } catch (err) {
+      setError('Unable to fetch tracking information. Please try again.');
       setJob(null);
     }
 
@@ -107,7 +114,7 @@ export default function Track() {
     if (initialId) {
       handleTrack();
     }
-  }, []);
+  }, [initialId]);
 
   const currentStepIndex = job ? getStatusIndex(job.status) : -1;
 
