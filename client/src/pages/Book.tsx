@@ -612,7 +612,7 @@ export default function Book() {
                                       field.onChange(value);
                                       if (fullAddress) setPickupFullAddress(fullAddress);
                                     }}
-                                    placeholder="e.g., HA4 6LW or start typing address"
+                                    placeholder="e.g., SW1A 1AA"
                                     data-testid="input-pickup-postcode"
                                   />
                                 </FormControl>
@@ -638,7 +638,7 @@ export default function Book() {
                                       field.onChange(value);
                                       if (fullAddress) setDeliveryFullAddress(fullAddress);
                                     }}
-                                    placeholder="e.g., SW1A 1AA or start typing address"
+                                    placeholder="e.g., EC1A 1BB"
                                     data-testid="input-delivery-postcode"
                                   />
                                 </FormControl>
