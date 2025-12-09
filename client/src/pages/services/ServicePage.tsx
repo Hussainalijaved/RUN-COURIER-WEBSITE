@@ -361,6 +361,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'medical' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Medical & Healthcare Delivery service is built to support hospitals, clinics, laboratories, pharmacies, and healthcare providers with urgent, sensitive, and highly regulated transportation needs. We handle medical samples, prescriptions, documents, test kits, diagnostic materials, and healthcare supplies with strict adherence to professional standards. Every delivery is treated with exceptional care to maintain integrity, confidentiality, and compliance throughout the process.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Drivers assigned to medical deliveries are trained to handle time-critical healthcare items responsibly, ensuring safe, direct, and temperature-appropriate transport when required. With real-time tracking, proof of delivery, and secure end-to-end handling, our healthcare courier service provides the reliability and professionalism essential for medical environments where precision and timeliness are vital.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
