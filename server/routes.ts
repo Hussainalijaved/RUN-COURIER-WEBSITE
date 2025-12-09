@@ -139,9 +139,9 @@ export async function registerRoutes(
     // Send admin notification
     await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send job notification:', err));
     // Send customer confirmation if email available
-    const customerEmail = (job as any).customerEmail || data.customerEmail;
+    const customerEmail = req.body.customerEmail || (job as any).customerEmail;
     if (customerEmail) {
-      await sendCustomerBookingConfirmation(customerEmail, job).catch(err => console.error('Failed to send customer confirmation:', err));
+      await sendCustomerBookingConfirmation(customerEmail, { ...job, customerEmail }).catch(err => console.error('Failed to send customer confirmation:', err));
     }
     res.status(201).json(job);
   }));
