@@ -237,14 +237,14 @@ export default function Book() {
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
     defaultValues: {
-      pickupPostcode: savedBooking?.pickupPostcode || '',
-      deliveryPostcode: savedBooking?.deliveryPostcode || '',
+      pickupPostcode: '',
+      deliveryPostcode: '',
       weight: savedBooking?.weight || 1,
       vehicleType: (savedBooking?.vehicleType || '') as VehicleType,
       isMultiDrop: savedBooking?.isMultiDrop || false,
       isReturnTrip: savedBooking?.isReturnTrip || false,
       returnToSameLocation: savedBooking?.returnToSameLocation ?? true,
-      returnPostcode: savedBooking?.returnPostcode || '',
+      returnPostcode: '',
       pickupDate: getTodayDate(),
       pickupTime: getCurrentTime(),
       deliveryDate: '',
@@ -253,11 +253,9 @@ export default function Book() {
   });
 
   useEffect(() => {
+    // Note: Postcodes and addresses are intentionally NOT restored from saved data
+    // They should always be empty when navigating to the booking page
     if (savedBooking) {
-      if (savedBooking.pickupFullAddress) setPickupFullAddress(savedBooking.pickupFullAddress);
-      if (savedBooking.deliveryFullAddress) setDeliveryFullAddress(savedBooking.deliveryFullAddress);
-      if (savedBooking.pickupAddress) setPickupAddress(savedBooking.pickupAddress);
-      if (savedBooking.deliveryAddress) setDeliveryAddress(savedBooking.deliveryAddress);
       if (savedBooking.multiDropStops) setMultiDropStops(savedBooking.multiDropStops);
     }
   }, []);
@@ -320,14 +318,12 @@ export default function Book() {
   useEffect(() => {
     if (userProfile) {
       // Only set pickup address from profile if not already set from quote/saved data
+      // Note: Postcodes are intentionally NOT auto-filled - they should always be empty
       setPickupAddress(prev => prev || userProfile.address || '');
       setPickupBuildingName(prev => prev || userProfile.buildingName || '');
       setPickupName(prev => prev || userProfile.fullName || '');
       setPickupPhone(prev => prev || userProfile.phone || '');
       setCustomerEmail(prev => prev || userProfile.email || '');
-      if (userProfile.postcode && !form.getValues('pickupPostcode')) {
-        form.setValue('pickupPostcode', userProfile.postcode);
-      }
     } else if (user) {
       setPickupName(prev => prev || user.fullName || '');
       setPickupPhone(prev => prev || user.phone || '');
