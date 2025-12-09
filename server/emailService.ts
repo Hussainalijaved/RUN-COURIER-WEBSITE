@@ -2,8 +2,8 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
-// Logo URL - hosted on the main website
-const LOGO_URL = 'https://www.runcourier.co.uk/logo-email.jpg';
+// Logo URL - use current deployment or production
+const LOGO_URL = 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev/logo-email.jpg';
 
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
