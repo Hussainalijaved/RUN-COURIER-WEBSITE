@@ -346,6 +346,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'scheduled' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Scheduled Delivery service is designed for businesses that need consistent, pre-planned collections and deliveries at fixed times. Whether it's daily, weekly, or monthly routines, we provide tailored logistics solutions that align with your operational requirements. This service ensures full reliability by guaranteeing a dedicated driver arrives at the same time and location as arranged, enabling businesses to plan their workflow with confidence.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Scheduled deliveries are essential for organisations such as pharmacies, corporate offices, laboratories, manufacturing companies, and retailers who must move items regularly. With full tracking, automated reminders, and priority handling, our Scheduled Delivery service brings structure, predictability, and efficiency to your logistics processes.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
