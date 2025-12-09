@@ -216,16 +216,51 @@ export async function sendContactFormSubmission(
   message: string
 ): Promise<boolean> {
   const htmlContent = `
-    <h2>New Contact Form Submission</h2>
-    <p><strong>Name:</strong> ${name}</p>
-    <p><strong>Email:</strong> ${email}</p>
-    ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
-    <p><strong>Subject:</strong> ${subject}</p>
-    <p><strong>Message:</strong></p>
-    <p>${message.replace(/\n/g, '<br>')}</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #007BFF; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Run Courier</h1>
+      </div>
+      <div style="padding: 30px; background-color: #f9f9f9;">
+        <h2 style="color: #333; margin-top: 0;">New Contact Form Submission</h2>
+        <div style="background-color: white; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 120px;"><strong>Name:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Email:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><a href="mailto:${email}" style="color: #007BFF;">${email}</a></td>
+            </tr>
+            ${phone ? `
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Phone:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><a href="tel:${phone}" style="color: #007BFF;">${phone}</a></td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 10px 0; color: #666;"><strong>Subject:</strong></td>
+              <td style="padding: 10px 0; color: #333;">${subject}</td>
+            </tr>
+          </table>
+        </div>
+        <div style="background-color: white; border-radius: 8px; padding: 20px;">
+          <h3 style="color: #333; margin-top: 0;">Message:</h3>
+          <p style="color: #666; line-height: 1.6; margin: 0;">${message.replace(/\n/g, '<br>')}</p>
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+          <a href="mailto:${email}?subject=Re: ${encodeURIComponent(subject)}" style="background-color: #007BFF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Reply to ${name}</a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">
+          Run Courier - Same Day Delivery Across the UK<br>
+          www.runcourier.co.uk
+        </p>
+      </div>
+    </div>
   `;
 
   const textContent = `New Contact Form Submission\n\nName: ${name}\nEmail: ${email}\n${phone ? `Phone: ${phone}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`;
 
-  return sendEmailNotification('support@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
+  return sendEmailNotification('info@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
 }
