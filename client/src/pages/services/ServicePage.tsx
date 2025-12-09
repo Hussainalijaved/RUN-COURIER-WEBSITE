@@ -391,6 +391,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'retail' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Retail & E-Commerce Delivery service provides online stores, local retailers, and growing brands with efficient, scalable logistics for same-day, next-day, and multi-drop distribution. We handle everything from small parcels and clothing to electronics, accessories, and packaged goods—ensuring each order reaches the customer quickly, safely, and in perfect condition.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                With real-time tracking, automated updates, and proof of delivery, retailers can offer customers a premium delivery experience that enhances brand reputation and reduces failed deliveries. Whether you process a few orders per day or manage high-volume shipments, our retail courier service provides the flexibility, consistency, and professionalism needed for modern e-commerce operations.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
