@@ -139,7 +139,7 @@ export async function sendAdminNotification(
   htmlContent: string,
   textContent?: string
 ): Promise<boolean> {
-  return sendEmailNotification('info@runcourier.co.uk', subject, htmlContent, textContent);
+  return sendEmailNotification('almashriqi2010@gmail.com', subject, htmlContent, textContent);
 }
 
 export async function sendWelcomeEmail(
@@ -254,7 +254,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
   const htmlContent = wrapEmailContent(content, 'New Booking');
   const textContent = `New Booking\n\nJob ID: ${jobId}\nTracking Number: ${jobDetails.trackingNumber || 'N/A'}\nPickup: ${jobDetails.pickupPostcode || 'N/A'}\nDelivery: ${jobDetails.deliveryPostcode || 'N/A'}\nVehicle: ${jobDetails.vehicleType || 'N/A'}\nPrice: £${jobDetails.totalPrice || '0.00'}\n\nPlease log in to the sales dashboard to review.`;
 
-  return sendEmailNotification('sales@runcourier.co.uk', 'New Booking', htmlContent, textContent);
+  return sendEmailNotification('almashriqi2010@gmail.com', 'New Booking', htmlContent, textContent);
 }
 
 export async function sendDriverApplicationNotification(
@@ -414,5 +414,5 @@ export async function sendContactFormSubmission(
   const htmlContent = wrapEmailContent(content, 'Contact Form');
   const textContent = `New Contact Form Submission\n\nName: ${name}\nEmail: ${email}\n${phone ? `Phone: ${phone}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`;
 
-  return sendEmailNotification('info@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
+  return sendEmailNotification('almashriqi2010@gmail.com', `Contact Form: ${subject}`, htmlContent, textContent);
 }
