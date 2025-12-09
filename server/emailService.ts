@@ -218,43 +218,274 @@ export async function sendNewRegistrationNotification(
 }
 
 export async function sendNewJobNotification(jobId: string, jobDetails: any): Promise<boolean> {
+  // Format vehicle type for display
+  const vehicleDisplay = (jobDetails.vehicleType || 'car').replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  
+  // Format date/time for scheduled deliveries
+  const formatDateTime = (date: string | Date | null) => {
+    if (!date) return null;
+    const d = new Date(date);
+    return d.toLocaleString('en-GB', { 
+      weekday: 'short', 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const scheduledPickup = formatDateTime(jobDetails.scheduledPickupTime);
+  const scheduledDelivery = formatDateTime(jobDetails.scheduledDeliveryTime);
+
   const content = `
-    <h2 style="color: #333; margin-top: 0;">New Booking</h2>
-    <div style="background-color: white; border-radius: 8px; padding: 20px;">
-      <table style="width: 100%; border-collapse: collapse;">
+    <h2 style="color: #333; margin-top: 0;">New Booking Received</h2>
+    
+    <!-- Tracking & Status -->
+    <div style="background-color: #007BFF; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center;">
+      <p style="margin: 0; font-size: 14px;">Tracking Number</p>
+      <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; letter-spacing: 2px;">${jobDetails.trackingNumber || 'N/A'}</p>
+    </div>
+    
+    <div style="background-color: white; border-radius: 0 0 8px 8px; padding: 20px; border: 1px solid #eee; border-top: none;">
+      
+      <!-- Pickup Details -->
+      <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">PICKUP DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 140px;"><strong>Tracking Number:</strong></td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">${jobDetails.trackingNumber || 'N/A'}</td>
+          <td style="padding: 8px 0; color: #666; width: 140px; vertical-align: top;"><strong>Postcode:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.pickupPostcode || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Pickup Location:</strong></td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${jobDetails.pickupPostcode || 'N/A'}</td>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.pickupAddress || 'N/A'}</td>
+        </tr>
+        ${jobDetails.pickupBuildingName ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Building:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.pickupBuildingName}</td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Contact Name:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.pickupContactName || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Delivery Location:</strong></td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${jobDetails.deliveryPostcode || 'N/A'}</td>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Contact Phone:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><a href="tel:${jobDetails.pickupContactPhone}" style="color: #007BFF;">${jobDetails.pickupContactPhone || 'N/A'}</a></td>
+        </tr>
+        ${jobDetails.pickupInstructions ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.pickupInstructions}</td>
+        </tr>
+        ` : ''}
+        ${scheduledPickup ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled Time:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledPickup}</td>
+        </tr>
+        ` : ''}
+      </table>
+
+      <!-- Delivery Details -->
+      <h3 style="color: #28a745; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #28a745; padding-bottom: 8px;">DELIVERY DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 140px; vertical-align: top;"><strong>Postcode:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.deliveryPostcode || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Vehicle Type:</strong></td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${jobDetails.vehicleType || 'N/A'}</td>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.deliveryAddress || 'N/A'}</td>
+        </tr>
+        ${jobDetails.deliveryBuildingName ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Building:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.deliveryBuildingName}</td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient Name:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.recipientName || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Price:</strong></td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">£${jobDetails.totalPrice || '0.00'}</td>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient Phone:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><a href="tel:${jobDetails.recipientPhone}" style="color: #007BFF;">${jobDetails.recipientPhone || 'N/A'}</a></td>
+        </tr>
+        ${jobDetails.deliveryInstructions ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.deliveryInstructions}</td>
+        </tr>
+        ` : ''}
+        ${scheduledDelivery ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled Time:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledDelivery}</td>
+        </tr>
+        ` : ''}
+      </table>
+
+      <!-- Delivery Options -->
+      <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">DELIVERY OPTIONS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Vehicle Type:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Status:</strong></td>
-          <td style="padding: 10px 0; color: #333;">${jobDetails.status || 'Pending'}</td>
+          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.weight || '0'} kg</td>
         </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.distance || '0'} miles</td>
+        </tr>
+        ${jobDetails.isMultiDrop ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Multi-Drop:</strong></td>
+          <td style="padding: 8px 0; color: #333;">Yes</td>
+        </tr>
+        ` : ''}
+        ${jobDetails.isReturnTrip ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Return Trip:</strong></td>
+          <td style="padding: 8px 0; color: #333;">Yes</td>
+        </tr>
+        ` : ''}
+        ${jobDetails.isCentralLondon ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Central London:</strong></td>
+          <td style="padding: 8px 0; color: #333;">Yes (Congestion charge applies)</td>
+        </tr>
+        ` : ''}
+      </table>
+
+      <!-- Pricing -->
+      <h3 style="color: #dc3545; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #dc3545; padding-bottom: 8px;">PRICING BREAKDOWN</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Base Price:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.basePrice || 0).toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Distance Price:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}</td>
+        </tr>
+        ${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Weight Surcharge:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.weightSurcharge).toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Multi-Drop Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.multiDropCharge).toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Return Trip Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.returnTripCharge).toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Central London Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ${parseFloat(jobDetails.waitingTimeCharge || 0) > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Waiting Time Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.waitingTimeCharge).toFixed(2)}</td>
+        </tr>
+        ` : ''}
+      </table>
+      <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: right;">
+        <span style="color: #666; font-size: 16px;">Total: </span>
+        <span style="color: #007BFF; font-size: 24px; font-weight: bold;">£${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}</span>
+      </div>
+
+      <!-- Payment & Status -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #f8f9fa; border-radius: 8px;">
+        <tr>
+          <td style="padding: 15px; color: #666; width: 50%;"><strong>Payment Status:</strong></td>
+          <td style="padding: 15px; color: #333; text-align: right;">
+            <span style="background-color: ${jobDetails.paymentStatus === 'paid' ? '#28a745' : jobDetails.paymentStatus === 'pay_later' ? '#ffc107' : '#dc3545'}; color: ${jobDetails.paymentStatus === 'pay_later' ? '#333' : 'white'}; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+              ${(jobDetails.paymentStatus || 'pending').toUpperCase().replace('_', ' ')}
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 15px; color: #666;"><strong>Job Status:</strong></td>
+          <td style="padding: 15px; color: #333; text-align: right;">
+            <span style="background-color: #6c757d; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+              ${(jobDetails.status || 'pending').toUpperCase()}
+            </span>
+          </td>
+        </tr>
+        ${jobDetails.customerEmail ? `
+        <tr>
+          <td style="padding: 15px; color: #666;"><strong>Customer Email:</strong></td>
+          <td style="padding: 15px; color: #333; text-align: right;">
+            <a href="mailto:${jobDetails.customerEmail}" style="color: #007BFF;">${jobDetails.customerEmail}</a>
+          </td>
+        </tr>
+        ` : ''}
       </table>
     </div>
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the sales dashboard to review and manage this booking.</p>
+    
+    <p style="color: #666; font-size: 14px; margin-top: 20px; text-align: center;">
+      Please log in to the <a href="https://www.runcourier.co.uk/admin" style="color: #007BFF;">admin dashboard</a> to manage this booking.
+    </p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'New Booking');
-  const textContent = `New Booking\n\nJob ID: ${jobId}\nTracking Number: ${jobDetails.trackingNumber || 'N/A'}\nPickup: ${jobDetails.pickupPostcode || 'N/A'}\nDelivery: ${jobDetails.deliveryPostcode || 'N/A'}\nVehicle: ${jobDetails.vehicleType || 'N/A'}\nPrice: £${jobDetails.totalPrice || '0.00'}\n\nPlease log in to the sales dashboard to review.`;
+  
+  const textContent = `NEW BOOKING RECEIVED
 
-  return sendEmailNotification('almashriqi2010@gmail.com', 'New Booking', htmlContent, textContent);
+Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
+
+PICKUP DETAILS
+--------------
+Postcode: ${jobDetails.pickupPostcode || 'N/A'}
+Address: ${jobDetails.pickupAddress || 'N/A'}
+${jobDetails.pickupBuildingName ? `Building: ${jobDetails.pickupBuildingName}\n` : ''}Contact: ${jobDetails.pickupContactName || 'N/A'}
+Phone: ${jobDetails.pickupContactPhone || 'N/A'}
+${jobDetails.pickupInstructions ? `Instructions: ${jobDetails.pickupInstructions}\n` : ''}${scheduledPickup ? `Scheduled: ${scheduledPickup}\n` : ''}
+
+DELIVERY DETAILS
+----------------
+Postcode: ${jobDetails.deliveryPostcode || 'N/A'}
+Address: ${jobDetails.deliveryAddress || 'N/A'}
+${jobDetails.deliveryBuildingName ? `Building: ${jobDetails.deliveryBuildingName}\n` : ''}Recipient: ${jobDetails.recipientName || 'N/A'}
+Phone: ${jobDetails.recipientPhone || 'N/A'}
+${jobDetails.deliveryInstructions ? `Instructions: ${jobDetails.deliveryInstructions}\n` : ''}${scheduledDelivery ? `Scheduled: ${scheduledDelivery}\n` : ''}
+
+DELIVERY OPTIONS
+----------------
+Vehicle: ${vehicleDisplay}
+Weight: ${jobDetails.weight || '0'} kg
+Distance: ${jobDetails.distance || '0'} miles
+${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 'Return Trip: Yes\n' : ''}${jobDetails.isCentralLondon ? 'Central London: Yes\n' : ''}
+
+PRICING
+-------
+Base Price: £${parseFloat(jobDetails.basePrice || 0).toFixed(2)}
+Distance Price: £${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}
+${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `Weight Surcharge: £${parseFloat(jobDetails.weightSurcharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `Multi-Drop: £${parseFloat(jobDetails.multiDropCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `Return Trip: £${parseFloat(jobDetails.returnTripCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `Central London: £${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}\n` : ''}TOTAL: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
+
+Payment Status: ${(jobDetails.paymentStatus || 'pending').toUpperCase()}
+Job Status: ${(jobDetails.status || 'pending').toUpperCase()}
+${jobDetails.customerEmail ? `Customer Email: ${jobDetails.customerEmail}\n` : ''}
+
+Please log in to the admin dashboard to manage this booking.
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification('almashriqi2010@gmail.com', `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
 }
 
 export async function sendDriverApplicationNotification(
