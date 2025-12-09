@@ -102,7 +102,13 @@ export default function Contact() {
           title: 'Message Sent',
           description: 'Thank you for contacting us. We will get back to you shortly.',
         });
-        form.reset();
+        form.reset({
+          name: '',
+          email: '',
+          phone: '',
+          subject: '',
+          message: '',
+        });
       } else {
         throw new Error('Failed to send message');
       }
