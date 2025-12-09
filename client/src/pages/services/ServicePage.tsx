@@ -406,6 +406,21 @@ export default function ServicePage({ type }: ServicePageProps) {
         </section>
       )}
 
+      {type === 'restaurants' && (
+        <section className="py-16 bg-slate-50 dark:bg-slate-900/30">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                Our Restaurant & Food Delivery service supports restaurants, cafés, catering businesses, and meal-prep companies that require fast, reliable transport of freshly prepared food. We understand the importance of timing, temperature control, and careful handling to preserve quality from the kitchen to the customer. Our dedicated drivers ensure meals are delivered promptly, maintaining freshness and presentation.
+              </p>
+              <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                This service is ideal for catering events, large corporate orders, meal plans, and urgent restaurant deliveries. With real-time tracking, organised route planning, and a reliable professional approach, we help food businesses maintain high service standards and deliver exceptional customer satisfaction.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
