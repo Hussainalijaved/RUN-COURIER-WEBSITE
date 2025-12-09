@@ -488,6 +488,257 @@ Run Courier - www.runcourier.co.uk`;
   return sendEmailNotification('almashriqi2010@gmail.com', `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
 }
 
+// Send booking confirmation email to customer
+export async function sendCustomerBookingConfirmation(customerEmail: string, jobDetails: any): Promise<boolean> {
+  // Format vehicle type for display
+  const vehicleDisplay = (jobDetails.vehicleType || 'car').replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  
+  // Format date/time for scheduled deliveries
+  const formatDateTime = (date: string | Date | null) => {
+    if (!date) return null;
+    const d = new Date(date);
+    return d.toLocaleString('en-GB', { 
+      weekday: 'short', 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const scheduledPickup = formatDateTime(jobDetails.scheduledPickupTime);
+  const scheduledDelivery = formatDateTime(jobDetails.scheduledDeliveryTime);
+  const createdAt = formatDateTime(jobDetails.createdAt) || formatDateTime(new Date());
+
+  const content = `
+    <h2 style="color: #333; margin-top: 0;">Thank You for Your Booking!</h2>
+    <p style="color: #666; font-size: 16px;">Your delivery has been confirmed and is being processed. Here are your booking details:</p>
+    
+    <!-- Tracking Number Banner -->
+    <div style="background-color: #007BFF; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+      <p style="margin: 0; font-size: 14px;">Your Tracking Number</p>
+      <p style="margin: 10px 0 5px; font-size: 28px; font-weight: bold; letter-spacing: 3px;">${jobDetails.trackingNumber || 'N/A'}</p>
+      <p style="margin: 0; font-size: 12px; opacity: 0.9;">Use this to track your delivery at runcourier.co.uk</p>
+    </div>
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; border: 1px solid #eee;">
+      
+      <!-- Pickup Details -->
+      <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">COLLECTION DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;">
+            ${jobDetails.pickupBuildingName ? `${jobDetails.pickupBuildingName}<br>` : ''}
+            ${jobDetails.pickupAddress || 'N/A'}<br>
+            <strong>${jobDetails.pickupPostcode || 'N/A'}</strong>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Contact:</strong></td>
+          <td style="padding: 8px 0; color: #333;">
+            ${jobDetails.pickupContactName || 'N/A'}<br>
+            <a href="tel:${jobDetails.pickupContactPhone}" style="color: #007BFF;">${jobDetails.pickupContactPhone || 'N/A'}</a>
+          </td>
+        </tr>
+        ${jobDetails.pickupInstructions ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.pickupInstructions}</td>
+        </tr>
+        ` : ''}
+        ${scheduledPickup ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledPickup}</td>
+        </tr>
+        ` : ''}
+      </table>
+
+      <!-- Delivery Details -->
+      <h3 style="color: #28a745; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #28a745; padding-bottom: 8px;">DELIVERY DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;">
+            ${jobDetails.deliveryBuildingName ? `${jobDetails.deliveryBuildingName}<br>` : ''}
+            ${jobDetails.deliveryAddress || 'N/A'}<br>
+            <strong>${jobDetails.deliveryPostcode || 'N/A'}</strong>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient:</strong></td>
+          <td style="padding: 8px 0; color: #333;">
+            ${jobDetails.recipientName || 'N/A'}<br>
+            <a href="tel:${jobDetails.recipientPhone}" style="color: #007BFF;">${jobDetails.recipientPhone || 'N/A'}</a>
+          </td>
+        </tr>
+        ${jobDetails.deliveryInstructions ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.deliveryInstructions}</td>
+        </tr>
+        ` : ''}
+        ${scheduledDelivery ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledDelivery}</td>
+        </tr>
+        ` : ''}
+      </table>
+
+      <!-- Service Details -->
+      <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">SERVICE DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 130px;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.weight || '0'} kg</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.distance || '0'} miles</td>
+        </tr>
+        ${jobDetails.isMultiDrop ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Service:</strong></td>
+          <td style="padding: 8px 0; color: #333;">Multi-Drop Delivery</td>
+        </tr>
+        ` : ''}
+        ${jobDetails.isReturnTrip ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Return Trip:</strong></td>
+          <td style="padding: 8px 0; color: #333;">Yes - Driver will return to pickup location</td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Booked:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${createdAt}</td>
+        </tr>
+      </table>
+
+      <!-- Payment Summary -->
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
+        <h3 style="color: #333; margin: 0 0 15px; font-size: 16px;">PAYMENT SUMMARY</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Base Price</td>
+            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.basePrice || 0).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Distance</td>
+            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}</td>
+          </tr>
+          ${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Weight Surcharge</td>
+            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.weightSurcharge).toFixed(2)}</td>
+          </tr>
+          ` : ''}
+          ${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Multi-Drop</td>
+            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.multiDropCharge).toFixed(2)}</td>
+          </tr>
+          ` : ''}
+          ${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Return Trip</td>
+            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.returnTripCharge).toFixed(2)}</td>
+          </tr>
+          ` : ''}
+          ${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Central London</td>
+            <td style="padding: 5px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}</td>
+          </tr>
+          ` : ''}
+        </table>
+        <hr style="border: none; border-top: 2px solid #ddd; margin: 15px 0;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="padding: 5px 0; color: #333; font-size: 18px; font-weight: bold;">Total Paid</td>
+            <td style="padding: 5px 0; color: #007BFF; text-align: right; font-size: 24px; font-weight: bold;">£${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}</td>
+          </tr>
+        </table>
+        <p style="margin: 15px 0 0; text-align: center;">
+          <span style="background-color: ${jobDetails.paymentStatus === 'paid' ? '#28a745' : jobDetails.paymentStatus === 'pay_later' ? '#ffc107' : '#dc3545'}; color: ${jobDetails.paymentStatus === 'pay_later' ? '#333' : 'white'}; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold;">
+            ${jobDetails.paymentStatus === 'paid' ? 'PAYMENT CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER - INVOICE PENDING' : 'PAYMENT PENDING'}
+          </span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Track Your Delivery CTA -->
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="https://www.runcourier.co.uk/track?ref=${jobDetails.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+        Track Your Delivery
+      </a>
+    </div>
+
+    <!-- Contact Info -->
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+      <p style="color: #666; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
+      <p style="color: #333; margin: 0; font-size: 14px;">
+        Call us: <a href="tel:+447311121217" style="color: #007BFF; font-weight: bold;">+44 7311 121 217</a><br>
+        Email: <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a>
+      </p>
+    </div>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Booking Confirmed');
+  
+  const textContent = `BOOKING CONFIRMATION
+
+Thank you for booking with Run Courier!
+
+Your Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
+
+COLLECTION DETAILS
+------------------
+${jobDetails.pickupBuildingName ? `${jobDetails.pickupBuildingName}\n` : ''}${jobDetails.pickupAddress || 'N/A'}
+${jobDetails.pickupPostcode || 'N/A'}
+Contact: ${jobDetails.pickupContactName || 'N/A'}
+Phone: ${jobDetails.pickupContactPhone || 'N/A'}
+${jobDetails.pickupInstructions ? `Instructions: ${jobDetails.pickupInstructions}\n` : ''}${scheduledPickup ? `Scheduled: ${scheduledPickup}\n` : ''}
+
+DELIVERY DETAILS
+----------------
+${jobDetails.deliveryBuildingName ? `${jobDetails.deliveryBuildingName}\n` : ''}${jobDetails.deliveryAddress || 'N/A'}
+${jobDetails.deliveryPostcode || 'N/A'}
+Recipient: ${jobDetails.recipientName || 'N/A'}
+Phone: ${jobDetails.recipientPhone || 'N/A'}
+${jobDetails.deliveryInstructions ? `Instructions: ${jobDetails.deliveryInstructions}\n` : ''}${scheduledDelivery ? `Scheduled: ${scheduledDelivery}\n` : ''}
+
+SERVICE DETAILS
+---------------
+Vehicle: ${vehicleDisplay}
+Weight: ${jobDetails.weight || '0'} kg
+Distance: ${jobDetails.distance || '0'} miles
+${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 'Return Trip: Yes\n' : ''}
+
+PAYMENT SUMMARY
+---------------
+Base Price: £${parseFloat(jobDetails.basePrice || 0).toFixed(2)}
+Distance: £${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}
+${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `Weight Surcharge: £${parseFloat(jobDetails.weightSurcharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `Multi-Drop: £${parseFloat(jobDetails.multiDropCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `Return Trip: £${parseFloat(jobDetails.returnTripCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `Central London: £${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}\n` : ''}
+TOTAL: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
+Payment Status: ${jobDetails.paymentStatus === 'paid' ? 'CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER' : 'PENDING'}
+
+Track your delivery: https://www.runcourier.co.uk/track?ref=${jobDetails.trackingNumber}
+
+Need help? Call +44 7311 121 217 or email info@runcourier.co.uk
+
+Run Courier - Same Day Delivery Across the UK
+www.runcourier.co.uk`;
+
+  return sendEmailNotification(customerEmail, `Booking Confirmed - ${jobDetails.trackingNumber}`, htmlContent, textContent);
+}
+
 export async function sendDriverApplicationNotification(
   applicantName: string,
   status: string

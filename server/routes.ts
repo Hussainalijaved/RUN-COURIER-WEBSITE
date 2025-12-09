@@ -22,7 +22,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation } from "./emailService";
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
@@ -138,6 +138,11 @@ export async function registerRoutes(
     const job = await storage.createJob(data);
     // Send admin notification
     await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send job notification:', err));
+    // Send customer confirmation if email available
+    const customerEmail = (job as any).customerEmail || data.customerEmail;
+    if (customerEmail) {
+      await sendCustomerBookingConfirmation(customerEmail, job).catch(err => console.error('Failed to send customer confirmation:', err));
+    }
     res.status(201).json(job);
   }));
 
@@ -1728,6 +1733,13 @@ export async function registerRoutes(
     
     console.log(`[Embedded Payment] Created job ${trackingNumber} with payment ${paymentIntentId}`);
 
+    // Send email notifications
+    await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send admin notification:', err));
+    const embeddedCustomerEmail = (job as any).customerEmail || metadata.customerEmail;
+    if (embeddedCustomerEmail) {
+      await sendCustomerBookingConfirmation(embeddedCustomerEmail, job).catch(err => console.error('Failed to send customer confirmation:', err));
+    }
+
     res.json({ 
       success: true, 
       trackingNumber: job.trackingNumber,
@@ -1815,6 +1827,13 @@ export async function registerRoutes(
     await storage.incrementCompletedBookings(bookingData.customerId);
     console.log(`[Pay Later Booking] Created job ${trackingNumber} for customer ${bookingData.customerId} - payment to be invoiced weekly`);
     
+    // Send email notifications
+    await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send admin notification:', err));
+    const customerEmailForNotification = bookingData.customerEmail || customer.email;
+    if (customerEmailForNotification) {
+      await sendCustomerBookingConfirmation(customerEmailForNotification, job).catch(err => console.error('Failed to send customer confirmation:', err));
+    }
+
     res.json({ 
       success: true, 
       trackingNumber: job.trackingNumber,
@@ -1887,6 +1906,13 @@ export async function registerRoutes(
       console.log(`[Booking] Incremented completed bookings count for user ${metadata.customerId}. Discount was ${metadata.discountApplied === 'true' ? 'applied' : 'not applied'}`);
     }
     
+    // Send email notifications
+    await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send admin notification:', err));
+    const customerEmailForConfirmation = metadata.customerEmail || session.customer_email;
+    if (customerEmailForConfirmation) {
+      await sendCustomerBookingConfirmation(customerEmailForConfirmation, job).catch(err => console.error('Failed to send customer confirmation:', err));
+    }
+
     res.json({ 
       success: true, 
       trackingNumber: job.trackingNumber,
