@@ -3,6 +3,16 @@ import { Resend } from 'resend';
 let connectionSettings: any;
 
 async function getResendCredentials() {
+  // First try environment variable (manual setup)
+  if (process.env.RESEND_API_KEY) {
+    console.log('[Email] Using RESEND_API_KEY from environment');
+    return {
+      apiKey: process.env.RESEND_API_KEY,
+      fromEmail: process.env.RESEND_FROM_EMAIL || 'info@runcourier.co.uk'
+    };
+  }
+
+  // Fall back to Replit connector
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
@@ -10,8 +20,11 @@ async function getResendCredentials() {
     ? 'depl ' + process.env.WEB_REPL_RENEWAL 
     : null;
 
+  if (!hostname) {
+    console.warn('[Email] REPLIT_CONNECTORS_HOSTNAME not found');
+  }
   if (!xReplitToken) {
-    console.warn('X_REPLIT_TOKEN not found - email notifications disabled');
+    console.warn('[Email] X_REPLIT_TOKEN not found - email notifications disabled. Set RESEND_API_KEY manually.');
     return null;
   }
 
@@ -27,16 +40,17 @@ async function getResendCredentials() {
     ).then(res => res.json()).then(data => data.items?.[0]);
 
     if (!connectionSettings?.settings?.api_key) {
-      console.warn('Resend connection not found - email notifications disabled');
+      console.warn('[Email] Resend connection not found - email notifications disabled. Set RESEND_API_KEY manually.');
       return null;
     }
     
+    console.log('[Email] Using Resend credentials from Replit connector');
     return {
       apiKey: connectionSettings.settings.api_key,
       fromEmail: connectionSettings.settings.from_email || 'info@runcourier.co.uk'
     };
   } catch (error) {
-    console.error('Failed to fetch Resend credentials:', error);
+    console.error('[Email] Failed to fetch Resend credentials:', error);
     return null;
   }
 }
@@ -47,14 +61,17 @@ export async function sendEmailNotification(
   htmlContent: string,
   textContent?: string
 ): Promise<boolean> {
+  console.log(`[Email] Attempting to send "${subject}" to ${recipient}`);
   try {
     const credentials = await getResendCredentials();
     if (!credentials) {
-      console.warn('Resend not configured - email notification not sent');
+      console.warn('[Email] Resend not configured - email notification not sent');
       return false;
     }
 
     const resend = new Resend(credentials.apiKey);
+    console.log(`[Email] Sending from ${credentials.fromEmail} to ${recipient}`);
+    
     const result = await resend.emails.send({
       from: credentials.fromEmail,
       to: recipient,
@@ -64,14 +81,14 @@ export async function sendEmailNotification(
     });
 
     if (result.error) {
-      console.error('Failed to send email:', result.error);
+      console.error('[Email] Failed to send email:', result.error);
       return false;
     }
 
-    console.log('Email notification sent:', result.data?.id);
+    console.log('[Email] Email notification sent successfully:', result.data?.id);
     return true;
   } catch (error) {
-    console.error('Error sending email notification:', error);
+    console.error('[Email] Error sending email notification:', error);
     return false;
   }
 }
