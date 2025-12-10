@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import path from "path";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -10,57 +11,27 @@ import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
 
-// Manual CORS handling - must be before all other routes
-app.all('*', (req, res, next) => {
-  const origin = req.headers.origin;
-  const method = req.method;
-  const path = req.path;
-  
-  console.log(`[CORS] ${method} ${path} from origin: ${origin}`);
-  
-  // Always allow these origins + localhost/replit dev
-  const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk', 'https://www.runcourier.co.uk', 'http://www.runcourier.co.uk'];
-  
-  // Normalize origin by removing trailing slashes for comparison
-  const normalizedOrigin = origin?.replace(/\/$/, '');
-  
-  let allowOrigin = false;
-  if (normalizedOrigin) {
-    if (allowedOrigins.includes(normalizedOrigin)) {
-      allowOrigin = true;
-    } else if (normalizedOrigin.includes('localhost') || normalizedOrigin.includes('127.0.0.1') || normalizedOrigin.includes('replit.dev')) {
-      allowOrigin = true;
+// CORS configuration - allow all requests from runcourier.co.uk
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk', 'https://www.runcourier.co.uk', 'http://www.runcourier.co.uk'];
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin) || origin?.includes('localhost') || origin?.includes('127.0.0.1') || origin?.includes('replit.dev')) {
+      console.log(`[CORS] Allowing origin: ${origin || 'no-origin'}`);
+      callback(null, true);
+    } else {
+      console.log(`[CORS] Blocking origin: ${origin}`);
+      callback(null, false);
     }
-  }
-  
-  // Set CORS headers for all requests
-  // IMPORTANT: Never use '*' with credentials: 'include'
-  if (normalizedOrigin && allowOrigin) {
-    res.header('Access-Control-Allow-Origin', normalizedOrigin);
-    console.log(`[CORS] Allowing origin: ${normalizedOrigin}`);
-  } else if (!normalizedOrigin) {
-    // No origin header - allow the request (likely local/internal)
-    res.header('Access-Control-Allow-Origin', 'https://runcourier.co.uk');
-    console.log(`[CORS] No origin header, setting Allow-Origin: https://runcourier.co.uk`);
-  } else {
-    // Origin not in allowed list - log for debugging
-    console.log(`[CORS] Origin not allowed: ${normalizedOrigin}`);
-  }
-  
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.header('Access-Control-Expose-Headers', 'Content-Type, Content-Length');
-  res.header('Access-Control-Max-Age', '86400');
-  
-  // Handle OPTIONS preflight
-  if (method === 'OPTIONS') {
-    console.log(`[CORS] Responding to OPTIONS preflight with 200`);
-    return res.status(200).end();
-  }
-  
-  next();
-});
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const httpServer = createServer(app);
