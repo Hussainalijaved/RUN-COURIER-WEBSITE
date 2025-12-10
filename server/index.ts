@@ -103,45 +103,32 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// CORS middleware for production domain
+// CORS middleware - allow all origins for cross-origin requests
 app.use((req, res, next) => {
-  const origin = req.headers.origin || '';
+  const origin = req.headers.origin;
   
-  // Allowed origins - expanded to cover all variations
-  const allowedOrigins = [
-    'https://runcourier.co.uk',
-    'http://runcourier.co.uk',
-    'https://www.runcourier.co.uk',
-    'http://www.runcourier.co.uk'
-  ];
-  
-  // Check if origin is allowed or is localhost/replit dev
-  const isAllowed = 
-    allowedOrigins.includes(origin) ||
-    origin.includes('localhost') ||
-    origin.includes('127.0.0.1') ||
-    origin.includes('replit.dev') ||
-    origin === 'https://runcourier.co.uk';
-  
-  // Log CORS requests for debugging
-  if (origin && req.path.includes('/api/')) {
-    console.log(`CORS: Origin=${origin}, Path=${req.path}, Allowed=${isAllowed}`);
+  if (origin) {
+    // Allow runcourier.co.uk and all development URLs
+    const allowedPatterns = ['runcourier.co.uk', 'localhost', '127.0.0.1', 'replit.dev'];
+    const isAllowed = allowedPatterns.some(pattern => origin.includes(pattern));
+    
+    if (isAllowed || origin.startsWith('https://') || origin.startsWith('http://')) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
   }
   
-  // Always set these headers
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  
-  // Set origin header if allowed
-  if (isAllowed && origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400');
-  }
+  // Always set these headers for CORS
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, X-JSON-Response');
+  res.setHeader('Access-Control-Max-Age', '86400');
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Length', '0');
+    return res.sendStatus(204);
   }
   
   next();
