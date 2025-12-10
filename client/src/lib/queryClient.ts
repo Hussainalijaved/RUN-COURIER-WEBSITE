@@ -12,10 +12,24 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Use full backend URL for API calls
-  const backendUrl = url.startsWith('http') 
-    ? url 
-    : `https://run-courier-site--almashriqi2010.replit.app${url}`;
+  // Determine backend URL based on current environment
+  let backendUrl: string;
+  
+  if (url.startsWith('http')) {
+    // Already a full URL
+    backendUrl = url;
+  } else {
+    // Check if running on production (Hostinger) or development (Replit)
+    const hostname = window.location.hostname;
+    
+    if (hostname === 'runcourier.co.uk' || hostname === 'www.runcourier.co.uk') {
+      // Production: use Replit backend
+      backendUrl = `https://run-courier-site--almashriqi2010.replit.app${url}`;
+    } else {
+      // Development: use relative URL (same server)
+      backendUrl = url;
+    }
+  }
   
   const res = await fetch(backendUrl, {
     method,
