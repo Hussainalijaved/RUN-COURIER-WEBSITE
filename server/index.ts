@@ -103,6 +103,31 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// CORS middleware for production domain
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Allow requests from production domain and local development
+  if (origin === 'https://runcourier.co.uk' || 
+      origin?.includes('localhost') || 
+      origin?.includes('127.0.0.1') ||
+      origin?.includes('replit.dev')) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
