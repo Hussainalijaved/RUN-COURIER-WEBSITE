@@ -1,5 +1,4 @@
 import express, { type Request, Response, NextFunction } from "express";
-import cors from "cors";
 import path from "path";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -14,26 +13,43 @@ const app = express();
 // Manual CORS handling - must be before all other routes
 app.all('*', (req, res, next) => {
   const origin = req.headers.origin;
+  const method = req.method;
+  const path = req.path;
   
-  // Always allow these origins
+  console.log(`[CORS] ${method} ${path} from origin: ${origin}`);
+  
+  // Always allow these origins + localhost/replit dev
   const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk'];
   
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else if (origin && (origin.includes('localhost') || origin.includes('replit.dev'))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  let allowOrigin = false;
+  if (origin) {
+    if (allowedOrigins.includes(origin)) {
+      allowOrigin = true;
+    } else if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('replit.dev')) {
+      allowOrigin = true;
+    }
   }
   
   // Set CORS headers for all requests
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Content-Length');
-  res.setHeader('Access-Control-Max-Age', '86400');
+  if (allowOrigin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    // No origin, allow anyway
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Expose-Headers', 'Content-Type, Content-Length');
+  res.header('Access-Control-Max-Age', '86400');
+  
+  console.log(`[CORS] Setting Allow-Origin: ${allowOrigin ? origin : '*'}`);
   
   // Handle OPTIONS preflight
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+  if (method === 'OPTIONS') {
+    console.log(`[CORS] Responding to OPTIONS with 200`);
+    return res.status(200).end();
   }
   
   next();
