@@ -31,11 +31,14 @@ app.all('*', (req, res, next) => {
   }
   
   // Set CORS headers for all requests
-  if (allowOrigin) {
+  // IMPORTANT: Never use '*' with credentials: 'include'
+  if (allowOrigin && origin) {
     res.header('Access-Control-Allow-Origin', origin);
+    console.log(`[CORS] Setting Allow-Origin: ${origin}`);
   } else if (!origin) {
-    // No origin, allow anyway
-    res.header('Access-Control-Allow-Origin', '*');
+    // No origin header - allow the request (likely local/internal)
+    res.header('Access-Control-Allow-Origin', 'https://runcourier.co.uk');
+    console.log(`[CORS] No origin header, setting Allow-Origin: https://runcourier.co.uk`);
   }
   
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -43,8 +46,6 @@ app.all('*', (req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.header('Access-Control-Expose-Headers', 'Content-Type, Content-Length');
   res.header('Access-Control-Max-Age', '86400');
-  
-  console.log(`[CORS] Setting Allow-Origin: ${allowOrigin ? origin : '*'}`);
   
   // Handle OPTIONS preflight
   if (method === 'OPTIONS') {
