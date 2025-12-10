@@ -13,10 +13,26 @@ const app = express();
 
 // CRITICAL: CORS middleware that applies to ALL responses
 app.use((req, res, next) => {
-  // Set CORS headers on every response
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowedOrigins = [
+    'https://runcourier.co.uk',
+    'https://www.runcourier.co.uk',
+    'http://localhost:5000',
+    'http://localhost:3000'
+  ];
+  
+  const origin = req.headers.origin;
+  
+  // Allow specific origins or echo back the origin if it's in the allowed list
+  if (origin && allowedOrigins.some(allowed => origin.startsWith(allowed.replace('www.', '')) || origin === allowed)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (origin) {
+    // For Replit preview URLs
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
   
   // Handle preflight OPTIONS requests
