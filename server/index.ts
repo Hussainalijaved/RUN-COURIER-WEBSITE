@@ -21,24 +21,30 @@ app.all('*', (req, res, next) => {
   // Always allow these origins + localhost/replit dev
   const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk', 'https://www.runcourier.co.uk', 'http://www.runcourier.co.uk'];
   
+  // Normalize origin by removing trailing slashes for comparison
+  const normalizedOrigin = origin?.replace(/\/$/, '');
+  
   let allowOrigin = false;
-  if (origin) {
-    if (allowedOrigins.includes(origin)) {
+  if (normalizedOrigin) {
+    if (allowedOrigins.includes(normalizedOrigin)) {
       allowOrigin = true;
-    } else if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('replit.dev')) {
+    } else if (normalizedOrigin.includes('localhost') || normalizedOrigin.includes('127.0.0.1') || normalizedOrigin.includes('replit.dev')) {
       allowOrigin = true;
     }
   }
   
   // Set CORS headers for all requests
   // IMPORTANT: Never use '*' with credentials: 'include'
-  if (allowOrigin && origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-    console.log(`[CORS] Setting Allow-Origin: ${origin}`);
-  } else if (!origin) {
+  if (normalizedOrigin && allowOrigin) {
+    res.header('Access-Control-Allow-Origin', normalizedOrigin);
+    console.log(`[CORS] Allowing origin: ${normalizedOrigin}`);
+  } else if (!normalizedOrigin) {
     // No origin header - allow the request (likely local/internal)
     res.header('Access-Control-Allow-Origin', 'https://runcourier.co.uk');
     console.log(`[CORS] No origin header, setting Allow-Origin: https://runcourier.co.uk`);
+  } else {
+    // Origin not in allowed list - log for debugging
+    console.log(`[CORS] Origin not allowed: ${normalizedOrigin}`);
   }
   
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -49,7 +55,7 @@ app.all('*', (req, res, next) => {
   
   // Handle OPTIONS preflight
   if (method === 'OPTIONS') {
-    console.log(`[CORS] Responding to OPTIONS with 200`);
+    console.log(`[CORS] Responding to OPTIONS preflight with 200`);
     return res.status(200).end();
   }
   
