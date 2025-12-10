@@ -11,25 +11,28 @@ import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
 
-// Explicit CORS middleware - handle all requests
+// CRITICAL: CORS middleware must be first and must handle OPTIONS for API routes
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
+  const origin = req.headers.origin || '*';
   
-  // Echo back the origin to allow all origins
-  if (origin) {
+  console.log(`[CORS] ${req.method} ${req.path} from ${origin}`);
+  
+  // Always allow CORS for API routes
+  if (req.path.startsWith('/api/') || req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    
+    // If no credentials, don't set credentials header
+    if (origin !== '*') {
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
   }
   
-  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  
-  // Handle OPTIONS preflight requests
+  // Always respond to OPTIONS (preflight) requests
   if (req.method === 'OPTIONS') {
-    console.log(`[CORS] Handling OPTIONS preflight for ${req.path}`);
+    console.log(`[CORS] Responding with 200 to OPTIONS ${req.path}`);
     return res.status(200).end();
   }
   
