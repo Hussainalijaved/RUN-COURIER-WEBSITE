@@ -418,7 +418,7 @@ export default function Quote() {
                                 </FormControl>
                                 <div>
                                   <FormLabel className="cursor-pointer">Multi-drop Delivery</FormLabel>
-                                  <FormDescription>Add multiple delivery stops (+£3 per stop)</FormDescription>
+                                  <FormDescription>Add multiple delivery stops</FormDescription>
                                 </div>
                               </FormItem>
                             )}
