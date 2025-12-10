@@ -19,7 +19,7 @@ app.all('*', (req, res, next) => {
   console.log(`[CORS] ${method} ${path} from origin: ${origin}`);
   
   // Always allow these origins + localhost/replit dev
-  const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk'];
+  const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk', 'https://www.runcourier.co.uk', 'http://www.runcourier.co.uk'];
   
   let allowOrigin = false;
   if (origin) {
