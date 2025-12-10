@@ -11,18 +11,30 @@ import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
 
-// CORS configuration
-const corsOptions = {
-  // Allow all origins (including from Hostinger)
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  optionsSuccessStatus: 200
-};
-
-console.log('[SERVER] Applying CORS middleware');
-app.use(cors(corsOptions));
+// Explicit CORS middleware - handle all requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Echo back the origin to allow all origins
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Handle OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log(`[CORS] Handling OPTIONS preflight for ${req.path}`);
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const httpServer = createServer(app);
