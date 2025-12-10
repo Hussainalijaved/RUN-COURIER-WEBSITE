@@ -1698,8 +1698,6 @@ export async function registerRoutes(
     const metadata = paymentIntent.metadata || bookingData || {};
     const trackingNumber = generateTrackingNumber();
     const totalPrice = parseFloat(metadata.totalPrice) || (paymentIntent.amount / 100);
-    const basePrice = totalPrice * 0.3;
-    const distancePrice = totalPrice * 0.7;
 
     const jobData = {
       trackingNumber,
@@ -1717,8 +1715,13 @@ export async function registerRoutes(
       deliveryInstructions: metadata.deliveryInstructions || null,
       vehicleType: (metadata.vehicleType || 'car') as VehicleType,
       weight: metadata.weight || '1',
-      basePrice: String(basePrice),
-      distancePrice: String(distancePrice),
+      basePrice: metadata.basePrice || String(totalPrice * 0.3),
+      distancePrice: metadata.distancePrice || String(totalPrice * 0.7),
+      weightSurcharge: metadata.weightSurcharge || '0',
+      multiDropCharge: metadata.multiDropCharge || '0',
+      returnTripCharge: metadata.returnTripCharge || '0',
+      centralLondonCharge: metadata.centralLondonCharge || '0',
+      waitingTimeCharge: metadata.waitingTimeCharge || '0',
       totalPrice: String(totalPrice),
       distance: metadata.distance || '0',
       customerId: metadata.customerId || '',
@@ -1728,6 +1731,8 @@ export async function registerRoutes(
       status: 'pending' as JobStatus,
       isMultiDrop: metadata.isMultiDrop === 'true',
       isReturnTrip: metadata.isReturnTrip === 'true',
+      isCentralLondon: metadata.isCentralLondon === 'true',
+      isRushHour: metadata.isRushHour === 'true',
       scheduledPickupTime: metadata.scheduledPickupTime ? new Date(metadata.scheduledPickupTime) : null,
       scheduledDeliveryTime: metadata.scheduledDeliveryTime ? new Date(metadata.scheduledDeliveryTime) : null,
       isScheduled: !!metadata.scheduledPickupTime,
@@ -1796,8 +1801,6 @@ export async function registerRoutes(
     }
 
     const trackingNumber = generateTrackingNumber();
-    const basePrice = bookingData.basePrice || bookingData.totalPrice * 0.3;
-    const distancePrice = bookingData.distancePrice || bookingData.totalPrice * 0.7;
     
     const jobData = {
       trackingNumber,
@@ -1815,8 +1818,13 @@ export async function registerRoutes(
       deliveryInstructions: bookingData.deliveryInstructions || null,
       vehicleType: bookingData.vehicleType as VehicleType,
       weight: String(bookingData.weight || 1),
-      basePrice: String(basePrice),
-      distancePrice: String(distancePrice),
+      basePrice: String(bookingData.basePrice || bookingData.totalPrice * 0.3),
+      distancePrice: String(bookingData.distancePrice || bookingData.totalPrice * 0.7),
+      weightSurcharge: String(bookingData.weightSurcharge || 0),
+      multiDropCharge: String(bookingData.multiDropCharge || 0),
+      returnTripCharge: String(bookingData.returnTripCharge || 0),
+      centralLondonCharge: String(bookingData.centralLondonCharge || 0),
+      waitingTimeCharge: String(bookingData.waitingTimeCharge || 0),
       totalPrice: String(bookingData.totalPrice || 0),
       distance: String(bookingData.distance || 0),
       customerId: bookingData.customerId,
@@ -1825,6 +1833,8 @@ export async function registerRoutes(
       status: 'pending' as JobStatus,
       isMultiDrop: bookingData.isMultiDrop || false,
       isReturnTrip: bookingData.isReturnTrip || false,
+      isCentralLondon: bookingData.isCentralLondon || false,
+      isRushHour: bookingData.isRushHour || false,
       scheduledPickupTime: bookingData.scheduledPickupTime ? new Date(bookingData.scheduledPickupTime) : null,
       scheduledDeliveryTime: bookingData.scheduledDeliveryTime ? new Date(bookingData.scheduledDeliveryTime) : null,
       isScheduled: !!bookingData.scheduledPickupTime,
@@ -1871,8 +1881,6 @@ export async function registerRoutes(
 
     const trackingNumber = generateTrackingNumber();
     const totalPrice = parseFloat(metadata.totalPrice || '0');
-    const basePrice = parseFloat(metadata.basePrice || String(totalPrice * 0.3));
-    const distancePrice = parseFloat(metadata.distancePrice || String(totalPrice * 0.7));
     
     const jobData = {
       trackingNumber,
@@ -1890,8 +1898,13 @@ export async function registerRoutes(
       deliveryInstructions: metadata.deliveryInstructions || null,
       vehicleType: metadata.vehicleType as VehicleType,
       weight: metadata.weight || '1',
-      basePrice: String(basePrice),
-      distancePrice: String(distancePrice),
+      basePrice: metadata.basePrice || String(totalPrice * 0.3),
+      distancePrice: metadata.distancePrice || String(totalPrice * 0.7),
+      weightSurcharge: metadata.weightSurcharge || '0',
+      multiDropCharge: metadata.multiDropCharge || '0',
+      returnTripCharge: metadata.returnTripCharge || '0',
+      centralLondonCharge: metadata.centralLondonCharge || '0',
+      waitingTimeCharge: metadata.waitingTimeCharge || '0',
       totalPrice: String(totalPrice),
       distance: metadata.distance || '0',
       customerId: metadata.customerId || `guest-${session.id}`,
@@ -1902,6 +1915,8 @@ export async function registerRoutes(
       status: 'pending' as JobStatus,
       isMultiDrop: metadata.isMultiDrop === 'true',
       isReturnTrip: metadata.isReturnTrip === 'true',
+      isCentralLondon: metadata.isCentralLondon === 'true',
+      isRushHour: metadata.isRushHour === 'true',
       scheduledPickupTime: metadata.scheduledPickupTime ? new Date(metadata.scheduledPickupTime) : null,
       scheduledDeliveryTime: metadata.scheduledDeliveryTime ? new Date(metadata.scheduledDeliveryTime) : null,
       isScheduled: !!metadata.scheduledPickupTime,

@@ -20,11 +20,18 @@ export interface BookingData {
   discountApplied?: boolean;
   basePrice?: number;
   distancePrice?: number;
+  weightSurcharge?: number;
+  multiDropCharge?: number;
+  returnTripCharge?: number;
+  centralLondonCharge?: number;
+  waitingTimeCharge?: number;
   totalPrice: number;
   distance: number;
   estimatedTime: number;
   isMultiDrop: boolean;
   isReturnTrip: boolean;
+  isCentralLondon?: boolean;
+  isRushHour?: boolean;
   multiDropStops?: string;
   customerId?: string;
   customerEmail?: string;
