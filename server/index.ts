@@ -103,22 +103,13 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// CORS middleware - allow all origins for cross-origin requests
+// CORS middleware - handle cross-origin requests
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
+  const origin = req.headers.origin || '*';
   
-  if (origin) {
-    // Allow runcourier.co.uk and all development URLs
-    const allowedPatterns = ['runcourier.co.uk', 'localhost', '127.0.0.1', 'replit.dev'];
-    const isAllowed = allowedPatterns.some(pattern => origin.includes(pattern));
-    
-    if (isAllowed || origin.startsWith('https://') || origin.startsWith('http://')) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-  }
-  
-  // Always set these headers for CORS
+  // Set CORS headers for all requests
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length, X-JSON-Response');
@@ -126,8 +117,6 @@ app.use((req, res, next) => {
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Length', '0');
     return res.sendStatus(204);
   }
   
