@@ -11,25 +11,33 @@ import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
 
-// CORS configuration - must be applied FIRST before any other middleware
-app.use(cors({
-  origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Allow requests from runcourier.co.uk and localhost/replit dev
-    if (!origin) {
-      return callback(null, true);
-    }
-    if (origin.includes('runcourier.co.uk') || origin.includes('localhost') || origin.includes('replit.dev')) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all for now
-    }
-  },
-  credentials: true,
-  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-}));
+// Manual CORS handling - must be before all other routes
+app.all('*', (req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Always allow these origins
+  const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk'];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (origin && (origin.includes('localhost') || origin.includes('replit.dev'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  // Set CORS headers for all requests
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Content-Length');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Handle OPTIONS preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const httpServer = createServer(app);
