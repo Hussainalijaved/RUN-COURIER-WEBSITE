@@ -11,26 +11,17 @@ import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
 
-// CORS configuration - allow all requests from runcourier.co.uk
+// CORS configuration
 const corsOptions = {
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    const allowedOrigins = ['https://runcourier.co.uk', 'http://runcourier.co.uk', 'https://www.runcourier.co.uk', 'http://www.runcourier.co.uk'];
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin || allowedOrigins.includes(origin) || origin?.includes('localhost') || origin?.includes('127.0.0.1') || origin?.includes('replit.dev')) {
-      console.log(`[CORS] Allowing origin: ${origin || 'no-origin'}`);
-      callback(null, true);
-    } else {
-      console.log(`[CORS] Blocking origin: ${origin}`);
-      callback(null, false);
-    }
-  },
+  // Allow all origins (including from Hostinger)
+  origin: true,
   credentials: true,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   optionsSuccessStatus: 200
 };
 
+console.log('[SERVER] Applying CORS middleware');
 app.use(cors(corsOptions));
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
