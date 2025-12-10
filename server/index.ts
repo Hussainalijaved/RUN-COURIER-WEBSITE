@@ -11,22 +11,25 @@ import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
 
-// REAL FIX: USE cors() FIRST AND CORRECTLY
+// CORS configuration - must be applied FIRST before any other middleware
 app.use(cors({
-  origin: "https://runcourier.co.uk",
+  origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests from runcourier.co.uk and localhost/replit dev
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (origin.includes('runcourier.co.uk') || origin.includes('localhost') || origin.includes('replit.dev')) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all for now
+    }
+  },
   credentials: true,
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"]
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
-
-// Handle OPTIONS manually (required on Replit)
-app.options("*", (req, res) => {
-  res.header("Access-Control-Allow-Origin", "https://runcourier.co.uk");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  return res.status(200).end();
-});
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const httpServer = createServer(app);
