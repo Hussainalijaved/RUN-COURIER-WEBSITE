@@ -13,7 +13,7 @@ export function trackConversion(label: string): void {
 
 export function trackPageView(pagePath: string): void {
   if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('config', 'AW-4080602084', {
+    window.gtag('config', 'AW-17051034778', {
       page_path: pagePath
     });
   }
