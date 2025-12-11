@@ -1,0 +1,111 @@
+I want to integrate Google Ads tracking and Google Tag Manager into my single-page website.
+Please make the following changes safely and correctly:
+
+1. Add Google Tag Manager
+
+Insert the GTM container code in the correct positions:
+
+A) Inside <head>, before any other script:
+
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id=GTM-XXXX';f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-XXXX');</script>
+<!-- End Google Tag Manager -->
+
+
+B) Immediately after <body>:
+
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXX"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+
+Replace GTM-XXXX with my container ID.
+
+2. Add Google Ads Global Site Tag
+
+Inside the <head>, directly after the GTM script, insert:
+
+<!-- Global site tag (gtag.js) - Google Ads -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-XXXXXXXXX"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'AW-XXXXXXXXX');
+</script>
+
+
+Replace AW-XXXXXXXXX with my Google Ads ID.
+
+3. Add Google Ads Conversion Event
+
+Create a reusable function at the bottom of index.html or in the main JS file:
+
+function trackConversion(label) {
+  gtag('event', 'conversion', {
+    'send_to': 'AW-XXXXXXXXX/LABELHERE'
+  });
+}
+
+
+Replace:
+
+AW-XXXXXXXXX with my Google Ads ID
+
+LABELHERE with my conversion label
+
+4. Trigger Conversion Events on Buttons
+
+Find the following buttons:
+
+“Get Quote”
+
+“Book Delivery”
+
+“Confirm Payment”
+
+“Submit”
+
+Attach the conversion triggers:
+
+Example:
+
+document.querySelector('#getQuoteBtn').addEventListener('click', () => {
+  trackConversion('LABELHERE');
+});
+
+
+Replace #getQuoteBtn with the actual button ID.
+
+Do this for each button I want to track.
+
+5. Ensure SPA routing works with tracking
+
+Because this is a single-page application, ensure:
+
+All scripts remain in index.html
+
+No duplicate GTM or gtag scripts
+
+Only one global site tag is loaded
+
+Conversion events work without page reload
+
+6. After implementing
+
+Show me:
+
+All files you changed
+
+All IDs or selectors used
+
+Where the scripts were placed
+
+Confirmation that there are no duplicate tags
+
+Do NOT break the current app functionality.
