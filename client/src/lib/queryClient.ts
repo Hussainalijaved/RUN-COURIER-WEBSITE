@@ -7,29 +7,26 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function getBackendUrl(url: string): string {
+  if (url.startsWith('http')) {
+    return url;
+  }
+  
+  const hostname = window.location.hostname;
+  
+  if (hostname === 'runcourier.co.uk' || hostname === 'www.runcourier.co.uk') {
+    return `https://run-courier-site--almashriqi2010.replit.app${url}`;
+  }
+  
+  return url;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Determine backend URL based on current environment
-  let backendUrl: string;
-  
-  if (url.startsWith('http')) {
-    // Already a full URL
-    backendUrl = url;
-  } else {
-    // Check if running on production (Hostinger) or development (Replit)
-    const hostname = window.location.hostname;
-    
-    if (hostname === 'runcourier.co.uk' || hostname === 'www.runcourier.co.uk') {
-      // Production: use Replit backend
-      backendUrl = `https://run-courier-site--almashriqi2010.replit.app${url}`;
-    } else {
-      // Development: use relative URL (same server)
-      backendUrl = url;
-    }
-  }
+  const backendUrl = getBackendUrl(url);
   
   const res = await fetch(backendUrl, {
     method,
@@ -73,7 +70,8 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const url = buildUrlFromQueryKey(queryKey);
-    const res = await fetch(url, {
+    const backendUrl = getBackendUrl(url);
+    const res = await fetch(backendUrl, {
       credentials: "include",
     });
 
