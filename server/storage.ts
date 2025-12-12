@@ -25,10 +25,11 @@ import {
   type BookingQuoteInput,
   driverApplications,
   jobs,
+  users,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -556,24 +557,43 @@ export class MemStorage implements IStorage {
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('[Storage] Error getting user from database:', error);
+      return undefined;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === username,
-    );
+    try {
+      const result = await db.select().from(users).where(eq(users.email, username)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('[Storage] Error getting user by username:', error);
+      return undefined;
+    }
   }
 
   async getUsers(filters?: { role?: string; isActive?: boolean }): Promise<User[]> {
-    let users = Array.from(this.users.values());
-    if (filters?.role) {
-      users = users.filter((u) => u.role === filters.role);
+    try {
+      let query = db.select().from(users);
+      const conditions = [];
+      if (filters?.role) {
+        conditions.push(eq(users.role, filters.role as UserRole));
+      }
+      if (filters?.isActive !== undefined) {
+        conditions.push(eq(users.isActive, filters.isActive));
+      }
+      if (conditions.length > 0) {
+        return await db.select().from(users).where(and(...conditions));
+      }
+      return await db.select().from(users);
+    } catch (error) {
+      console.error('[Storage] Error getting users:', error);
+      return [];
     }
-    if (filters?.isActive !== undefined) {
-      users = users.filter((u) => u.isActive === filters.isActive);
-    }
-    return users;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -582,60 +602,100 @@ export class MemStorage implements IStorage {
   }
 
   async createUserWithId(id: string, insertUser: InsertUser): Promise<User> {
-    if (this.users.has(id)) {
-      throw new Error(`User with id ${id} already exists`);
+    try {
+      // Check if user already exists
+      const existing = await this.getUser(id);
+      if (existing) {
+        // Return existing user instead of throwing error
+        return existing;
+      }
+      
+      const userData = {
+        id,
+        email: insertUser.email,
+        fullName: insertUser.fullName,
+        password: insertUser.password || null,
+        phone: insertUser.phone || null,
+        postcode: insertUser.postcode || null,
+        address: insertUser.address || null,
+        buildingName: insertUser.buildingName || null,
+        role: (insertUser.role || "customer") as UserRole,
+        userType: (insertUser.userType || "individual") as UserType,
+        companyName: insertUser.companyName || null,
+        registrationNumber: insertUser.registrationNumber || null,
+        businessAddress: insertUser.businessAddress || null,
+        vatNumber: insertUser.vatNumber || null,
+        stripeCustomerId: insertUser.stripeCustomerId || null,
+        payLaterEnabled: insertUser.payLaterEnabled || false,
+        completedBookingsCount: insertUser.completedBookingsCount || 0,
+        isActive: insertUser.isActive ?? true,
+        createdAt: new Date(),
+      };
+      
+      const result = await db.insert(users).values(userData).returning();
+      console.log(`[Storage] Created user ${id} in database`);
+      return result[0];
+    } catch (error: any) {
+      // Handle unique constraint violation - user might already exist
+      if (error.code === '23505') {
+        const existing = await this.getUser(id);
+        if (existing) return existing;
+      }
+      console.error('[Storage] Error creating user:', error);
+      throw error;
     }
-    const user: User = { 
-      id,
-      email: insertUser.email,
-      fullName: insertUser.fullName,
-      password: insertUser.password || null,
-      phone: insertUser.phone || null,
-      postcode: insertUser.postcode || null,
-      address: insertUser.address || null,
-      buildingName: insertUser.buildingName || null,
-      role: (insertUser.role || "customer") as UserRole,
-      userType: (insertUser.userType || "individual") as UserType,
-      companyName: insertUser.companyName || null,
-      registrationNumber: insertUser.registrationNumber || null,
-      businessAddress: insertUser.businessAddress || null,
-      vatNumber: insertUser.vatNumber || null,
-      stripeCustomerId: insertUser.stripeCustomerId || null,
-      payLaterEnabled: insertUser.payLaterEnabled || false,
-      completedBookingsCount: insertUser.completedBookingsCount || 0,
-      isActive: insertUser.isActive ?? true,
-      createdAt: new Date(),
-    };
-    this.users.set(id, user);
-    return user;
   }
 
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    const updated = { ...user, ...data };
-    this.users.set(id, updated);
-    return updated;
+    try {
+      // Remove id from update data to avoid issues
+      const { id: _, ...updateData } = data;
+      
+      const result = await db.update(users)
+        .set(updateData)
+        .where(eq(users.id, id))
+        .returning();
+      
+      if (result.length > 0) {
+        console.log(`[Storage] Updated user ${id} in database`);
+        return result[0];
+      }
+      return undefined;
+    } catch (error) {
+      console.error('[Storage] Error updating user:', error);
+      return undefined;
+    }
   }
 
   async incrementCompletedBookings(id: string): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    const updated = { 
-      ...user, 
-      completedBookingsCount: (user.completedBookingsCount || 0) + 1 
-    };
-    this.users.set(id, updated);
-    return updated;
+    try {
+      const result = await db.update(users)
+        .set({ 
+          completedBookingsCount: sql`${users.completedBookingsCount} + 1` 
+        })
+        .where(eq(users.id, id))
+        .returning();
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('[Storage] Error incrementing completed bookings:', error);
+      return undefined;
+    }
   }
 
   async deleteUser(id: string): Promise<void> {
-    this.users.delete(id);
-    const notifEntries = Array.from(this.notifications.entries());
-    for (const [notifId, notif] of notifEntries) {
-      if (notif.userId === id) {
-        this.notifications.delete(notifId);
+    try {
+      await db.delete(users).where(eq(users.id, id));
+      console.log(`[Storage] Deleted user ${id} from database`);
+      // Also clean up in-memory notifications
+      const notifEntries = Array.from(this.notifications.entries());
+      for (const [notifId, notif] of notifEntries) {
+        if (notif.userId === id) {
+          this.notifications.delete(notifId);
+        }
       }
+    } catch (error) {
+      console.error('[Storage] Error deleting user:', error);
+      throw error;
     }
   }
 
