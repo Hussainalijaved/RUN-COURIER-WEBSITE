@@ -30,32 +30,6 @@
     <!-- TrustBox script -->
     <script type="text/javascript" src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js" async></script>
     <!-- End TrustBox script -->
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: linear-gradient(180deg, #2B6DFF 0%, #1C92FF 100%);
-        min-height: 100%;
-      }
-      #app-loader {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(180deg, #2B6DFF 0%, #1C92FF 100%);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-      }
-      #app-loader img {
-        max-width: 200px;
-        max-height: 200px;
-        width: auto;
-        height: auto;
-      }
-    </style>
   </head>
   <body>
     <!-- Google Tag Manager (noscript) -->
@@ -63,22 +37,10 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
 
-    <div id="app-loader">
-      <img src="/run-loader.png" alt="Run Courier Loading" />
-    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      window.addEventListener('load', function() {
-        var loader = document.getElementById('app-loader');
-        if (loader) {
-          loader.style.display = 'none';
-        }
-      });
-
       // Google Ads Conversion Tracking Function
-      // Usage: trackConversion('YOUR_CONVERSION_LABEL') 
-      // Replace YOUR_CONVERSION_LABEL with the label from Google Ads
       function trackConversion(label) {
         if (typeof gtag === 'function') {
           gtag('event', 'conversion', {
@@ -86,8 +48,6 @@
           });
         }
       }
-
-      // Make trackConversion available globally for React components
       window.trackConversion = trackConversion;
     </script>
   </body>
