@@ -164,11 +164,10 @@ export default function AdminMap() {
           if (!infoWindowRef.current) {
             infoWindowRef.current = new google.maps.InfoWindow();
           }
-          const driverCode = driver.id.slice(0, 8).toUpperCase();
           const vehicleType = driver.vehicleType?.replace(/_/g, ' ') || 'Unknown';
           infoWindowRef.current.setContent(`
-            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 120px;">
-              <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">ID: ${driverCode}</div>
+            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">ID: ${driver.id}</div>
               <div style="font-size: 12px; color: #666; text-transform: capitalize;">Vehicle: ${vehicleType}</div>
             </div>
           `);
