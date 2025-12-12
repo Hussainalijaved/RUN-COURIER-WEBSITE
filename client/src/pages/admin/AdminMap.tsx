@@ -16,6 +16,7 @@ export default function AdminMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -157,6 +158,27 @@ export default function AdminMap() {
           setSelectedDriver(driver);
           map.panTo(location);
           map.setZoom(15);
+        });
+
+        marker.addListener('mouseover', () => {
+          if (!infoWindowRef.current) {
+            infoWindowRef.current = new google.maps.InfoWindow();
+          }
+          const driverCode = driver.id.slice(0, 8).toUpperCase();
+          const vehicleType = driver.vehicleType?.replace(/_/g, ' ') || 'Unknown';
+          infoWindowRef.current.setContent(`
+            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 120px;">
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">ID: ${driverCode}</div>
+              <div style="font-size: 12px; color: #666; text-transform: capitalize;">Vehicle: ${vehicleType}</div>
+            </div>
+          `);
+          infoWindowRef.current.open(map, marker);
+        });
+
+        marker.addListener('mouseout', () => {
+          if (infoWindowRef.current) {
+            infoWindowRef.current.close();
+          }
         });
 
         markersRef.current.set(driver.id, marker);
