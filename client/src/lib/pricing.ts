@@ -1,4 +1,4 @@
-import type { VehicleType } from "@shared/schema";
+import type { VehicleType, PricingSettings, Vehicle } from "@shared/schema";
 
 export interface PricingConfig {
   vehicles: {
@@ -233,4 +233,213 @@ export function shouldSwitchVehicle(vehicleType: VehicleType, distance: number):
     }
   }
   return null;
+}
+
+// Cache for fetched pricing config
+let cachedPricingConfig: PricingConfig | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch pricing configuration from the API.
+ * Returns cached config if available and not expired.
+ * Falls back to defaultPricingConfig on error.
+ */
+export async function fetchPricingConfig(): Promise<PricingConfig> {
+  // Return cached config if valid
+  if (cachedPricingConfig && Date.now() - cacheTimestamp < CACHE_TTL) {
+    return cachedPricingConfig;
+  }
+
+  try {
+    // Fetch both pricing settings and vehicles in parallel
+    const [pricingRes, vehiclesRes] = await Promise.all([
+      fetch('/api/pricing'),
+      fetch('/api/vehicles'),
+    ]);
+
+    if (!pricingRes.ok || !vehiclesRes.ok) {
+      console.warn('Failed to fetch pricing config, using defaults');
+      return defaultPricingConfig;
+    }
+
+    const pricingSettings: PricingSettings = await pricingRes.json();
+    const vehicles: Vehicle[] = await vehiclesRes.json();
+
+    // Transform API data to PricingConfig format
+    const vehiclesMap: PricingConfig['vehicles'] = { ...defaultPricingConfig.vehicles };
+    
+    vehicles.forEach((v) => {
+      const type = v.type as VehicleType;
+      if (vehiclesMap[type]) {
+        vehiclesMap[type] = {
+          name: v.name,
+          baseCharge: parseFloat(v.baseCharge) || vehiclesMap[type].baseCharge,
+          perMileRate: parseFloat(v.perMileRate) || vehiclesMap[type].perMileRate,
+          rushHourRate: parseFloat(v.rushHourRate || '0') || vehiclesMap[type].rushHourRate,
+          maxWeight: v.maxWeight || vehiclesMap[type].maxWeight,
+        };
+      }
+    });
+
+    // Convert weight surcharges from Record to array format
+    const weightSurcharges: PricingConfig['weightSurcharges'] = [];
+    if (pricingSettings.weightSurcharges) {
+      const surcharges = pricingSettings.weightSurcharges as Record<string, number>;
+      Object.entries(surcharges).forEach(([range, charge]) => {
+        if (range.includes('+')) {
+          const min = parseInt(range.replace('+', ''));
+          weightSurcharges.push({ min, max: null, charge });
+        } else if (range.includes('-')) {
+          const [minStr, maxStr] = range.split('-');
+          weightSurcharges.push({ min: parseInt(minStr), max: parseInt(maxStr), charge });
+        }
+      });
+      weightSurcharges.sort((a, b) => a.min - b.min);
+    }
+
+    // Convert rush hour settings to periods array
+    const rushHourPeriods = [
+      { start: pricingSettings.rushHourStart || '07:00', end: pricingSettings.rushHourEnd || '09:00' },
+      { start: pricingSettings.rushHourStartEvening || '17:00', end: pricingSettings.rushHourEndEvening || '19:00' },
+    ];
+
+    cachedPricingConfig = {
+      vehicles: vehiclesMap,
+      weightSurcharges: weightSurcharges.length > 0 ? weightSurcharges : defaultPricingConfig.weightSurcharges,
+      centralLondonSurcharge: parseFloat(pricingSettings.centralLondonSurcharge || '15'),
+      multiDropCharge: parseFloat(pricingSettings.multiDropCharge || '5'),
+      returnTripMultiplier: parseFloat(pricingSettings.returnTripMultiplier || '0.60'),
+      waitingTimeFreeMinutes: pricingSettings.waitingTimeFreeMinutes || 10,
+      waitingTimePerMinute: parseFloat(pricingSettings.waitingTimePerMinute || '0.50'),
+      rushHourPeriods,
+    };
+    cacheTimestamp = Date.now();
+
+    return cachedPricingConfig;
+  } catch (error) {
+    console.warn('Error fetching pricing config:', error);
+    return defaultPricingConfig;
+  }
+}
+
+/**
+ * Clear the pricing config cache.
+ * Call this when pricing is updated to ensure fresh values are used.
+ */
+export function clearPricingCache(): void {
+  cachedPricingConfig = null;
+  cacheTimestamp = 0;
+}
+
+/**
+ * Calculate quote with pricing fetched from the database.
+ * This is the async version that uses server pricing.
+ */
+export async function calculateQuoteAsync(
+  vehicleType: VehicleType,
+  distance: number,
+  weight: number,
+  options: {
+    pickupPostcode: string;
+    deliveryPostcode: string;
+    isMultiDrop?: boolean;
+    multiDropCount?: number;
+    multiDropDistances?: number[];
+    isReturnTrip?: boolean;
+    returnToSameLocation?: boolean;
+    returnDistance?: number;
+    scheduledTime?: Date;
+  }
+): Promise<QuoteBreakdown> {
+  const config = await fetchPricingConfig();
+  const vehicle = config.vehicles[vehicleType];
+  
+  // Check rush hour using fetched config
+  const rushHour = options.scheduledTime 
+    ? isRushHourWithConfig(options.scheduledTime, config)
+    : isRushHourWithConfig(new Date(), config);
+  
+  const baseCharge = vehicle.baseCharge;
+  const perMileRate = rushHour ? vehicle.rushHourRate : vehicle.perMileRate;
+  const distanceCharge = distance * perMileRate;
+  
+  // Get weight surcharge from fetched config
+  const weightSurcharge = getWeightSurchargeWithConfig(weight, config);
+  
+  const isCentralPickup = isCentralLondon(options.pickupPostcode);
+  const isCentralDelivery = isCentralLondon(options.deliveryPostcode);
+  const centralLondonCharge = (isCentralPickup || isCentralDelivery) ? config.centralLondonSurcharge : 0;
+  
+  let multiDropCharge = 0;
+  let multiDropDistanceCharge = 0;
+  let totalMultiDropDistance = 0;
+  
+  if (options.isMultiDrop && options.multiDropCount && options.multiDropCount > 0) {
+    multiDropCharge = config.multiDropCharge * options.multiDropCount;
+    
+    if (options.multiDropDistances && options.multiDropDistances.length > 0) {
+      totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
+      multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
+    }
+  }
+  
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge;
+  
+  let returnTripCharge = 0;
+  if (options.isReturnTrip) {
+    if (options.returnToSameLocation) {
+      returnTripCharge = subtotalBeforeReturn * config.returnTripMultiplier;
+    } else if (options.returnDistance) {
+      returnTripCharge = options.returnDistance * perMileRate;
+    }
+  }
+  
+  const totalDistance = distance + totalMultiDropDistance;
+  const totalPrice = subtotalBeforeReturn + returnTripCharge;
+  
+  return {
+    vehicleType,
+    distance,
+    totalDistance,
+    weight,
+    baseCharge,
+    distanceCharge,
+    multiDropDistanceCharge,
+    weightSurcharge,
+    centralLondonCharge,
+    multiDropCharge,
+    returnTripCharge,
+    rushHourApplied: rushHour,
+    totalPrice: Math.round(totalPrice * 100) / 100,
+  };
+}
+
+// Helper to check rush hour with a specific config
+function isRushHourWithConfig(date: Date, config: PricingConfig): boolean {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const time = hours * 60 + minutes;
+  
+  for (const period of config.rushHourPeriods) {
+    const [startHour, startMin] = period.start.split(":").map(Number);
+    const [endHour, endMin] = period.end.split(":").map(Number);
+    const start = startHour * 60 + startMin;
+    const end = endHour * 60 + endMin;
+    
+    if (time >= start && time <= end) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Helper to get weight surcharge with a specific config
+function getWeightSurchargeWithConfig(weight: number, config: PricingConfig): number {
+  for (const surcharge of config.weightSurcharges) {
+    if (weight >= surcharge.min && (surcharge.max === null || weight < surcharge.max)) {
+      return surcharge.charge;
+    }
+  }
+  return 0;
 }

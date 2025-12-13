@@ -369,4 +369,70 @@ export function registerMobileRoutes(app: Express): void {
       validTransitions: VALID_JOB_TRANSITIONS,
     });
   });
+
+  // Public pricing endpoint for mobile app - no auth required
+  app.get("/api/mobile/v1/pricing",
+    asyncHandler(async (req, res) => {
+      // Fetch pricing settings
+      const pricingSettings = await storage.getPricingSettings();
+      
+      // Fetch vehicles
+      const vehicles = await storage.getVehicles();
+      
+      // Transform weight surcharges to array format
+      const weightSurchargesArray: { min: number; max: number | null; charge: number }[] = [];
+      if (pricingSettings.weightSurcharges) {
+        const surcharges = pricingSettings.weightSurcharges as Record<string, number>;
+        Object.entries(surcharges).forEach(([range, charge]) => {
+          if (range.includes('+')) {
+            const min = parseInt(range.replace('+', ''));
+            weightSurchargesArray.push({ min, max: null, charge });
+          } else if (range.includes('-')) {
+            const [minStr, maxStr] = range.split('-');
+            weightSurchargesArray.push({ min: parseInt(minStr), max: parseInt(maxStr), charge });
+          }
+        });
+        weightSurchargesArray.sort((a, b) => a.min - b.min);
+      }
+      
+      // Transform vehicles to config format
+      const vehiclesConfig: Record<string, {
+        name: string;
+        baseCharge: number;
+        perMileRate: number;
+        rushHourRate: number;
+        maxWeight: number;
+      }> = {};
+      
+      vehicles.forEach((v) => {
+        vehiclesConfig[v.type] = {
+          name: v.name,
+          baseCharge: parseFloat(v.baseCharge) || 0,
+          perMileRate: parseFloat(v.perMileRate) || 0,
+          rushHourRate: parseFloat(v.rushHourRate || '0') || 0,
+          maxWeight: v.maxWeight || 0,
+        };
+      });
+      
+      // Return pricing config in the same format as frontend expects
+      res.json({
+        vehicles: vehiclesConfig,
+        weightSurcharges: weightSurchargesArray,
+        centralLondonSurcharge: parseFloat(pricingSettings.centralLondonSurcharge || '15'),
+        multiDropCharge: parseFloat(pricingSettings.multiDropCharge || '5'),
+        returnTripMultiplier: parseFloat(pricingSettings.returnTripMultiplier || '0.60'),
+        waitingTimeFreeMinutes: pricingSettings.waitingTimeFreeMinutes || 10,
+        waitingTimePerMinute: parseFloat(pricingSettings.waitingTimePerMinute || '0.50'),
+        rushHourPeriods: [
+          { start: pricingSettings.rushHourStart || '07:00', end: pricingSettings.rushHourEnd || '09:00' },
+          { start: pricingSettings.rushHourStartEvening || '17:00', end: pricingSettings.rushHourEndEvening || '19:00' },
+        ],
+        centralLondonPostcodes: [
+          "EC1", "EC2", "EC3", "EC4",
+          "WC1", "WC2",
+          "W1", "SW1", "SE1", "E1", "N1", "NW1",
+        ],
+      });
+    })
+  );
 }
