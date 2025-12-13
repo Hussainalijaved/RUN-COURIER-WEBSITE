@@ -6,26 +6,47 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { initGoogleMaps, getMapCenter } from '@/lib/maps';
-import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { useDriverLocations, type DriverLocation } from '@/hooks/useDriverLocations';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { initGoogleMaps, getMapCenter, geocodePostcode } from '@/lib/maps';
+import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useDriverLocations } from '@/hooks/useDriverLocations';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { Driver, Job } from '@shared/schema';
+
+interface JobLocation {
+  jobId: number;
+  pickupLat: number;
+  pickupLng: number;
+  deliveryLat: number;
+  deliveryLng: number;
+  pickupPostcode: string;
+  deliveryPostcode: string;
+}
 
 export default function AdminMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const driverMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const jobMarkersRef = useRef<Map<number, { pickup: google.maps.Marker; delivery: google.maps.Marker; polyline: google.maps.Polyline }>>(new Map());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [jobLocations, setJobLocations] = useState<Map<number, JobLocation>>(new Map());
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assigningJobId, setAssigningJobId] = useState<number | null>(null);
+  const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
+  const { toast } = useToast();
 
   const { 
     locations: realtimeLocations, 
     isConnected: wsConnected, 
     isConnecting: wsConnecting,
-    error: wsError,
     reconnect 
   } = useDriverLocations({
     enabled: true,
@@ -38,12 +59,32 @@ export default function AdminMap() {
     refetchInterval: wsConnected ? false : 10000,
   });
 
-  const { data: jobs } = useQuery<Job[]>({
+  const { data: jobs, refetch: refetchJobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
     refetchInterval: 30000,
   });
 
+  const assignJobMutation = useMutation({
+    mutationFn: async ({ jobId, driverId }: { jobId: number; driverId: string }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId });
+    },
+    onSuccess: () => {
+      toast({ title: 'Job assigned successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      setShowAssignDialog(false);
+      setAssigningJobId(null);
+      setSelectedDriverForAssign('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to assign job', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const activeDrivers = drivers?.filter(d => d.isVerified) || [];
+  const availableDrivers = activeDrivers.filter(d => d.isAvailable);
+  
+  const pendingJobs = jobs?.filter(j => j.status === 'pending' && !j.driverId) || [];
+  const activeJobs = jobs?.filter(j => !['delivered', 'cancelled'].includes(j.status) && j.driverId) || [];
 
   const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number } | null => {
     const realtimeLoc = realtimeLocations.get(driver.id);
@@ -114,6 +155,41 @@ export default function AdminMap() {
   }, [initMap]);
 
   useEffect(() => {
+    const geocodeJobs = async () => {
+      if (!jobs || !mapLoaded) return;
+      
+      const jobsToGeocode = [...pendingJobs, ...activeJobs].filter(job => 
+        job.pickupPostcode && job.deliveryPostcode && !jobLocations.has(job.id)
+      );
+      
+      for (const job of jobsToGeocode) {
+        try {
+          const [pickupResult, deliveryResult] = await Promise.all([
+            geocodePostcode(job.pickupPostcode),
+            geocodePostcode(job.deliveryPostcode)
+          ]);
+          
+          if (pickupResult && deliveryResult) {
+            setJobLocations(prev => new Map(prev).set(job.id, {
+              jobId: job.id,
+              pickupLat: pickupResult.lat,
+              pickupLng: pickupResult.lng,
+              deliveryLat: deliveryResult.lat,
+              deliveryLng: deliveryResult.lng,
+              pickupPostcode: job.pickupPostcode,
+              deliveryPostcode: job.deliveryPostcode,
+            }));
+          }
+        } catch (error) {
+          console.error(`Failed to geocode job ${job.id}:`, error);
+        }
+      }
+    };
+    
+    geocodeJobs();
+  }, [jobs, mapLoaded, pendingJobs, activeJobs]);
+
+  useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !mapLoaded) return;
 
@@ -127,7 +203,7 @@ export default function AdminMap() {
       const status = getDriverStatus(driver);
       const fillColor = status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF';
 
-      const existingMarker = markersRef.current.get(driver.id);
+      const existingMarker = driverMarkersRef.current.get(driver.id);
       
       if (existingMarker) {
         existingMarker.setPosition(location);
@@ -156,6 +232,7 @@ export default function AdminMap() {
 
         marker.addListener('click', () => {
           setSelectedDriver(driver);
+          setSelectedJob(null);
           map.panTo(location);
           map.setZoom(15);
         });
@@ -167,7 +244,7 @@ export default function AdminMap() {
           const vehicleType = driver.vehicleType?.replace(/_/g, ' ') || 'Unknown';
           infoWindowRef.current.setContent(`
             <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
-              <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">ID: ${driver.id}</div>
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${driver.fullName || 'Driver'}</div>
               <div style="font-size: 12px; color: #666; text-transform: capitalize;">Vehicle: ${vehicleType}</div>
             </div>
           `);
@@ -180,25 +257,203 @@ export default function AdminMap() {
           }
         });
 
-        markersRef.current.set(driver.id, marker);
+        driverMarkersRef.current.set(driver.id, marker);
       }
     });
 
-    markersRef.current.forEach((marker, driverId) => {
+    driverMarkersRef.current.forEach((marker, driverId) => {
       if (!currentMarkerIds.has(driverId)) {
         marker.setMap(null);
-        markersRef.current.delete(driverId);
+        driverMarkersRef.current.delete(driverId);
       }
     });
   }, [activeDrivers, mapLoaded, jobs, realtimeLocations, getDriverLocation]);
 
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !mapLoaded) return;
+
+    const currentJobIds = new Set<number>();
+    const allDisplayJobs = [...pendingJobs, ...activeJobs];
+
+    allDisplayJobs.forEach((job) => {
+      const location = jobLocations.get(job.id);
+      if (!location) return;
+
+      currentJobIds.add(job.id);
+      const isPending = job.status === 'pending' && !job.driverId;
+      const existingJobMarkers = jobMarkersRef.current.get(job.id);
+
+      if (existingJobMarkers) {
+        existingJobMarkers.pickup.setPosition({ lat: location.pickupLat, lng: location.pickupLng });
+        existingJobMarkers.delivery.setPosition({ lat: location.deliveryLat, lng: location.deliveryLng });
+        existingJobMarkers.pickup.setIcon({
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          scale: 6,
+          fillColor: isPending ? '#F59E0B' : '#22C55E',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          rotation: 0,
+        });
+        existingJobMarkers.delivery.setIcon({
+          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          scale: 6,
+          fillColor: isPending ? '#EF4444' : '#3B82F6',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          rotation: 0,
+        });
+        existingJobMarkers.polyline.setOptions({
+          strokeColor: isPending ? '#F59E0B' : '#3B82F6',
+        });
+      } else {
+        const pickupMarker = new google.maps.Marker({
+          position: { lat: location.pickupLat, lng: location.pickupLng },
+          map,
+          title: `Pickup: ${job.pickupPostcode}`,
+          icon: {
+            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 6,
+            fillColor: isPending ? '#F59E0B' : '#22C55E',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            rotation: 0,
+          },
+        });
+
+        const deliveryMarker = new google.maps.Marker({
+          position: { lat: location.deliveryLat, lng: location.deliveryLng },
+          map,
+          title: `Delivery: ${job.deliveryPostcode}`,
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 6,
+            fillColor: isPending ? '#EF4444' : '#3B82F6',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            rotation: 0,
+          },
+        });
+
+        const polyline = new google.maps.Polyline({
+          path: [
+            { lat: location.pickupLat, lng: location.pickupLng },
+            { lat: location.deliveryLat, lng: location.deliveryLng }
+          ],
+          geodesic: true,
+          strokeColor: isPending ? '#F59E0B' : '#3B82F6',
+          strokeOpacity: 0.6,
+          strokeWeight: 3,
+          map,
+        });
+
+        const handleMarkerClick = () => {
+          setSelectedJob(job);
+          setSelectedDriver(null);
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend({ lat: location.pickupLat, lng: location.pickupLng });
+          bounds.extend({ lat: location.deliveryLat, lng: location.deliveryLng });
+          map.fitBounds(bounds, 100);
+        };
+
+        pickupMarker.addListener('click', handleMarkerClick);
+        deliveryMarker.addListener('click', handleMarkerClick);
+
+        pickupMarker.addListener('mouseover', () => {
+          if (!infoWindowRef.current) {
+            infoWindowRef.current = new google.maps.InfoWindow();
+          }
+          infoWindowRef.current.setContent(`
+            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
+              <div style="font-weight: 600; font-size: 13px; color: #22C55E; margin-bottom: 4px;">Pickup Location</div>
+              <div style="font-size: 12px; color: #666;">${job.pickupPostcode}</div>
+              <div style="font-size: 11px; color: #999; margin-top: 4px;">Job: ${job.trackingNumber || job.id}</div>
+            </div>
+          `);
+          infoWindowRef.current.open(map, pickupMarker);
+        });
+
+        pickupMarker.addListener('mouseout', () => {
+          if (infoWindowRef.current) infoWindowRef.current.close();
+        });
+
+        deliveryMarker.addListener('mouseover', () => {
+          if (!infoWindowRef.current) {
+            infoWindowRef.current = new google.maps.InfoWindow();
+          }
+          infoWindowRef.current.setContent(`
+            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
+              <div style="font-weight: 600; font-size: 13px; color: #EF4444; margin-bottom: 4px;">Delivery Location</div>
+              <div style="font-size: 12px; color: #666;">${job.deliveryPostcode}</div>
+              <div style="font-size: 11px; color: #999; margin-top: 4px;">Job: ${job.trackingNumber || job.id}</div>
+            </div>
+          `);
+          infoWindowRef.current.open(map, deliveryMarker);
+        });
+
+        deliveryMarker.addListener('mouseout', () => {
+          if (infoWindowRef.current) infoWindowRef.current.close();
+        });
+
+        jobMarkersRef.current.set(job.id, { pickup: pickupMarker, delivery: deliveryMarker, polyline });
+      }
+    });
+
+    jobMarkersRef.current.forEach((markers, jobId) => {
+      if (!currentJobIds.has(jobId)) {
+        markers.pickup.setMap(null);
+        markers.delivery.setMap(null);
+        markers.polyline.setMap(null);
+        jobMarkersRef.current.delete(jobId);
+      }
+    });
+  }, [pendingJobs, activeJobs, jobLocations, mapLoaded]);
+
   const handleDriverClick = (driver: Driver) => {
     setSelectedDriver(driver);
+    setSelectedJob(null);
     const map = mapInstanceRef.current;
     const location = getDriverLocation(driver);
     if (map && location) {
       map.panTo(location);
       map.setZoom(15);
+    }
+  };
+
+  const handleJobClick = (job: Job) => {
+    setSelectedJob(job);
+    setSelectedDriver(null);
+    const map = mapInstanceRef.current;
+    const location = jobLocations.get(job.id);
+    if (map && location) {
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend({ lat: location.pickupLat, lng: location.pickupLng });
+      bounds.extend({ lat: location.deliveryLat, lng: location.deliveryLng });
+      map.fitBounds(bounds, 100);
+    }
+  };
+
+  const handleAssignJob = (job: Job) => {
+    setAssigningJobId(job.id);
+    setSelectedDriverForAssign('');
+    setShowAssignDialog(true);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setSelectedDriverForAssign('');
+      setAssigningJobId(null);
+    }
+    setShowAssignDialog(open);
+  };
+
+  const confirmAssignJob = () => {
+    if (assigningJobId && selectedDriverForAssign) {
+      assignJobMutation.mutate({ jobId: assigningJobId, driverId: selectedDriverForAssign });
     }
   };
 
@@ -211,6 +466,21 @@ export default function AdminMap() {
         return <Badge className="bg-green-500 text-white text-xs">Available</Badge>;
       default:
         return <Badge variant="secondary" className="text-xs">Offline</Badge>;
+    }
+  };
+
+  const getJobStatusBadge = (job: Job) => {
+    switch (job.status) {
+      case 'pending':
+        return <Badge className="bg-yellow-500 text-white text-xs">Pending</Badge>;
+      case 'assigned':
+        return <Badge className="bg-blue-500 text-white text-xs">Assigned</Badge>;
+      case 'picked_up':
+        return <Badge className="bg-purple-500 text-white text-xs">Picked Up</Badge>;
+      case 'in_transit':
+        return <Badge className="bg-indigo-500 text-white text-xs">In Transit</Badge>;
+      default:
+        return <Badge variant="secondary" className="text-xs">{job.status}</Badge>;
     }
   };
 
@@ -248,19 +518,35 @@ export default function AdminMap() {
               <div className="flex items-center gap-3">
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-primary" />
-                  Live Driver Map
+                  Live Map
                 </CardTitle>
                 {getConnectionStatus()}
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => refetchDrivers()}
-                data-testid="button-refresh-map"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <span>Pending Job</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <span>Available Driver</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span>Active Job/Driver</span>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => { refetchDrivers(); refetchJobs(); }}
+                  data-testid="button-refresh-map"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0 h-full relative">
@@ -292,134 +578,296 @@ export default function AdminMap() {
           </CardContent>
         </Card>
 
-        <Card className="w-80 flex flex-col">
-          <CardHeader className="border-b">
-            <CardTitle className="text-base flex items-center gap-2">
-              Active Drivers
-              {activeDrivers.length > 0 && (
-                <Badge variant="secondary">{activeDrivers.length}</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-3">
-              {driversLoading ? (
-                [1, 2, 3].map(i => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))
-              ) : activeDrivers.length > 0 ? (
-                activeDrivers.map((driver) => {
-                  const currentJob = getDriverCurrentJob(driver.id);
-                  const location = getDriverLocation(driver);
-                  const isLive = realtimeLocations.has(driver.id);
-                  
-                  return (
-                    <button
-                      key={driver.id}
-                      onClick={() => handleDriverClick(driver)}
-                      className={`w-full p-3 rounded-lg border text-left transition-colors ${
-                        selectedDriver?.id === driver.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover-elevate'
-                      }`}
-                      data-testid={`driver-card-${driver.id}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="relative">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                              {(driver.fullName || driver.vehicleRegistration || 'DR')
-                                .split(' ')
-                                .map(n => n[0])
-                                .join('')
-                                .slice(0, 2)
-                                .toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {isLive && (
-                            <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {driver.fullName || driver.vehicleRegistration || 'Driver'}
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Truck className="h-3 w-3" />
-                            <span className="capitalize">{driver.vehicleType?.replace('_', ' ')}</span>
-                          </div>
-                          <div className="mt-1 flex items-center gap-2">
-                            {getStatusBadge(driver)}
-                            {isLive && (
-                              <span className="text-[10px] text-green-600 font-medium">LIVE</span>
-                            )}
-                          </div>
-                          {currentJob && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Job: {currentJob.trackingNumber}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Truck className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No active drivers</p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+        <Card className="w-96 flex flex-col">
+          <Tabs defaultValue="drivers" className="flex flex-col h-full">
+            <CardHeader className="border-b pb-0">
+              <TabsList className="w-full">
+                <TabsTrigger value="drivers" className="flex-1" data-testid="tab-drivers">
+                  <Truck className="h-4 w-4 mr-2" />
+                  Drivers ({activeDrivers.length})
+                </TabsTrigger>
+                <TabsTrigger value="jobs" className="flex-1" data-testid="tab-jobs">
+                  <Package className="h-4 w-4 mr-2" />
+                  Jobs ({pendingJobs.length})
+                </TabsTrigger>
+              </TabsList>
+            </CardHeader>
 
-          {selectedDriver && (
-            <div className="border-t p-4">
-              <h4 className="font-semibold mb-3">
-                {selectedDriver.fullName || selectedDriver.vehicleRegistration || 'Driver'}
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-muted-foreground" />
-                  <span className="capitalize">{selectedDriver.vehicleType?.replace('_', ' ')}</span>
-                  {selectedDriver.vehicleRegistration && (
-                    <span className="text-muted-foreground">({selectedDriver.vehicleRegistration})</span>
+            <TabsContent value="drivers" className="flex-1 flex flex-col mt-0 overflow-hidden">
+              <ScrollArea className="flex-1">
+                <div className="p-4 space-y-3">
+                  {driversLoading ? (
+                    [1, 2, 3].map(i => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))
+                  ) : activeDrivers.length > 0 ? (
+                    activeDrivers.map((driver) => {
+                      const currentJob = getDriverCurrentJob(driver.id);
+                      const isLive = realtimeLocations.has(driver.id);
+                      
+                      return (
+                        <button
+                          key={driver.id}
+                          onClick={() => handleDriverClick(driver)}
+                          className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                            selectedDriver?.id === driver.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover-elevate'
+                          }`}
+                          data-testid={`driver-card-${driver.id}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="relative">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                                  {(driver.fullName || driver.vehicleRegistration || 'DR')
+                                    .split(' ')
+                                    .map(n => n[0])
+                                    .join('')
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              {isLive && (
+                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">
+                                {driver.fullName || driver.vehicleRegistration || 'Driver'}
+                              </div>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Truck className="h-3 w-3" />
+                                <span className="capitalize">{driver.vehicleType?.replace('_', ' ')}</span>
+                              </div>
+                              <div className="mt-1 flex items-center gap-2">
+                                {getStatusBadge(driver)}
+                                {isLive && (
+                                  <span className="text-[10px] text-green-600 font-medium">LIVE</span>
+                                )}
+                              </div>
+                              {currentJob && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Job: {currentJob.trackingNumber}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Truck className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No active drivers</p>
+                    </div>
                   )}
                 </div>
-                {(() => {
-                  const loc = getDriverLocation(selectedDriver);
-                  if (loc) {
-                    return (
+              </ScrollArea>
+
+              {selectedDriver && (
+                <div className="border-t p-4">
+                  <h4 className="font-semibold mb-3">
+                    {selectedDriver.fullName || selectedDriver.vehicleRegistration || 'Driver'}
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-muted-foreground" />
+                      <span className="capitalize">{selectedDriver.vehicleType?.replace('_', ' ')}</span>
+                      {selectedDriver.vehicleRegistration && (
+                        <span className="text-muted-foreground">({selectedDriver.vehicleRegistration})</span>
+                      )}
+                    </div>
+                    {(() => {
+                      const loc = getDriverLocation(selectedDriver);
+                      if (loc) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs font-mono">
+                              {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
+                            </span>
+                            {realtimeLocations.has(selectedDriver.id) && (
+                              <Badge className="bg-green-500 text-white text-[10px] px-1 py-0">LIVE</Badge>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    {getDriverCurrentJob(selectedDriver.id) && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-xs font-mono">
-                          {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
-                        </span>
-                        {realtimeLocations.has(selectedDriver.id) && (
-                          <Badge className="bg-green-500 text-white text-[10px] px-1 py-0">LIVE</Badge>
-                        )}
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>Job: {getDriverCurrentJob(selectedDriver.id)?.trackingNumber}</span>
                       </div>
-                    );
-                  }
-                  return null;
-                })()}
-                {getDriverCurrentJob(selectedDriver.id) && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>Job: {getDriverCurrentJob(selectedDriver.id)?.trackingNumber}</span>
+                    )}
                   </div>
-                )}
-              </div>
-              {selectedDriver.phone && (
-                <Button className="w-full mt-4" size="sm" data-testid="button-contact-driver">
-                  <Phone className="h-4 w-4 mr-2" />
-                  Contact Driver
-                </Button>
+                  {selectedDriver.phone && (
+                    <Button 
+                      className="w-full mt-4" 
+                      size="sm" 
+                      asChild
+                      data-testid="button-contact-driver"
+                    >
+                      <a href={`tel:${selectedDriver.phone}`}>
+                        <Phone className="h-4 w-4 mr-2" />
+                        Call {selectedDriver.phone}
+                      </a>
+                    </Button>
+                  )}
+                </div>
               )}
-            </div>
-          )}
+            </TabsContent>
+
+            <TabsContent value="jobs" className="flex-1 flex flex-col mt-0 overflow-hidden">
+              <ScrollArea className="flex-1">
+                <div className="p-4 space-y-3">
+                  {pendingJobs.length > 0 ? (
+                    pendingJobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className={`p-3 rounded-lg border transition-colors ${
+                          selectedJob?.id === job.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border'
+                        }`}
+                        data-testid={`job-card-${job.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <button
+                            onClick={() => handleJobClick(job)}
+                            className="flex-1 text-left"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <Package className="h-4 w-4 text-primary" />
+                              <span className="font-medium text-sm">{job.trackingNumber || `#${job.id}`}</span>
+                              {getJobStatusBadge(job)}
+                            </div>
+                            <div className="space-y-1 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                <Navigation className="h-3 w-3 text-green-500" />
+                                <span>{job.pickupPostcode}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3 w-3 text-red-500" />
+                                <span>{job.deliveryPostcode}</span>
+                              </div>
+                            </div>
+                          </button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAssignJob(job)}
+                            data-testid={`button-assign-job-${job.id}`}
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Assign
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No pending jobs</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              {selectedJob && (
+                <div className="border-t p-4">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    {selectedJob.trackingNumber || `Job #${selectedJob.id}`}
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Navigation className="h-4 w-4 text-green-500" />
+                      <span>From: {selectedJob.pickupPostcode}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-red-500" />
+                      <span>To: {selectedJob.deliveryPostcode}</span>
+                    </div>
+                    {selectedJob.vehicleType && (
+                      <div className="flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-muted-foreground" />
+                        <span className="capitalize">{selectedJob.vehicleType.replace('_', ' ')}</span>
+                      </div>
+                    )}
+                  </div>
+                  {!selectedJob.driverId && (
+                    <Button 
+                      className="w-full mt-4" 
+                      size="sm"
+                      onClick={() => handleAssignJob(selectedJob)}
+                      data-testid="button-assign-selected-job"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Assign to Driver
+                    </Button>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </Card>
       </div>
+
+      <Dialog open={showAssignDialog} onOpenChange={handleDialogClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Job to Driver</DialogTitle>
+            <DialogDescription>
+              Select an available driver to assign this job to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={selectedDriverForAssign} onValueChange={setSelectedDriverForAssign}>
+              <SelectTrigger data-testid="select-driver-for-assign">
+                <SelectValue placeholder="Select a driver" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDrivers.length > 0 ? (
+                  availableDrivers.map((driver) => (
+                    <SelectItem key={driver.id} value={driver.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span>{driver.fullName || driver.vehicleRegistration || 'Driver'}</span>
+                        <span className="text-muted-foreground text-xs capitalize">
+                          ({driver.vehicleType?.replace('_', ' ')})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>
+                    No available drivers
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleDialogClose(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmAssignJob} 
+              disabled={!selectedDriverForAssign || assignJobMutation.isPending}
+              data-testid="button-confirm-assign"
+            >
+              {assignJobMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Assign Job
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
