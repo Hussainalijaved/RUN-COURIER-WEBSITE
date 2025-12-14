@@ -16,6 +16,7 @@ import {
   Phone,
   Loader2,
 } from 'lucide-react';
+import { SmoothBackground } from '@/components/ui/smooth-image';
 import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept.png';
 import type { JobStatus } from '@shared/schema';
 
@@ -124,13 +125,12 @@ export default function Track() {
 
   return (
     <PublicLayout>
-      <section className="relative min-h-[400px] flex items-center">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${trackingHeroImage})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/70 via-[#0077B6]/60 to-[#00B4D8]/50" />
-        <div className="container mx-auto px-4 relative z-10">
+      <SmoothBackground 
+        src={trackingHeroImage}
+        className="min-h-[400px] flex items-center"
+        overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0077B6]/60 to-[#00B4D8]/50"
+      >
+        <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">Track Your Parcel</h1>
             <p className="text-lg text-white/90 mb-8">
@@ -159,7 +159,7 @@ export default function Track() {
             )}
           </div>
         </div>
-      </section>
+      </SmoothBackground>
 
       {job && (
         <section className="py-16">

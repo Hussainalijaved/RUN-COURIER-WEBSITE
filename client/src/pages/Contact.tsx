@@ -18,6 +18,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Phone, MapPin, Clock, Loader2, Send } from 'lucide-react';
 import { SiWhatsapp } from 'react-icons/si';
+import { SmoothBackground } from '@/components/ui/smooth-image';
 import contactHeroImage from '@assets/generated_images/customer_service_lady_with_headphones.png';
 
 const contactSchema = z.object({
@@ -125,14 +126,12 @@ export default function Contact() {
 
   return (
     <PublicLayout>
-      <section className="relative min-h-[400px] lg:min-h-[450px] flex items-center">
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${contactHeroImage})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50" />
-        
-        <div className="relative container mx-auto px-4 py-20">
+      <SmoothBackground 
+        src={contactHeroImage}
+        className="min-h-[400px] lg:min-h-[450px] flex items-center"
+        overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50"
+      >
+        <div className="container mx-auto px-4 py-20">
           <div className="max-w-3xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">Contact Us</h1>
             <p className="text-lg text-white/90">
@@ -141,7 +140,7 @@ export default function Contact() {
             </p>
           </div>
         </div>
-      </section>
+      </SmoothBackground>
 
       <section className="py-16">
         <div className="container mx-auto px-4">

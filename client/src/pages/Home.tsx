@@ -26,6 +26,7 @@ import {
   CalendarClock,
   Repeat,
 } from 'lucide-react';
+import { SmoothBackground } from '@/components/ui/smooth-image';
 import heroBackground from '@assets/WhatsApp_Image_2025-09-06_at_20.08.04_32824ae2_1764877551595.jpg';
 
 const heroServices = [
@@ -136,14 +137,12 @@ export default function Home() {
 
   return (
     <PublicLayout>
-      <section className="relative min-h-[600px] lg:min-h-[700px] flex flex-col">
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${heroBackground})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50" />
-        
-        <div className="relative flex-1 flex items-center justify-center px-4 py-20">
+      <SmoothBackground 
+        src={heroBackground}
+        className="min-h-[600px] lg:min-h-[700px] flex flex-col"
+        overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50"
+      >
+        <div className="flex-1 flex items-center justify-center px-4 py-20">
           <div className="max-w-4xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
               Fast. Reliable. Same-Day
@@ -176,7 +175,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="relative bg-white/95 backdrop-blur-sm py-4 px-4 shadow-lg">
+        <div className="bg-white/95 backdrop-blur-sm py-4 px-4 shadow-lg">
           <div className="container mx-auto">
             <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 lg:gap-8">
               {heroServices.map((service) => (
@@ -193,7 +192,7 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </section>
+      </SmoothBackground>
 
       <section className="py-16 bg-card border-y border-border">
         <div className="container mx-auto px-4">

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
+import { SmoothImage } from '@/components/ui/smooth-image';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import {
   Menu,
@@ -61,10 +62,11 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4">
         <Link href="/" className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0 min-w-0" data-testid="logo-link">
-          <img 
+          <SmoothImage 
             src={logoImage} 
             alt="Run Courier" 
             className="h-7 sm:h-10 w-auto object-contain flex-shrink-0"
+            wrapperClassName="h-7 sm:h-10 flex-shrink-0"
             data-testid="logo-image"
           />
           <span className="font-bold text-[11px] sm:text-lg tracking-tight whitespace-nowrap">

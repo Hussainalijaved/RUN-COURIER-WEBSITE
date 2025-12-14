@@ -1,6 +1,7 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore } from 'react-icons/si';
+import { SmoothImage } from '@/components/ui/smooth-image';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
 const footerLinks = {
@@ -35,10 +36,11 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div>
             <Link href="/" className="flex items-center gap-2 mb-4" data-testid="footer-logo-link">
-              <img 
+              <SmoothImage 
                 src={logoImage} 
                 alt="Run Courier" 
                 className="h-10 w-auto object-contain"
+                wrapperClassName="h-10 flex-shrink-0"
                 data-testid="footer-logo-image"
               />
               <span className="font-bold text-sm tracking-tight">
