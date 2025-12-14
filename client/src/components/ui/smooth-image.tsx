@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
+
+const loadedImages = new Set<string>();
 
 interface SmoothImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   wrapperClassName?: string;
@@ -14,24 +16,26 @@ export function SmoothImage({
   placeholderClassName,
   ...props
 }: SmoothImageProps) {
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState(false);
+  const alreadyLoaded = src ? loadedImages.has(src) : false;
+  const [loaded, setLoaded] = useState(alreadyLoaded);
 
   const handleLoad = useCallback(() => {
+    if (src) loadedImages.add(src);
     setLoaded(true);
-  }, []);
+  }, [src]);
 
-  const handleError = useCallback(() => {
-    setError(true);
-    setLoaded(true);
-  }, []);
+  useEffect(() => {
+    if (src && loadedImages.has(src)) {
+      setLoaded(true);
+    }
+  }, [src]);
 
   return (
     <div className={cn("relative overflow-hidden", wrapperClassName)}>
       {!loaded && (
         <div 
           className={cn(
-            "absolute inset-0 bg-muted/50 animate-pulse",
+            "absolute inset-0 bg-muted/30 animate-pulse",
             placeholderClassName
           )} 
         />
@@ -40,13 +44,11 @@ export function SmoothImage({
         src={src}
         alt={alt}
         className={cn(
-          "transition-opacity duration-500 ease-out",
+          "transition-opacity duration-300 ease-out",
           loaded ? "opacity-100" : "opacity-0",
-          error && "opacity-50",
           className
         )}
         onLoad={handleLoad}
-        onError={handleError}
         {...props}
       />
     </div>
@@ -66,16 +68,43 @@ export function SmoothBackground({
   children,
   overlayClassName,
 }: SmoothBackgroundProps) {
-  const [loaded, setLoaded] = useState(false);
+  const alreadyLoaded = loadedImages.has(src);
+  const [loaded, setLoaded] = useState(alreadyLoaded);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (loadedImages.has(src)) {
+      setLoaded(true);
+      return;
+    }
+
+    const img = new Image();
+    img.src = src;
+    imgRef.current = img;
+    
+    if (img.complete) {
+      loadedImages.add(src);
+      setLoaded(true);
+    } else {
+      img.onload = () => {
+        loadedImages.add(src);
+        setLoaded(true);
+      };
+    }
+
+    return () => {
+      img.onload = null;
+    };
+  }, [src]);
 
   return (
     <div className={cn("relative", className)}>
       {!loaded && (
-        <div className="absolute inset-0 bg-muted/30 animate-pulse" />
+        <div className="absolute inset-0 bg-muted/20 animate-pulse" />
       )}
       <div
         className={cn(
-          "absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-700 ease-out",
+          "absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out",
           loaded ? "opacity-100" : "opacity-0"
         )}
         style={{ backgroundImage: `url(${src})` }}
@@ -83,12 +112,6 @@ export function SmoothBackground({
       {overlayClassName && (
         <div className={cn("absolute inset-0", overlayClassName)} />
       )}
-      <img
-        src={src}
-        alt=""
-        className="hidden"
-        onLoad={() => setLoaded(true)}
-      />
       <div className="relative z-10">
         {children}
       </div>
