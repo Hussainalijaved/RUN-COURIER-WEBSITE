@@ -13,31 +13,41 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function extractUserFromSession(session: any): AuthUser | null {
+  if (!session?.user) return null;
+  
+  const metadata = session.user.user_metadata;
+  return {
+    id: session.user.id,
+    email: session.user.email || '',
+    fullName: metadata?.fullName || metadata?.full_name || 'User',
+    role: metadata?.role || 'customer',
+    userType: metadata?.userType || 'individual',
+    companyName: metadata?.companyName,
+    phone: metadata?.phone,
+    isActive: true,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const metadata = session.user.user_metadata;
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            fullName: metadata?.fullName || metadata?.full_name || 'User',
-            role: metadata?.role || 'customer',
-            userType: metadata?.userType || 'individual',
-            companyName: metadata?.companyName,
-            phone: metadata?.phone,
-            isActive: true,
-          });
+        if (mounted && session?.user) {
+          setUser(extractUserFromSession(session));
         }
       } catch (error) {
         console.error('Auth init error:', error);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -45,25 +55,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          const metadata = session.user.user_metadata;
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            fullName: metadata?.fullName || metadata?.full_name || 'User',
-            role: metadata?.role || 'customer',
-            userType: metadata?.userType || 'individual',
-            companyName: metadata?.companyName,
-            phone: metadata?.phone,
-            isActive: true,
-          });
-        } else if (event === 'SIGNED_OUT') {
+        if (!mounted) return;
+
+        if (event === 'SIGNED_OUT') {
           setUser(null);
+          setLoading(false);
+        } else if (session?.user) {
+          setUser(extractUserFromSession(session));
+          setLoading(false);
         }
       }
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);

@@ -9,7 +9,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      storageKey: 'runcourier-auth',
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
 );
 
 export type AuthUser = {
@@ -33,7 +41,6 @@ export const signUp = async (email: string, password: string, metadata: Record<s
     },
   });
   
-  // Send welcome email and admin notification after successful signup
   if (data?.user && !error) {
     try {
       await fetch('/api/auth/registration-email', {
