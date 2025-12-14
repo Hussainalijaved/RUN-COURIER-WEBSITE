@@ -382,7 +382,14 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/drivers/:id", asyncHandler(async (req, res) => {
-    const driver = await storage.updateDriver(req.params.id, req.body);
+    // Prevent any attempt to change immutable identifiers
+    if (req.body.id || req.body.userId || req.body.driverCode) {
+      console.warn(`[Security] Attempt to modify immutable driver fields blocked for driver ${req.params.id}`);
+    }
+    // Remove immutable fields from request body before processing
+    const { id: _id, userId: _userId, driverCode: _driverCode, ...safeBody } = req.body;
+    
+    const driver = await storage.updateDriver(req.params.id, safeBody);
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
@@ -394,18 +401,18 @@ export async function registerRoutes(
       const { eq } = await import("drizzle-orm");
       
       const updateData: Partial<typeof drivers.$inferSelect> = {};
-      if (req.body.vehicleType !== undefined) updateData.vehicleType = req.body.vehicleType;
-      if (req.body.vehicleRegistration !== undefined) updateData.vehicleRegistration = req.body.vehicleRegistration;
-      if (req.body.vehicleMake !== undefined) updateData.vehicleMake = req.body.vehicleMake;
-      if (req.body.vehicleModel !== undefined) updateData.vehicleModel = req.body.vehicleModel;
-      if (req.body.vehicleColor !== undefined) updateData.vehicleColor = req.body.vehicleColor;
-      if (req.body.fullName !== undefined) updateData.fullName = req.body.fullName;
-      if (req.body.email !== undefined) updateData.email = req.body.email;
-      if (req.body.phone !== undefined) updateData.phone = req.body.phone;
-      if (req.body.postcode !== undefined) updateData.postcode = req.body.postcode;
-      if (req.body.address !== undefined) updateData.address = req.body.address;
-      if (req.body.isAvailable !== undefined) updateData.isAvailable = req.body.isAvailable;
-      if (req.body.isVerified !== undefined) updateData.isVerified = req.body.isVerified;
+      if (safeBody.vehicleType !== undefined) updateData.vehicleType = safeBody.vehicleType;
+      if (safeBody.vehicleRegistration !== undefined) updateData.vehicleRegistration = safeBody.vehicleRegistration;
+      if (safeBody.vehicleMake !== undefined) updateData.vehicleMake = safeBody.vehicleMake;
+      if (safeBody.vehicleModel !== undefined) updateData.vehicleModel = safeBody.vehicleModel;
+      if (safeBody.vehicleColor !== undefined) updateData.vehicleColor = safeBody.vehicleColor;
+      if (safeBody.fullName !== undefined) updateData.fullName = safeBody.fullName;
+      if (safeBody.email !== undefined) updateData.email = safeBody.email;
+      if (safeBody.phone !== undefined) updateData.phone = safeBody.phone;
+      if (safeBody.postcode !== undefined) updateData.postcode = safeBody.postcode;
+      if (safeBody.address !== undefined) updateData.address = safeBody.address;
+      if (safeBody.isAvailable !== undefined) updateData.isAvailable = safeBody.isAvailable;
+      if (safeBody.isVerified !== undefined) updateData.isVerified = safeBody.isVerified;
       
       if (Object.keys(updateData).length > 0) {
         await db.update(drivers).set(updateData).where(eq(drivers.id, req.params.id));
