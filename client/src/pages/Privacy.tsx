@@ -104,7 +104,44 @@ export default function Privacy() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">10. Contact Us</h2>
+            <h2 className="text-2xl font-semibold mb-4">10. Account Deletion</h2>
+            <p className="text-muted-foreground mb-4">
+              You have the right to delete your account at any time. Account deletion is available 
+              directly within the Run Courier mobile application and does not require contacting support.
+            </p>
+            <p className="text-muted-foreground mb-4">
+              <strong>How to delete your account:</strong>
+            </p>
+            <ol className="list-decimal pl-6 space-y-2 text-muted-foreground mb-4">
+              <li>Open the Run Courier mobile app</li>
+              <li>Navigate to your <strong>Profile</strong> section</li>
+              <li>Tap on <strong>Delete Account</strong></li>
+              <li>Confirm your decision when prompted</li>
+            </ol>
+            <p className="text-muted-foreground mb-4">
+              <strong>What happens when you delete your account:</strong>
+            </p>
+            <ul className="list-disc pl-6 space-y-2 text-muted-foreground mb-4">
+              <li>Your user account and login credentials will be permanently deleted</li>
+              <li>Your personal information, including name, email, phone number, and addresses, will be removed from our active systems</li>
+              <li>For drivers: your driver profile, uploaded documents, and vehicle information will be deleted</li>
+              <li>Your delivery history and preferences will be removed</li>
+            </ul>
+            <p className="text-muted-foreground mb-4">
+              <strong>Data retention exceptions:</strong> In accordance with applicable laws (including GDPR and UK financial regulations), 
+              certain data may be retained for a limited period after account deletion where required for legal, tax, accounting, 
+              or regulatory compliance purposes. This includes transaction records and invoices, which may be retained for up to 
+              7 years as required by law. Any retained data will be securely stored and automatically deleted once the legal 
+              retention period expires.
+            </p>
+            <p className="text-muted-foreground">
+              Account deletion is irreversible. If you wish to use Run Courier services again after deleting your account, 
+              you will need to create a new account.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold mb-4">11. Contact Us</h2>
             <p className="text-muted-foreground">
               For privacy-related inquiries or to exercise your rights, contact our Data Protection Officer at:
             </p>
@@ -116,7 +153,7 @@ export default function Privacy() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">11. Changes to This Policy</h2>
+            <h2 className="text-2xl font-semibold mb-4">12. Changes to This Policy</h2>
             <p className="text-muted-foreground">
               We may update this policy periodically. Significant changes will be communicated 
               via email or platform notification. Continued use of our services constitutes 
