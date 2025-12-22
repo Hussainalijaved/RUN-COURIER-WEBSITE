@@ -48,3 +48,4 @@ TESTING_VITE_STRIPE_PUBLIC_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7T
 TESTING_STRIPE_SECRET_KEY = "sk_live_...sak1"
 VITE_STRIPE_PUBLISHABLE_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwvoYu7injdGbDVInDb6W8OawVlcwuO2frMNx3y8IuQoXIh2Erq00wayXGWgW"
 NODE_ENV = "production"
+APP_URL = "https://runcourier.co.uk"
