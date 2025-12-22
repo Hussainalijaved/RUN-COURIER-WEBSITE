@@ -120,6 +120,10 @@ export default function AdminJobs() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
   const [assignDriverPrice, setAssignDriverPrice] = useState<string>('');
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailDialogJobId, setEmailDialogJobId] = useState<string>('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
@@ -226,18 +230,30 @@ export default function AdminJobs() {
   });
 
   const sendPaymentLinkMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      return apiRequest('POST', '/api/admin/payment-links', { jobId });
+    mutationFn: async ({ jobId, customerEmail, customerName }: { jobId: string; customerEmail?: string; customerName?: string }) => {
+      return apiRequest('POST', '/api/admin/payment-links', { jobId, customerEmail, customerName });
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-links'] });
+      setEmailDialogOpen(false);
+      setEmailDialogJobId('');
+      setCustomerEmail('');
+      setCustomerName('');
       toast({ 
         title: 'Payment link sent!', 
         description: data.emailSent ? 'Customer will receive an email with the payment link.' : 'Payment link created but email delivery may have failed.'
       });
     },
     onError: (error: any) => {
+      // Check if the error indicates we need an email
+      if (error?.requiresEmail) {
+        toast({ 
+          title: 'Customer email required', 
+          description: 'Please provide the customer email to send the payment link.',
+        });
+        return;
+      }
       toast({ 
         title: 'Failed to send payment link', 
         description: error?.message || 'Please try again', 
@@ -245,6 +261,29 @@ export default function AdminJobs() {
       });
     },
   });
+
+  const handleSendPaymentLink = async (jobId: string, job?: Job) => {
+    try {
+      await sendPaymentLinkMutation.mutateAsync({ jobId });
+    } catch (error: any) {
+      // If email is required, open the dialog
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('requiresEmail') || errorMessage.includes('Customer email not found') || errorMessage.includes('Please provide a customer email')) {
+        setEmailDialogJobId(jobId);
+        setCustomerName(job?.recipientName || '');
+        setEmailDialogOpen(true);
+      }
+    }
+  };
+
+  const handleSendPaymentLinkWithEmail = () => {
+    if (!emailDialogJobId || !customerEmail) return;
+    sendPaymentLinkMutation.mutate({ 
+      jobId: emailDialogJobId, 
+      customerEmail, 
+      customerName: customerName || undefined 
+    });
+  };
 
   const resendPaymentLinkMutation = useMutation({
     mutationFn: async ({ jobId }: { jobId: string }) => {
@@ -715,7 +754,7 @@ export default function AdminJobs() {
                             )}
                             {job.paymentStatus !== 'paid' && job.paymentStatus !== 'awaiting_payment' && job.status !== 'cancelled' && job.status !== 'delivered' && (
                               <DropdownMenuItem 
-                                onClick={() => sendPaymentLinkMutation.mutate(job.id)}
+                                onClick={() => handleSendPaymentLink(job.id, job)}
                                 disabled={sendPaymentLinkMutation.isPending}
                                 data-testid={`menu-send-payment-link-${job.id}`}
                               >
@@ -1131,6 +1170,75 @@ export default function AdminJobs() {
               <Button onClick={handlePrintLabel} className="gap-2" data-testid="button-print-label">
                 <Printer className="h-4 w-4" />
                 Print Label
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Customer Email Dialog for Payment Link */}
+        <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Customer Email Required
+              </DialogTitle>
+              <DialogDescription>
+                Please enter the customer's email address to send the payment link.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="customer-email">Customer Email *</Label>
+                <Input
+                  id="customer-email"
+                  type="email"
+                  placeholder="customer@example.com"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  data-testid="input-customer-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customer-name">Customer Name (optional)</Label>
+                <Input
+                  id="customer-name"
+                  type="text"
+                  placeholder="John Smith"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  data-testid="input-customer-name"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setEmailDialogOpen(false);
+                  setEmailDialogJobId('');
+                  setCustomerEmail('');
+                  setCustomerName('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSendPaymentLinkWithEmail} 
+                disabled={!customerEmail || sendPaymentLinkMutation.isPending}
+                data-testid="button-send-payment-link"
+              >
+                {sendPaymentLinkMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send Payment Link
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

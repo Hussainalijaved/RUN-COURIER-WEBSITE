@@ -2425,7 +2425,7 @@ export async function registerRoutes(
 
   // Admin: Generate and send payment link for a job
   app.post("/api/admin/payment-links", asyncHandler(async (req, res) => {
-    const { jobId, adminId } = req.body;
+    const { jobId, adminId, customerEmail: providedEmail, customerName: providedName } = req.body;
 
     if (!jobId) {
       return res.status(400).json({ error: "jobId is required" });
@@ -2445,10 +2445,25 @@ export async function registerRoutes(
       });
     }
 
-    // Get customer information
+    // Get customer information - try from user record first, then from provided data, then from job recipient
+    let customerEmail: string | undefined;
+    let customerName: string;
+    let customerId = job.customerId;
+
     const customer = await storage.getUser(job.customerId);
-    if (!customer?.email) {
-      return res.status(400).json({ error: "Customer email not found" });
+    if (customer?.email) {
+      customerEmail = customer.email;
+      customerName = customer.fullName;
+    } else if (providedEmail) {
+      // Admin provided email directly (for admin-created jobs)
+      customerEmail = providedEmail;
+      customerName = providedName || job.recipientName || 'Customer';
+    } else {
+      // No email found - ask admin to provide one
+      return res.status(400).json({ 
+        error: "Customer email not found. Please provide a customer email.",
+        requiresEmail: true 
+      });
     }
 
     // Generate secure token
@@ -2459,8 +2474,8 @@ export async function registerRoutes(
     // Create payment link
     const paymentLink = await storage.createPaymentLink({
       jobId,
-      customerId: job.customerId,
-      customerEmail: customer.email,
+      customerId,
+      customerEmail,
       token,
       tokenHash,
       amount: job.totalPrice,
@@ -2481,8 +2496,8 @@ export async function registerRoutes(
     const paymentUrl = `${BASE_URL}/pay/${token}`;
 
     // Send email to customer
-    const emailSent = await sendPaymentLinkEmail(customer.email, {
-      customerName: customer.fullName,
+    const emailSent = await sendPaymentLinkEmail(customerEmail, {
+      customerName,
       trackingNumber: job.trackingNumber,
       paymentLink: paymentUrl,
       amount: `£${parseFloat(job.totalPrice).toFixed(2)}`,
@@ -2508,18 +2523,18 @@ export async function registerRoutes(
         status: "sent",
         sentViaEmail: true,
       });
-      await storage.appendPaymentLinkAuditLog(paymentLink.id, "email_sent", adminId, customer.email);
+      await storage.appendPaymentLinkAuditLog(paymentLink.id, "email_sent", adminId, customerEmail);
     } else {
       // Email failed - notify admin
       await sendPaymentLinkFailureNotification({
-        customerName: customer.fullName,
-        customerEmail: customer.email,
+        customerName,
+        customerEmail,
         trackingNumber: job.trackingNumber,
         amount: `£${parseFloat(job.totalPrice).toFixed(2)}`,
         paymentLink: paymentUrl,
         jobId,
       });
-      await storage.appendPaymentLinkAuditLog(paymentLink.id, "email_failed", adminId, customer.email);
+      await storage.appendPaymentLinkAuditLog(paymentLink.id, "email_failed", adminId, customerEmail);
     }
 
     // Notify admin
@@ -2528,8 +2543,8 @@ export async function registerRoutes(
         userId: adminId,
         title: emailSent ? "Payment Link Sent" : "Payment Link Email Failed",
         message: emailSent 
-          ? `Payment link sent to ${customer.email} for job ${job.trackingNumber}` 
-          : `Payment link created but email failed for ${customer.email}. Check admin email for the payment link.`,
+          ? `Payment link sent to ${customerEmail} for job ${job.trackingNumber}` 
+          : `Payment link created but email failed for ${customerEmail}. Check admin email for the payment link.`,
         type: "payment_link",
         data: { jobId, paymentLinkId: paymentLink.id, emailFailed: !emailSent },
       });
