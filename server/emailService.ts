@@ -1063,3 +1063,85 @@ Run Courier - www.runcourier.co.uk`;
 
   return sendEmailNotification(customerEmail, `Payment Confirmed - ${data.trackingNumber}`, htmlContent, textContent);
 }
+
+export async function sendPaymentLinkFailureNotification(
+  data: {
+    customerName: string;
+    customerEmail: string;
+    trackingNumber: string;
+    amount: string;
+    paymentLink: string;
+    jobId: string;
+  }
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #dc3545; margin-top: 0;">Payment Link Email Failed to Send</h2>
+    <p style="color: #666; font-size: 16px;">
+      The payment link email could not be delivered to the customer. Please contact them manually or resend the link.
+    </p>
+    
+    <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #856404; margin-top: 0;">Customer Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #856404; width: 140px;"><strong>Name:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.customerName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #856404;"><strong>Email:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><a href="mailto:${data.customerEmail}" style="color: #007BFF;">${data.customerEmail}</a></td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #856404;"><strong>Tracking #:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #856404;"><strong>Amount:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-weight: bold;">${data.amount}</td>
+        </tr>
+      </table>
+    </div>
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0;">Payment Link</h3>
+      <p style="color: #666; font-size: 14px; word-break: break-all;">
+        <a href="${data.paymentLink}" style="color: #007BFF;">${data.paymentLink}</a>
+      </p>
+      <p style="color: #999; font-size: 12px;">
+        You can copy this link and send it to the customer manually via email, SMS, or WhatsApp.
+      </p>
+    </div>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="mailto:${data.customerEmail}?subject=Payment%20Link%20for%20Booking%20${data.trackingNumber}&body=Hello%20${encodeURIComponent(data.customerName)},%0A%0APlease%20use%20the%20following%20link%20to%20complete%20your%20payment:%0A%0A${encodeURIComponent(data.paymentLink)}%0A%0AAmount%20Due:%20${encodeURIComponent(data.amount)}%0A%0AThank%20you,%0ARun%20Courier" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+        Email Customer Manually
+      </a>
+    </div>
+    
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="${BASE_URL}/admin/jobs" style="background-color: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-size: 14px; display: inline-block;">
+        Go to Admin Jobs
+      </a>
+    </div>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Email Delivery Failed');
+  const textContent = `Payment Link Email Failed to Send
+
+The payment link email could not be delivered to the customer.
+
+Customer Details:
+- Name: ${data.customerName}
+- Email: ${data.customerEmail}
+- Tracking #: ${data.trackingNumber}
+- Amount: ${data.amount}
+
+Payment Link:
+${data.paymentLink}
+
+Please contact the customer manually or resend the link from the admin panel.
+
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification('info@runcourier.co.uk', `Payment Link Email Failed - ${data.trackingNumber}`, htmlContent, textContent);
+}

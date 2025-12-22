@@ -22,7 +22,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification } from "./emailService";
 import { createHash, randomBytes } from "crypto";
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
@@ -2509,16 +2509,29 @@ export async function registerRoutes(
         sentViaEmail: true,
       });
       await storage.appendPaymentLinkAuditLog(paymentLink.id, "email_sent", adminId, customer.email);
+    } else {
+      // Email failed - notify admin
+      await sendPaymentLinkFailureNotification({
+        customerName: customer.fullName,
+        customerEmail: customer.email,
+        trackingNumber: job.trackingNumber,
+        amount: `£${parseFloat(job.totalPrice).toFixed(2)}`,
+        paymentLink: paymentUrl,
+        jobId,
+      });
+      await storage.appendPaymentLinkAuditLog(paymentLink.id, "email_failed", adminId, customer.email);
     }
 
     // Notify admin
     if (adminId) {
       await storage.createNotification({
         userId: adminId,
-        title: "Payment Link Sent",
-        message: `Payment link sent to ${customer.email} for job ${job.trackingNumber}`,
+        title: emailSent ? "Payment Link Sent" : "Payment Link Email Failed",
+        message: emailSent 
+          ? `Payment link sent to ${customer.email} for job ${job.trackingNumber}` 
+          : `Payment link created but email failed for ${customer.email}. Check admin email for the payment link.`,
         type: "payment_link",
-        data: { jobId, paymentLinkId: paymentLink.id },
+        data: { jobId, paymentLinkId: paymentLink.id, emailFailed: !emailSent },
       });
     }
 
@@ -2629,8 +2642,22 @@ export async function registerRoutes(
       distance: job.distance || "N/A",
     });
 
-    await storage.appendPaymentLinkAuditLog(link.id, "email_resent", adminId, customer.email);
-    console.log(`[PaymentLink] Resent payment link email to ${customer.email}`);
+    if (emailSent) {
+      await storage.appendPaymentLinkAuditLog(link.id, "email_resent", adminId, customer.email);
+      console.log(`[PaymentLink] Resent payment link email to ${customer.email}`);
+    } else {
+      // Email failed - notify admin
+      await sendPaymentLinkFailureNotification({
+        customerName: customer.fullName,
+        customerEmail: customer.email,
+        trackingNumber: job.trackingNumber,
+        amount: `£${parseFloat(link.amount).toFixed(2)}`,
+        paymentLink: paymentUrl,
+        jobId: link.jobId,
+      });
+      await storage.appendPaymentLinkAuditLog(link.id, "email_resend_failed", adminId, customer.email);
+      console.log(`[PaymentLink] Resend email FAILED for ${customer.email}`);
+    }
 
     res.json({ success: true, emailSent });
   }));
@@ -2709,6 +2736,17 @@ export async function registerRoutes(
           sentViaEmail: true,
         });
         await storage.appendPaymentLinkAuditLog(newLink.id, "email_sent", adminId, customer.email);
+      } else {
+        // Email failed - notify admin
+        await sendPaymentLinkFailureNotification({
+          customerName: customer.fullName,
+          customerEmail: customer.email,
+          trackingNumber: job.trackingNumber,
+          amount: `£${parseFloat(newLink.amount).toFixed(2)}`,
+          paymentLink: paymentUrl,
+          jobId: oldLink.jobId,
+        });
+        await storage.appendPaymentLinkAuditLog(newLink.id, "email_failed", adminId, customer.email);
       }
     }
 
