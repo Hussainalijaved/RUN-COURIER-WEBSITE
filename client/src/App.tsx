@@ -46,6 +46,7 @@ import Book from "@/pages/Book";
 import Quote from "@/pages/Quote";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
+import PaymentLink, { PaymentLinkSuccess } from "@/pages/PaymentLink";
 
 import {
   SameDayService,
@@ -143,6 +144,9 @@ function Router() {
       <Route path="/quote" component={Quote} />
       <Route path="/payment/success" component={PaymentSuccess} />
       <Route path="/payment/cancel" component={PaymentCancel} />
+      
+      <Route path="/pay/:token" component={PaymentLink} />
+      <Route path="/pay/:token/success" component={PaymentLinkSuccess} />
       
       <Route path="/services/same-day" component={SameDayService} />
       <Route path="/services/medical" component={MedicalService} />

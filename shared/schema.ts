@@ -328,6 +328,31 @@ export const driverPayments = pgTable("driver_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export type PaymentLinkStatus = "pending" | "sent" | "opened" | "paid" | "cancelled" | "expired";
+
+export const paymentLinks = pgTable("payment_links", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  jobId: varchar("job_id", { length: 36 }).notNull(),
+  customerId: varchar("customer_id", { length: 36 }).notNull(),
+  customerEmail: text("customer_email").notNull(),
+  token: text("token").notNull().unique(),
+  tokenHash: text("token_hash").notNull().unique(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").$type<PaymentLinkStatus>().notNull().default("pending"),
+  stripeSessionId: text("stripe_session_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeReceiptUrl: text("stripe_receipt_url"),
+  sentViaEmail: boolean("sent_via_email").default(false),
+  sentViaSms: boolean("sent_via_sms").default(false),
+  auditLog: jsonb("audit_log").$type<Array<{ event: string; timestamp: string; actor?: string; details?: string }>>().default([]),
+  expiresAt: timestamp("expires_at").notNull(),
+  openedAt: timestamp("opened_at"),
+  paidAt: timestamp("paid_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by", { length: 36 }),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertDriverSchema = createInsertSchema(drivers).omit({ id: true, createdAt: true });
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true });
@@ -342,6 +367,7 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true,
 export const insertJobAssignmentSchema = createInsertSchema(jobAssignments).omit({ id: true, createdAt: true });
 export const insertDeliveryContactSchema = createInsertSchema(deliveryContacts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDriverPaymentSchema = createInsertSchema(driverPayments).omit({ id: true, createdAt: true });
+export const insertPaymentLinkSchema = createInsertSchema(paymentLinks).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -371,6 +397,8 @@ export type InsertDeliveryContact = z.infer<typeof insertDeliveryContactSchema>;
 export type DeliveryContact = typeof deliveryContacts.$inferSelect;
 export type InsertDriverPayment = z.infer<typeof insertDriverPaymentSchema>;
 export type DriverPayment = typeof driverPayments.$inferSelect;
+export type InsertPaymentLink = z.infer<typeof insertPaymentLinkSchema>;
+export type PaymentLink = typeof paymentLinks.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),

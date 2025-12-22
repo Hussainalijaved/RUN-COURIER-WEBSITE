@@ -20,9 +20,10 @@ import {
   type JobAssignmentStatus,
 } from "@shared/schema";
 import { stripeService, type BookingData } from "./stripeService";
-import { getStripePublishableKey } from "./stripeClient";
+import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail } from "./emailService";
+import { createHash, randomBytes } from "crypto";
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
@@ -2409,6 +2410,573 @@ export async function registerRoutes(
   }));
 
   registerMobileRoutes(app);
+
+  // Payment Links Routes
+  const PAYMENT_LINK_EXPIRY_HOURS = 72; // Links expire after 72 hours
+  const BASE_URL = process.env.APP_URL || 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev';
+
+  function generateSecureToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  function hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  // Admin: Generate and send payment link for a job
+  app.post("/api/admin/payment-links", asyncHandler(async (req, res) => {
+    const { jobId, adminId } = req.body;
+
+    if (!jobId) {
+      return res.status(400).json({ error: "jobId is required" });
+    }
+
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    // Check if there's already an active payment link
+    const existingLink = await storage.getActivePaymentLinkForJob(jobId);
+    if (existingLink) {
+      return res.status(400).json({ 
+        error: "An active payment link already exists for this job",
+        existingLinkId: existingLink.id 
+      });
+    }
+
+    // Get customer information
+    const customer = await storage.getUser(job.customerId);
+    if (!customer?.email) {
+      return res.status(400).json({ error: "Customer email not found" });
+    }
+
+    // Generate secure token
+    const token = generateSecureToken();
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + PAYMENT_LINK_EXPIRY_HOURS * 60 * 60 * 1000);
+
+    // Create payment link
+    const paymentLink = await storage.createPaymentLink({
+      jobId,
+      customerId: job.customerId,
+      customerEmail: customer.email,
+      token,
+      tokenHash,
+      amount: job.totalPrice,
+      status: "pending",
+      expiresAt,
+      createdBy: adminId || null,
+      auditLog: [{
+        event: "created",
+        timestamp: new Date().toISOString(),
+        actor: adminId || "system",
+      }],
+    });
+
+    // Update job payment status
+    await storage.updateJob(jobId, { paymentStatus: "awaiting_payment" });
+
+    // Generate the payment URL
+    const paymentUrl = `${BASE_URL}/pay/${token}`;
+
+    // Send email to customer
+    const emailSent = await sendPaymentLinkEmail(customer.email, {
+      customerName: customer.fullName,
+      trackingNumber: job.trackingNumber,
+      paymentLink: paymentUrl,
+      amount: `£${parseFloat(job.totalPrice).toFixed(2)}`,
+      expiresAt: expiresAt.toLocaleDateString('en-GB', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      pickupAddress: job.pickupAddress,
+      pickupPostcode: job.pickupPostcode,
+      deliveryAddress: job.deliveryAddress,
+      deliveryPostcode: job.deliveryPostcode,
+      vehicleType: job.vehicleType,
+      weight: job.weight,
+      distance: job.distance || "N/A",
+    });
+
+    if (emailSent) {
+      await storage.updatePaymentLink(paymentLink.id, {
+        status: "sent",
+        sentViaEmail: true,
+      });
+      await storage.appendPaymentLinkAuditLog(paymentLink.id, "email_sent", adminId, customer.email);
+    }
+
+    // Notify admin
+    if (adminId) {
+      await storage.createNotification({
+        userId: adminId,
+        title: "Payment Link Sent",
+        message: `Payment link sent to ${customer.email} for job ${job.trackingNumber}`,
+        type: "payment_link",
+        data: { jobId, paymentLinkId: paymentLink.id },
+      });
+    }
+
+    console.log(`[PaymentLink] Created payment link for job ${job.trackingNumber}`);
+
+    res.status(201).json({
+      id: paymentLink.id,
+      paymentUrl,
+      expiresAt,
+      emailSent,
+      status: emailSent ? "sent" : "pending",
+    });
+  }));
+
+  // Admin: Get payment links for a job
+  app.get("/api/admin/payment-links", asyncHandler(async (req, res) => {
+    const { jobId, customerId, status } = req.query;
+    const links = await storage.getPaymentLinks({
+      jobId: jobId as string | undefined,
+      customerId: customerId as string | undefined,
+      status: status as any,
+    });
+    res.json(links);
+  }));
+
+  // Admin: Get single payment link
+  app.get("/api/admin/payment-links/:id", asyncHandler(async (req, res) => {
+    const link = await storage.getPaymentLink(req.params.id);
+    if (!link) {
+      return res.status(404).json({ error: "Payment link not found" });
+    }
+    res.json(link);
+  }));
+
+  // Admin: Cancel payment link
+  app.post("/api/admin/payment-links/:id/cancel", asyncHandler(async (req, res) => {
+    const { adminId } = req.body;
+    const link = await storage.getPaymentLink(req.params.id);
+
+    if (!link) {
+      return res.status(404).json({ error: "Payment link not found" });
+    }
+
+    if (link.status === "paid") {
+      return res.status(400).json({ error: "Cannot cancel a paid payment link" });
+    }
+
+    if (link.status === "cancelled") {
+      return res.status(400).json({ error: "Payment link is already cancelled" });
+    }
+
+    const cancelled = await storage.cancelPaymentLink(req.params.id, adminId);
+    console.log(`[PaymentLink] Cancelled payment link ${req.params.id}`);
+
+    res.json(cancelled);
+  }));
+
+  // Admin: Resend payment link email
+  app.post("/api/admin/payment-links/:id/resend", asyncHandler(async (req, res) => {
+    const { adminId } = req.body;
+    const link = await storage.getPaymentLink(req.params.id);
+
+    if (!link) {
+      return res.status(404).json({ error: "Payment link not found" });
+    }
+
+    if (link.status === "paid" || link.status === "cancelled" || link.status === "expired") {
+      return res.status(400).json({ error: "Cannot resend an inactive payment link" });
+    }
+
+    // Check if expired
+    if (new Date(link.expiresAt) < new Date()) {
+      await storage.updatePaymentLink(link.id, { status: "expired" });
+      return res.status(400).json({ error: "Payment link has expired" });
+    }
+
+    const job = await storage.getJob(link.jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Associated job not found" });
+    }
+
+    const customer = await storage.getUser(link.customerId);
+    if (!customer?.email) {
+      return res.status(400).json({ error: "Customer email not found" });
+    }
+
+    const paymentUrl = `${BASE_URL}/pay/${link.token}`;
+
+    const emailSent = await sendPaymentLinkEmail(customer.email, {
+      customerName: customer.fullName,
+      trackingNumber: job.trackingNumber,
+      paymentLink: paymentUrl,
+      amount: `£${parseFloat(link.amount).toFixed(2)}`,
+      expiresAt: new Date(link.expiresAt).toLocaleDateString('en-GB', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      pickupAddress: job.pickupAddress,
+      pickupPostcode: job.pickupPostcode,
+      deliveryAddress: job.deliveryAddress,
+      deliveryPostcode: job.deliveryPostcode,
+      vehicleType: job.vehicleType,
+      weight: job.weight,
+      distance: job.distance || "N/A",
+    });
+
+    await storage.appendPaymentLinkAuditLog(link.id, "email_resent", adminId, customer.email);
+    console.log(`[PaymentLink] Resent payment link email to ${customer.email}`);
+
+    res.json({ success: true, emailSent });
+  }));
+
+  // Admin: Regenerate payment link (create new one, cancel old)
+  app.post("/api/admin/payment-links/:id/regenerate", asyncHandler(async (req, res) => {
+    const { adminId } = req.body;
+    const oldLink = await storage.getPaymentLink(req.params.id);
+
+    if (!oldLink) {
+      return res.status(404).json({ error: "Payment link not found" });
+    }
+
+    if (oldLink.status === "paid") {
+      return res.status(400).json({ error: "Cannot regenerate a paid payment link" });
+    }
+
+    // Cancel old link
+    await storage.cancelPaymentLink(oldLink.id, adminId);
+    await storage.appendPaymentLinkAuditLog(oldLink.id, "replaced", adminId, "Regenerated with new link");
+
+    // Generate new token
+    const token = generateSecureToken();
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + PAYMENT_LINK_EXPIRY_HOURS * 60 * 60 * 1000);
+
+    const newLink = await storage.createPaymentLink({
+      jobId: oldLink.jobId,
+      customerId: oldLink.customerId,
+      customerEmail: oldLink.customerEmail,
+      token,
+      tokenHash,
+      amount: oldLink.amount,
+      status: "pending",
+      expiresAt,
+      createdBy: adminId || null,
+      auditLog: [{
+        event: "created",
+        timestamp: new Date().toISOString(),
+        actor: adminId || "system",
+        details: `Regenerated from link ${oldLink.id}`,
+      }],
+    });
+
+    const job = await storage.getJob(oldLink.jobId);
+    const customer = await storage.getUser(oldLink.customerId);
+    const paymentUrl = `${BASE_URL}/pay/${token}`;
+
+    let emailSent = false;
+    if (customer?.email && job) {
+      emailSent = await sendPaymentLinkEmail(customer.email, {
+        customerName: customer.fullName,
+        trackingNumber: job.trackingNumber,
+        paymentLink: paymentUrl,
+        amount: `£${parseFloat(newLink.amount).toFixed(2)}`,
+        expiresAt: expiresAt.toLocaleDateString('en-GB', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        pickupAddress: job.pickupAddress,
+        pickupPostcode: job.pickupPostcode,
+        deliveryAddress: job.deliveryAddress,
+        deliveryPostcode: job.deliveryPostcode,
+        vehicleType: job.vehicleType,
+        weight: job.weight,
+        distance: job.distance || "N/A",
+      });
+
+      if (emailSent) {
+        await storage.updatePaymentLink(newLink.id, {
+          status: "sent",
+          sentViaEmail: true,
+        });
+        await storage.appendPaymentLinkAuditLog(newLink.id, "email_sent", adminId, customer.email);
+      }
+    }
+
+    console.log(`[PaymentLink] Regenerated payment link for job ${job?.trackingNumber}`);
+
+    res.status(201).json({
+      id: newLink.id,
+      paymentUrl,
+      expiresAt,
+      emailSent,
+      status: emailSent ? "sent" : "pending",
+    });
+  }));
+
+  // Public: Validate token and get booking details
+  app.get("/api/payment-links/:token", asyncHandler(async (req, res) => {
+    const token = req.params.token;
+    const link = await storage.getPaymentLinkByToken(token);
+
+    if (!link) {
+      return res.status(404).json({ error: "Invalid or expired payment link" });
+    }
+
+    // Check if expired
+    if (new Date(link.expiresAt) < new Date()) {
+      await storage.updatePaymentLink(link.id, { status: "expired" });
+      await storage.appendPaymentLinkAuditLog(link.id, "expired", undefined, "Link accessed after expiry");
+      return res.status(410).json({ error: "This payment link has expired" });
+    }
+
+    // Check if already paid
+    if (link.status === "paid") {
+      return res.status(410).json({ error: "This payment has already been completed" });
+    }
+
+    // Check if cancelled
+    if (link.status === "cancelled") {
+      return res.status(410).json({ error: "This payment link has been cancelled" });
+    }
+
+    const job = await storage.getJob(link.jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    // Log that link was opened
+    if (link.status !== "opened") {
+      await storage.updatePaymentLink(link.id, { status: "opened", openedAt: new Date() });
+      await storage.appendPaymentLinkAuditLog(link.id, "opened");
+    }
+
+    // Return read-only booking details
+    res.json({
+      trackingNumber: job.trackingNumber,
+      amount: link.amount,
+      expiresAt: link.expiresAt,
+      pickup: {
+        address: job.pickupAddress,
+        postcode: job.pickupPostcode,
+      },
+      delivery: {
+        address: job.deliveryAddress,
+        postcode: job.deliveryPostcode,
+      },
+      vehicleType: job.vehicleType,
+      weight: job.weight,
+      distance: job.distance,
+      pricing: {
+        basePrice: job.basePrice,
+        distancePrice: job.distancePrice,
+        weightSurcharge: job.weightSurcharge,
+        centralLondonCharge: job.centralLondonCharge,
+        multiDropCharge: job.multiDropCharge,
+        returnTripCharge: job.returnTripCharge,
+        totalPrice: job.totalPrice,
+      },
+      isMultiDrop: job.isMultiDrop,
+      isReturnTrip: job.isReturnTrip,
+      isCentralLondon: job.isCentralLondon,
+    });
+  }));
+
+  // Public: Create Stripe checkout session for payment link
+  app.post("/api/payment-links/:token/checkout", asyncHandler(async (req, res) => {
+    const token = req.params.token;
+    const link = await storage.getPaymentLinkByToken(token);
+
+    if (!link) {
+      return res.status(404).json({ error: "Invalid or expired payment link" });
+    }
+
+    if (new Date(link.expiresAt) < new Date()) {
+      await storage.updatePaymentLink(link.id, { status: "expired" });
+      return res.status(410).json({ error: "This payment link has expired" });
+    }
+
+    if (link.status === "paid") {
+      return res.status(410).json({ error: "This payment has already been completed" });
+    }
+
+    if (link.status === "cancelled") {
+      return res.status(410).json({ error: "This payment link has been cancelled" });
+    }
+
+    const job = await storage.getJob(link.jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const vehicleName = job.vehicleType.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+    const description = `Run Courier Delivery - ${vehicleName} - ${job.pickupPostcode} to ${job.deliveryPostcode}`;
+
+    const successUrl = `${BASE_URL}/pay/${token}/success`;
+    const cancelUrl = `${BASE_URL}/pay/${token}`;
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'gbp',
+          unit_amount: Math.round(parseFloat(link.amount) * 100),
+          product_data: {
+            name: description,
+            description: `Tracking: ${job.trackingNumber} | From: ${job.pickupPostcode} | To: ${job.deliveryPostcode}`,
+          },
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      customer_email: link.customerEmail,
+      metadata: {
+        paymentLinkId: link.id,
+        jobId: link.jobId,
+        trackingNumber: job.trackingNumber,
+        type: 'payment_link',
+      },
+    });
+
+    await storage.updatePaymentLink(link.id, { stripeSessionId: session.id });
+    await storage.appendPaymentLinkAuditLog(link.id, "checkout_started", undefined, `Session: ${session.id}`);
+
+    console.log(`[PaymentLink] Checkout session created for job ${job.trackingNumber}`);
+
+    res.json({ 
+      sessionId: session.id, 
+      url: session.url 
+    });
+  }));
+
+  // Public: Handle successful payment (called after redirect from Stripe)
+  app.post("/api/payment-links/:token/complete", asyncHandler(async (req, res) => {
+    const token = req.params.token;
+    const { sessionId } = req.body;
+    const link = await storage.getPaymentLinkByToken(token);
+
+    if (!link) {
+      return res.status(404).json({ error: "Payment link not found" });
+    }
+
+    if (link.status === "paid") {
+      return res.json({ success: true, message: "Payment already confirmed" });
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const session = await stripe.checkout.sessions.retrieve(sessionId || link.stripeSessionId);
+
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({ error: "Payment not yet completed" });
+    }
+
+    // Mark payment link as paid
+    await storage.updatePaymentLink(link.id, {
+      status: "paid",
+      paidAt: new Date(),
+      stripePaymentIntentId: session.payment_intent as string,
+    });
+    await storage.appendPaymentLinkAuditLog(link.id, "paid", undefined, `PaymentIntent: ${session.payment_intent}`);
+
+    // Update job payment status
+    const job = await storage.getJob(link.jobId);
+    if (job) {
+      await storage.updateJob(link.jobId, {
+        paymentStatus: "paid",
+        paymentIntentId: session.payment_intent as string,
+      });
+
+      // Send confirmation email
+      const customer = await storage.getUser(link.customerId);
+      if (customer?.email) {
+        await sendPaymentConfirmationEmail(customer.email, {
+          customerName: customer.fullName,
+          trackingNumber: job.trackingNumber,
+          amount: `£${parseFloat(link.amount).toFixed(2)}`,
+          pickupAddress: job.pickupAddress,
+          pickupPostcode: job.pickupPostcode,
+          deliveryAddress: job.deliveryAddress,
+          deliveryPostcode: job.deliveryPostcode,
+          vehicleType: job.vehicleType,
+        });
+      }
+
+      // Notify admins
+      const admins = await storage.getUsers({ role: 'admin' });
+      for (const admin of admins) {
+        await storage.createNotification({
+          userId: admin.id,
+          title: "Payment Received",
+          message: `Payment of £${parseFloat(link.amount).toFixed(2)} received for job ${job.trackingNumber}`,
+          type: "payment_received",
+          data: { jobId: link.jobId, paymentLinkId: link.id },
+        });
+      }
+
+      console.log(`[PaymentLink] Payment completed for job ${job.trackingNumber}`);
+    }
+
+    res.json({ success: true });
+  }));
+
+  // Stripe webhook for payment completion (optional backup)
+  app.post("/api/webhooks/payment-links", asyncHandler(async (req, res) => {
+    const stripe = await getUncachableStripeClient();
+    const sig = req.headers['stripe-signature'];
+    
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig as string,
+        process.env.STRIPE_WEBHOOK_SECRET || ''
+      );
+    } catch (err: any) {
+      console.error(`[Webhook] Signature verification failed:`, err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as any;
+      
+      if (session.metadata?.type === 'payment_link' && session.metadata?.paymentLinkId) {
+        const link = await storage.getPaymentLink(session.metadata.paymentLinkId);
+        
+        if (link && link.status !== 'paid') {
+          await storage.updatePaymentLink(link.id, {
+            status: "paid",
+            paidAt: new Date(),
+            stripePaymentIntentId: session.payment_intent,
+          });
+          await storage.appendPaymentLinkAuditLog(link.id, "paid_via_webhook", undefined, `PaymentIntent: ${session.payment_intent}`);
+
+          const job = await storage.getJob(link.jobId);
+          if (job) {
+            await storage.updateJob(link.jobId, {
+              paymentStatus: "paid",
+              paymentIntentId: session.payment_intent,
+            });
+          }
+
+          console.log(`[Webhook] Payment completed via webhook for link ${link.id}`);
+        }
+      }
+    }
+
+    res.json({ received: true });
+  }));
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("API Error:", err);

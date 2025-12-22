@@ -10,12 +10,14 @@ import {
   type JobAssignment, type InsertJobAssignment,
   type DeliveryContact, type InsertDeliveryContact,
   type DriverPayment, type InsertDriverPayment,
+  type PaymentLink, type InsertPaymentLink,
   type DriverApplicationStatus,
   type InvoiceStatus,
   type JobAssignmentStatus,
   type DocumentType,
   type DocumentStatus,
   type DriverPaymentStatus,
+  type PaymentLinkStatus,
   type PricingSettings,
   type Vehicle,
   type JobStatus,
@@ -26,6 +28,7 @@ import {
   driverApplications,
   jobs,
   users,
+  paymentLinks,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -123,6 +126,17 @@ export interface IStorage {
   getDriverPaymentStats(driverId: string): Promise<{ totalEarnings: number; pendingAmount: number; paidAmount: number; totalJobs: number }>;
   createDriverPayment(payment: InsertDriverPayment): Promise<DriverPayment>;
   updateDriverPayment(id: string, data: Partial<DriverPayment>): Promise<DriverPayment | undefined>;
+
+  getPaymentLink(id: string): Promise<PaymentLink | undefined>;
+  getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined>;
+  getPaymentLinkByTokenHash(tokenHash: string): Promise<PaymentLink | undefined>;
+  getPaymentLinks(filters?: { jobId?: string; customerId?: string; status?: PaymentLinkStatus }): Promise<PaymentLink[]>;
+  getActivePaymentLinkForJob(jobId: string): Promise<PaymentLink | undefined>;
+  createPaymentLink(link: InsertPaymentLink): Promise<PaymentLink>;
+  updatePaymentLink(id: string, data: Partial<PaymentLink>): Promise<PaymentLink | undefined>;
+  appendPaymentLinkAuditLog(id: string, event: string, actor?: string, details?: string): Promise<PaymentLink | undefined>;
+  cancelPaymentLink(id: string, actor?: string): Promise<PaymentLink | undefined>;
+  expirePaymentLinks(): Promise<number>;
 }
 
 export class MemStorage implements IStorage {
@@ -137,6 +151,7 @@ export class MemStorage implements IStorage {
   private jobAssignments: Map<string, JobAssignment>;
   private deliveryContacts: Map<string, DeliveryContact>;
   private driverPayments: Map<string, DriverPayment>;
+  private paymentLinksMap: Map<string, PaymentLink>;
   private pricingSettings: PricingSettings;
   private vehicles: Map<VehicleType, Vehicle>;
 
@@ -152,6 +167,7 @@ export class MemStorage implements IStorage {
     this.jobAssignments = new Map();
     this.deliveryContacts = new Map();
     this.driverPayments = new Map();
+    this.paymentLinksMap = new Map();
     
     this.pricingSettings = {
       id: "default",
@@ -1745,6 +1761,168 @@ export class MemStorage implements IStorage {
     const updatedPayment = { ...payment, ...data };
     this.driverPayments.set(id, updatedPayment);
     return updatedPayment;
+  }
+
+  async getPaymentLink(id: string): Promise<PaymentLink | undefined> {
+    return this.paymentLinksMap.get(id);
+  }
+
+  async getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined> {
+    const links = Array.from(this.paymentLinksMap.values());
+    return links.find(l => l.token === token);
+  }
+
+  async getPaymentLinkByTokenHash(tokenHash: string): Promise<PaymentLink | undefined> {
+    const links = Array.from(this.paymentLinksMap.values());
+    return links.find(l => l.tokenHash === tokenHash);
+  }
+
+  async getPaymentLinks(filters?: { jobId?: string; customerId?: string; status?: PaymentLinkStatus }): Promise<PaymentLink[]> {
+    let links = Array.from(this.paymentLinksMap.values());
+    if (filters?.jobId) {
+      links = links.filter(l => l.jobId === filters.jobId);
+    }
+    if (filters?.customerId) {
+      links = links.filter(l => l.customerId === filters.customerId);
+    }
+    if (filters?.status) {
+      links = links.filter(l => l.status === filters.status);
+    }
+    return links.sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+  }
+
+  async getActivePaymentLinkForJob(jobId: string): Promise<PaymentLink | undefined> {
+    const links = Array.from(this.paymentLinksMap.values());
+    return links.find(l => 
+      l.jobId === jobId && 
+      (l.status === "pending" || l.status === "sent" || l.status === "opened") &&
+      new Date(l.expiresAt) > new Date()
+    );
+  }
+
+  async createPaymentLink(link: InsertPaymentLink): Promise<PaymentLink> {
+    const id = randomUUID();
+    const newLink: PaymentLink = {
+      id,
+      jobId: link.jobId,
+      customerId: link.customerId,
+      customerEmail: link.customerEmail,
+      token: link.token,
+      tokenHash: link.tokenHash,
+      amount: link.amount,
+      status: (link.status || "pending") as PaymentLinkStatus,
+      stripeSessionId: link.stripeSessionId || null,
+      stripePaymentIntentId: link.stripePaymentIntentId || null,
+      stripeReceiptUrl: link.stripeReceiptUrl || null,
+      sentViaEmail: link.sentViaEmail || false,
+      sentViaSms: link.sentViaSms || false,
+      auditLog: link.auditLog || [],
+      expiresAt: link.expiresAt,
+      openedAt: link.openedAt || null,
+      paidAt: link.paidAt || null,
+      cancelledAt: link.cancelledAt || null,
+      createdAt: new Date(),
+      createdBy: link.createdBy || null,
+    };
+    this.paymentLinksMap.set(id, newLink);
+    
+    try {
+      await db.insert(paymentLinks).values({
+        id,
+        jobId: newLink.jobId,
+        customerId: newLink.customerId,
+        customerEmail: newLink.customerEmail,
+        token: newLink.token,
+        tokenHash: newLink.tokenHash,
+        amount: newLink.amount,
+        status: newLink.status,
+        stripeSessionId: newLink.stripeSessionId,
+        stripePaymentIntentId: newLink.stripePaymentIntentId,
+        stripeReceiptUrl: newLink.stripeReceiptUrl,
+        sentViaEmail: newLink.sentViaEmail,
+        sentViaSms: newLink.sentViaSms,
+        auditLog: newLink.auditLog,
+        expiresAt: newLink.expiresAt,
+        openedAt: newLink.openedAt,
+        paidAt: newLink.paidAt,
+        cancelledAt: newLink.cancelledAt,
+        createdAt: newLink.createdAt,
+        createdBy: newLink.createdBy,
+      });
+    } catch (err) {
+      console.error('Failed to persist payment link to database:', err);
+    }
+    
+    return newLink;
+  }
+
+  async updatePaymentLink(id: string, data: Partial<PaymentLink>): Promise<PaymentLink | undefined> {
+    const link = this.paymentLinksMap.get(id);
+    if (!link) return undefined;
+    const updated = { ...link, ...data };
+    this.paymentLinksMap.set(id, updated);
+    
+    try {
+      await db.update(paymentLinks).set(data).where(eq(paymentLinks.id, id));
+    } catch (err) {
+      console.error('Failed to update payment link in database:', err);
+    }
+    
+    return updated;
+  }
+
+  async appendPaymentLinkAuditLog(id: string, event: string, actor?: string, details?: string): Promise<PaymentLink | undefined> {
+    const link = this.paymentLinksMap.get(id);
+    if (!link) return undefined;
+    
+    const auditEntry = {
+      event,
+      timestamp: new Date().toISOString(),
+      actor: actor || undefined,
+      details: details || undefined,
+    };
+    
+    const newAuditLog = [...(link.auditLog || []), auditEntry];
+    return this.updatePaymentLink(id, { auditLog: newAuditLog });
+  }
+
+  async cancelPaymentLink(id: string, actor?: string): Promise<PaymentLink | undefined> {
+    const link = this.paymentLinksMap.get(id);
+    if (!link) return undefined;
+    
+    const updated = await this.updatePaymentLink(id, {
+      status: "cancelled" as PaymentLinkStatus,
+      cancelledAt: new Date(),
+    });
+    
+    if (updated) {
+      await this.appendPaymentLinkAuditLog(id, "cancelled", actor);
+    }
+    
+    return updated;
+  }
+
+  async expirePaymentLinks(): Promise<number> {
+    const now = new Date();
+    let expiredCount = 0;
+    
+    for (const [id, link] of this.paymentLinksMap.entries()) {
+      if ((link.status === "pending" || link.status === "sent" || link.status === "opened") && 
+          new Date(link.expiresAt) < now) {
+        this.paymentLinksMap.set(id, { ...link, status: "expired" as PaymentLinkStatus });
+        expiredCount++;
+        
+        try {
+          await db.update(paymentLinks).set({ status: "expired" }).where(eq(paymentLinks.id, id));
+        } catch (err) {
+          console.error('Failed to expire payment link in database:', err);
+        }
+      }
+    }
+    
+    return expiredCount;
   }
 }
 

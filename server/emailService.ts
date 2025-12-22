@@ -854,3 +854,212 @@ export async function sendContactFormSubmission(
 
   return sendEmailNotification('almashriqi2010@gmail.com', `Contact Form: ${subject}`, htmlContent, textContent);
 }
+
+export interface PaymentLinkEmailData {
+  customerName: string;
+  trackingNumber: string;
+  paymentLink: string;
+  amount: string;
+  expiresAt: string;
+  pickupAddress: string;
+  pickupPostcode: string;
+  deliveryAddress: string;
+  deliveryPostcode: string;
+  vehicleType: string;
+  weight: string;
+  distance: string;
+  basePrice?: string;
+  distancePrice?: string;
+  weightSurcharge?: string;
+  centralLondonCharge?: string;
+  multiDropCharge?: string;
+  returnTripCharge?: string;
+}
+
+export async function sendPaymentLinkEmail(
+  customerEmail: string,
+  data: PaymentLinkEmailData
+): Promise<boolean> {
+  const vehicleName = data.vehicleType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  
+  const content = `
+    <h2 style="color: #333; margin-top: 0;">Payment Required for Your Delivery</h2>
+    <p style="color: #666; font-size: 16px;">
+      Dear ${data.customerName || 'Customer'},
+    </p>
+    <p style="color: #666; font-size: 16px;">
+      Your delivery booking has been created and is awaiting payment. Please complete the payment to confirm your booking.
+    </p>
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Booking Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Tracking #:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${vehicleName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.weight} kg</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.distance} miles</td>
+        </tr>
+      </table>
+    </div>
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Route</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 140px; vertical-align: top;"><strong>Pickup:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.pickupAddress}<br><span style="font-family: monospace; color: #007BFF;">${data.pickupPostcode}</span></td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Delivery:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.deliveryAddress}<br><span style="font-family: monospace; color: #007BFF;">${data.deliveryPostcode}</span></td>
+        </tr>
+      </table>
+    </div>
+    
+    <div style="background-color: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <p style="color: #333; font-size: 18px; margin: 0 0 10px 0;">Amount Due:</p>
+      <p style="color: #007BFF; font-size: 36px; font-weight: bold; margin: 0;">${data.amount}</p>
+    </div>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${data.paymentLink}" style="background-color: #28a745; color: white; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; display: inline-block;">
+        Pay Now Securely
+      </a>
+    </div>
+    
+    <p style="color: #999; font-size: 12px; text-align: center;">
+      This payment link expires on ${data.expiresAt}.<br>
+      Secure payment powered by Stripe. We accept all major cards, Apple Pay, and Google Pay.
+    </p>
+    
+    <p style="color: #666; font-size: 14px; margin-top: 30px;">
+      If you did not request this booking, please ignore this email or contact us.
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Payment Required');
+  const textContent = `Payment Required for Your Delivery
+
+Dear ${data.customerName || 'Customer'},
+
+Your delivery booking has been created and is awaiting payment.
+
+Booking Details:
+- Tracking #: ${data.trackingNumber}
+- Vehicle: ${vehicleName}
+- Weight: ${data.weight} kg
+- Distance: ${data.distance} miles
+
+Route:
+- Pickup: ${data.pickupAddress} (${data.pickupPostcode})
+- Delivery: ${data.deliveryAddress} (${data.deliveryPostcode})
+
+Amount Due: ${data.amount}
+
+Pay now: ${data.paymentLink}
+
+This payment link expires on ${data.expiresAt}.
+
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(customerEmail, `Payment Required - Booking ${data.trackingNumber}`, htmlContent, textContent);
+}
+
+export async function sendPaymentConfirmationEmail(
+  customerEmail: string,
+  data: {
+    customerName: string;
+    trackingNumber: string;
+    amount: string;
+    pickupAddress: string;
+    pickupPostcode: string;
+    deliveryAddress: string;
+    deliveryPostcode: string;
+    vehicleType: string;
+    stripeReceiptUrl?: string;
+  }
+): Promise<boolean> {
+  const vehicleName = data.vehicleType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  
+  const content = `
+    <h2 style="color: #28a745; margin-top: 0;">Payment Confirmed!</h2>
+    <p style="color: #666; font-size: 16px;">
+      Dear ${data.customerName || 'Customer'},
+    </p>
+    <p style="color: #666; font-size: 16px;">
+      Thank you for your payment. Your delivery booking is now confirmed and a driver will be assigned shortly.
+    </p>
+    
+    <div style="background-color: #d4edda; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <p style="color: #155724; font-size: 18px; margin: 0;">Payment Received: <strong>${data.amount}</strong></p>
+    </div>
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0;">Booking Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Tracking #:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${vehicleName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Pickup:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.pickupAddress}<br><span style="font-family: monospace;">${data.pickupPostcode}</span></td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Delivery:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.deliveryAddress}<br><span style="font-family: monospace;">${data.deliveryPostcode}</span></td>
+        </tr>
+      </table>
+    </div>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${BASE_URL}/track/${data.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+        Track Your Delivery
+      </a>
+    </div>
+    
+    ${data.stripeReceiptUrl ? `
+    <p style="color: #666; font-size: 14px; text-align: center;">
+      <a href="${data.stripeReceiptUrl}" style="color: #007BFF;">View Payment Receipt</a>
+    </p>
+    ` : ''}
+    
+    <p style="color: #666; font-size: 14px;">
+      We'll notify you when a driver is assigned and when your delivery is on the way.
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Payment Confirmed');
+  const textContent = `Payment Confirmed!
+
+Dear ${data.customerName || 'Customer'},
+
+Thank you for your payment of ${data.amount}. Your delivery booking is now confirmed.
+
+Booking Details:
+- Tracking #: ${data.trackingNumber}
+- Vehicle: ${vehicleName}
+- Pickup: ${data.pickupAddress} (${data.pickupPostcode})
+- Delivery: ${data.deliveryAddress} (${data.deliveryPostcode})
+
+Track your delivery: ${BASE_URL}/track/${data.trackingNumber}
+
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(customerEmail, `Payment Confirmed - ${data.trackingNumber}`, htmlContent, textContent);
+}

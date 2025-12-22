@@ -52,6 +52,9 @@ import {
   Printer,
   Volume2,
   VolumeX,
+  Send,
+  CreditCard,
+  RefreshCw,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -219,6 +222,57 @@ export default function AdminJobs() {
     },
     onError: () => {
       toast({ title: 'Failed to update job', variant: 'destructive' });
+    },
+  });
+
+  const sendPaymentLinkMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest('POST', '/api/admin/payment-links', { jobId });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-links'] });
+      toast({ 
+        title: 'Payment link sent!', 
+        description: data.emailSent ? 'Customer will receive an email with the payment link.' : 'Payment link created but email delivery may have failed.'
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to send payment link', 
+        description: error?.message || 'Please try again', 
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const resendPaymentLinkMutation = useMutation({
+    mutationFn: async ({ jobId }: { jobId: string }) => {
+      const linksRes = await apiRequest('GET', `/api/admin/payment-links?jobId=${jobId}`);
+      const links = Array.isArray(linksRes) ? linksRes : [];
+      const activeLink = links.find((l: any) => 
+        (l.status === 'pending' || l.status === 'sent' || l.status === 'opened') && 
+        new Date(l.expiresAt) > new Date()
+      );
+      if (!activeLink) {
+        throw new Error('No active payment link found. Please send a new payment link.');
+      }
+      return apiRequest('POST', `/api/admin/payment-links/${activeLink.id}/resend`, {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-links'] });
+      toast({ 
+        title: 'Payment link resent!', 
+        description: data.emailSent ? 'Customer will receive another email with the payment link.' : 'Resend attempted but email delivery may have failed.'
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to resend payment link', 
+        description: error?.message || 'Please try again', 
+        variant: 'destructive' 
+      });
     },
   });
 
@@ -657,6 +711,34 @@ export default function AdminJobs() {
                               >
                                 <UserPlus className="mr-2 h-4 w-4" />
                                 Reassign Driver
+                              </DropdownMenuItem>
+                            )}
+                            {job.paymentStatus !== 'paid' && job.paymentStatus !== 'awaiting_payment' && job.status !== 'cancelled' && job.status !== 'delivered' && (
+                              <DropdownMenuItem 
+                                onClick={() => sendPaymentLinkMutation.mutate(job.id)}
+                                disabled={sendPaymentLinkMutation.isPending}
+                                data-testid={`menu-send-payment-link-${job.id}`}
+                              >
+                                {sendPaymentLinkMutation.isPending ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CreditCard className="mr-2 h-4 w-4" />
+                                )}
+                                Send Payment Link
+                              </DropdownMenuItem>
+                            )}
+                            {job.paymentStatus === 'awaiting_payment' && job.status !== 'cancelled' && job.status !== 'delivered' && (
+                              <DropdownMenuItem 
+                                onClick={() => resendPaymentLinkMutation.mutate({ jobId: job.id })}
+                                disabled={resendPaymentLinkMutation.isPending}
+                                data-testid={`menu-resend-payment-link-${job.id}`}
+                              >
+                                {resendPaymentLinkMutation.isPending ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                )}
+                                Resend Payment Link
                               </DropdownMenuItem>
                             )}
                             {job.status !== 'delivered' && job.status !== 'cancelled' && (
