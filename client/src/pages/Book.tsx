@@ -332,16 +332,26 @@ export default function Book() {
   }, [userProfile, user, form]);
 
   useEffect(() => {
-    // Note: Postcodes are intentionally NOT loaded from URL params
-    // They should always be empty when navigating to the booking page
     const params = new URLSearchParams(searchParams);
+    const pickupParam = params.get('pickup');
+    const deliveryParam = params.get('delivery');
     const vehicle = params.get('vehicle') as VehicleType;
     const weightParam = params.get('weight');
     const isMultiDropParam = params.get('multiDrop') === 'true';
     const stopsParam = params.get('stops');
     const isReturnParam = params.get('return') === 'true';
     const returnSameParam = params.get('returnSame') === 'true';
+    const returnPostcodeParam = params.get('returnPostcode');
     const timeParam = params.get('time');
+    const priceParam = params.get('price');
+
+    // Load postcodes from URL params when coming from quote page
+    if (pickupParam) {
+      form.setValue('pickupPostcode', pickupParam);
+    }
+    if (deliveryParam) {
+      form.setValue('deliveryPostcode', deliveryParam);
+    }
 
     if (vehicle) {
       form.setValue('vehicleType', vehicle);
@@ -357,9 +367,16 @@ export default function Book() {
       if (isReturnParam) {
         form.setValue('isReturnTrip', true);
         form.setValue('returnToSameLocation', returnSameParam);
+        if (!returnSameParam && returnPostcodeParam) {
+          form.setValue('returnPostcode', returnPostcodeParam);
+        }
       }
       if (timeParam) {
         setEstimatedTime(parseInt(timeParam));
+      }
+      // Mark that quote came from params so we can auto-calculate
+      if (priceParam && pickupParam && deliveryParam) {
+        setQuoteFromParams(true);
       }
     }
   }, [searchParams, form]);
@@ -504,6 +521,14 @@ export default function Book() {
       setIsCalculating(false);
     }
   }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, returnPostcode, multiDropStops, toast]);
+
+  // Auto-calculate quote when coming from quote page with pre-filled data
+  useEffect(() => {
+    if (quoteFromParams && pickupPostcode && deliveryPostcode && vehicleType && !quote && !isCalculating) {
+      handleGetQuote();
+      setQuoteFromParams(false);
+    }
+  }, [quoteFromParams, pickupPostcode, deliveryPostcode, vehicleType, quote, isCalculating, handleGetQuote]);
 
   const addMultiDropStop = () => {
     setMultiDropStops([...multiDropStops, '']);
