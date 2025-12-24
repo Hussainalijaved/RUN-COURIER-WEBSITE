@@ -97,6 +97,48 @@ export async function registerRoutes(
     res.json(jobs);
   }));
 
+  // Test email endpoint - for testing email templates
+  app.post("/api/test-email", asyncHandler(async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+    
+    const testJobDetails = {
+      trackingNumber: 'RCTEST123456',
+      pickupPostcode: 'SW1A 1AA',
+      pickupAddress: '10 Downing Street, Westminster',
+      pickupBuildingName: 'Prime Minister Office',
+      pickupContactName: 'John Smith',
+      pickupContactPhone: '+44 7700 900123',
+      pickupInstructions: 'Ring the doorbell',
+      deliveryPostcode: 'EC1A 1BB',
+      deliveryAddress: '1 London Wall, City of London',
+      deliveryBuildingName: 'Tower Building',
+      recipientName: 'Jane Doe',
+      recipientPhone: '+44 7700 900456',
+      deliveryInstructions: 'Leave with reception',
+      vehicleType: 'small_van',
+      weight: 25,
+      distance: 8.5,
+      isMultiDrop: false,
+      isReturnTrip: false,
+      basePrice: 12.00,
+      distancePrice: 17.00,
+      weightSurcharge: 15.00,
+      multiDropCharge: 0,
+      returnTripCharge: 0,
+      centralLondonCharge: 15.00,
+      waitingTimeCharge: 0,
+      totalPrice: 59.00,
+      paymentStatus: 'paid',
+      createdAt: new Date()
+    };
+    
+    const result = await sendCustomerBookingConfirmation(email, testJobDetails);
+    res.json({ success: true, message: "Test email sent", result });
+  }));
+
   // Track by tracking number - must be before :id route
   // Query database directly for public tracking (doesn't require auth)
   app.get("/api/jobs/track/:trackingNumber", asyncHandler(async (req, res) => {
