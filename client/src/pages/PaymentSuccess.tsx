@@ -26,6 +26,10 @@ export default function PaymentSuccess() {
       setIsPayLater(true);
       setTrackingNumber(tracking);
       setIsLoading(false);
+    } else if (tracking) {
+      // Embedded payment already confirmed - just show success
+      setTrackingNumber(tracking);
+      setIsLoading(false);
     } else if (sessionId) {
       confirmPayment(sessionId);
     } else {
