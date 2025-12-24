@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
-import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore } from 'react-icons/si';
+import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { SmoothImage } from '@/components/ui/smooth-image';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
@@ -90,6 +90,15 @@ export function Footer() {
                 data-testid="appstore-link-top"
               >
                 <SiAppstore className="h-4 w-4" />
+              </a>
+              <a 
+                href="#" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
+                data-testid="playstore-link-top"
+              >
+                <SiGoogleplay className="h-4 w-4" />
               </a>
             </div>
           </div>
