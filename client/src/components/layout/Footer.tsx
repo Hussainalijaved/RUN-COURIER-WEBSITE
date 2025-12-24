@@ -54,6 +54,10 @@ export function Footer() {
                 <span>+44 7311 121 217</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
+                <Phone className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                <span>+44 7862 771 999</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
                 <Mail className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                 <span>info@runcourier.co.uk</span>
               </div>
