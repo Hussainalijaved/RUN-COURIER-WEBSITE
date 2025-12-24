@@ -123,14 +123,14 @@ export async function registerRoutes(
       distance: 8.5,
       isMultiDrop: false,
       isReturnTrip: false,
-      basePrice: 12.00,
+      basePrice: 17.00,
       distancePrice: 17.00,
       weightSurcharge: 15.00,
       multiDropCharge: 0,
       returnTripCharge: 0,
-      centralLondonCharge: 15.00,
+      centralLondonCharge: 17.00,
       waitingTimeCharge: 0,
-      totalPrice: 59.00,
+      totalPrice: 66.00,
       paymentStatus: 'paid',
       createdAt: new Date()
     };
