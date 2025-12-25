@@ -325,6 +325,7 @@ export class MemStorage implements IStorage {
         lastLocationUpdate: new Date(),
         rating: (4.5 + Math.random() * 0.5).toFixed(2),
         totalJobs: Math.floor(Math.random() * 500) + 50,
+        profilePictureUrl: null,
         createdAt: new Date(),
       };
       this.drivers.set(driver.id, driver);
@@ -527,11 +528,15 @@ export class MemStorage implements IStorage {
         pickupLatitude: job.pickupLatitude || null,
         pickupLongitude: job.pickupLongitude || null,
         pickupInstructions: null,
+        pickupBuildingName: null,
+        pickupContactName: null,
+        pickupContactPhone: null,
         deliveryAddress: job.deliveryAddress!,
         deliveryPostcode: job.deliveryPostcode!,
         deliveryLatitude: job.deliveryLatitude || null,
         deliveryLongitude: job.deliveryLongitude || null,
         deliveryInstructions: null,
+        deliveryBuildingName: null,
         recipientName: job.recipientName || null,
         recipientPhone: job.recipientPhone || null,
         weight: job.weight!,
@@ -798,6 +803,7 @@ export class MemStorage implements IStorage {
       lastLocationUpdate: insertDriver.lastLocationUpdate || null,
       rating: insertDriver.rating || "5.00",
       totalJobs: insertDriver.totalJobs || 0,
+      profilePictureUrl: insertDriver.profilePictureUrl || null,
       createdAt: new Date(),
     };
     this.drivers.set(id, driver);
@@ -888,11 +894,15 @@ export class MemStorage implements IStorage {
       pickupLatitude: insertJob.pickupLatitude || null,
       pickupLongitude: insertJob.pickupLongitude || null,
       pickupInstructions: insertJob.pickupInstructions || null,
+      pickupBuildingName: insertJob.pickupBuildingName || null,
+      pickupContactName: insertJob.pickupContactName || null,
+      pickupContactPhone: insertJob.pickupContactPhone || null,
       deliveryAddress: insertJob.deliveryAddress,
       deliveryPostcode: insertJob.deliveryPostcode,
       deliveryLatitude: insertJob.deliveryLatitude || null,
       deliveryLongitude: insertJob.deliveryLongitude || null,
       deliveryInstructions: insertJob.deliveryInstructions || null,
+      deliveryBuildingName: insertJob.deliveryBuildingName || null,
       recipientName: insertJob.recipientName || null,
       recipientPhone: insertJob.recipientPhone || null,
       weight: insertJob.weight,
@@ -1621,6 +1631,7 @@ export class MemStorage implements IStorage {
       respondedAt: assignment.respondedAt || null,
       cancelledAt: assignment.cancelledAt || null,
       cancellationReason: assignment.cancellationReason || null,
+      rejectionReason: assignment.rejectionReason || null,
       expiresAt: assignment.expiresAt || null,
       createdAt: new Date(),
     };
@@ -1908,7 +1919,7 @@ export class MemStorage implements IStorage {
     const now = new Date();
     let expiredCount = 0;
     
-    for (const [id, link] of this.paymentLinksMap.entries()) {
+    for (const [id, link] of Array.from(this.paymentLinksMap.entries())) {
       if ((link.status === "pending" || link.status === "sent" || link.status === "opened") && 
           new Date(link.expiresAt) < now) {
         this.paymentLinksMap.set(id, { ...link, status: "expired" as PaymentLinkStatus });
