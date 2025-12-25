@@ -1,0 +1,127 @@
+ISSUE
+
+Stripe payment fails with error:
+
+“Payment Error – Failed to fetch”
+
+This happens immediately after clicking “Pay £X Now”.
+Stripe checkout never opens.
+
+🧠 ROOT CAUSE (DO NOT IGNORE)
+
+The frontend is attempting to create a Stripe payment, but the backend payment endpoint is missing, unreachable, misconfigured, or blocked by CORS.
+
+This is NOT a UI issue and NOT a Stripe card issue.
+
+🎯 OBJECTIVE
+
+Fix the payment flow so:
+
+Clicking Pay Now calls a valid backend endpoint
+
+Backend successfully creates a Stripe Payment Intent
+
+Frontend receives clientSecret
+
+Stripe payment UI opens
+
+Payment completes successfully
+
+🔧 REQUIRED IMPLEMENTATION (MANDATORY)
+1️⃣ Backend – Stripe Payment Intent
+
+Create OR verify this backend endpoint exists and is deployed:
+
+POST /api/create-payment-intent
+
+
+It MUST:
+
+Use STRIPE_SECRET_KEY from environment variables
+
+NOT expose secret keys to frontend
+
+Accept request body:
+
+{
+  "amount": 843,
+  "currency": "gbp",
+  "bookingId": "RC-XXXX"
+}
+
+
+Create Stripe PaymentIntent
+
+Return:
+
+{
+  "clientSecret": "pi_xxx_secret_xxx"
+}
+
+2️⃣ Environment Variables (CRITICAL)
+
+Ensure backend has:
+
+STRIPE_SECRET_KEY=sk_live_xxx
+
+
+❌ Do NOT use frontend keys
+❌ Do NOT hardcode keys
+❌ Do NOT use test keys in production
+
+3️⃣ Frontend – Fetch Fix
+
+Update frontend to:
+
+Call the correct production backend URL
+
+Example:
+
+https://api.runcourier.co.uk/api/create-payment-intent
+
+
+Handle fetch errors explicitly
+
+Do NOT call localhost or Replit preview URLs in production
+
+4️⃣ CORS (MANDATORY)
+
+Backend response MUST include:
+
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Content-Type
+Access-Control-Allow-Methods: POST
+
+
+Without this, fetch will fail.
+
+5️⃣ Error Handling
+
+If backend fails, frontend must show:
+
+“Unable to start payment. Please try again.”
+
+❌ Do NOT show generic “Failed to fetch”
+
+✅ FINAL ACCEPTANCE CRITERIA
+
+✔ Clicking Pay £X Now opens Stripe payment UI
+✔ No “Failed to fetch” error
+✔ Payment completes successfully
+✔ Booking is marked as paid
+
+❌ DO NOT
+
+Change UI
+
+Change booking flow
+
+Change pricing logic
+
+Change payment amount
+
+Use client-side Stripe secret keys
+
+⚠️ IMPORTANT
+
+Fix backend + API connection only.

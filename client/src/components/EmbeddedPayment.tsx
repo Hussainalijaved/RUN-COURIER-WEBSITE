@@ -247,17 +247,25 @@ export function EmbeddedPayment({ bookingData, onSuccess, onCancel }: EmbeddedPa
   useEffect(() => {
     const createPaymentIntent = async () => {
       try {
+        console.log('[Payment] Creating payment intent for amount:', bookingData.totalPrice);
         const response = await apiRequest('POST', '/api/booking/create-payment-intent', bookingData);
         const data = await response.json();
         
         if (data.clientSecret) {
+          console.log('[Payment] Payment intent created successfully');
           setClientSecret(data.clientSecret);
           setPaymentIntentId(data.paymentIntentId);
         } else {
+          console.error('[Payment] No client secret in response:', data);
           setError(data.error || 'Failed to initialize payment');
         }
       } catch (err: any) {
-        setError(err.message || 'Failed to initialize payment');
+        console.error('[Payment] Error creating payment intent:', err);
+        if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+          setError('Unable to start payment. Please check your internet connection and try again.');
+        } else {
+          setError(err.message || 'Failed to initialize payment. Please try again.');
+        }
       } finally {
         setIsLoading(false);
       }

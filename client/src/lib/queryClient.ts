@@ -50,15 +50,22 @@ export async function apiRequest(
 ): Promise<Response> {
   const backendUrl = getBackendUrl(url);
   
-  const res = await fetch(backendUrl, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  console.log(`[API] ${method} ${backendUrl}`);
+  
+  try {
+    const res = await fetch(backendUrl, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (err) {
+    console.error(`[API] Request failed for ${backendUrl}:`, err);
+    throw err;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
