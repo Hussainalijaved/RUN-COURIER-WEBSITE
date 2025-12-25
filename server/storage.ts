@@ -37,22 +37,24 @@ import { eq, desc, and, sql } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  getUsers(filters?: { role?: string; isActive?: boolean }): Promise<User[]>;
+  getUsers(filters?: { role?: string; isActive?: boolean; includeInactive?: boolean }): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   createUserWithId(id: string, user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
   incrementCompletedBookings(id: string): Promise<User | undefined>;
-  deleteUser(id: string): Promise<void>;
+  deactivateUser(id: string): Promise<User | undefined>;
+  reactivateUser(id: string): Promise<User | undefined>;
 
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByUserId(userId: string): Promise<Driver | undefined>;
-  getDrivers(filters?: { isAvailable?: boolean; isVerified?: boolean; vehicleType?: VehicleType }): Promise<Driver[]>;
+  getDrivers(filters?: { isAvailable?: boolean; isVerified?: boolean; vehicleType?: VehicleType; includeInactive?: boolean }): Promise<Driver[]>;
   createDriver(driver: InsertDriver): Promise<Driver>;
   updateDriver(id: string, data: Partial<Driver>): Promise<Driver | undefined>;
   updateDriverAvailability(id: string, isAvailable: boolean): Promise<Driver | undefined>;
   updateDriverLocation(id: string, latitude: string, longitude: string): Promise<Driver | undefined>;
   verifyDriver(id: string, isVerified: boolean): Promise<Driver | undefined>;
-  deleteDriver(id: string): Promise<void>;
+  deactivateDriver(id: string): Promise<Driver | undefined>;
+  reactivateDriver(id: string): Promise<Driver | undefined>;
 
   getJob(id: string): Promise<Job | undefined>;
   getJobByTrackingNumber(trackingNumber: string): Promise<Job | undefined>;
@@ -260,6 +262,7 @@ export class MemStorage implements IStorage {
       payLaterEnabled: false,
       completedBookingsCount: 0,
       isActive: true,
+      deactivatedAt: null,
       createdAt: new Date(),
     };
     this.users.set(adminUser.id, adminUser);
@@ -295,6 +298,7 @@ export class MemStorage implements IStorage {
         payLaterEnabled: false,
         completedBookingsCount: 0,
         isActive: true,
+        deactivatedAt: null,
         createdAt: new Date(),
       };
       this.users.set(user.id, user);
@@ -328,6 +332,8 @@ export class MemStorage implements IStorage {
         rating: (4.5 + Math.random() * 0.5).toFixed(2),
         totalJobs: Math.floor(Math.random() * 500) + 50,
         profilePictureUrl: null,
+        isActive: true,
+        deactivatedAt: null,
         createdAt: new Date(),
       };
       this.drivers.set(driver.id, driver);
@@ -402,6 +408,7 @@ export class MemStorage implements IStorage {
         payLaterEnabled: c.type === "business",
         completedBookingsCount: 0,
         isActive: true,
+        deactivatedAt: null,
         createdAt: new Date(),
       };
       this.users.set(user.id, user);
@@ -625,16 +632,21 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async getUsers(filters?: { role?: string; isActive?: boolean }): Promise<User[]> {
+  async getUsers(filters?: { role?: string; isActive?: boolean; includeInactive?: boolean }): Promise<User[]> {
     try {
-      let query = db.select().from(users);
       const conditions = [];
+      
       if (filters?.role) {
         conditions.push(eq(users.role, filters.role as UserRole));
       }
+      
+      // Filter by isActive status - exclude inactive by default unless includeInactive is true
       if (filters?.isActive !== undefined) {
         conditions.push(eq(users.isActive, filters.isActive));
+      } else if (!filters?.includeInactive) {
+        conditions.push(eq(users.isActive, true));
       }
+      
       if (conditions.length > 0) {
         return await db.select().from(users).where(and(...conditions));
       }
@@ -678,6 +690,7 @@ export class MemStorage implements IStorage {
         payLaterEnabled: insertUser.payLaterEnabled || false,
         completedBookingsCount: insertUser.completedBookingsCount || 0,
         isActive: insertUser.isActive ?? true,
+        deactivatedAt: null,
         createdAt: new Date(),
       };
       
@@ -731,19 +744,44 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async deleteUser(id: string): Promise<void> {
+  async deactivateUser(id: string): Promise<User | undefined> {
     try {
-      await db.delete(users).where(eq(users.id, id));
-      console.log(`[Storage] Deleted user ${id} from database`);
-      // Also clean up in-memory notifications
-      const notifEntries = Array.from(this.notifications.entries());
-      for (const [notifId, notif] of notifEntries) {
-        if (notif.userId === id) {
-          this.notifications.delete(notifId);
-        }
+      const result = await db.update(users)
+        .set({ 
+          isActive: false,
+          deactivatedAt: new Date()
+        })
+        .where(eq(users.id, id))
+        .returning();
+      
+      if (result.length > 0) {
+        console.log(`[Storage] Deactivated user ${id}`);
+        return result[0];
       }
+      return undefined;
     } catch (error) {
-      console.error('[Storage] Error deleting user:', error);
+      console.error('[Storage] Error deactivating user:', error);
+      throw error;
+    }
+  }
+
+  async reactivateUser(id: string): Promise<User | undefined> {
+    try {
+      const result = await db.update(users)
+        .set({ 
+          isActive: true,
+          deactivatedAt: null
+        })
+        .where(eq(users.id, id))
+        .returning();
+      
+      if (result.length > 0) {
+        console.log(`[Storage] Reactivated user ${id}`);
+        return result[0];
+      }
+      return undefined;
+    } catch (error) {
+      console.error('[Storage] Error reactivating user:', error);
       throw error;
     }
   }
@@ -756,8 +794,14 @@ export class MemStorage implements IStorage {
     return Array.from(this.drivers.values()).find((d) => d.userId === userId);
   }
 
-  async getDrivers(filters?: { isAvailable?: boolean; isVerified?: boolean; vehicleType?: VehicleType }): Promise<Driver[]> {
+  async getDrivers(filters?: { isAvailable?: boolean; isVerified?: boolean; vehicleType?: VehicleType; includeInactive?: boolean }): Promise<Driver[]> {
     let drivers = Array.from(this.drivers.values());
+    
+    // Filter out inactive drivers by default unless includeInactive is true
+    if (!filters?.includeInactive) {
+      drivers = drivers.filter((d) => d.isActive !== false);
+    }
+    
     if (filters?.isAvailable !== undefined) {
       drivers = drivers.filter((d) => d.isAvailable === filters.isAvailable);
     }
@@ -832,6 +876,8 @@ export class MemStorage implements IStorage {
       rating: insertDriver.rating || "5.00",
       totalJobs: insertDriver.totalJobs || 0,
       profilePictureUrl: insertDriver.profilePictureUrl || null,
+      isActive: true,
+      deactivatedAt: null,
       createdAt: new Date(),
     };
     this.drivers.set(id, driver);
@@ -864,17 +910,35 @@ export class MemStorage implements IStorage {
     return this.updateDriver(id, { isVerified });
   }
 
-  async deleteDriver(id: string): Promise<void> {
+  async deactivateDriver(id: string): Promise<Driver | undefined> {
     const driver = this.drivers.get(id);
     if (driver) {
-      this.drivers.delete(id);
-      const docEntries = Array.from(this.documents.entries());
-      for (const [docId, doc] of docEntries) {
-        if (doc.driverId === id) {
-          this.documents.delete(docId);
-        }
-      }
+      const updated = { 
+        ...driver, 
+        isActive: false, 
+        deactivatedAt: new Date(),
+        isAvailable: false 
+      };
+      this.drivers.set(id, updated);
+      console.log(`[Storage] Deactivated driver ${id}`);
+      return updated;
     }
+    return undefined;
+  }
+
+  async reactivateDriver(id: string): Promise<Driver | undefined> {
+    const driver = this.drivers.get(id);
+    if (driver) {
+      const updated = { 
+        ...driver, 
+        isActive: true, 
+        deactivatedAt: null 
+      };
+      this.drivers.set(id, updated);
+      console.log(`[Storage] Reactivated driver ${id}`);
+      return updated;
+    }
+    return undefined;
   }
 
   async getJob(id: string): Promise<Job | undefined> {
