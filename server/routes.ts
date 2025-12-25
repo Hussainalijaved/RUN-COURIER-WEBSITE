@@ -26,6 +26,41 @@ import { sendNewJobNotification, sendDriverApplicationNotification, sendDocument
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated } from "./realtime";
 
+// Server-side pricing configuration - SINGLE SOURCE OF TRUTH
+// This must match the client-side config in client/src/lib/pricing.ts
+const PRICING_CONFIG = {
+  vehicles: {
+    motorbike: { name: "Motorbike", baseCharge: 7, perMileRate: 1.3 },
+    car: { name: "Car", baseCharge: 17, perMileRate: 1.2 },
+    small_van: { name: "Small Van", baseCharge: 21, perMileRate: 1.3 },
+    medium_van: { name: "Medium Van", baseCharge: 25, perMileRate: 1.4 },
+  }
+} as const;
+
+// Helper function to get base charge for any vehicle type
+function getBaseChargeForVehicle(vehicleType: string): number {
+  const vehicle = PRICING_CONFIG.vehicles[vehicleType as keyof typeof PRICING_CONFIG.vehicles];
+  if (!vehicle) {
+    console.warn(`[Pricing] Unknown vehicle type: ${vehicleType}, defaulting to car base charge`);
+    return PRICING_CONFIG.vehicles.car.baseCharge;
+  }
+  return vehicle.baseCharge;
+}
+
+// Validation: ensure motorbike base price is never less than £7
+function validateBasePrice(vehicleType: string, basePrice: number): number {
+  if (vehicleType === 'motorbike' && basePrice < 7) {
+    console.warn(`[Pricing] Invalid motorbike base price £${basePrice}, correcting to £7.00`);
+    return 7;
+  }
+  const expectedBase = getBaseChargeForVehicle(vehicleType);
+  if (basePrice < expectedBase * 0.9) {
+    console.warn(`[Pricing] Base price £${basePrice} seems too low for ${vehicleType} (expected ~£${expectedBase}), using config value`);
+    return expectedBase;
+  }
+  return basePrice;
+}
+
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
 if (!fs.existsSync(uploadsDir)) {
@@ -1809,8 +1844,8 @@ export async function registerRoutes(
       deliveryInstructions: metadata.deliveryInstructions || null,
       vehicleType: (metadata.vehicleType || 'car') as VehicleType,
       weight: metadata.weight || '1',
-      basePrice: metadata.basePrice || String(totalPrice * 0.3),
-      distancePrice: metadata.distancePrice || String(totalPrice * 0.7),
+      basePrice: metadata.basePrice || String(getBaseChargeForVehicle(metadata.vehicleType || 'car')),
+      distancePrice: metadata.distancePrice || String(Math.max(0, totalPrice - getBaseChargeForVehicle(metadata.vehicleType || 'car'))),
       weightSurcharge: metadata.weightSurcharge || '0',
       multiDropCharge: metadata.multiDropCharge || '0',
       returnTripCharge: metadata.returnTripCharge || '0',
@@ -1912,8 +1947,8 @@ export async function registerRoutes(
       deliveryInstructions: bookingData.deliveryInstructions || null,
       vehicleType: bookingData.vehicleType as VehicleType,
       weight: String(bookingData.weight || 1),
-      basePrice: String(bookingData.basePrice || bookingData.totalPrice * 0.3),
-      distancePrice: String(bookingData.distancePrice || bookingData.totalPrice * 0.7),
+      basePrice: String(bookingData.basePrice || getBaseChargeForVehicle(bookingData.vehicleType)),
+      distancePrice: String(bookingData.distancePrice || Math.max(0, (bookingData.totalPrice || 0) - getBaseChargeForVehicle(bookingData.vehicleType))),
       weightSurcharge: String(bookingData.weightSurcharge || 0),
       multiDropCharge: String(bookingData.multiDropCharge || 0),
       returnTripCharge: String(bookingData.returnTripCharge || 0),
@@ -1992,8 +2027,8 @@ export async function registerRoutes(
       deliveryInstructions: metadata.deliveryInstructions || null,
       vehicleType: metadata.vehicleType as VehicleType,
       weight: metadata.weight || '1',
-      basePrice: metadata.basePrice || String(totalPrice * 0.3),
-      distancePrice: metadata.distancePrice || String(totalPrice * 0.7),
+      basePrice: metadata.basePrice || String(getBaseChargeForVehicle(metadata.vehicleType || 'car')),
+      distancePrice: metadata.distancePrice || String(Math.max(0, totalPrice - getBaseChargeForVehicle(metadata.vehicleType || 'car'))),
       weightSurcharge: metadata.weightSurcharge || '0',
       multiDropCharge: metadata.multiDropCharge || '0',
       returnTripCharge: metadata.returnTripCharge || '0',

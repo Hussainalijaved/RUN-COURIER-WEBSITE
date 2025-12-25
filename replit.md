@@ -44,6 +44,18 @@ Approved business customers can use a "Pay Later" option for bookings, bypassing
 ### Pricing Engine
 A TypeScript-based pricing engine calculates delivery costs considering vehicle type, distance, rush hour surcharges, weight, Central London congestion charge, multi-drop fees, return trip multipliers, and waiting times. It supports client-side quote generation with server-side validation.
 
+**CRITICAL PRICING RULE - Base Charges (FIXED, never calculated from distance)**:
+- Motorbike: £7.00
+- Car: £17.00
+- Small Van: £21.00
+- Medium Van: £25.00
+
+The pricing config is defined in two locations (must stay in sync):
+1. Client-side: `client/src/lib/pricing.ts` - `defaultPricingConfig.vehicles`
+2. Server-side: `server/routes.ts` - `PRICING_CONFIG.vehicles`
+
+Server-side validation via `validateBasePrice()` ensures motorbike base price is never less than £7.00.
+
 ### Form Handling & Validation
 React Hook Form is used for form state management, integrated with Zod schemas for type-safe forms, shared validation logic, and automatic error handling.
 
