@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { getWebSocketUrl } from '@/lib/queryClient';
 
 export interface DriverLocation {
   driverId: string;
@@ -80,8 +81,7 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
     setIsConnecting(true);
     setError(null);
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/realtime`;
+    const wsUrl = getWebSocketUrl('/ws/realtime');
 
     try {
       const ws = new WebSocket(wsUrl);
@@ -251,8 +251,7 @@ export function useDriverLocationUpdater() {
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/realtime`;
+    const wsUrl = getWebSocketUrl('/ws/realtime');
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

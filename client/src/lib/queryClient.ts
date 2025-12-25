@@ -7,6 +7,8 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+const REPLIT_BACKEND_HOST = 'run-courier-site--almashriqi2010.replit.app';
+
 function getBackendUrl(url: string): string {
   if (url.startsWith('http')) {
     return url;
@@ -15,10 +17,30 @@ function getBackendUrl(url: string): string {
   const hostname = window.location.hostname;
   
   if (hostname === 'runcourier.co.uk' || hostname === 'www.runcourier.co.uk') {
-    return `https://run-courier-site--almashriqi2010.replit.app${url}`;
+    return `https://${REPLIT_BACKEND_HOST}${url}`;
   }
   
   return url;
+}
+
+export function getWebSocketUrl(path: string, baseUrl?: string): string {
+  // Handle mobile app or SSR environments where window is not available
+  if (typeof window === 'undefined') {
+    // Use provided baseUrl or fallback to Replit backend
+    const host = baseUrl || REPLIT_BACKEND_HOST;
+    return `wss://${host}${path}`;
+  }
+  
+  const hostname = window.location.hostname;
+  
+  // Frontend hosted on Hostinger - route to Replit backend
+  if (hostname === 'runcourier.co.uk' || hostname === 'www.runcourier.co.uk') {
+    return `wss://${REPLIT_BACKEND_HOST}${path}`;
+  }
+  
+  // Local development or Replit preview - use same host
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}${path}`;
 }
 
 export async function apiRequest(

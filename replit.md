@@ -23,7 +23,11 @@ PostgreSQL, accessed via the Neon serverless driver, is managed with Drizzle ORM
 Supabase Auth manages user authentication (email/password) and session management. Role-based access control is implemented via `ProtectedRoute` components, leveraging user metadata to direct users to specific dashboards (`/admin`, `/customer`, `/driver`, `/dispatcher`, `/vendor`).
 
 ### Real-Time Features
-A WebSocket server (`ws` library) at `/ws/realtime` provides live driver location tracking, broadcasting, connection heartbeats, and offline detection. It uses secure token-based authentication with Supabase JWT verification and server-side role validation, with a fallback to REST API polling.
+A WebSocket server (`ws` library) at `/ws/realtime` provides live driver location tracking, **real-time job status updates**, broadcasting, connection heartbeats, and offline detection. It uses secure token-based authentication with Supabase JWT verification and server-side role validation, with a fallback to REST API polling.
+
+**Job Status Updates**: The `useJobUpdates` hook subscribes to job status changes via WebSocket. Admins and dispatchers receive all job updates, while customers receive updates for their own jobs only. Job creation events trigger toasts for administrators. The Track page uses 10-second polling for live updates.
+
+**WebSocket Compatibility**: The `getWebSocketUrl()` helper in `queryClient.ts` ensures WebSocket connections work correctly when the frontend is hosted on Hostinger (runcourier.co.uk) by redirecting WebSocket traffic to the Replit backend.
 
 ### Driver Application System
 A multi-step application process allows prospective drivers to submit personal details, documents, and vehicle/bank information for admin review and approval, activating their account upon verification.

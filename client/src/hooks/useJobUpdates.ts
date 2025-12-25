@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, getWebSocketUrl } from '@/lib/queryClient';
 
 export interface JobStatusUpdate {
   jobId: string;
@@ -104,8 +104,7 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
     setIsConnecting(true);
     setError(null);
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/realtime`;
+    const wsUrl = getWebSocketUrl('/ws/realtime');
 
     try {
       const ws = new WebSocket(wsUrl);
