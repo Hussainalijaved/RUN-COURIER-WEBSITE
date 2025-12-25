@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link } from "wouter";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import { SmoothBackground } from "@/components/ui/smooth-image";
+import supportHeroImage from "@assets/generated_images/customer_support_representative_professional.png";
 import { 
   MapPin, 
   CreditCard, 
@@ -129,17 +131,23 @@ export default function Support() {
   return (
     <PublicLayout>
       {/* Page Header */}
-      <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-16">
-        <div className="container mx-auto px-4 text-center">
-          <HelpCircle className="w-16 h-16 mx-auto mb-6 opacity-90" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4" data-testid="text-support-title">
-            Support & Help Centre
-          </h1>
-          <p className="text-xl text-blue-100 max-w-2xl mx-auto" data-testid="text-support-subtitle">
-            We're here to help with bookings, payments, tracking, and delivery support.
-          </p>
+      <SmoothBackground 
+        src={supportHeroImage}
+        className="min-h-[400px] lg:min-h-[450px] flex items-center"
+        overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50"
+      >
+        <div className="container mx-auto px-4 py-20">
+          <div className="max-w-3xl mx-auto text-center text-white">
+            <HelpCircle className="w-16 h-16 mx-auto mb-6 opacity-90" />
+            <h1 className="text-4xl md:text-5xl font-bold mb-4" data-testid="text-support-title">
+              Support & Help Centre
+            </h1>
+            <p className="text-xl text-white/90 max-w-2xl mx-auto" data-testid="text-support-subtitle">
+              We're here to help with bookings, payments, tracking, and delivery support.
+            </p>
+          </div>
         </div>
-      </section>
+      </SmoothBackground>
 
       {/* Quick Support Actions */}
       <section className="py-12 bg-muted/30">
