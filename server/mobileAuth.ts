@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyAccessToken, type VerifiedUser } from "./supabaseAdmin";
 import { storage } from "./storage";
+import { db } from "./db";
+import { drivers as driversTable } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import type { Driver } from "@shared/schema";
 
 declare global {
@@ -65,7 +68,16 @@ export async function requireDriverRole(
   }
 
   try {
-    const driver = await storage.getDriver(req.auth.id);
+    // First try to get driver from in-memory storage
+    let driver = await storage.getDriver(req.auth.id);
+    
+    // If not found in memory, try the database
+    if (!driver) {
+      const dbDrivers = await db.select().from(driversTable).where(eq(driversTable.id, req.auth.id));
+      if (dbDrivers.length > 0) {
+        driver = dbDrivers[0];
+      }
+    }
     
     if (!driver) {
       res.status(403).json({ 

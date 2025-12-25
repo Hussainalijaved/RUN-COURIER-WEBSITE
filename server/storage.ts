@@ -271,12 +271,14 @@ export class MemStorage implements IStorage {
       { id: "driver-4", userId: "user-d4", name: "Emma Brown", code: "EB04", vehicle: "medium_van" as VehicleType, lat: "51.5225", lng: "-0.0800" },
       { id: "driver-5", userId: "user-d5", name: "Rachel Davies", code: "RD05", vehicle: "car" as VehicleType, lat: "51.5100", lng: "-0.1150" },
       { id: "driver-test", userId: "user-test-driver", name: "Test Driver", code: "TEST01", vehicle: "car" as VehicleType, lat: "51.5200", lng: "-0.1200" },
+      { id: "87c8dcf9-2259-43e5-8219-e0a7e8307962", userId: "87c8dcf9-2259-43e5-8219-e0a7e8307962", name: "RC02C Test Driver", code: "RC02C", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "driver@test.com" },
     ];
 
     drivers.forEach((d, i) => {
+      const driverEmail = (d as any).email || `${d.name.toLowerCase().replace(" ", ".")}@runcourier.co.uk`;
       const user: User = {
         id: d.userId,
-        email: `${d.name.toLowerCase().replace(" ", ".")}@runcourier.co.uk`,
+        email: driverEmail,
         password: null,
         fullName: d.name,
         phone: `0770090000${i + 2}`,
@@ -302,7 +304,7 @@ export class MemStorage implements IStorage {
         userId: d.userId,
         driverCode: d.code,
         fullName: d.name,
-        email: `${d.name.toLowerCase().replace(" ", ".")}@runcourier.co.uk`,
+        email: driverEmail,
         phone: `0770090000${i + 2}`,
         postcode: null,
         address: null,
@@ -341,12 +343,13 @@ export class MemStorage implements IStorage {
         { type: "hire_reward", name: "Hire_Reward_Policy.pdf" },
       ];
 
-      // First driver has all approved docs, second has mix, third has pending, fourth has rejected, fifth has all approved, sixth (test) has all approved
+      // First driver has all approved docs, second has mix, third has pending, fourth has rejected, fifth has all approved, sixth (test) has all approved, seventh (RC02C) has all approved
       const docStatuses: DocumentStatus[][] = [
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "pending", "approved", "pending", "pending", "pending"],
         ["pending", "pending", "pending", "pending", "pending", "pending", "pending"],
         ["approved", "approved", "rejected", "approved", "pending", "rejected", "pending"],
+        ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
       ];
@@ -509,6 +512,31 @@ export class MemStorage implements IStorage {
         podPhotoUrl: "https://example.com/pod-photo-1.jpg",
         podSignatureUrl: "https://example.com/pod-sig-1.png",
         deliveredAt: new Date(Date.now() - 3600000),
+        paymentStatus: "paid",
+      },
+      {
+        id: "job-rc02c-test",
+        trackingNumber: "RCTEST001",
+        customerId: "customer-test",
+        driverId: "87c8dcf9-2259-43e5-8219-e0a7e8307962",
+        status: "assigned",
+        vehicleType: "car",
+        pickupAddress: "10 Downing Street, London",
+        pickupPostcode: "SW1A 2AA",
+        pickupLatitude: "51.5034",
+        pickupLongitude: "-0.1276",
+        deliveryAddress: "Tower of London, London",
+        deliveryPostcode: "EC3N 4AB",
+        deliveryLatitude: "51.5081",
+        deliveryLongitude: "-0.0759",
+        recipientName: "Test Recipient",
+        recipientPhone: "07700900999",
+        weight: "5.00",
+        distance: "3.2",
+        basePrice: "19.00",
+        distancePrice: "6.40",
+        driverPrice: "20.00",
+        totalPrice: "25.40",
         paymentStatus: "paid",
       },
     ];

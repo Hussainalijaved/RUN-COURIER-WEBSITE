@@ -2,7 +2,10 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { requireSupabaseAuth, requireDriverRole } from "./mobileAuth";
 import { broadcastLocationUpdate } from "./realtime";
-import type { JobStatus } from "@shared/schema";
+import { db } from "./db";
+import { jobs as jobsTable } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import type { JobStatus, Job } from "@shared/schema";
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -147,7 +150,15 @@ export function registerMobileRoutes(app: Express): void {
       const driver = req.driver!;
       const { status } = req.query;
 
-      let jobs = await storage.getJobs({ driverId: driver.id });
+      // Get jobs from both in-memory storage and database
+      let memoryJobs = await storage.getJobs({ driverId: driver.id });
+      const dbJobs = await db.select().from(jobsTable).where(eq(jobsTable.driverId, driver.id));
+      
+      // Merge jobs, preferring database versions for duplicates
+      const jobMap = new Map<string, Job>();
+      memoryJobs.forEach(j => jobMap.set(j.id, j));
+      dbJobs.forEach(j => jobMap.set(j.id, j));
+      let jobs = Array.from(jobMap.values());
 
       if (status === "active") {
         jobs = jobs.filter(j => 
@@ -200,7 +211,14 @@ export function registerMobileRoutes(app: Express): void {
       const driver = req.driver!;
       const { jobId } = req.params;
 
-      const job = await storage.getJob(jobId);
+      // Try memory first, then database
+      let job = await storage.getJob(jobId);
+      if (!job) {
+        const dbJobs = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId));
+        if (dbJobs.length > 0) {
+          job = dbJobs[0];
+        }
+      }
 
       if (!job) {
         return res.status(404).json({ 
