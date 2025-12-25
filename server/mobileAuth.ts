@@ -68,18 +68,39 @@ export async function requireDriverRole(
   }
 
   try {
-    // First try to get driver from in-memory storage
+    console.log("[Mobile Auth] Looking for driver with ID:", req.auth.id);
+    
+    // First try to get driver from in-memory storage by ID
     let driver = await storage.getDriver(req.auth.id);
+    console.log("[Mobile Auth] Driver found in memory by ID:", !!driver);
+    
+    // Also try by userId if not found
+    if (!driver) {
+      driver = await storage.getDriverByUserId(req.auth.id);
+      console.log("[Mobile Auth] Driver found in memory by userId:", !!driver);
+    }
     
     // If not found in memory, try the database
     if (!driver) {
+      console.log("[Mobile Auth] Checking database for driver...");
       const dbDrivers = await db.select().from(driversTable).where(eq(driversTable.id, req.auth.id));
+      console.log("[Mobile Auth] Database result by ID:", dbDrivers.length, "drivers found");
       if (dbDrivers.length > 0) {
         driver = dbDrivers[0];
       }
     }
     
+    // Also try database by userId
     if (!driver) {
+      const dbDriversByUserId = await db.select().from(driversTable).where(eq(driversTable.userId, req.auth.id));
+      console.log("[Mobile Auth] Database result by userId:", dbDriversByUserId.length, "drivers found");
+      if (dbDriversByUserId.length > 0) {
+        driver = dbDriversByUserId[0];
+      }
+    }
+    
+    if (!driver) {
+      console.log("[Mobile Auth] No driver found for ID:", req.auth.id);
       res.status(403).json({ 
         error: "Driver profile not found. Please complete driver registration.",
         code: "NO_DRIVER_PROFILE"

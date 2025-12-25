@@ -27,6 +27,30 @@ const VALID_JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 
 export function registerMobileRoutes(app: Express): void {
   
+  // Debug endpoint to check auth and driver lookup
+  app.get("/api/mobile/v1/debug/auth",
+    requireSupabaseAuth,
+    asyncHandler(async (req, res) => {
+      const authUser = req.auth!;
+      console.log("[Mobile Debug] Auth user ID:", authUser.id);
+      console.log("[Mobile Debug] Auth user email:", authUser.email);
+      console.log("[Mobile Debug] Auth user role:", authUser.role);
+      
+      // Try to find driver by the auth ID
+      const memoryDriver = await storage.getDriver(authUser.id);
+      const dbDrivers = await db.select().from(jobsTable).where(eq(jobsTable.driverId, authUser.id));
+      
+      res.json({
+        authUserId: authUser.id,
+        authEmail: authUser.email,
+        authRole: authUser.role,
+        driverFoundInMemory: !!memoryDriver,
+        jobsInDatabase: dbDrivers.length,
+        message: memoryDriver ? "Driver found!" : "Driver NOT found - ID mismatch"
+      });
+    })
+  );
+
   app.get("/api/mobile/v1/driver/profile", 
     requireSupabaseAuth, 
     requireDriverRole,
