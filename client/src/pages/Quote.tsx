@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { useBooking } from '@/context/BookingContext';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { 
   Bike, 
@@ -58,25 +59,26 @@ const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: n
 export default function Quote() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { booking, updateBooking } = useBooking();
   const { toast } = useToast();
   const [isCalculating, setIsCalculating] = useState(false);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
-  const [distance, setDistance] = useState<number>(0);
-  const [estimatedTime, setEstimatedTime] = useState<number>(0);
-  const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
+  const [distance, setDistance] = useState<number>(booking.distance || 0);
+  const [estimatedTime, setEstimatedTime] = useState<number>(booking.estimatedTime || 0);
+  const [multiDropStops, setMultiDropStops] = useState<string[]>(booking.multiDropStops || []);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
 
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
     defaultValues: {
-      pickupPostcode: '',
-      deliveryPostcode: '',
-      weight: 1,
-      vehicleType: '' as VehicleType,
-      isMultiDrop: false,
-      isReturnTrip: false,
-      returnToSameLocation: true,
-      returnPostcode: '',
+      pickupPostcode: booking.pickupPostcode || '',
+      deliveryPostcode: booking.deliveryPostcode || '',
+      weight: booking.weight || 1,
+      vehicleType: (booking.vehicleType || '') as VehicleType,
+      isMultiDrop: booking.isMultiDrop || false,
+      isReturnTrip: booking.isReturnTrip || false,
+      returnToSameLocation: booking.returnToSameLocation ?? true,
+      returnPostcode: booking.returnPostcode || '',
     },
   });
 
@@ -261,7 +263,33 @@ export default function Quote() {
     return params.toString();
   };
 
+  const saveBookingToContext = () => {
+    updateBooking({
+      pickupPostcode,
+      deliveryPostcode,
+      vehicleType: vehicleType as any,
+      weight,
+      isMultiDrop,
+      isReturnTrip,
+      returnToSameLocation,
+      returnPostcode,
+      multiDropStops,
+      distance,
+      estimatedTime,
+      totalPrice: quote?.totalPrice || 0,
+      basePrice: quote?.baseCharge || 0,
+      distancePrice: quote?.distanceCharge || 0,
+      weightSurcharge: quote?.weightSurcharge || 0,
+      rushHourCharge: quote?.rushHourApplied ? (quote.totalPrice * 0.15) : 0,
+      centralLondonCharge: quote?.centralLondonCharge || 0,
+      multiDropCharge: quote?.multiDropCharge || 0,
+      returnTripCharge: quote?.returnTripCharge || 0,
+      waitingTimeCharge: 0,
+    });
+  };
+
   const handleBookNow = () => {
+    saveBookingToContext();
     if (user) {
       setLocation(`/book?${buildBookingParams()}`);
     } else {
@@ -271,11 +299,13 @@ export default function Quote() {
 
   const handleContinueAsGuest = () => {
     setShowLoginDialog(false);
+    saveBookingToContext();
     setLocation(`/book?${buildBookingParams()}`);
   };
 
   const handleLoginToBook = () => {
     setShowLoginDialog(false);
+    saveBookingToContext();
     const bookingParams = buildBookingParams();
     setLocation(`/login?redirect=/book?${encodeURIComponent(bookingParams)}`);
   };

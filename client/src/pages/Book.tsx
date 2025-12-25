@@ -55,6 +55,7 @@ import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User
 import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance, calculateETA } from '@/lib/maps';
 import { EmbeddedPayment } from '@/components/EmbeddedPayment';
+import { useBooking } from '@/context/BookingContext';
 
 const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: number }[] = [
   { type: 'motorbike', icon: Bike, name: 'Motorbike', maxWeight: 5 },
@@ -67,6 +68,7 @@ export default function Book() {
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
   const { user } = useAuth();
+  const { booking, updateBooking, clearBooking } = useBooking();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -74,24 +76,24 @@ export default function Book() {
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [showEmbeddedPayment, setShowEmbeddedPayment] = useState(false);
   const [pendingBookingData, setPendingBookingData] = useState<any>(null);
-  const [distance, setDistance] = useState<number>(0);
-  const [estimatedTime, setEstimatedTime] = useState<number>(0);
-  const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
-  const [pickupFullAddress, setPickupFullAddress] = useState('');
-  const [deliveryFullAddress, setDeliveryFullAddress] = useState('');
+  const [distance, setDistance] = useState<number>(booking.distance || 0);
+  const [estimatedTime, setEstimatedTime] = useState<number>(booking.estimatedTime || 0);
+  const [multiDropStops, setMultiDropStops] = useState<string[]>(booking.multiDropStops || []);
+  const [pickupFullAddress, setPickupFullAddress] = useState(booking.pickupAddress || '');
+  const [deliveryFullAddress, setDeliveryFullAddress] = useState(booking.deliveryAddress || '');
   const [quoteFromParams, setQuoteFromParams] = useState(false);
 
-  const [pickupAddress, setPickupAddress] = useState('');
-  const [pickupBuildingName, setPickupBuildingName] = useState('');
-  const [pickupName, setPickupName] = useState('');
-  const [pickupPhone, setPickupPhone] = useState('');
-  const [pickupInstructions, setPickupInstructions] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [deliveryBuildingName, setDeliveryBuildingName] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientPhone, setRecipientPhone] = useState('');
-  const [deliveryInstructions, setDeliveryInstructions] = useState('');
+  const [pickupAddress, setPickupAddress] = useState(booking.pickupAddress || '');
+  const [pickupBuildingName, setPickupBuildingName] = useState(booking.pickupBuildingName || '');
+  const [pickupName, setPickupName] = useState(booking.pickupName || '');
+  const [pickupPhone, setPickupPhone] = useState(booking.pickupPhone || '');
+  const [pickupInstructions, setPickupInstructions] = useState(booking.pickupInstructions || '');
+  const [customerEmail, setCustomerEmail] = useState(booking.customerEmail || '');
+  const [deliveryAddress, setDeliveryAddress] = useState(booking.deliveryAddress || '');
+  const [deliveryBuildingName, setDeliveryBuildingName] = useState(booking.deliveryBuildingName || '');
+  const [recipientName, setRecipientName] = useState(booking.recipientName || '');
+  const [recipientPhone, setRecipientPhone] = useState(booking.recipientPhone || '');
+  const [deliveryInstructions, setDeliveryInstructions] = useState(booking.deliveryInstructions || '');
   
   interface StopDetails {
     postcode: string;
@@ -212,53 +214,23 @@ export default function Book() {
     return `${hours}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const BOOKING_STORAGE_KEY = 'runcourier_booking_draft';
-
-  const getSavedBookingData = () => {
-    try {
-      const saved = localStorage.getItem(BOOKING_STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        const savedTime = data.savedAt ? new Date(data.savedAt) : null;
-        const now = new Date();
-        if (savedTime && (now.getTime() - savedTime.getTime()) < 24 * 60 * 60 * 1000) {
-          return data;
-        }
-        localStorage.removeItem(BOOKING_STORAGE_KEY);
-      }
-    } catch (e) {
-      console.error('Error loading saved booking:', e);
-    }
-    return null;
-  };
-
-  const savedBooking = getSavedBookingData();
-
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
     defaultValues: {
-      pickupPostcode: '',
-      deliveryPostcode: '',
-      weight: savedBooking?.weight || 1,
-      vehicleType: (savedBooking?.vehicleType || '') as VehicleType,
-      isMultiDrop: savedBooking?.isMultiDrop || false,
-      isReturnTrip: savedBooking?.isReturnTrip || false,
-      returnToSameLocation: savedBooking?.returnToSameLocation ?? true,
-      returnPostcode: '',
-      pickupDate: getTodayDate(),
-      pickupTime: getCurrentTime(),
-      deliveryDate: '',
-      deliveryTime: '',
+      pickupPostcode: booking.pickupPostcode || '',
+      deliveryPostcode: booking.deliveryPostcode || '',
+      weight: booking.weight || 1,
+      vehicleType: (booking.vehicleType || '') as VehicleType,
+      isMultiDrop: booking.isMultiDrop || false,
+      isReturnTrip: booking.isReturnTrip || false,
+      returnToSameLocation: booking.returnToSameLocation ?? true,
+      returnPostcode: booking.returnPostcode || '',
+      pickupDate: booking.pickupDate || getTodayDate(),
+      pickupTime: booking.pickupTime || getCurrentTime(),
+      deliveryDate: booking.deliveryDate || '',
+      deliveryTime: booking.deliveryTime || '',
     },
   });
-
-  useEffect(() => {
-    // Note: Postcodes and addresses are intentionally NOT restored from saved data
-    // They should always be empty when navigating to the booking page
-    if (savedBooking) {
-      if (savedBooking.multiDropStops) setMultiDropStops(savedBooking.multiDropStops);
-    }
-  }, []);
 
   const pickupPostcode = form.watch('pickupPostcode');
   const deliveryPostcode = form.watch('deliveryPostcode');
@@ -274,46 +246,36 @@ export default function Book() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
-  // Auto-save booking data to localStorage
+  // Auto-save booking data to context (which persists to localStorage)
   useEffect(() => {
-    const saveBookingData = () => {
-      const dataToSave = {
+    if (pickupPostcode || deliveryPostcode || vehicleType) {
+      updateBooking({
         pickupPostcode,
         deliveryPostcode,
         weight,
-        vehicleType,
+        vehicleType: vehicleType as any,
         isMultiDrop,
         isReturnTrip,
         returnToSameLocation,
         returnPostcode,
-        pickupFullAddress,
-        deliveryFullAddress,
-        pickupAddress,
-        deliveryAddress,
+        pickupAddress: pickupFullAddress || pickupAddress,
+        deliveryAddress: deliveryFullAddress || deliveryAddress,
+        pickupBuildingName,
+        pickupName,
+        pickupPhone,
+        pickupInstructions,
+        customerEmail,
+        deliveryBuildingName,
+        recipientName,
+        recipientPhone,
+        deliveryInstructions,
         multiDropStops,
-        savedAt: new Date().toISOString(),
-      };
-      try {
-        localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(dataToSave));
-      } catch (e) {
-        console.error('Error saving booking draft:', e);
-      }
-    };
-
-    // Only save if there's meaningful data
-    if (pickupPostcode || deliveryPostcode || vehicleType) {
-      saveBookingData();
+        distance,
+        estimatedTime,
+        totalPrice: quote?.totalPrice || booking.totalPrice || 0,
+      });
     }
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, returnPostcode, pickupFullAddress, deliveryFullAddress, pickupAddress, deliveryAddress, multiDropStops]);
-
-  // Clear saved booking data after successful booking
-  const clearSavedBooking = () => {
-    try {
-      localStorage.removeItem(BOOKING_STORAGE_KEY);
-    } catch (e) {
-      console.error('Error clearing saved booking:', e);
-    }
-  };
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, returnPostcode, pickupFullAddress, deliveryFullAddress, pickupAddress, deliveryAddress, pickupBuildingName, pickupName, pickupPhone, pickupInstructions, customerEmail, deliveryBuildingName, recipientName, recipientPhone, deliveryInstructions, multiDropStops, distance, estimatedTime, quote]);
 
   useEffect(() => {
     if (userProfile) {
@@ -1554,7 +1516,7 @@ export default function Book() {
                             description: `Your booking has been created. Tracking number: ${result.trackingNumber}`,
                           });
                           
-                          clearSavedBooking();
+                          clearBooking();
                           setLocation(`/payment/success?tracking=${result.trackingNumber}&payLater=true`);
                         } else {
                           setPendingBookingData(bookingData);
@@ -1616,7 +1578,7 @@ export default function Book() {
                       title: 'Payment Successful!',
                       description: `Your booking has been confirmed. Tracking number: ${trackingNumber}`,
                     });
-                    clearSavedBooking();
+                    clearBooking();
                     setLocation(`/payment/success?tracking=${trackingNumber}`);
                   }}
                   onCancel={() => {

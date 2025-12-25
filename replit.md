@@ -25,6 +25,9 @@ Supabase Auth manages user authentication (email/password) and session managemen
 ### Real-Time Features
 A WebSocket server (`ws` library) at `/ws/realtime` provides live driver location tracking, **real-time job status updates**, broadcasting, connection heartbeats, and offline detection. It uses secure token-based authentication with Supabase JWT verification and server-side role validation, with a fallback to REST API polling.
 
+### Booking State Persistence (BookingContext)
+A global `BookingContext` (`client/src/context/BookingContext.tsx`) manages booking data across page navigation. It automatically persists to localStorage on every change and restores data on page load (24-hour expiry). This ensures users don't lose their entered data when navigating between Quote and Book pages, going back, or refreshing the page.
+
 **Job Status Updates**: The `useJobUpdates` hook subscribes to job status changes via WebSocket. Admins and dispatchers receive all job updates, while customers receive updates for their own jobs only. Job creation events trigger toasts for administrators. The Track page uses 10-second polling for live updates.
 
 **WebSocket Compatibility**: The `getWebSocketUrl()` helper in `queryClient.ts` ensures WebSocket connections work correctly when the frontend is hosted on Hostinger (runcourier.co.uk) by redirecting WebSocket traffic to the Replit backend.

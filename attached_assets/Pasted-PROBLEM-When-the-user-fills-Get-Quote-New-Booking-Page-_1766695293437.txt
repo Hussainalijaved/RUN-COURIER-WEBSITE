@@ -1,0 +1,138 @@
+PROBLEM
+
+When the user fills Get Quote / New Booking – Page 1 and navigates to Page 2,
+all previously entered data is lost, and the user must re-enter everything again.
+
+This is unacceptable UX and must be fixed.
+
+🎯 REQUIRED BEHAVIOR (MUST IMPLEMENT)
+
+All booking details entered on Page 1 must be:
+
+Saved immediately
+
+Persist across navigation
+
+Automatically pre-filled on the next page
+
+Still available if the user goes back
+
+🧠 ROOT CAUSE
+
+Booking data is currently stored only in local component state, so when navigation happens, the state is destroyed.
+
+✅ SOLUTION (MANDATORY)
+1️⃣ Create a Global Booking State
+
+Use ONE of the following (depending on framework used):
+
+React Context
+
+Global Store (Zustand / Redux)
+
+FlutterFlow App State
+
+Supabase draft booking record
+
+Local persistent storage (AsyncStorage / SecureStore)
+
+❌ Do NOT rely on page-level state
+❌ Do NOT re-calculate or re-ask user for values
+
+2️⃣ Booking Object Structure (STANDARDIZE THIS)
+
+Create a single shared booking object:
+
+bookingDraft = {
+  pickupPostcode: "",
+  pickupAddress: "",
+  pickupLat: null,
+  pickupLng: null,
+
+  deliveryPostcode: "",
+  deliveryAddress: "",
+  deliveryLat: null,
+  deliveryLng: null,
+
+  vehicleType: "",
+  weightKg: 0,
+  distanceMiles: 0,
+
+  deliveryDate: "",
+  deliveryTime: "",
+
+  isReturn: false,
+  price: 0
+}
+
+3️⃣ Save Data ON EVERY CHANGE
+
+Each input field must:
+
+Update the shared bookingDraft
+
+NOT wait until page submit
+
+Example logic:
+
+onChange(input):
+  update bookingDraft.field = value
+
+4️⃣ Navigation MUST PASS OR READ STATE
+
+When moving to the next page:
+
+DO NOT reset state
+
+DO NOT create a new booking object
+
+Read from the existing bookingDraft
+
+On page load:
+
+if bookingDraft exists:
+  pre-fill all fields
+
+5️⃣ Back Button Behavior
+
+If user goes back:
+
+Previously entered data MUST still be there
+
+No field should reset
+
+6️⃣ Price Calculation Rule
+
+Price should calculate automatically once:
+
+pickup + delivery are set
+
+vehicle type is selected
+
+distance is available
+
+Price must persist across pages
+
+Do NOT recalculate unless inputs change
+
+✅ ACCEPTANCE CRITERIA
+
+✔ User fills Page 1 → goes to Page 2 → data is still there
+✔ User goes back → nothing is lost
+✔ Price stays the same
+✔ No duplicate API calls
+✔ No UI redesign
+
+❌ DO NOT
+
+Change UI
+
+Change booking steps
+
+Ask user to re-enter data
+
+Store sensitive data in URL
+
+⚠️ IMPORTANT
+
+This fix is required before App Store / Play Store approval.

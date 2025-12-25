@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
+import { BookingProvider } from "@/context/BookingContext";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 
 function ScrollToTop() {
@@ -339,9 +340,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <ScrollToTop />
-          <Toaster />
-          <Router />
+          <BookingProvider>
+            <ScrollToTop />
+            <Toaster />
+            <Router />
+          </BookingProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
