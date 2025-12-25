@@ -31,9 +31,9 @@ import { broadcastJobUpdate, broadcastJobCreated } from "./realtime";
 const PRICING_CONFIG = {
   vehicles: {
     motorbike: { name: "Motorbike", baseCharge: 7, perMileRate: 1.3 },
-    car: { name: "Car", baseCharge: 17, perMileRate: 1.2 },
-    small_van: { name: "Small Van", baseCharge: 21, perMileRate: 1.3 },
-    medium_van: { name: "Medium Van", baseCharge: 25, perMileRate: 1.4 },
+    car: { name: "Car", baseCharge: 19, perMileRate: 1.2 },
+    small_van: { name: "Small Van", baseCharge: 25, perMileRate: 1.3 },
+    medium_van: { name: "Medium Van", baseCharge: 30, perMileRate: 1.4 },
   }
 } as const;
 

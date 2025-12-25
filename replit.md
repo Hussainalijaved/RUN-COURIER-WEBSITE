@@ -46,9 +46,9 @@ A TypeScript-based pricing engine calculates delivery costs considering vehicle 
 
 **CRITICAL PRICING RULE - Base Charges (FIXED, never calculated from distance)**:
 - Motorbike: £7.00
-- Car: £17.00
-- Small Van: £21.00
-- Medium Van: £25.00
+- Car: £19.00
+- Small Van: £25.00
+- Medium Van: £30.00
 
 The pricing config is defined in two locations (must stay in sync):
 1. Client-side: `client/src/lib/pricing.ts` - `defaultPricingConfig.vehicles`
