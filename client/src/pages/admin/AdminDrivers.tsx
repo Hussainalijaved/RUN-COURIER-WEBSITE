@@ -132,13 +132,14 @@ export default function AdminDrivers() {
   const [nationalitySearch, setNationalitySearch] = useState('');
   const [nationalityOpen, setNationalityOpen] = useState(false);
   const [uploadingDbs, setUploadingDbs] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
+  const [driverToDeactivate, setDriverToDeactivate] = useState<Driver | null>(null);
+  const [showInactive, setShowInactive] = useState(true);
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: drivers, isLoading: driversLoading } = useQuery<Driver[]>({
-    queryKey: ['/api/drivers'],
+    queryKey: ['/api/drivers', { includeInactive: showInactive }],
   });
 
   const { data: supabaseDrivers } = useQuery<SupabaseDriver[]>({
@@ -203,26 +204,43 @@ export default function AdminDrivers() {
     },
   });
 
-  const deleteDriverMutation = useMutation({
+  const deactivateDriverMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/drivers/${id}`);
+      const response = await apiRequest('POST', `/api/drivers/${id}/deactivate`);
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete driver');
+        throw new Error(errorData.error || 'Failed to deactivate driver');
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
-      toast({ title: 'Driver deleted successfully' });
-      setDeleteDialogOpen(false);
-      setDriverToDelete(null);
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/drivers' });
+      toast({ title: 'Driver deactivated successfully' });
+      setDeactivateDialogOpen(false);
+      setDriverToDeactivate(null);
       setProfileDialogOpen(false);
       setSelectedDriver(null);
     },
     onError: (error: Error) => {
-      toast({ title: error.message || 'Failed to delete driver', variant: 'destructive' });
+      toast({ title: error.message || 'Failed to deactivate driver', variant: 'destructive' });
+    },
+  });
+
+  const reactivateDriverMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/drivers/${id}/reactivate`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to reactivate driver');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/drivers' });
+      toast({ title: 'Driver reactivated successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || 'Failed to reactivate driver', variant: 'destructive' });
     },
   });
 
@@ -622,7 +640,10 @@ export default function AdminDrivers() {
                             ) : (
                               <Badge variant="secondary" className="w-fit" data-testid={`badge-unverified-${driver.id}`}>Unverified</Badge>
                             )}
-                            {driver.isAvailable && (
+                            {driver.isActive === false && (
+                              <Badge variant="outline" className="text-orange-600 border-orange-600 w-fit" data-testid={`badge-deactivated-${driver.id}`}>Deactivated</Badge>
+                            )}
+                            {driver.isAvailable && driver.isActive !== false && (
                               <Badge className="bg-blue-500 text-white w-fit" data-testid={`badge-available-${driver.id}`}>Online</Badge>
                             )}
                             {docStatus.isComplete ? (
@@ -715,17 +736,29 @@ export default function AdminDrivers() {
                                   Revoke Verification
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => {
-                                  setDriverToDelete(driver);
-                                  setDeleteDialogOpen(true);
-                                }}
-                                data-testid={`menu-delete-${driver.id}`}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete Driver
-                              </DropdownMenuItem>
+                              {driver.isActive !== false ? (
+                                <DropdownMenuItem
+                                  className="text-orange-600"
+                                  onClick={() => {
+                                    setDriverToDeactivate(driver);
+                                    setDeactivateDialogOpen(true);
+                                  }}
+                                  data-testid={`menu-deactivate-${driver.id}`}
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Deactivate Driver
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  className="text-green-600"
+                                  onClick={() => reactivateDriverMutation.mutate(driver.id)}
+                                  disabled={reactivateDriverMutation.isPending}
+                                  data-testid={`menu-reactivate-${driver.id}`}
+                                >
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Reactivate Driver
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -1165,20 +1198,38 @@ export default function AdminDrivers() {
                 </>
               ) : (
                 <div className="flex justify-between w-full">
-                  <Button 
-                    variant="outline"
-                    className="text-red-600 border-red-600 hover:bg-red-50"
-                    onClick={() => {
-                      if (selectedDriver) {
-                        setDriverToDelete(selectedDriver);
-                        setDeleteDialogOpen(true);
-                      }
-                    }}
-                    data-testid="button-delete-driver"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Driver
-                  </Button>
+                  {selectedDriver?.isActive !== false ? (
+                    <Button 
+                      variant="outline"
+                      className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                      onClick={() => {
+                        if (selectedDriver) {
+                          setDriverToDeactivate(selectedDriver);
+                          setDeactivateDialogOpen(true);
+                        }
+                      }}
+                      data-testid="button-deactivate-driver"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Deactivate Driver
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline"
+                      className="text-green-600 border-green-600 hover:bg-green-50"
+                      onClick={() => {
+                        if (selectedDriver) {
+                          reactivateDriverMutation.mutate(selectedDriver.id);
+                          setProfileDialogOpen(false);
+                        }
+                      }}
+                      disabled={reactivateDriverMutation.isPending}
+                      data-testid="button-reactivate-driver"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Reactivate Driver
+                    </Button>
+                  )}
                   <div className="flex gap-2">
                     {!selectedDriver?.isVerified ? (
                       <Button 
@@ -1336,33 +1387,33 @@ export default function AdminDrivers() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        {/* Deactivate Confirmation Dialog */}
+        <Dialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
+              <DialogTitle className="flex items-center gap-2 text-orange-600">
                 <AlertTriangle className="h-5 w-5" />
-                Delete Driver
+                Deactivate Driver
               </DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete this driver? This action cannot be undone.
+                Are you sure you want to deactivate this driver? They will no longer receive jobs or be able to log in.
               </DialogDescription>
             </DialogHeader>
-            {driverToDelete && (
+            {driverToDeactivate && (
               <div className="py-4">
                 <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getDriverInfo(driverToDelete).name?.split(' ').map((n) => n[0]).join('') || 'D'}
+                      {getDriverInfo(driverToDeactivate).name?.split(' ').map((n) => n[0]).join('') || 'D'}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium">{getDriverInfo(driverToDelete).name}</p>
-                    <p className="text-sm text-muted-foreground">{getDriverInfo(driverToDelete).email}</p>
+                    <p className="font-medium">{getDriverInfo(driverToDeactivate).name}</p>
+                    <p className="text-sm text-muted-foreground">{getDriverInfo(driverToDeactivate).email}</p>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mt-3">
-                  This will permanently delete the driver profile, their documents, and all associated data.
+                  This will deactivate the driver account. Their job history will be preserved and you can reactivate them later.
                 </p>
               </div>
             )}
@@ -1370,28 +1421,28 @@ export default function AdminDrivers() {
               <Button 
                 variant="outline" 
                 onClick={() => {
-                  setDeleteDialogOpen(false);
-                  setDriverToDelete(null);
+                  setDeactivateDialogOpen(false);
+                  setDriverToDeactivate(null);
                 }}
               >
                 Cancel
               </Button>
               <Button
-                variant="destructive"
+                className="bg-orange-600 hover:bg-orange-700 text-white"
                 onClick={() => {
-                  if (driverToDelete) {
-                    deleteDriverMutation.mutate(driverToDelete.id);
+                  if (driverToDeactivate) {
+                    deactivateDriverMutation.mutate(driverToDeactivate.id);
                   }
                 }}
-                disabled={deleteDriverMutation.isPending}
-                data-testid="button-confirm-delete"
+                disabled={deactivateDriverMutation.isPending}
+                data-testid="button-confirm-deactivate"
               >
-                {deleteDriverMutation.isPending ? (
+                {deactivateDriverMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <XCircle className="h-4 w-4 mr-2" />
                 )}
-                Delete Driver
+                Deactivate Driver
               </Button>
             </DialogFooter>
           </DialogContent>

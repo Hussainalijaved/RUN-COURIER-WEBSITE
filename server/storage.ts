@@ -1121,6 +1121,13 @@ export class MemStorage implements IStorage {
   }
 
   async assignDriver(id: string, driverId: string, dispatcherId?: string): Promise<Job | undefined> {
+    // Validate driver is active before assignment
+    const driver = await this.getDriver(driverId);
+    if (driver && driver.isActive === false) {
+      // Return undefined instead of throwing to allow callers to handle gracefully
+      return undefined;
+    }
+    
     return this.updateJob(id, { 
       driverId, 
       dispatcherId: dispatcherId || null, 

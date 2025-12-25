@@ -62,8 +62,25 @@ React Hook Form is used for form state management, integrated with Zod schemas f
 ### Document Upload Backend API
 A secure backend API (`POST /api/documents/upload`) handles document uploads (JPEG, PNG, GIF, WebP, PDF up to 10MB) using `multer`. It includes robust security features like path sanitization and traversal prevention, storing files in a structured directory. This replaces the previous Supabase Storage dependency.
 
-### Account Deletion (GDPR Compliance)
-Users and drivers can delete their accounts from their profile pages, triggering a cascading deletion process across Supabase Auth and the application database, ensuring GDPR compliance.
+### Soft Delete System (Drivers & Users)
+Instead of permanently deleting records, the system uses soft delete to preserve job history and audit trails:
+- **isActive**: Boolean column indicating whether the account is active (default: true)
+- **deactivatedAt**: Timestamp of when the account was deactivated
+
+**Deactivation Rules**:
+- Deactivated drivers cannot receive jobs or log in
+- Deactivated users cannot access the platform
+- All job history is preserved for audit purposes
+- Admins can reactivate accounts at any time
+
+**API Endpoints**:
+- `POST /api/drivers/:id/deactivate` - Deactivate a driver
+- `POST /api/drivers/:id/reactivate` - Reactivate a driver  
+- `POST /api/users/:id/deactivate` - Deactivate a user
+- `POST /api/users/:id/reactivate` - Reactivate a user
+- Query parameter `includeInactive=true` to include inactive records in GET endpoints
+
+**UI Features**: Admin Drivers page shows Deactivate/Reactivate buttons with confirmation dialogs explaining job history preservation.
 
 ### Admin Job Assignment System
 Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments via a "Job Offers" tab. Assignment statuses are tracked (pending, sent, accepted, rejected, cancelled, expired), and assignment history is maintained.

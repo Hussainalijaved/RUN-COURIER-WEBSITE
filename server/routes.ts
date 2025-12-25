@@ -284,6 +284,18 @@ export async function registerRoutes(
 
   app.patch("/api/jobs/:id/assign", asyncHandler(async (req, res) => {
     const { driverId, dispatcherId } = req.body;
+    
+    // Validate driver is active before assignment
+    if (driverId) {
+      const driver = await storage.getDriver(driverId);
+      if (!driver) {
+        return res.status(404).json({ error: "Driver not found" });
+      }
+      if (driver.isActive === false) {
+        return res.status(400).json({ error: "Cannot assign jobs to deactivated drivers" });
+      }
+    }
+    
     const previousJob = await storage.getJob(req.params.id);
     const job = await storage.assignDriver(req.params.id, driverId, dispatcherId);
     if (!job) {
@@ -354,11 +366,12 @@ export async function registerRoutes(
   }));
 
   app.get("/api/drivers", asyncHandler(async (req, res) => {
-    const { isAvailable, isVerified, vehicleType } = req.query;
+    const { isAvailable, isVerified, vehicleType, includeInactive } = req.query;
     const drivers = await storage.getDrivers({
       isAvailable: isAvailable === "true" ? true : isAvailable === "false" ? false : undefined,
       isVerified: isVerified === "true" ? true : isVerified === "false" ? false : undefined,
       vehicleType: vehicleType as VehicleType | undefined,
+      includeInactive: includeInactive === "true",
     });
     res.json(drivers);
   }));
@@ -686,7 +699,7 @@ export async function registerRoutes(
     res.json(driver);
   }));
 
-  app.delete("/api/drivers/:id", asyncHandler(async (req, res) => {
+  app.post("/api/drivers/:id/deactivate", asyncHandler(async (req, res) => {
     const driverId = req.params.id;
     
     // Check if driver exists
@@ -695,43 +708,75 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Driver not found" });
     }
     
-    // Helper function to check if a string is a valid UUID
-    const isValidUUID = (str: string) => {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      return uuidRegex.test(str);
-    };
-    
-    // If driver has a userId that is a valid UUID, delete from Supabase Auth
-    if (driver.userId && isValidUUID(driver.userId)) {
-      const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
-      if (supabaseAdmin) {
-        try {
-          const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(driver.userId);
-          if (supabaseError) {
-            console.error('Error deleting user from Supabase:', supabaseError);
-            // Continue with local deletion even if Supabase fails
-          } else {
-            console.log(`[Drivers] Deleted user ${driver.userId} from Supabase Auth`);
-          }
-        } catch (supabaseError) {
-          console.error('Error deleting user from Supabase:', supabaseError);
-          // Continue with local deletion even if Supabase fails
-        }
-      }
-    } else {
-      console.log(`[Drivers] Skipping Supabase Auth deletion for non-UUID userId: ${driver.userId}`);
+    // Deactivate driver (soft delete)
+    const deactivatedDriver = await storage.deactivateDriver(driverId);
+    if (!deactivatedDriver) {
+      return res.status(500).json({ error: "Failed to deactivate driver" });
     }
     
-    // Delete user from local storage if userId exists
+    // Also deactivate the user if they exist
     if (driver.userId) {
-      await storage.deleteUser(driver.userId);
+      await storage.deactivateUser(driver.userId);
     }
     
-    // Delete driver record
-    await storage.deleteDriver(driverId);
-    console.log(`[Drivers] Deleted driver ${driverId}`);
+    // Sync to PostgreSQL
+    try {
+      const { db } = await import("./db");
+      const { drivers: driversTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.update(driversTable).set({ 
+        isActive: false, 
+        deactivatedAt: new Date(),
+        isAvailable: false
+      }).where(eq(driversTable.id, driverId));
+      console.log(`[Drivers] Synced driver deactivation to PostgreSQL: ${driverId}`);
+    } catch (e) {
+      console.error("Failed to sync driver deactivation to PostgreSQL:", e);
+    }
     
-    res.json({ success: true, message: "Driver account deleted successfully" });
+    console.log(`[Drivers] Deactivated driver ${driverId}`);
+    res.json({ success: true, message: "Driver account deactivated successfully", driver: deactivatedDriver });
+  }));
+
+  app.post("/api/drivers/:id/reactivate", asyncHandler(async (req, res) => {
+    const driverId = req.params.id;
+    
+    // Check if driver exists (include inactive)
+    const allDrivers = await storage.getDrivers({ includeInactive: true });
+    const driver = allDrivers.find(d => d.id === driverId);
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+    
+    // Reactivate driver
+    const reactivatedDriver = await storage.reactivateDriver(driverId);
+    if (!reactivatedDriver) {
+      return res.status(500).json({ error: "Failed to reactivate driver" });
+    }
+    
+    // Also reactivate the user if they exist
+    if (driver.userId) {
+      await storage.reactivateUser(driver.userId);
+    }
+    
+    // Sync to PostgreSQL
+    try {
+      const { db } = await import("./db");
+      const { drivers: driversTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.update(driversTable).set({ 
+        isActive: true, 
+        deactivatedAt: null
+      }).where(eq(driversTable.id, driverId));
+      console.log(`[Drivers] Synced driver reactivation to PostgreSQL: ${driverId}`);
+    } catch (e) {
+      console.error("Failed to sync driver reactivation to PostgreSQL:", e);
+    }
+    
+    console.log(`[Drivers] Reactivated driver ${driverId}`);
+    res.json({ success: true, message: "Driver account reactivated successfully", driver: reactivatedDriver });
   }));
 
   // Fetch all drivers from Supabase (users with role=driver)
@@ -819,10 +864,11 @@ export async function registerRoutes(
   }));
 
   app.get("/api/users", asyncHandler(async (req, res) => {
-    const { role, isActive } = req.query;
+    const { role, isActive, includeInactive } = req.query;
     const users = await storage.getUsers({
       role: role as string | undefined,
       isActive: isActive === "true" ? true : isActive === "false" ? false : undefined,
+      includeInactive: includeInactive === "true",
     });
     res.json(users);
   }));
@@ -958,56 +1004,87 @@ export async function registerRoutes(
     }
   }));
 
-  app.delete("/api/users/:id", asyncHandler(async (req, res) => {
+  app.post("/api/users/:id/deactivate", asyncHandler(async (req, res) => {
     const userId = req.params.id;
     
-    // Delete from Supabase Auth first - this is where the actual account lives
-    const supabaseAdmin = (await import('./supabaseAdmin')).supabaseAdmin;
-    if (!supabaseAdmin) {
-      console.error('[Users] Supabase admin not configured, cannot delete user');
-      return res.status(500).json({ error: "Account deletion service unavailable" });
+    // Get the user first
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
     
-    try {
-      const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-      if (supabaseError) {
-        console.error('Error deleting user from Supabase:', supabaseError);
-        return res.status(500).json({ error: "Failed to delete account from authentication service" });
-      }
-      console.log(`[Users] Deleted user ${userId} from Supabase Auth`);
-    } catch (supabaseError) {
-      console.error('Error deleting user from Supabase:', supabaseError);
-      return res.status(500).json({ error: "Failed to delete account from authentication service" });
+    // Deactivate user
+    const deactivatedUser = await storage.deactivateUser(userId);
+    if (!deactivatedUser) {
+      return res.status(500).json({ error: "Failed to deactivate user" });
     }
     
-    // If user is a driver, delete driver record too (from both PostgreSQL and in-memory)
+    // If user is a driver, deactivate driver record too
     const driver = await storage.getDriverByUserId(userId);
     if (driver) {
-      // Delete from PostgreSQL
+      await storage.deactivateDriver(driver.id);
+      
+      // Sync to PostgreSQL
       try {
         const { db } = await import("./db");
         const { drivers: driversTable } = await import("@shared/schema");
         const { eq } = await import("drizzle-orm");
-        await db.delete(driversTable).where(eq(driversTable.userId, userId));
-        console.log(`[Users] Deleted driver record from PostgreSQL for user ${userId}`);
-      } catch (dbError) {
-        console.error('Error deleting driver from PostgreSQL:', dbError);
+        
+        await db.update(driversTable).set({ 
+          isActive: false, 
+          deactivatedAt: new Date(),
+          isAvailable: false
+        }).where(eq(driversTable.userId, userId));
+        console.log(`[Users] Synced driver deactivation to PostgreSQL for user ${userId}`);
+      } catch (e) {
+        console.error("Failed to sync driver deactivation to PostgreSQL:", e);
       }
+    }
+    
+    console.log(`[Users] Deactivated user ${userId}`);
+    res.json({ success: true, message: "Account deactivated successfully", user: deactivatedUser });
+  }));
+
+  app.post("/api/users/:id/reactivate", asyncHandler(async (req, res) => {
+    const userId = req.params.id;
+    
+    // Get the user (include inactive)
+    const allUsers = await storage.getUsers({ includeInactive: true });
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Reactivate user
+    const reactivatedUser = await storage.reactivateUser(userId);
+    if (!reactivatedUser) {
+      return res.status(500).json({ error: "Failed to reactivate user" });
+    }
+    
+    // If user is a driver, reactivate driver record too
+    const allDrivers = await storage.getDrivers({ includeInactive: true });
+    const driver = allDrivers.find(d => d.userId === userId);
+    if (driver) {
+      await storage.reactivateDriver(driver.id);
       
-      // Delete from in-memory storage
-      await storage.deleteDriver(driver.id);
-      console.log(`[Users] Deleted driver record from memory for user ${userId}`);
+      // Sync to PostgreSQL
+      try {
+        const { db } = await import("./db");
+        const { drivers: driversTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        
+        await db.update(driversTable).set({ 
+          isActive: true, 
+          deactivatedAt: null
+        }).where(eq(driversTable.userId, userId));
+        console.log(`[Users] Synced driver reactivation to PostgreSQL for user ${userId}`);
+      } catch (e) {
+        console.error("Failed to sync driver reactivation to PostgreSQL:", e);
+      }
     }
     
-    // Delete user from local storage if exists (user may only exist in Supabase)
-    try {
-      await storage.deleteUser(userId);
-      console.log(`[Users] Deleted user ${userId} from local storage`);
-    } catch (e) {
-      console.log(`[Users] User ${userId} not found in local storage (only existed in Supabase)`);
-    }
-    
-    res.json({ success: true, message: "Account deleted successfully" });
+    console.log(`[Users] Reactivated user ${userId}`);
+    res.json({ success: true, message: "Account reactivated successfully", user: reactivatedUser });
   }));
 
   app.get("/api/documents", asyncHandler(async (req, res) => {
@@ -2324,6 +2401,9 @@ export async function registerRoutes(
       } else {
         return res.status(404).json({ error: "Driver not found" });
       }
+    } else if (driver.isActive === false) {
+      // Driver exists but is deactivated
+      return res.status(400).json({ error: "Cannot assign jobs to deactivated drivers" });
     }
 
     // Check for existing active assignment
@@ -2381,6 +2461,14 @@ export async function registerRoutes(
 
     if (assignment.status !== "sent") {
       return res.status(400).json({ error: "Assignment is no longer pending response" });
+    }
+
+    // Check if driver is still active before accepting
+    if (accepted) {
+      const driver = await storage.getDriver(assignment.driverId);
+      if (driver && driver.isActive === false) {
+        return res.status(400).json({ error: "Your account has been deactivated. Please contact support." });
+      }
     }
 
     const newStatus: JobAssignmentStatus = accepted ? "accepted" : "rejected";

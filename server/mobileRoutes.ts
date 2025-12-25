@@ -81,6 +81,15 @@ export function registerMobileRoutes(app: Express): void {
     requireDriverRole,
     asyncHandler(async (req, res) => {
       const driver = req.driver!;
+      
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+      
       const { latitude, longitude, speed, heading, accuracy } = req.body;
 
       if (latitude === undefined || longitude === undefined) {
@@ -142,6 +151,15 @@ export function registerMobileRoutes(app: Express): void {
     requireDriverRole,
     asyncHandler(async (req, res) => {
       const driver = req.driver!;
+      
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+      
       const { isAvailable } = req.body;
 
       if (typeof isAvailable !== "boolean") {
@@ -294,6 +312,15 @@ export function registerMobileRoutes(app: Express): void {
     requireDriverRole,
     asyncHandler(async (req, res) => {
       const driver = req.driver!;
+      
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+      
       const { jobId } = req.params;
       const { status, rejectionReason } = req.body;
 
@@ -350,6 +377,15 @@ export function registerMobileRoutes(app: Express): void {
     requireDriverRole,
     asyncHandler(async (req, res) => {
       const driver = req.driver!;
+      
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+      
       const { jobId } = req.params;
       const { podPhotoUrl, podSignatureUrl } = req.body;
 
