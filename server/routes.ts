@@ -24,6 +24,7 @@ import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClie
 import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification } from "./emailService";
 import { createHash, randomBytes } from "crypto";
+import { broadcastJobUpdate, broadcastJobCreated } from "./realtime";
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
@@ -187,6 +188,14 @@ export async function registerRoutes(
     
     const data = insertJobSchema.parse(preprocessedBody);
     const job = await storage.createJob(data);
+    // Broadcast job created event for real-time updates
+    broadcastJobCreated({
+      id: job.id,
+      trackingNumber: job.trackingNumber,
+      status: job.status,
+      customerId: job.customerId,
+      createdAt: job.createdAt,
+    });
     // Send admin notification
     await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send job notification:', err));
     // Send customer confirmation if email available
@@ -198,28 +207,63 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/jobs/:id", asyncHandler(async (req, res) => {
+    const previousJob = await storage.getJob(req.params.id);
     const job = await storage.updateJob(req.params.id, req.body);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
+    }
+    // Broadcast job update if status changed
+    if (previousJob && previousJob.status !== job.status) {
+      broadcastJobUpdate({
+        id: job.id,
+        trackingNumber: job.trackingNumber,
+        status: job.status,
+        previousStatus: previousJob.status,
+        customerId: job.customerId,
+        driverId: job.driverId,
+        updatedAt: job.updatedAt,
+      });
     }
     res.json(job);
   }));
 
   app.patch("/api/jobs/:id/status", asyncHandler(async (req, res) => {
     const { status, rejectionReason } = req.body;
+    const previousJob = await storage.getJob(req.params.id);
     const job = await storage.updateJobStatus(req.params.id, status, rejectionReason);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
+    // Broadcast job status update for real-time updates
+    broadcastJobUpdate({
+      id: job.id,
+      trackingNumber: job.trackingNumber,
+      status: job.status,
+      previousStatus: previousJob?.status,
+      customerId: job.customerId,
+      driverId: job.driverId,
+      updatedAt: job.updatedAt,
+    });
     res.json(job);
   }));
 
   app.patch("/api/jobs/:id/assign", asyncHandler(async (req, res) => {
     const { driverId, dispatcherId } = req.body;
+    const previousJob = await storage.getJob(req.params.id);
     const job = await storage.assignDriver(req.params.id, driverId, dispatcherId);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
+    // Broadcast job assignment for real-time updates
+    broadcastJobUpdate({
+      id: job.id,
+      trackingNumber: job.trackingNumber,
+      status: job.status,
+      previousStatus: previousJob?.status,
+      customerId: job.customerId,
+      driverId: job.driverId,
+      updatedAt: job.updatedAt,
+    });
     res.json(job);
   }));
 
@@ -2517,7 +2561,7 @@ export async function registerRoutes(
     const paymentLink = await storage.createPaymentLink({
       jobId,
       customerId,
-      customerEmail,
+      customerEmail: customerEmail!,
       token,
       tokenHash,
       amount: job.totalPrice,
@@ -2538,7 +2582,7 @@ export async function registerRoutes(
     const paymentUrl = `${BASE_URL}/pay/${token}`;
 
     // Send email to customer
-    const emailSent = await sendPaymentLinkEmail(customerEmail, {
+    const emailSent = await sendPaymentLinkEmail(customerEmail!, {
       customerName,
       trackingNumber: job.trackingNumber,
       paymentLink: paymentUrl,
@@ -2570,7 +2614,7 @@ export async function registerRoutes(
       // Email failed - notify admin
       await sendPaymentLinkFailureNotification({
         customerName,
-        customerEmail,
+        customerEmail: customerEmail!,
         trackingNumber: job.trackingNumber,
         amount: `£${parseFloat(job.totalPrice).toFixed(2)}`,
         paymentLink: paymentUrl,

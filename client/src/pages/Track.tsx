@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearch } from 'wouter';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   User,
   Phone,
   Loader2,
+  Radio,
 } from 'lucide-react';
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept.png';
@@ -62,6 +63,8 @@ interface MockJob {
   createdAt: string;
 }
 
+const REFRESH_INTERVAL = 10000; // Refresh every 10 seconds for live updates
+
 export default function Track() {
   const searchParams = useSearch();
   const params = new URLSearchParams(searchParams);
@@ -71,14 +74,20 @@ export default function Track() {
   const [isLoading, setIsLoading] = useState(false);
   const [job, setJob] = useState<MockJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLive, setIsLive] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const previousStatusRef = useRef<JobStatus | null>(null);
 
-  const fetchTrackingData = async (number: string) => {
+  const fetchTrackingData = useCallback(async (number: string, silent = false) => {
     if (!number.trim()) {
       setError('Please enter a tracking number');
       return;
     }
 
-    setIsLoading(true);
+    if (!silent) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -86,10 +95,18 @@ export default function Track() {
       
       if (response.ok) {
         const data = await response.json();
+        const newStatus = data.status as JobStatus;
+        
+        // Check if status changed (for live updates)
+        if (previousStatusRef.current && previousStatusRef.current !== newStatus) {
+          console.log('[Track] Status changed:', previousStatusRef.current, '->', newStatus);
+        }
+        previousStatusRef.current = newStatus;
+        
         setJob({
           id: data.id,
           trackingNumber: data.trackingNumber,
-          status: data.status,
+          status: newStatus,
           pickupAddress: `${data.pickupAddress}, ${data.pickupPostcode}`,
           deliveryAddress: `${data.deliveryAddress}, ${data.deliveryPostcode}`,
           driverName: data.driverName || undefined,
@@ -98,28 +115,70 @@ export default function Track() {
           estimatedDelivery: data.estimatedDeliveryTime ? new Date(data.estimatedDeliveryTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined,
           createdAt: data.createdAt,
         });
+        setLastUpdate(new Date());
         setError(null);
+        
+        // Stop polling if delivered or cancelled
+        if (newStatus === 'delivered' || newStatus === 'cancelled') {
+          setIsLive(false);
+          if (refreshIntervalRef.current) {
+            clearInterval(refreshIntervalRef.current);
+            refreshIntervalRef.current = null;
+          }
+        }
       } else {
         setError('Tracking number not found. Please check and try again.');
         setJob(null);
+        setIsLive(false);
       }
     } catch (err) {
       setError('Unable to fetch tracking information. Please try again.');
-      setJob(null);
+      if (!silent) {
+        setJob(null);
+      }
     }
 
-    setIsLoading(false);
-  };
+    if (!silent) {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const startLiveTracking = useCallback((number: string) => {
+    // Clear existing interval
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+    }
+    
+    setIsLive(true);
+    
+    // Set up polling interval
+    refreshIntervalRef.current = setInterval(() => {
+      fetchTrackingData(number, true);
+    }, REFRESH_INTERVAL);
+  }, [fetchTrackingData]);
 
   const handleTrack = () => {
-    fetchTrackingData(trackingNumber);
+    previousStatusRef.current = null;
+    fetchTrackingData(trackingNumber).then(() => {
+      startLiveTracking(trackingNumber);
+    });
   };
 
   useEffect(() => {
     if (initialId) {
-      fetchTrackingData(initialId);
+      previousStatusRef.current = null;
+      fetchTrackingData(initialId).then(() => {
+        startLiveTracking(initialId);
+      });
     }
-  }, [initialId]);
+    
+    // Cleanup on unmount
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [initialId, fetchTrackingData, startLiveTracking]);
 
   const currentStepIndex = job ? getStatusIndex(job.status) : -1;
 
@@ -169,10 +228,23 @@ export default function Track() {
                 <CardHeader className="pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                      <CardTitle className="text-lg">Tracking Number</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-lg">Tracking Number</CardTitle>
+                        {isLive && (
+                          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 gap-1" data-testid="badge-live">
+                            <Radio className="h-3 w-3 animate-pulse" />
+                            Live
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-2xl font-mono font-bold text-primary">
                         {job.trackingNumber}
                       </p>
+                      {lastUpdate && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Last updated: {lastUpdate.toLocaleTimeString('en-GB')}
+                        </p>
+                      )}
                     </div>
                     <Badge className={`${getStatusColor(job.status)} text-white`}>
                       {statusSteps.find((s) => s.status === job.status)?.label || job.status}

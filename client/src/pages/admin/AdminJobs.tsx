@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useJobUpdates } from '@/hooks/useJobUpdates';
 import {
   Table,
   TableBody,
@@ -132,6 +133,23 @@ export default function AdminJobs() {
   const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
     refetchInterval: 30000, // Poll every 30 seconds for new jobs
+  });
+
+  // Real-time job updates via WebSocket
+  const { isConnected: wsConnected } = useJobUpdates({
+    enabled: true,
+    onJobUpdate: (update) => {
+      console.log('[AdminJobs] Real-time job update:', update);
+      // TanStack Query cache is auto-invalidated by the hook
+    },
+    onJobCreated: (job) => {
+      console.log('[AdminJobs] Real-time new job:', job);
+      playAlert();
+      toast({
+        title: 'New Job Received!',
+        description: `Tracking: ${job.trackingNumber}`,
+      });
+    },
   });
 
   // Detect new jobs and play sound

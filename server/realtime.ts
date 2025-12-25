@@ -32,11 +32,20 @@ interface LocationUpdateMessage {
   };
 }
 
-interface SubscribeMessage {
+interface SubscribeDriversMessage {
   type: 'subscribe:drivers';
 }
 
-type IncomingMessage_WS = AuthMessage | LocationUpdateMessage | SubscribeMessage | { type: 'ping' };
+interface SubscribeJobsMessage {
+  type: 'subscribe:jobs';
+  payload?: {
+    customerId?: string;
+    jobId?: string;
+    trackingNumber?: string;
+  };
+}
+
+type IncomingMessage_WS = AuthMessage | LocationUpdateMessage | SubscribeDriversMessage | SubscribeJobsMessage | { type: 'ping' };
 
 interface OutgoingLocationMessage {
   type: 'driver:location';
@@ -63,24 +72,58 @@ interface ErrorMessage {
   payload: { message: string; code?: string };
 }
 
+interface JobStatusUpdateMessage {
+  type: 'job:status_update';
+  payload: {
+    jobId: string;
+    trackingNumber: string;
+    status: string;
+    previousStatus?: string;
+    customerId?: string;
+    driverId?: string | null;
+    updatedAt: string;
+  };
+}
+
+interface JobCreatedMessage {
+  type: 'job:created';
+  payload: {
+    jobId: string;
+    trackingNumber: string;
+    status: string;
+    customerId: string;
+    createdAt: string;
+  };
+}
+
 type OutgoingMessage = 
   | OutgoingLocationMessage 
   | BulkSnapshotMessage 
   | DriverOfflineMessage 
   | AuthSuccessMessage 
   | ErrorMessage
+  | JobStatusUpdateMessage
+  | JobCreatedMessage
   | { type: 'pong' };
+
+interface JobSubscription {
+  customerId?: string;
+  jobId?: string;
+  trackingNumber?: string;
+}
 
 interface AuthenticatedClient {
   ws: WebSocket;
   user: VerifiedUser;
   driverId?: string;
   isSubscribed: boolean;
+  jobSubscription?: JobSubscription;
   lastActivity: number;
 }
 
 const driverConnections = new Map<string, AuthenticatedClient>();
 const observerConnections = new Map<string, AuthenticatedClient>();
+const jobSubscribers = new Map<string, AuthenticatedClient>();
 const locationCache = new Map<string, DriverLocation>();
 const lastUpdateTime = new Map<string, number>();
 
@@ -141,6 +184,9 @@ export function setupRealtimeServer(server: Server): WebSocketServer {
           case 'subscribe:drivers':
             handleSubscribe(client);
             break;
+          case 'subscribe:jobs':
+            handleJobSubscribe(client, message, clientId);
+            break;
           default:
             sendMessage(ws, { type: 'error', payload: { message: 'Unknown message type', code: 'UNKNOWN_TYPE' } });
         }
@@ -159,6 +205,7 @@ export function setupRealtimeServer(server: Server): WebSocketServer {
           log(`Driver ${client.driverId} disconnected`, 'realtime');
         } else {
           observerConnections.delete(clientId);
+          jobSubscribers.delete(clientId);
           log(`Observer ${clientId} disconnected`, 'realtime');
         }
       }
@@ -357,6 +404,111 @@ function handleSubscribe(client: AuthenticatedClient): void {
   sendMessage(client.ws, { type: 'driver:bulk_snapshot', payload: snapshot });
   
   log(`Client subscribed to driver locations, sent ${snapshot.length} cached locations`, 'realtime');
+}
+
+function handleJobSubscribe(client: AuthenticatedClient, message: SubscribeJobsMessage, clientId: string): void {
+  const subscription: JobSubscription = message.payload || {};
+  
+  if (client.user.role === 'customer') {
+    subscription.customerId = client.user.id;
+  }
+  
+  client.jobSubscription = subscription;
+  client.isSubscribed = true; // Mark as subscribed so broadcasts reach this client
+  jobSubscribers.set(clientId, client);
+  
+  log(`Client ${clientId} subscribed to job updates (customerId: ${subscription.customerId || 'all'}, jobId: ${subscription.jobId || 'all'})`, 'realtime');
+}
+
+export function broadcastJobUpdate(job: {
+  id: string;
+  trackingNumber: string;
+  status: string;
+  previousStatus?: string;
+  customerId: string;
+  driverId?: string | null;
+  updatedAt?: Date | null;
+}): void {
+  const message: JobStatusUpdateMessage = {
+    type: 'job:status_update',
+    payload: {
+      jobId: job.id,
+      trackingNumber: job.trackingNumber,
+      status: job.status,
+      previousStatus: job.previousStatus,
+      customerId: job.customerId,
+      driverId: job.driverId,
+      updatedAt: job.updatedAt?.toISOString() || new Date().toISOString(),
+    },
+  };
+
+  let sentCount = 0;
+
+  jobSubscribers.forEach((client) => {
+    if (client.ws.readyState !== WebSocket.OPEN) return;
+    
+    const sub = client.jobSubscription;
+    if (!sub) return;
+    
+    const isAdmin = ['admin', 'dispatcher'].includes(client.user.role);
+    const matchesCustomer = sub.customerId && sub.customerId === job.customerId;
+    const matchesJob = sub.jobId && sub.jobId === job.id;
+    const matchesTracking = sub.trackingNumber && sub.trackingNumber === job.trackingNumber;
+    
+    if (isAdmin || matchesCustomer || matchesJob || matchesTracking) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+  
+  observerConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  log(`Broadcasted job status update for ${job.id} (${job.status}) to ${sentCount} clients`, 'realtime');
+}
+
+export function broadcastJobCreated(job: {
+  id: string;
+  trackingNumber: string;
+  status: string;
+  customerId: string;
+  createdAt?: Date | null;
+}): void {
+  const message: JobCreatedMessage = {
+    type: 'job:created',
+    payload: {
+      jobId: job.id,
+      trackingNumber: job.trackingNumber,
+      status: job.status,
+      customerId: job.customerId,
+      createdAt: job.createdAt?.toISOString() || new Date().toISOString(),
+    },
+  };
+
+  observerConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+      sendMessage(client.ws, message);
+    }
+  });
+
+  jobSubscribers.forEach((client) => {
+    if (client.ws.readyState !== WebSocket.OPEN) return;
+    const sub = client.jobSubscription;
+    if (!sub) return;
+    
+    const isAdmin = ['admin', 'dispatcher'].includes(client.user.role);
+    const matchesCustomer = sub.customerId && sub.customerId === job.customerId;
+    
+    if (isAdmin || matchesCustomer) {
+      sendMessage(client.ws, message);
+    }
+  });
+
+  log(`Broadcasted job created for ${job.id}`, 'realtime');
 }
 
 function broadcastLocation(location: DriverLocation): void {
