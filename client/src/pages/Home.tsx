@@ -194,6 +194,29 @@ export default function Home() {
         </div>
       </SmoothBackground>
 
+      {/* Promotional Banner */}
+      <section className="bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 py-4">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-white text-center">
+            <div className="flex items-center gap-2">
+              <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">NEW</span>
+              <span className="font-medium">Create your account and enjoy <strong className="text-yellow-300">20% OFF</strong> at checkout for your first 3 bookings!</span>
+            </div>
+            <Link href="/signup">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="bg-white text-blue-600 border-white hover:bg-white/90 font-semibold"
+                data-testid="promo-signup-button"
+              >
+                Sign Up Now
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="py-16 bg-card border-y border-border">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center mb-8">
