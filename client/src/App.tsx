@@ -47,6 +47,7 @@ import Quote from "@/pages/Quote";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import PaymentLink, { PaymentLinkSuccess } from "@/pages/PaymentLink";
+import Support from "@/pages/Support";
 
 import {
   SameDayService,
@@ -94,6 +95,7 @@ function Router() {
       <Route path="/track" component={Track} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
+      <Route path="/support" component={Support} />
       
       <Route path="/login">
         <PublicOnlyRoute>

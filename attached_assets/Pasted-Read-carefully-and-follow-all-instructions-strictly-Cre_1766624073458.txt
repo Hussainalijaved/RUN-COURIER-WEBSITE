@@ -1,0 +1,136 @@
+Read carefully and follow all instructions strictly.
+
+Create a professional “Support & Help Centre” page for a same-day courier company called Run Courier.
+
+This page must look and feel like a large, established logistics company (clean, confident, corporate tone).
+
+The goal of this page is to help customers with bookings, payments, tracking, invoices, and delivery issues, not marketing or sales.
+
+Branding & Style
+
+Clean, modern, professional layout
+
+Light blue / blue colour theme
+
+Clear spacing, readable typography
+
+Mobile-responsive
+
+Calm and trustworthy tone
+
+No sales language, no promotions
+
+Page Structure (REQUIRED)
+1. Page Header
+
+Title:
+Support & Help Centre
+
+Subtitle:
+We’re here to help with bookings, payments, tracking, and delivery support.
+
+2. Quick Support Actions (Buttons or Cards)
+
+Add four clearly visible action blocks:
+
+Track a Delivery
+
+Payment & Invoice Support
+
+Delivery Issues
+
+Contact Support
+
+Each should look clickable and professional.
+
+3. Support Contact Information (Very Important)
+
+Create a highlighted support contact section:
+
+Run Courier Support
+
+Email: support@runcourier.co.uk
+
+Phone: +44 7311 121217
+
+Support hours: Monday – Sunday, 7:00 AM – 10:00 PM
+
+Add a short note explaining that urgent matters should be handled by phone.
+
+4. Support Request Form
+
+Create a clean, professional support form with the following fields:
+
+Full Name
+
+Email Address
+
+Phone Number (optional)
+
+Booking / Tracking Number
+
+Issue Type (dropdown):
+
+Payment issue
+
+Delivery delay
+
+Tracking issue
+
+Invoice request
+
+Other
+
+Message / Description
+
+Submit button text:
+Submit Support Request
+
+Add a short confirmation note below the form:
+Our support team will respond as soon as possible.
+
+5. Frequently Asked Questions (FAQ)
+
+Add a professional FAQ section with real operational questions:
+
+How do I track my delivery?
+Customers receive tracking updates once the booking is confirmed.
+
+My payment was successful. What happens next?
+Your booking is confirmed and a driver will be assigned shortly.
+
+Can I receive an invoice?
+Yes, invoices are sent by email or can be requested from support.
+
+What should I do if my delivery is delayed?
+Contact support with your booking number for immediate assistance.
+
+6. Business & Account Support
+
+Add a small professional section for business clients:
+
+Business Support
+For account setup, weekly invoicing, or contract deliveries, please contact our support team at
+support@runcourier.co.uk
+
+7. Final Notes
+
+Do NOT include pricing tables
+
+Do NOT include marketing slogans
+
+Do NOT include driver recruitment
+
+This page must feel corporate, reliable, and enterprise-ready
+
+The final result should look suitable for:
+
+Business customers
+
+Stripe payments
+
+Google Ads traffic
+
+App Store / Play Store review
+
+End result: a fully professional support page for a large courier company.
