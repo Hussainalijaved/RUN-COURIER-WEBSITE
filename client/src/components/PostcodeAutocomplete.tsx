@@ -22,6 +22,7 @@ export function PostcodeAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [predictions, setPredictions] = useState<Array<{ description: string; placeId: string }>>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const justSelectedRef = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -35,6 +36,11 @@ export function PostcodeAutocomplete({
   }, []);
 
   useEffect(() => {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+
     const fetchPredictions = async () => {
       if (value.length < 2) {
         setPredictions([]);
@@ -61,6 +67,7 @@ export function PostcodeAutocomplete({
   }, [value]);
 
   const handleSelect = (prediction: { description: string; placeId: string }) => {
+    justSelectedRef.current = true;
     const postcodeMatch = prediction.description.match(/[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}/i);
     const postcode = postcodeMatch ? postcodeMatch[0].toUpperCase().replace(/\s+/g, ' ') : prediction.description;
     onChange(postcode, prediction.description);
