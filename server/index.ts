@@ -52,11 +52,30 @@ declare module "http" {
   }
 }
 
+function getConnectionString(): string | null {
+  // First try DATABASE_URL if it looks like a valid postgres connection string
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
+    return process.env.DATABASE_URL;
+  }
+  
+  // Fall back to individual PG* variables
+  if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
+    const host = process.env.PGHOST;
+    const port = process.env.PGPORT || '5432';
+    const user = process.env.PGUSER;
+    const password = process.env.PGPASSWORD;
+    const database = process.env.PGDATABASE;
+    return `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
+  }
+  
+  return null;
+}
+
 async function initStripe() {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = getConnectionString();
 
   if (!databaseUrl) {
-    console.warn('DATABASE_URL not found - Stripe integration will be disabled');
+    console.warn('Database not configured - Stripe integration will be disabled');
     return;
   }
 
