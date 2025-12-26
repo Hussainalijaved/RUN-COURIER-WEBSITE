@@ -11,7 +11,7 @@ import { setupRealtimeServer, hydrateLocationCache } from './realtime';
 
 const app = express();
 
-// CRITICAL: CORS middleware that applies to ALL responses
+// CRITICAL: CORS middleware that applies to ALL responses - must be FIRST
 app.use((req, res, next) => {
   const allowedOrigins = [
     'https://runcourier.co.uk',
@@ -22,22 +22,25 @@ app.use((req, res, next) => {
   
   const origin = req.headers.origin;
   
-  // Allow specific origins or echo back the origin if it's in the allowed list
-  if (origin && allowedOrigins.some(allowed => origin.startsWith(allowed.replace('www.', '')) || origin === allowed)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else if (origin) {
-    // For Replit preview URLs
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  // Always set CORS headers for all origins (frontend on Hostinger, Replit preview, localhost)
+  if (origin) {
+    if (allowedOrigins.includes(origin) || origin.includes('.replit.dev') || origin.includes('.replit.app')) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      // Allow all origins for now to debug CORS issues
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
   }
   
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
   
-  // Handle preflight OPTIONS requests
+  // Handle preflight OPTIONS requests immediately - don't continue to other middleware
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
   
   next();
