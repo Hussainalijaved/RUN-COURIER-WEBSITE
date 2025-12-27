@@ -215,19 +215,43 @@ export default function DriverApplication() {
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
       case 1:
-        const step1Fields: (keyof DriverApplicationFormValues)[] = ["fullName", "email", "phone", "postcode", "fullAddress", "nationality", "isBritish", "nationalInsuranceNumber"];
+        const step1Fields: (keyof DriverApplicationFormValues)[] = ["fullName", "email", "phone", "postcode", "fullAddress", "nationality", "nationalInsuranceNumber"];
+        
+        const isStep1Valid = await form.trigger(step1Fields);
+        
+        if (!isStep1Valid) {
+          const errors = form.formState.errors;
+          const errorMessages: string[] = [];
+          if (errors.fullName) errorMessages.push("Full Name");
+          if (errors.email) errorMessages.push("Email");
+          if (errors.phone) errorMessages.push("Phone Number");
+          if (errors.postcode) errorMessages.push("Postcode");
+          if (errors.fullAddress) errorMessages.push("Full Address");
+          if (errors.nationality) errorMessages.push("Nationality");
+          if (errors.nationalInsuranceNumber) errorMessages.push("National Insurance Number");
+          
+          if (errorMessages.length > 0) {
+            toast({
+              title: "Please complete required fields",
+              description: `Missing or invalid: ${errorMessages.join(", ")}`,
+              variant: "destructive",
+            });
+          }
+          return false;
+        }
+        
         if (!isBritish) {
           const shareCode = form.getValues("rightToWorkShareCode");
           if (!shareCode || shareCode.trim().length < 9) {
             toast({
               title: "Right to Work Share Code required",
-              description: "Please enter your UK Right to Work Share Code.",
+              description: "Non-British citizens must provide a valid UK Right to Work Share Code (at least 9 characters).",
               variant: "destructive",
             });
             return false;
           }
         }
-        return form.trigger(step1Fields);
+        return true;
       case 2:
         if (!uploadedFiles.drivingLicenceFront || !uploadedFiles.drivingLicenceBack) {
           toast({
