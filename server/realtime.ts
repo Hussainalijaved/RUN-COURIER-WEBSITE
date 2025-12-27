@@ -454,8 +454,10 @@ export function broadcastJobUpdate(job: {
     const matchesCustomer = sub.customerId && sub.customerId === job.customerId;
     const matchesJob = sub.jobId && sub.jobId === job.id;
     const matchesTracking = sub.trackingNumber && sub.trackingNumber === job.trackingNumber;
+    // Drivers receive updates for jobs assigned to them
+    const isDriverForJob = client.user.role === 'driver' && job.driverId && client.driverId === job.driverId;
     
-    if (isAdmin || matchesCustomer || matchesJob || matchesTracking) {
+    if (isAdmin || matchesCustomer || matchesJob || matchesTracking || isDriverForJob) {
       sendMessage(client.ws, message);
       sentCount++;
     }

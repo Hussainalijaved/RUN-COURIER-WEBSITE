@@ -27,6 +27,24 @@ const VALID_JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 
 export function registerMobileRoutes(app: Express): void {
   
+  // Health check endpoint - no auth required
+  app.get("/api/mobile/v1/health", (req, res) => {
+    res.json({
+      status: "ok",
+      version: "1.0.0",
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        auth: "/api/mobile/v1/debug/auth",
+        profile: "/api/mobile/v1/driver/profile",
+        jobs: "/api/mobile/v1/driver/jobs",
+        jobOffers: "/api/mobile/v1/driver/job-offers",
+        location: "/api/mobile/v1/driver/location",
+        availability: "/api/mobile/v1/driver/availability",
+        websocket: "/ws/realtime"
+      }
+    });
+  });
+
   // Debug endpoint to check auth and driver lookup
   app.get("/api/mobile/v1/debug/auth",
     requireSupabaseAuth,
