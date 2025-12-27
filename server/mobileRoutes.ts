@@ -36,17 +36,58 @@ export function registerMobileRoutes(app: Express): void {
       console.log("[Mobile Debug] Auth user email:", authUser.email);
       console.log("[Mobile Debug] Auth user role:", authUser.role);
       
-      // Try to find driver by the auth ID
-      const memoryDriver = await storage.getDriver(authUser.id);
-      const dbDrivers = await db.select().from(jobsTable).where(eq(jobsTable.driverId, authUser.id));
+      // Try to find driver by the auth ID directly
+      const memoryDriverById = await storage.getDriver(authUser.id);
+      // Try to find driver by userId
+      const memoryDriverByUserId = await storage.getDriverByUserId(authUser.id);
+      const driver = memoryDriverById || memoryDriverByUserId;
+      
+      // Get jobs for this driver
+      let jobCount = 0;
+      let jobs: any[] = [];
+      if (driver) {
+        const memoryJobs = await storage.getJobs({ driverId: driver.id });
+        const dbJobs = await db.select().from(jobsTable).where(eq(jobsTable.driverId, driver.id));
+        // Merge
+        const jobMap = new Map<string, any>();
+        memoryJobs.forEach(j => jobMap.set(j.id, j));
+        dbJobs.forEach(j => jobMap.set(j.id, j));
+        jobs = Array.from(jobMap.values());
+        jobCount = jobs.length;
+      }
       
       res.json({
         authUserId: authUser.id,
         authEmail: authUser.email,
         authRole: authUser.role,
-        driverFoundInMemory: !!memoryDriver,
-        jobsInDatabase: dbDrivers.length,
-        message: memoryDriver ? "Driver found!" : "Driver NOT found - ID mismatch"
+        driverFoundById: !!memoryDriverById,
+        driverFoundByUserId: !!memoryDriverByUserId,
+        driverId: driver?.id || null,
+        driverCode: driver?.driverCode || null,
+        isVerified: driver?.isVerified || false,
+        isActive: driver?.isActive !== false,
+        jobCount,
+        jobs: jobs.map(j => ({ id: j.id, trackingNumber: j.trackingNumber, status: j.status, driverId: j.driverId })),
+        message: driver ? `Driver found! ID: ${driver.id}, Code: ${driver.driverCode}` : "Driver NOT found"
+      });
+    })
+  );
+
+  // Debug endpoint to list all drivers (admin use only - for debugging)
+  app.get("/api/mobile/v1/debug/drivers",
+    asyncHandler(async (req, res) => {
+      const allDrivers = await storage.getDrivers({ includeInactive: true });
+      res.json({
+        count: allDrivers.length,
+        drivers: allDrivers.map(d => ({
+          id: d.id,
+          userId: d.userId,
+          driverCode: d.driverCode,
+          fullName: d.fullName,
+          email: d.email,
+          isVerified: d.isVerified,
+          isActive: d.isActive !== false
+        }))
       });
     })
   );
