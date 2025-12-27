@@ -2456,9 +2456,14 @@ export async function registerRoutes(
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     });
 
-    // Automatically update job status to "assigned" when assignment is created
-    await storage.updateJobStatus(jobId, "assigned" as any);
-    console.log(`[Job Assignment] Job ${jobId} status updated to 'assigned'`);
+    // Automatically update job status to "assigned" AND set the driverId when assignment is created
+    // This ensures the job appears in the driver's mobile app immediately
+    await storage.updateJob(jobId, {
+      status: "assigned" as any,
+      driverId: driverId,
+      driverPrice: driverPrice
+    });
+    console.log(`[Job Assignment] Job ${jobId} assigned to driver ${driverId} with price £${driverPrice}`);
 
     // Create notification for driver
     await storage.createNotification({
