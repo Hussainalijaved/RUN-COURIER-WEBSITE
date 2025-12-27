@@ -268,15 +268,15 @@ export class MemStorage implements IStorage {
     this.users.set(adminUser.id, adminUser);
 
     const drivers = [
-      { id: "driver-1", userId: "user-d1", name: "John Smith", code: "JS01", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278" },
-      { id: "driver-2", userId: "user-d2", name: "Sarah Wilson", code: "SW02", vehicle: "small_van" as VehicleType, lat: "51.5155", lng: "-0.1420" },
-      { id: "driver-3", userId: "user-d3", name: "Mike Johnson", code: "MJ03", vehicle: "motorbike" as VehicleType, lat: "51.4995", lng: "-0.1248" },
-      { id: "driver-4", userId: "user-d4", name: "Emma Brown", code: "EB04", vehicle: "medium_van" as VehicleType, lat: "51.5225", lng: "-0.0800" },
-      { id: "driver-5", userId: "user-d5", name: "Rachel Davies", code: "RD05", vehicle: "car" as VehicleType, lat: "51.5100", lng: "-0.1150" },
-      { id: "driver-test", userId: "user-test-driver", name: "Test Driver", code: "TEST01", vehicle: "car" as VehicleType, lat: "51.5200", lng: "-0.1200" },
-      { id: "87c8dcf9-2259-43e5-8219-e0a7e8307962", userId: "87c8dcf9-2259-43e5-8219-e0a7e8307962", name: "RC02C Test Driver", code: "RC02C", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "driver@test.com" },
-      { id: "0016f858-af9d-4dbb-a554-1db66cd994c9", userId: "0016f858-af9d-4dbb-a554-1db66cd994c9", name: "Almashriqi Amen", code: "RC18C", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "amenanwar20@yahoo.com" },
-      { id: "7a81c672-c0e0-438d-a718-9c26974ef819", userId: "7a81c672-c0e0-438d-a718-9c26974ef819", name: "ANWAR ALMASHRIQI", code: "RC02A", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "almashriqiuk@gmail.com" },
+      { id: "driver-1", userId: "user-d1", name: "John Smith", code: "JS01", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", rating: "4.99", totalJobs: 458 },
+      { id: "driver-2", userId: "user-d2", name: "Sarah Wilson", code: "SW02", vehicle: "small_van" as VehicleType, lat: "51.5155", lng: "-0.1420", rating: "4.89", totalJobs: 492 },
+      { id: "driver-3", userId: "user-d3", name: "Mike Johnson", code: "MJ03", vehicle: "motorbike" as VehicleType, lat: "51.4995", lng: "-0.1248", rating: "4.81", totalJobs: 386 },
+      { id: "driver-4", userId: "user-d4", name: "Emma Brown", code: "EB04", vehicle: "medium_van" as VehicleType, lat: "51.5225", lng: "-0.0800", rating: "4.69", totalJobs: 267 },
+      { id: "driver-5", userId: "user-d5", name: "Rachel Davies", code: "RD05", vehicle: "car" as VehicleType, lat: "51.5100", lng: "-0.1150", rating: "4.64", totalJobs: 210 },
+      { id: "driver-test", userId: "user-test-driver", name: "Test Driver", code: "TEST01", vehicle: "car" as VehicleType, lat: "51.5200", lng: "-0.1200", rating: "4.96", totalJobs: 492 },
+      { id: "87c8dcf9-2259-43e5-8219-e0a7e8307962", userId: "87c8dcf9-2259-43e5-8219-e0a7e8307962", name: "RC02C Test Driver", code: "RC02C", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "driver@test.com", rating: "4.56", totalJobs: 417 },
+      { id: "0016f858-af9d-4dbb-a554-1db66cd994c9", userId: "0016f858-af9d-4dbb-a554-1db66cd994c9", name: "Almashriqi Amen", code: "RC18C", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "amenanwar20@yahoo.com", rating: "4.97", totalJobs: 487 },
+      { id: "7a81c672-c0e0-438d-a718-9c26974ef819", userId: "7a81c672-c0e0-438d-a718-9c26974ef819", name: "ANWAR ALMASHRIQI", code: "RC02A", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "almashriqiuk@gmail.com", rating: "4.62", totalJobs: 543 },
     ];
 
     drivers.forEach((d, i) => {
@@ -331,8 +331,8 @@ export class MemStorage implements IStorage {
         currentLatitude: d.lat,
         currentLongitude: d.lng,
         lastLocationUpdate: new Date(),
-        rating: (4.5 + Math.random() * 0.5).toFixed(2),
-        totalJobs: Math.floor(Math.random() * 500) + 50,
+        rating: (d as any).rating || "4.50",
+        totalJobs: (d as any).totalJobs || 100,
         profilePictureUrl: null,
         isActive: true,
         deactivatedAt: null,
