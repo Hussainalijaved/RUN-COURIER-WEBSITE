@@ -554,4 +554,181 @@ export function registerMobileRoutes(app: Express): void {
       });
     })
   );
+
+  // ============= JOB OFFERS (Admin Assignments) =============
+  // Get pending job offers for this driver
+  app.get("/api/mobile/v1/driver/job-offers",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      
+      // Get all pending/sent job assignments for this driver
+      const assignments = await storage.getJobAssignments({ 
+        driverId: driver.id,
+        status: "sent" // Only show sent offers (pending means admin hasn't sent yet)
+      });
+      
+      // Also get "pending" status assignments that are ready to be viewed
+      const pendingAssignments = await storage.getJobAssignments({ 
+        driverId: driver.id,
+        status: "pending"
+      });
+      
+      const allAssignments = [...assignments, ...pendingAssignments];
+      
+      // Enrich with job details
+      const enrichedOffers = await Promise.all(
+        allAssignments.map(async (assignment) => {
+          const job = await storage.getJob(assignment.jobId);
+          return {
+            id: assignment.id,
+            jobId: assignment.jobId,
+            status: assignment.status,
+            driverPrice: assignment.driverPrice,
+            expiresAt: assignment.expiresAt,
+            createdAt: assignment.createdAt,
+            job: job ? {
+              id: job.id,
+              trackingNumber: job.trackingNumber,
+              vehicleType: job.vehicleType,
+              pickupAddress: job.pickupAddress,
+              pickupPostcode: job.pickupPostcode,
+              deliveryAddress: job.deliveryAddress,
+              deliveryPostcode: job.deliveryPostcode,
+              recipientName: job.recipientName,
+              recipientPhone: job.recipientPhone,
+              weight: job.weight,
+              distance: job.distance,
+              isMultiDrop: job.isMultiDrop,
+              isReturnTrip: job.isReturnTrip,
+              totalPrice: job.totalPrice,
+              pickupInstructions: job.pickupInstructions,
+              deliveryInstructions: job.deliveryInstructions,
+            } : null
+          };
+        })
+      );
+      
+      res.json({
+        success: true,
+        offers: enrichedOffers.filter(o => o.job !== null),
+        count: enrichedOffers.filter(o => o.job !== null).length
+      });
+    })
+  );
+
+  // Accept a job offer
+  app.post("/api/mobile/v1/driver/job-offers/:id/accept",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const assignmentId = req.params.id;
+      
+      const assignment = await storage.getJobAssignment(assignmentId);
+      
+      if (!assignment) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Job offer not found" 
+        });
+      }
+      
+      if (assignment.driverId !== driver.id) {
+        return res.status(403).json({ 
+          success: false, 
+          error: "This job offer is not for you" 
+        });
+      }
+      
+      if (assignment.status !== "sent" && assignment.status !== "pending") {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Cannot accept offer with status: ${assignment.status}` 
+        });
+      }
+      
+      // Check if expired
+      if (assignment.expiresAt && new Date(assignment.expiresAt) < new Date()) {
+        await storage.updateJobAssignment(assignmentId, { status: "expired" });
+        return res.status(400).json({ 
+          success: false, 
+          error: "This job offer has expired" 
+        });
+      }
+      
+      // Accept the assignment
+      await storage.updateJobAssignment(assignmentId, { 
+        status: "accepted" as any,
+        respondedAt: new Date()
+      });
+      
+      // Update the job to assign this driver
+      const job = await storage.getJob(assignment.jobId);
+      if (job) {
+        await storage.updateJob(assignment.jobId, { 
+          driverId: driver.id,
+          status: "accepted",
+          driverPrice: assignment.driverPrice
+        });
+        
+        console.log(`[Mobile] Driver ${driver.driverCode} accepted job ${job.trackingNumber}`);
+      }
+      
+      res.json({
+        success: true,
+        message: "Job offer accepted successfully",
+        jobId: assignment.jobId
+      });
+    })
+  );
+
+  // Reject a job offer
+  app.post("/api/mobile/v1/driver/job-offers/:id/reject",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const assignmentId = req.params.id;
+      const { reason } = req.body;
+      
+      const assignment = await storage.getJobAssignment(assignmentId);
+      
+      if (!assignment) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Job offer not found" 
+        });
+      }
+      
+      if (assignment.driverId !== driver.id) {
+        return res.status(403).json({ 
+          success: false, 
+          error: "This job offer is not for you" 
+        });
+      }
+      
+      if (assignment.status !== "sent" && assignment.status !== "pending") {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Cannot reject offer with status: ${assignment.status}` 
+        });
+      }
+      
+      // Reject the assignment
+      await storage.updateJobAssignment(assignmentId, { 
+        status: "rejected" as any,
+        respondedAt: new Date(),
+        rejectionReason: reason || null
+      });
+      
+      console.log(`[Mobile] Driver ${driver.driverCode} rejected job offer ${assignmentId}`);
+      
+      res.json({
+        success: true,
+        message: "Job offer rejected"
+      });
+    })
+  );
 }

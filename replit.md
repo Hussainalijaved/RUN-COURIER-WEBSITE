@@ -38,6 +38,13 @@ A multi-step application process allows prospective drivers to submit personal d
 ### Mobile API (Driver App)
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities, including profile management, location updates, availability toggling, job retrieval, job status updates, and proof of delivery uploads, all authenticated with a Supabase JWT token.
 
+**Mobile Job Offers Endpoints** (Admin-to-Driver Job Assignment Sync):
+- `GET /api/mobile/v1/driver/job-offers` - Get pending job offers for the driver
+- `POST /api/mobile/v1/driver/job-offers/:id/accept` - Accept a job offer
+- `POST /api/mobile/v1/driver/job-offers/:id/reject` - Reject a job offer (with optional reason)
+
+When admin assigns a job via web interface, the driver receives it in their mobile app's job offers list and can accept or reject it.
+
 ### Pay Later Feature & Business Customer Invoices
 Approved business customers can use a "Pay Later" option for bookings, bypassing immediate payment for weekly invoicing. An "Invoices" section (`/customer/invoices`) provides invoice history, status tracking, dashboard stats, detailed invoice views, and PDF download/print options.
 
