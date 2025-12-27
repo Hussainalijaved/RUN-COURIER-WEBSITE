@@ -275,6 +275,8 @@ export class MemStorage implements IStorage {
       { id: "driver-5", userId: "user-d5", name: "Rachel Davies", code: "RD05", vehicle: "car" as VehicleType, lat: "51.5100", lng: "-0.1150" },
       { id: "driver-test", userId: "user-test-driver", name: "Test Driver", code: "TEST01", vehicle: "car" as VehicleType, lat: "51.5200", lng: "-0.1200" },
       { id: "87c8dcf9-2259-43e5-8219-e0a7e8307962", userId: "87c8dcf9-2259-43e5-8219-e0a7e8307962", name: "RC02C Test Driver", code: "RC02C", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "driver@test.com" },
+      { id: "0016f858-af9d-4dbb-a554-1db66cd994c9", userId: "0016f858-af9d-4dbb-a554-1db66cd994c9", name: "Almashriqi Amen", code: "RC18C", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "amenanwar20@yahoo.com" },
+      { id: "7a81c672-c0e0-438d-a718-9c26974ef819", userId: "7a81c672-c0e0-438d-a718-9c26974ef819", name: "ANWAR ALMASHRIQI", code: "RC02A", vehicle: "car" as VehicleType, lat: "51.5074", lng: "-0.1278", email: "almashriqiuk@gmail.com" },
     ];
 
     drivers.forEach((d, i) => {
@@ -349,12 +351,14 @@ export class MemStorage implements IStorage {
         { type: "hire_reward", name: "Hire_Reward_Policy.pdf" },
       ];
 
-      // First driver has all approved docs, second has mix, third has pending, fourth has rejected, fifth has all approved, sixth (test) has all approved, seventh (RC02C) has all approved
+      // First driver has all approved docs, second has mix, third has pending, fourth has rejected, fifth has all approved, sixth (test) has all approved, seventh-ninth (RC02C, RC18C, RC02A) have all approved
       const docStatuses: DocumentStatus[][] = [
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "pending", "approved", "pending", "pending", "pending"],
         ["pending", "pending", "pending", "pending", "pending", "pending", "pending"],
         ["approved", "approved", "rejected", "approved", "pending", "rejected", "pending"],
+        ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
+        ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
         ["approved", "approved", "approved", "approved", "approved", "approved", "approved"],
