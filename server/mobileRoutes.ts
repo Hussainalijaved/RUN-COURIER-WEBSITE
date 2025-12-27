@@ -27,6 +27,16 @@ const VALID_JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 
 export function registerMobileRoutes(app: Express): void {
   
+  // Logging middleware for all mobile API calls
+  app.use("/api/mobile", (req, res, next) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[Mobile API] ${timestamp} ${req.method} ${req.path} from ${req.ip || req.headers['x-forwarded-for'] || 'unknown'}`);
+    if (req.headers.authorization) {
+      console.log(`[Mobile API] Auth header present: ${req.headers.authorization.substring(0, 20)}...`);
+    }
+    next();
+  });
+  
   // Health check endpoint - no auth required
   app.get("/api/mobile/v1/health", (req, res) => {
     res.json({

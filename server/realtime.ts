@@ -96,6 +96,21 @@ interface JobCreatedMessage {
   };
 }
 
+interface JobAssignedMessage {
+  type: 'job:assigned';
+  payload: {
+    jobId: string;
+    trackingNumber: string;
+    status: string;
+    driverId: string;
+    pickupAddress?: string;
+    deliveryAddress?: string;
+    vehicleType?: string;
+    driverPrice?: string | null;
+    assignedAt: string;
+  };
+}
+
 type OutgoingMessage = 
   | OutgoingLocationMessage 
   | BulkSnapshotMessage 
@@ -104,6 +119,7 @@ type OutgoingMessage =
   | ErrorMessage
   | JobStatusUpdateMessage
   | JobCreatedMessage
+  | JobAssignedMessage
   | { type: 'pong' };
 
 interface JobSubscription {
@@ -511,6 +527,61 @@ export function broadcastJobCreated(job: {
   });
 
   log(`Broadcasted job created for ${job.id}`, 'realtime');
+}
+
+export function broadcastJobAssigned(job: {
+  id: string;
+  trackingNumber: string;
+  status: string;
+  driverId: string;
+  pickupAddress?: string;
+  deliveryAddress?: string;
+  vehicleType?: string;
+  driverPrice?: string | null;
+}): void {
+  const message: JobAssignedMessage = {
+    type: 'job:assigned',
+    payload: {
+      jobId: job.id,
+      trackingNumber: job.trackingNumber,
+      status: job.status,
+      driverId: job.driverId,
+      pickupAddress: job.pickupAddress,
+      deliveryAddress: job.deliveryAddress,
+      vehicleType: job.vehicleType,
+      driverPrice: job.driverPrice,
+      assignedAt: new Date().toISOString(),
+    },
+  };
+
+  let sentCount = 0;
+
+  // Send to all connected drivers that match this driverId
+  driverConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && client.driverId === job.driverId) {
+      sendMessage(client.ws, message);
+      sentCount++;
+      log(`Sent job assignment notification to driver ${job.driverId}`, 'realtime');
+    }
+  });
+
+  // Also send to job subscribers who are this driver
+  jobSubscribers.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && client.driverId === job.driverId) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  // Send to admins/dispatchers for monitoring
+  observerConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  log(`Broadcasted job assignment for ${job.id} to driver ${job.driverId} (${sentCount} clients)`, 'realtime');
 }
 
 function broadcastLocation(location: DriverLocation): void {

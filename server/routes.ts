@@ -24,7 +24,7 @@ import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClie
 import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification } from "./emailService";
 import { createHash, randomBytes } from "crypto";
-import { broadcastJobUpdate, broadcastJobCreated } from "./realtime";
+import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned } from "./realtime";
 
 // Server-side pricing configuration - SINGLE SOURCE OF TRUTH
 // This must match the client-side config in client/src/lib/pricing.ts
@@ -231,6 +231,20 @@ export async function registerRoutes(
       customerId: job.customerId,
       createdAt: job.createdAt,
     });
+    // If job is created with a driver already assigned, notify the driver
+    if (job.driverId) {
+      broadcastJobAssigned({
+        id: job.id,
+        trackingNumber: job.trackingNumber,
+        status: job.status,
+        driverId: job.driverId,
+        pickupAddress: job.pickupAddress,
+        deliveryAddress: job.deliveryAddress,
+        vehicleType: job.vehicleType,
+        driverPrice: job.driverPrice,
+      });
+      console.log(`[Jobs] New job ${job.id} created and assigned to driver ${job.driverId}`);
+    }
     // Send admin notification
     await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send job notification:', err));
     // Send customer confirmation if email available
@@ -311,6 +325,20 @@ export async function registerRoutes(
       driverId: job.driverId,
       updatedAt: job.updatedAt,
     });
+    // Send specific notification to the assigned driver
+    if (job.driverId) {
+      broadcastJobAssigned({
+        id: job.id,
+        trackingNumber: job.trackingNumber,
+        status: job.status,
+        driverId: job.driverId,
+        pickupAddress: job.pickupAddress,
+        deliveryAddress: job.deliveryAddress,
+        vehicleType: job.vehicleType,
+        driverPrice: job.driverPrice,
+      });
+      console.log(`[Jobs] Job ${job.id} assigned to driver ${job.driverId}, notification sent`);
+    }
     res.json(job);
   }));
 
