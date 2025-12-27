@@ -942,6 +942,16 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
+  async deleteDriver(id: string): Promise<boolean> {
+    const driver = this.drivers.get(id);
+    if (driver) {
+      this.drivers.delete(id);
+      console.log(`[Storage] Permanently deleted driver ${id}`);
+      return true;
+    }
+    return false;
+  }
+
   async getJob(id: string): Promise<Job | undefined> {
     return this.jobs.get(id);
   }

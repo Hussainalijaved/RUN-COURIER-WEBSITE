@@ -134,6 +134,8 @@ export default function AdminDrivers() {
   const [uploadingDbs, setUploadingDbs] = useState(false);
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
   const [driverToDeactivate, setDriverToDeactivate] = useState<Driver | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [showInactive, setShowInactive] = useState(true);
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -241,6 +243,28 @@ export default function AdminDrivers() {
     },
     onError: (error: Error) => {
       toast({ title: error.message || 'Failed to reactivate driver', variant: 'destructive' });
+    },
+  });
+
+  const deleteDriverMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/drivers/${id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete driver');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/drivers' });
+      toast({ title: 'Driver deleted permanently' });
+      setDeleteDialogOpen(false);
+      setDriverToDelete(null);
+      setProfileDialogOpen(false);
+      setSelectedDriver(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || 'Failed to delete driver', variant: 'destructive' });
     },
   });
 
@@ -759,6 +783,17 @@ export default function AdminDrivers() {
                                   Reactivate Driver
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => {
+                                  setDriverToDelete(driver);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                data-testid={`menu-delete-${driver.id}`}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Driver
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -1443,6 +1478,67 @@ export default function AdminDrivers() {
                   <XCircle className="h-4 w-4 mr-2" />
                 )}
                 Deactivate Driver
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <Trash2 className="h-5 w-5" />
+                Delete Driver Permanently
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete this driver? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            {driverToDelete && (
+              <div className="py-4">
+                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {getDriverInfo(driverToDelete).name?.split(' ').map((n) => n[0]).join('') || 'D'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{getDriverInfo(driverToDelete).name}</p>
+                    <p className="text-sm text-muted-foreground">{getDriverInfo(driverToDelete).email}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-red-600 mt-3 font-medium">
+                  Warning: This will permanently remove the driver from the system. All data associated with this driver will be lost.
+                </p>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDriverToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => {
+                  if (driverToDelete) {
+                    deleteDriverMutation.mutate(driverToDelete.id);
+                  }
+                }}
+                disabled={deleteDriverMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteDriverMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete Permanently
               </Button>
             </DialogFooter>
           </DialogContent>

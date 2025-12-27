@@ -779,6 +779,39 @@ export async function registerRoutes(
     res.json({ success: true, message: "Driver account reactivated successfully", driver: reactivatedDriver });
   }));
 
+  // Delete driver permanently
+  app.delete("/api/drivers/:id", asyncHandler(async (req, res) => {
+    const driverId = req.params.id;
+    
+    // Check if driver exists (include inactive)
+    const allDrivers = await storage.getDrivers({ includeInactive: true });
+    const driver = allDrivers.find(d => d.id === driverId);
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+    
+    // Delete from in-memory storage
+    const deleted = await storage.deleteDriver(driverId);
+    if (!deleted) {
+      return res.status(500).json({ error: "Failed to delete driver" });
+    }
+    
+    // Delete from PostgreSQL
+    try {
+      const { db } = await import("./db");
+      const { drivers: driversTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.delete(driversTable).where(eq(driversTable.id, driverId));
+      console.log(`[Drivers] Deleted driver from PostgreSQL: ${driverId}`);
+    } catch (e) {
+      console.error("Failed to delete driver from PostgreSQL:", e);
+    }
+    
+    console.log(`[Drivers] Permanently deleted driver ${driverId}`);
+    res.json({ success: true, message: "Driver permanently deleted" });
+  }));
+
   // Fetch all drivers from Supabase (users with role=driver)
   app.get("/api/supabase-drivers", asyncHandler(async (req, res) => {
     const { supabaseAdmin } = await import("./supabaseAdmin");
