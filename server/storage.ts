@@ -815,24 +815,23 @@ export class MemStorage implements IStorage {
   }
 
   private generateDriverCode(): string {
-    // Format: RC + random alphanumeric characters (e.g., RC7K2M, RCAB34)
+    // Format: RC + 2 numbers + 1 letter (e.g., RC02C, RC15A, RC99Z)
     const existingCodes = new Set(
       Array.from(this.drivers.values())
         .map(d => d.driverCode)
         .filter(Boolean)
     );
     
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let attempts = 0;
     const maxAttempts = 1000;
     
     while (attempts < maxAttempts) {
-      // Generate 4 random characters after RC
-      let suffix = '';
-      for (let i = 0; i < 4; i++) {
-        suffix += chars[Math.floor(Math.random() * chars.length)];
-      }
-      const code = `RC${suffix}`;
+      // Generate 2 random numbers (00-99) + 1 random letter
+      const num1 = Math.floor(Math.random() * 10);
+      const num2 = Math.floor(Math.random() * 10);
+      const letter = letters[Math.floor(Math.random() * letters.length)];
+      const code = `RC${num1}${num2}${letter}`;
       
       if (!existingCodes.has(code)) {
         return code;
@@ -841,7 +840,7 @@ export class MemStorage implements IStorage {
     }
     
     // Fallback: use timestamp-based code with RC prefix
-    const ts = Date.now().toString(36).toUpperCase().slice(-4);
+    const ts = Date.now().toString(36).toUpperCase().slice(-3);
     return `RC${ts}`;
   }
 
