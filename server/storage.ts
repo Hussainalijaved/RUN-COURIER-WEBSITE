@@ -815,25 +815,34 @@ export class MemStorage implements IStorage {
   }
 
   private generateDriverCode(): string {
-    // Format: RC followed by 2-digit number and C (e.g., RC02C, RC03C, RC04C...)
-    const existingCodes = Array.from(this.drivers.values())
-      .map(d => d.driverCode)
-      .filter(Boolean) as string[];
+    // Format: RC + random alphanumeric characters (e.g., RC7K2M, RCAB34)
+    const existingCodes = new Set(
+      Array.from(this.drivers.values())
+        .map(d => d.driverCode)
+        .filter(Boolean)
+    );
     
-    // Extract existing numbers from RC##C format codes
-    const existingNumbers = existingCodes
-      .filter(code => /^RC\d{2}C$/.test(code))
-      .map(code => parseInt(code.slice(2, 4), 10));
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let attempts = 0;
+    const maxAttempts = 1000;
     
-    // Find the next available number (start at 2 since RC01C might be reserved)
-    let nextNumber = 2;
-    if (existingNumbers.length > 0) {
-      nextNumber = Math.max(...existingNumbers) + 1;
+    while (attempts < maxAttempts) {
+      // Generate 4 random characters after RC
+      let suffix = '';
+      for (let i = 0; i < 4; i++) {
+        suffix += chars[Math.floor(Math.random() * chars.length)];
+      }
+      const code = `RC${suffix}`;
+      
+      if (!existingCodes.has(code)) {
+        return code;
+      }
+      attempts++;
     }
     
-    // Generate code in format RC##C (e.g., RC02C, RC03C, RC10C, RC99C)
-    const paddedNumber = nextNumber.toString().padStart(2, '0');
-    return `RC${paddedNumber}C`;
+    // Fallback: use timestamp-based code with RC prefix
+    const ts = Date.now().toString(36).toUpperCase().slice(-4);
+    return `RC${ts}`;
   }
 
   async createDriver(insertDriver: InsertDriver): Promise<Driver> {

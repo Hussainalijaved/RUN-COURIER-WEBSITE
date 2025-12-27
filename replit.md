@@ -83,9 +83,8 @@ Instead of permanently deleting records, the system uses soft delete to preserve
 **UI Features**: Admin Drivers page shows Deactivate/Reactivate buttons with confirmation dialogs explaining job history preservation.
 
 ### Driver Code Format
-Driver codes follow a sequential format: **RC##C** (e.g., RC02C, RC03C, RC04C...).
-- Format: `RC` prefix + 2-digit zero-padded number + `C` suffix
-- Starts at RC02C (RC01C reserved)
+Driver codes follow the format: **RC** + 4 random alphanumeric characters (e.g., RC7K2M, RCAB34, RC9XYZ).
+- Format: `RC` prefix + 4 random characters (A-Z, 0-9)
 - Auto-generated on driver creation
 - Unique per driver, immutable after creation
 - Mobile app displays and uses this same code
