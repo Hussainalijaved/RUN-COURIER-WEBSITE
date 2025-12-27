@@ -815,32 +815,25 @@ export class MemStorage implements IStorage {
   }
 
   private generateDriverCode(): string {
-    const existingCodes = new Set(
-      Array.from(this.drivers.values())
-        .map(d => d.driverCode)
-        .filter(Boolean)
-    );
+    // Format: RC followed by 2-digit number and C (e.g., RC02C, RC03C, RC04C...)
+    const existingCodes = Array.from(this.drivers.values())
+      .map(d => d.driverCode)
+      .filter(Boolean) as string[];
     
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let attempts = 0;
-    const maxAttempts = 1000;
+    // Extract existing numbers from RC##C format codes
+    const existingNumbers = existingCodes
+      .filter(code => /^RC\d{2}C$/.test(code))
+      .map(code => parseInt(code.slice(2, 4), 10));
     
-    while (attempts < maxAttempts) {
-      const l1 = letters[Math.floor(Math.random() * letters.length)];
-      const l2 = letters[Math.floor(Math.random() * letters.length)];
-      const n1 = Math.floor(Math.random() * 10);
-      const n2 = Math.floor(Math.random() * 10);
-      const code = `${l1}${l2}${n1}${n2}`;
-      
-      if (!existingCodes.has(code)) {
-        return code;
-      }
-      attempts++;
+    // Find the next available number (start at 2 since RC01C might be reserved)
+    let nextNumber = 2;
+    if (existingNumbers.length > 0) {
+      nextNumber = Math.max(...existingNumbers) + 1;
     }
     
-    // Fallback: use timestamp-based code
-    const ts = Date.now().toString(36).toUpperCase().slice(-4);
-    return ts;
+    // Generate code in format RC##C (e.g., RC02C, RC03C, RC10C, RC99C)
+    const paddedNumber = nextNumber.toString().padStart(2, '0');
+    return `RC${paddedNumber}C`;
   }
 
   async createDriver(insertDriver: InsertDriver): Promise<Driver> {

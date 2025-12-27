@@ -82,6 +82,14 @@ Instead of permanently deleting records, the system uses soft delete to preserve
 
 **UI Features**: Admin Drivers page shows Deactivate/Reactivate buttons with confirmation dialogs explaining job history preservation.
 
+### Driver Code Format
+Driver codes follow a sequential format: **RC##C** (e.g., RC02C, RC03C, RC04C...).
+- Format: `RC` prefix + 2-digit zero-padded number + `C` suffix
+- Starts at RC02C (RC01C reserved)
+- Auto-generated on driver creation
+- Unique per driver, immutable after creation
+- Mobile app displays and uses this same code
+
 ### Admin Job Assignment System
 Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments via a "Job Offers" tab. Assignment statuses are tracked (pending, sent, accepted, rejected, cancelled, expired), and assignment history is maintained.
 
