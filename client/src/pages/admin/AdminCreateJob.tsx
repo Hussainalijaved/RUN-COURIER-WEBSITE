@@ -129,7 +129,8 @@ export default function AdminCreateJob() {
     queryKey: ['/api/drivers'],
   });
 
-  const availableDrivers = drivers?.filter(d => d.isAvailable && d.isVerified) || [];
+  // Admin can assign to any verified and active driver, regardless of availability status
+  const availableDrivers = drivers?.filter(d => d.isVerified && d.isActive !== false) || [];
 
   const pickupPostcode = form.watch('pickupPostcode');
   const deliveryPostcode = form.watch('deliveryPostcode');
@@ -898,6 +899,11 @@ export default function AdminCreateJob() {
                               {availableDrivers.map((driver) => (
                                 <SelectItem key={driver.id} value={driver.id}>
                                   <div className="flex items-center gap-2">
+                                    {driver.driverCode && (
+                                      <Badge variant="secondary" className="text-xs font-mono">
+                                        {driver.driverCode}
+                                      </Badge>
+                                    )}
                                     <span>{driver.fullName || driver.vehicleRegistration}</span>
                                     <Badge variant="outline" className="text-xs">
                                       {driver.vehicleType}
@@ -909,8 +915,8 @@ export default function AdminCreateJob() {
                           </Select>
                           <FormDescription>
                             {availableDrivers.length === 0 
-                              ? 'No drivers currently available'
-                              : `${availableDrivers.length} driver${availableDrivers.length > 1 ? 's' : ''} available`
+                              ? 'No verified drivers found'
+                              : `${availableDrivers.length} verified driver${availableDrivers.length > 1 ? 's' : ''}`
                             }
                           </FormDescription>
                         </FormItem>
