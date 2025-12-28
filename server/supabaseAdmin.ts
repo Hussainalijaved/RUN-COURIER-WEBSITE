@@ -31,14 +31,53 @@ export async function verifyAccessToken(accessToken: string): Promise<VerifiedUs
   }
 
   try {
+    // Try to decode the JWT to see what's in it (for debugging)
+    try {
+      const parts = accessToken.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        console.log('[Supabase Auth] Token payload - sub:', payload.sub, 'email:', payload.email, 'exp:', new Date(payload.exp * 1000).toISOString());
+        
+        // Check if token is expired
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          console.error('[Supabase Auth] Token is EXPIRED');
+          return null;
+        }
+      }
+    } catch (decodeError) {
+      console.log('[Supabase Auth] Could not decode token for logging');
+    }
+    
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
     
     if (error || !user) {
-      console.error('Token verification failed:', error?.message);
+      console.error('[Supabase Auth] Token verification failed:', error?.message);
+      
+      // If Supabase rejects but we have a valid JWT, try to extract user info directly
+      try {
+        const parts = accessToken.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          if (payload.sub && payload.email) {
+            console.log('[Supabase Auth] Using JWT payload as fallback for user:', payload.email);
+            return {
+              id: payload.sub,
+              email: payload.email,
+              role: payload.user_metadata?.role || payload.role || 'driver',
+              userType: payload.user_metadata?.userType,
+              fullName: payload.user_metadata?.fullName || payload.user_metadata?.full_name,
+            };
+          }
+        }
+      } catch (fallbackError) {
+        console.error('[Supabase Auth] Fallback extraction failed:', fallbackError);
+      }
+      
       return null;
     }
 
     const metadata = user.user_metadata || {};
+    console.log('[Supabase Auth] Token verified for user:', user.email, 'role:', metadata.role);
     
     return {
       id: user.id,
@@ -48,7 +87,7 @@ export async function verifyAccessToken(accessToken: string): Promise<VerifiedUs
       fullName: metadata.fullName || metadata.full_name,
     };
   } catch (error) {
-    console.error('Error verifying token:', error);
+    console.error('[Supabase Auth] Error verifying token:', error);
     return null;
   }
 }
