@@ -3,12 +3,7 @@ import { Pool } from 'pg';
 import * as schema from '@shared/schema';
 
 function getConnectionString(): string {
-  // First try NEON_DATABASE_URL (external Neon database)
-  if (process.env.NEON_DATABASE_URL && process.env.NEON_DATABASE_URL.startsWith('postgresql://')) {
-    return process.env.NEON_DATABASE_URL;
-  }
-  
-  // Then try DATABASE_URL if it looks like a valid postgres connection string
+  // First try DATABASE_URL if it looks like a valid postgres connection string
   if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
     return process.env.DATABASE_URL;
   }
@@ -24,7 +19,7 @@ function getConnectionString(): string {
     return `postgresql://${user}:${password}@${host}:${port}/${database}`;
   }
   
-  throw new Error('Database connection not configured. Set NEON_DATABASE_URL, DATABASE_URL, or PGHOST/PGUSER/PGPASSWORD/PGDATABASE');
+  throw new Error('Database connection not configured. Set a valid DATABASE_URL or PGHOST/PGUSER/PGPASSWORD/PGDATABASE');
 }
 
 const connectionString = getConnectionString();
