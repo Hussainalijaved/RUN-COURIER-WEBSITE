@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
@@ -42,7 +42,7 @@ const navLinks = [
 ];
 
 export function Navbar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
 
@@ -57,6 +57,11 @@ export function Navbar() {
       default: return '/customer';
     }
   };
+
+  const handleNavClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    setLocation(href);
+  }, [setLocation]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -118,9 +123,14 @@ export function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem asChild>
-                  <Link href={getDashboardPath()} className="w-full cursor-pointer" data-testid="link-dashboard">
+                  <a 
+                    href={getDashboardPath()} 
+                    onClick={(e) => handleNavClick(e, getDashboardPath())}
+                    className="w-full cursor-pointer" 
+                    data-testid="link-dashboard"
+                  >
                     Dashboard
-                  </Link>
+                  </a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer" data-testid="button-logout">
@@ -186,9 +196,15 @@ export function Navbar() {
                 <div className="border-t border-border pt-4 mt-4">
                   {user ? (
                     <>
-                      <Link href={getDashboardPath()} onClick={() => setIsOpen(false)}>
+                      <a 
+                        href={getDashboardPath()} 
+                        onClick={(e) => {
+                          handleNavClick(e, getDashboardPath());
+                          setIsOpen(false);
+                        }}
+                      >
                         <Button className="w-full mb-2">Dashboard</Button>
-                      </Link>
+                      </a>
                       <Button
                         variant="outline"
                         className="w-full"
