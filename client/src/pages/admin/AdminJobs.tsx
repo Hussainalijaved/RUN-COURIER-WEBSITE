@@ -59,6 +59,9 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
+  Undo2,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -66,6 +69,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ShippingLabel } from '@/components/ShippingLabel';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
+import { useAuth } from '@/context/AuthContext';
 import type { Job, Driver, JobStatus, JobAssignment } from '@shared/schema';
 
 // Type for drivers from Supabase
@@ -131,6 +135,7 @@ export default function AdminJobs() {
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
+  const { user } = useAuth();
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.7 });
 
   const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
@@ -185,6 +190,20 @@ export default function AdminJobs() {
     queryKey: ['/api/supabase-drivers'],
   });
 
+  // Fetch all job assignments for managing them
+  const { data: jobAssignments } = useQuery<JobAssignment[]>({
+    queryKey: ['/api/job-assignments'],
+  });
+
+  // Helper to get active assignment for a job
+  const getActiveAssignment = (jobId: string): JobAssignment | undefined => {
+    if (!jobAssignments) return undefined;
+    return jobAssignments.find(a => 
+      a.jobId === jobId && 
+      ['pending', 'sent', 'accepted'].includes(a.status)
+    );
+  };
+
   const assignDriverMutation = useMutation({
     mutationFn: async ({ jobId, driverId, driverPrice, assignedBy }: { jobId: string; driverId: string; driverPrice: string; assignedBy: string }) => {
       return apiRequest('POST', '/api/job-assignments', { 
@@ -232,6 +251,51 @@ export default function AdminJobs() {
     },
     onError: () => {
       toast({ title: 'Failed to cancel assignment', variant: 'destructive' });
+    },
+  });
+
+  // Withdraw assignment (for pending/sent offers before driver responds)
+  const withdrawAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return apiRequest('PATCH', `/api/job-assignments/${assignmentId}/withdraw`, { adminUserId: user?.id });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      toast({ title: 'Offer withdrawn', description: 'The job offer has been withdrawn from the driver.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to withdraw offer', description: error?.message || 'Please try again', variant: 'destructive' });
+    },
+  });
+
+  // Remove assignment (for accepted/active assignments)
+  const removeAssignmentMutation = useMutation({
+    mutationFn: async ({ assignmentId, reason }: { assignmentId: string; reason?: string }) => {
+      return apiRequest('PATCH', `/api/job-assignments/${assignmentId}/remove`, { adminUserId: user?.id, reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      toast({ title: 'Assignment removed', description: 'The job has been removed from the driver and is ready for reassignment.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to remove assignment', description: error?.message || 'Please try again', variant: 'destructive' });
+    },
+  });
+
+  // Clean assignment (full reset for fresh reassignment)
+  const cleanAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return apiRequest('PATCH', `/api/job-assignments/${assignmentId}/clean`, { adminUserId: user?.id });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      toast({ title: 'Job cleaned', description: 'The job has been fully reset and is ready for a fresh assignment.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to clean job', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 
@@ -850,6 +914,49 @@ export default function AdminJobs() {
                                 </>
                               )}
                             </DropdownMenuItem>
+                            {/* Assignment Management - Withdraw/Remove/Clean */}
+                            {(() => {
+                              const assignment = getActiveAssignment(job.id);
+                              if (!assignment) return null;
+                              return (
+                                <>
+                                  {/* Withdraw - for pending/sent offers only */}
+                                  {['pending', 'sent'].includes(assignment.status) && (
+                                    <DropdownMenuItem 
+                                      onClick={() => withdrawAssignmentMutation.mutate(assignment.id)}
+                                      disabled={withdrawAssignmentMutation.isPending}
+                                      className="text-orange-600"
+                                      data-testid={`menu-withdraw-${job.id}`}
+                                    >
+                                      <Undo2 className="mr-2 h-4 w-4" />
+                                      Withdraw Offer
+                                    </DropdownMenuItem>
+                                  )}
+                                  {/* Remove - for accepted assignments */}
+                                  {assignment.status === 'accepted' && (
+                                    <DropdownMenuItem 
+                                      onClick={() => removeAssignmentMutation.mutate({ assignmentId: assignment.id })}
+                                      disabled={removeAssignmentMutation.isPending}
+                                      className="text-red-600"
+                                      data-testid={`menu-remove-${job.id}`}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Remove from Driver
+                                    </DropdownMenuItem>
+                                  )}
+                                  {/* Clean - always available for active assignments */}
+                                  <DropdownMenuItem 
+                                    onClick={() => cleanAssignmentMutation.mutate(assignment.id)}
+                                    disabled={cleanAssignmentMutation.isPending}
+                                    className="text-blue-600"
+                                    data-testid={`menu-clean-${job.id}`}
+                                  >
+                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                    Reset Job
+                                  </DropdownMenuItem>
+                                </>
+                              );
+                            })()}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
