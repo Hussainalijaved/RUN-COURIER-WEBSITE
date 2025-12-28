@@ -223,7 +223,7 @@ export const vendorApiKeys = pgTable("vendor_api_keys", {
 
 export type DriverApplicationStatus = "pending" | "approved" | "rejected";
 export type InvoiceStatus = "pending" | "paid" | "overdue" | "cancelled";
-export type JobAssignmentStatus = "pending" | "sent" | "accepted" | "rejected" | "cancelled" | "expired";
+export type JobAssignmentStatus = "pending" | "sent" | "accepted" | "rejected" | "cancelled" | "expired" | "withdrawn" | "removed" | "cleaned";
 
 export const invoices = pgTable("invoices", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -305,6 +305,12 @@ export const jobAssignments = pgTable("job_assignments", {
   cancellationReason: text("cancellation_reason"),
   rejectionReason: text("rejection_reason"),
   expiresAt: timestamp("expires_at"),
+  withdrawnAt: timestamp("withdrawn_at"),
+  withdrawnBy: varchar("withdrawn_by", { length: 36 }),
+  removedAt: timestamp("removed_at"),
+  removedBy: varchar("removed_by", { length: 36 }),
+  cleanedAt: timestamp("cleaned_at"),
+  cleanedBy: varchar("cleaned_by", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
