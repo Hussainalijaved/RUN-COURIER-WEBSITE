@@ -26,20 +26,25 @@ export function ProtectedRoute({
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
 
+  console.log('[ProtectedRoute] State:', { loading, user: user ? { id: user.id, role: user.role } : null, allowedRoles });
+
   useEffect(() => {
     if (loading) return;
     
     if (!user) {
+      console.log('[ProtectedRoute] No user, redirecting to:', redirectTo);
       setLocation(redirectTo);
       return;
     }
 
     if (allowedRoles && !allowedRoles.includes(user.role)) {
+      console.log('[ProtectedRoute] Role mismatch, user role:', user.role, 'allowed:', allowedRoles);
       setLocation(dashboardRoutes[user.role] || '/');
     }
   }, [user, loading, allowedRoles, redirectTo, setLocation]);
 
   if (loading) {
+    console.log('[ProtectedRoute] Loading...');
     return (
       <div className="flex items-center justify-center h-screen" data-testid="loading-auth">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -48,6 +53,7 @@ export function ProtectedRoute({
   }
 
   if (!user) {
+    console.log('[ProtectedRoute] No user, showing redirect spinner');
     return (
       <div className="flex items-center justify-center h-screen" data-testid="redirecting-auth">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -56,6 +62,7 @@ export function ProtectedRoute({
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    console.log('[ProtectedRoute] Role not allowed, showing redirect spinner. User role:', user.role);
     return (
       <div className="flex items-center justify-center h-screen" data-testid="redirecting-role">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -63,6 +70,7 @@ export function ProtectedRoute({
     );
   }
 
+  console.log('[ProtectedRoute] Rendering children');
   return <>{children}</>;
 }
 
