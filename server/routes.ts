@@ -2774,6 +2774,144 @@ export async function registerRoutes(
     res.json(cancelled);
   }));
 
+  // Admin: Withdraw job assignment (for pending/sent offers before driver responds)
+  app.patch("/api/job-assignments/:id/withdraw", asyncHandler(async (req, res) => {
+    const { adminUserId } = req.body;
+    
+    if (!adminUserId) {
+      return res.status(400).json({ error: "adminUserId is required" });
+    }
+
+    const assignment = await storage.getJobAssignment(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    // Can only withdraw pending or sent assignments (before driver responds)
+    if (!["pending", "sent"].includes(assignment.status)) {
+      return res.status(400).json({ 
+        error: "Can only withdraw pending or sent assignments. Use 'remove' for accepted assignments." 
+      });
+    }
+
+    const updated = await storage.updateJobAssignment(req.params.id, {
+      status: "withdrawn" as any,
+      withdrawnAt: new Date(),
+      withdrawnBy: adminUserId,
+    });
+
+    // Reset job status to pending so it can be reassigned
+    await storage.updateJob(assignment.jobId, { status: "pending", driverId: null });
+    console.log(`[Job Assignment] Admin withdrawn - Job ${assignment.jobId} status reset to 'pending'`);
+
+    // Notify driver that the offer was withdrawn
+    const driver = await storage.getDriver(assignment.driverId);
+    if (driver?.userId) {
+      await storage.createNotification({
+        userId: driver.userId,
+        title: "Job Offer Withdrawn",
+        message: "A job offer has been withdrawn by the admin.",
+        type: "assignment_withdrawn",
+        data: { assignmentId: assignment.id, jobId: assignment.jobId },
+      });
+    }
+
+    res.json(updated);
+  }));
+
+  // Admin: Remove job assignment (for accepted/active assignments)
+  app.patch("/api/job-assignments/:id/remove", asyncHandler(async (req, res) => {
+    const { adminUserId, reason } = req.body;
+    
+    if (!adminUserId) {
+      return res.status(400).json({ error: "adminUserId is required" });
+    }
+
+    const assignment = await storage.getJobAssignment(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    // Can remove any assignment that isn't already removed/cleaned
+    if (["removed", "cleaned"].includes(assignment.status)) {
+      return res.status(400).json({ error: "Assignment is already removed or cleaned" });
+    }
+
+    const updated = await storage.updateJobAssignment(req.params.id, {
+      status: "removed" as any,
+      removedAt: new Date(),
+      removedBy: adminUserId,
+      cancellationReason: reason || null,
+    });
+
+    // Reset job status to pending and clear driver assignment
+    await storage.updateJob(assignment.jobId, { status: "pending", driverId: null });
+    console.log(`[Job Assignment] Admin removed - Job ${assignment.jobId} status reset to 'pending'`);
+
+    // Notify driver that the assignment was removed
+    const driver = await storage.getDriver(assignment.driverId);
+    if (driver?.userId) {
+      await storage.createNotification({
+        userId: driver.userId,
+        title: "Job Assignment Removed",
+        message: `Your job assignment has been removed by admin.${reason ? ` Reason: ${reason}` : ""}`,
+        type: "assignment_removed",
+        data: { assignmentId: assignment.id, jobId: assignment.jobId },
+      });
+    }
+
+    res.json(updated);
+  }));
+
+  // Admin: Clean job assignment (reset job completely for fresh reassignment)
+  app.patch("/api/job-assignments/:id/clean", asyncHandler(async (req, res) => {
+    const { adminUserId } = req.body;
+    
+    if (!adminUserId) {
+      return res.status(400).json({ error: "adminUserId is required" });
+    }
+
+    const assignment = await storage.getJobAssignment(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    // Can clean any assignment
+    if (assignment.status === "cleaned") {
+      return res.status(400).json({ error: "Assignment is already cleaned" });
+    }
+
+    const updated = await storage.updateJobAssignment(req.params.id, {
+      status: "cleaned" as any,
+      cleanedAt: new Date(),
+      cleanedBy: adminUserId,
+    });
+
+    // Reset job completely - clear driver, set to pending, clear any driver-related data
+    await storage.updateJob(assignment.jobId, { 
+      status: "pending", 
+      driverId: null,
+      driverHidden: false,
+      driverHiddenAt: null,
+      driverHiddenBy: null,
+    });
+    console.log(`[Job Assignment] Admin cleaned - Job ${assignment.jobId} fully reset for reassignment`);
+
+    // Notify driver that the assignment was cleaned/reset
+    const driver = await storage.getDriver(assignment.driverId);
+    if (driver?.userId) {
+      await storage.createNotification({
+        userId: driver.userId,
+        title: "Job Assignment Reset",
+        message: "A job assignment has been reset by admin and is no longer assigned to you.",
+        type: "assignment_cleaned",
+        data: { assignmentId: assignment.id, jobId: assignment.jobId },
+      });
+    }
+
+    res.json(updated);
+  }));
+
   // Delivery Contacts routes (for business customers to save delivery details)
   app.get("/api/delivery-contacts", asyncHandler(async (req, res) => {
     const customerId = req.query.customerId as string;
