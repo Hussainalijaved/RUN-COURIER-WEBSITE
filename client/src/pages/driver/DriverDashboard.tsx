@@ -36,8 +36,10 @@ import {
 } from '@/hooks/useSupabaseDriver';
 import type { Job, JobStatus } from '@shared/schema';
 
-const formatPrice = (price: string | number) => {
+const formatPrice = (price: string | number | null | undefined) => {
+  if (price === null || price === undefined) return '£0.00';
   const num = typeof price === 'string' ? parseFloat(price) : price;
+  if (isNaN(num)) return '£0.00';
   return `£${num.toFixed(2)}`;
 };
 
