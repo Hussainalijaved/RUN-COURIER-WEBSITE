@@ -932,6 +932,28 @@ export async function registerRoutes(
         });
       }
 
+      // Also include local-only drivers (test drivers, drivers created before Supabase sync)
+      const supabaseUserIds = new Set(driverUsersList.map(u => u.id));
+      for (const localDriver of localDrivers) {
+        // Skip if already included from Supabase or if deactivated
+        if (supabaseUserIds.has(localDriver.userId || '') || supabaseUserIds.has(localDriver.id)) {
+          continue;
+        }
+        if (localDriver.isActive === false) {
+          continue;
+        }
+        // Add local-only driver
+        driverUsers.push({
+          id: localDriver.id,
+          email: localDriver.email || null,
+          fullName: localDriver.fullName || 'Local Driver',
+          phone: localDriver.phone || null,
+          role: 'driver',
+          driverCode: localDriver.driverCode || null,
+          createdAt: null,
+        });
+      }
+
       res.json(driverUsers);
     } catch (err) {
       console.error("Error in supabase-drivers:", err);
