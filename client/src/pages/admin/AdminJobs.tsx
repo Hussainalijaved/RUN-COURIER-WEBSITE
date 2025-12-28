@@ -56,6 +56,8 @@ import {
   Send,
   CreditCard,
   RefreshCw,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -891,6 +893,69 @@ export default function AdminJobs() {
                     <h4 className="font-semibold mb-2">Recipient</h4>
                     <p className="text-sm">{selectedJob.recipientName}</p>
                     <p className="text-sm text-muted-foreground">{selectedJob.recipientPhone}</p>
+                  </div>
+                )}
+                
+                {/* Proof of Delivery Section */}
+                {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl) && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Proof of Delivery
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedJob.podPhotoUrl && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">Delivery Photo</p>
+                          <a 
+                            href={selectedJob.podPhotoUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <img 
+                              src={selectedJob.podPhotoUrl} 
+                              alt="Proof of Delivery" 
+                              className="rounded-lg border max-h-48 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                              data-testid="img-pod-photo"
+                            />
+                          </a>
+                        </div>
+                      )}
+                      {selectedJob.podSignatureUrl && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">Recipient Signature</p>
+                          <a 
+                            href={selectedJob.podSignatureUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <img 
+                              src={selectedJob.podSignatureUrl} 
+                              alt="Recipient Signature" 
+                              className="rounded-lg border bg-white p-2 max-h-32 object-contain hover:opacity-90 transition-opacity cursor-pointer"
+                              data-testid="img-pod-signature"
+                            />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                    {selectedJob.deliveredAt && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Delivered on {formatDate(selectedJob.deliveredAt)}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* No POD warning for delivered jobs */}
+                {selectedJob.status === 'delivered' && !selectedJob.podPhotoUrl && !selectedJob.podSignatureUrl && (
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
+                      <AlertCircle className="h-4 w-4" />
+                      <p className="text-sm">No Proof of Delivery was submitted for this job</p>
+                    </div>
                   </div>
                 )}
               </div>
