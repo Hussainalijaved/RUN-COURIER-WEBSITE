@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useCallback } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -103,8 +103,13 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
 };
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, signOut } = useAuth();
+
+  const handleNavClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    setLocation(href);
+  }, [setLocation]);
 
   if (!user) {
     return <div className="p-8">Loading...</div>;
@@ -151,10 +156,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         isActive={location === item.href}
                         tooltip={item.label}
                       >
-                        <Link href={item.href} data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}>
+                        <a 
+                          href={item.href} 
+                          onClick={(e) => handleNavClick(e, item.href)}
+                          data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
+                        >
                           <item.icon className="h-4 w-4" />
                           <span>{item.label}</span>
-                        </Link>
+                        </a>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
