@@ -897,12 +897,23 @@ export default function AdminJobs() {
                 )}
                 
                 {/* Proof of Delivery Section */}
-                {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl) && (
+                {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl || selectedJob.podRecipientName) && (
                   <div className="border-t pt-4">
                     <h4 className="font-semibold mb-3 flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       Proof of Delivery
                     </h4>
+                    
+                    {/* Recipient Name */}
+                    {selectedJob.podRecipientName && (
+                      <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <p className="text-sm text-muted-foreground">Received By</p>
+                        <p className="font-medium text-green-700 dark:text-green-400" data-testid="text-pod-recipient">
+                          {selectedJob.podRecipientName}
+                        </p>
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-2 gap-4">
                       {selectedJob.podPhotoUrl && (
                         <div>

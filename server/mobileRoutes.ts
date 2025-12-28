@@ -583,6 +583,7 @@ export function registerMobileRoutes(app: Express): void {
       
       const { jobId } = req.params;
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const recipientName = req.body.recipientName as string | undefined;
 
       const job = await storage.getJob(jobId);
 
@@ -629,8 +630,9 @@ export function registerMobileRoutes(app: Express): void {
       // Keep existing POD if not uploading new one
       const finalPhotoUrl = podPhotoUrl || job.podPhotoUrl || undefined;
       const finalSignatureUrl = podSignatureUrl || job.podSignatureUrl || undefined;
+      const finalRecipientName = recipientName || job.podRecipientName || undefined;
 
-      const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl);
+      const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName);
 
       if (!updatedJob) {
         return res.status(500).json({ 
@@ -639,7 +641,7 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      console.log(`[POD Upload] Job ${jobId}: photo=${podPhotoUrl || 'none'}, signature=${podSignatureUrl || 'none'}`);
+      console.log(`[POD Upload] Job ${jobId}: photo=${podPhotoUrl || 'none'}, signature=${podSignatureUrl || 'none'}, recipient=${recipientName || 'none'}`);
 
       res.json({
         success: true,
@@ -647,6 +649,7 @@ export function registerMobileRoutes(app: Express): void {
         pod: {
           photoUrl: updatedJob.podPhotoUrl,
           signatureUrl: updatedJob.podSignatureUrl,
+          recipientName: updatedJob.podRecipientName,
         },
       });
     })

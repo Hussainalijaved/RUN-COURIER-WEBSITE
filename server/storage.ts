@@ -63,7 +63,7 @@ export interface IStorage {
   updateJob(id: string, data: Partial<Job>): Promise<Job | undefined>;
   updateJobStatus(id: string, status: JobStatus, rejectionReason?: string): Promise<Job | undefined>;
   assignDriver(id: string, driverId: string, dispatcherId?: string): Promise<Job | undefined>;
-  updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string): Promise<Job | undefined>;
+  updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string): Promise<Job | undefined>;
   deleteJob(id: string): Promise<void>;
 
   getDocument(id: string): Promise<Document | undefined>;
@@ -1150,10 +1150,11 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string): Promise<Job | undefined> {
+  async updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string): Promise<Job | undefined> {
     return this.updateJob(id, { 
       podPhotoUrl: podPhotoUrl || null, 
-      podSignatureUrl: podSignatureUrl || null 
+      podSignatureUrl: podSignatureUrl || null,
+      podRecipientName: podRecipientName || null
     });
   }
 

@@ -154,6 +154,7 @@ export const jobs = pgTable("jobs", {
   paymentIntentId: text("payment_intent_id"),
   podPhotoUrl: text("pod_photo_url"),
   podSignatureUrl: text("pod_signature_url"),
+  podRecipientName: text("pod_recipient_name"),
   deliveredAt: timestamp("delivered_at"),
   rejectionReason: text("rejection_reason"),
   estimatedPickupTime: timestamp("estimated_pickup_time"),
@@ -179,6 +180,7 @@ export const multiDropStops = pgTable("multi_drop_stops", {
   deliveredAt: timestamp("delivered_at"),
   podPhotoUrl: text("pod_photo_url"),
   podSignatureUrl: text("pod_signature_url"),
+  podRecipientName: text("pod_recipient_name"),
 });
 
 export const documents = pgTable("documents", {
