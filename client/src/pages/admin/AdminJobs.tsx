@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useJobUpdates } from '@/hooks/useJobUpdates';
 import {
   Table,
@@ -132,6 +133,11 @@ export default function AdminJobs() {
   const [emailDialogJobId, setEmailDialogJobId] = useState<string>('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [batchAssignDialogOpen, setBatchAssignDialogOpen] = useState(false);
+  const [batchDriverId, setBatchDriverId] = useState<string>('');
+  const [batchDriverPrice, setBatchDriverPrice] = useState<string>('');
+  const [batchErrors, setBatchErrors] = useState<{ jobId: string; error: string }[]>([]);
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
@@ -224,6 +230,50 @@ export default function AdminJobs() {
     },
     onError: (error: any) => {
       toast({ title: 'Failed to send assignment', description: error?.message || 'Please try again', variant: 'destructive' });
+    },
+  });
+
+  const batchAssignMutation = useMutation({
+    mutationFn: async ({ jobIds, driverId, driverPrice, assignedBy }: { jobIds: string[]; driverId: string; driverPrice: string; assignedBy: string }) => {
+      return apiRequest('POST', '/api/job-assignments/batch', { 
+        jobIds, 
+        driverId, 
+        driverPrice,
+        assignedBy 
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      const successCount = data.successCount || 0;
+      const errorCount = data.errorCount || 0;
+      const errors = data.errors || [];
+      
+      if (errorCount > 0) {
+        // Keep dialog open and show which jobs failed
+        setBatchErrors(errors);
+        // Remove successfully assigned jobs from selection
+        const failedJobIds = new Set<string>(errors.map((e: { jobId: string }) => e.jobId));
+        setSelectedJobIds(failedJobIds);
+        toast({ 
+          title: `${successCount} assigned, ${errorCount} failed`, 
+          description: 'Some jobs could not be assigned. See the list below.',
+          variant: 'destructive'
+        });
+      } else {
+        toast({ 
+          title: 'Batch assignment complete', 
+          description: `${successCount} job${successCount > 1 ? 's' : ''} assigned to the driver.` 
+        });
+        setBatchAssignDialogOpen(false);
+        setBatchDriverId('');
+        setBatchDriverPrice('');
+        setBatchErrors([]);
+        setSelectedJobIds(new Set());
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to batch assign', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 
@@ -522,6 +572,33 @@ export default function AdminJobs() {
   const availableDrivers = drivers?.filter((d) => d.isAvailable && d.isVerified) || [];
   const allDrivers = drivers || [];
 
+  // Multi-select helpers
+  const assignableJobs = filteredJobs.filter(job => 
+    job.status === 'pending' && !job.driverId && !getActiveAssignment(job.id)
+  );
+  const allAssignableSelected = assignableJobs.length > 0 && 
+    assignableJobs.every(job => selectedJobIds.has(job.id));
+  
+  const toggleJobSelection = (jobId: string) => {
+    setSelectedJobIds(prev => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllAssignable = () => {
+    if (allAssignableSelected) {
+      setSelectedJobIds(new Set());
+    } else {
+      setSelectedJobIds(new Set(assignableJobs.map(job => job.id)));
+    }
+  };
+
   const formatPrice = (price: string | number | null | undefined) => {
     if (price === null || price === undefined) return '—';
     const num = typeof price === 'string' ? parseFloat(price) : price;
@@ -739,6 +816,18 @@ export default function AdminJobs() {
                 Create Job
               </Button>
             </Link>
+            {selectedJobIds.size > 0 && (
+              <Button 
+                onClick={() => {
+                  setBatchErrors([]);
+                  setBatchAssignDialogOpen(true);
+                }}
+                data-testid="button-batch-assign"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Assign {selectedJobIds.size} Job{selectedJobIds.size > 1 ? 's' : ''}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -786,6 +875,14 @@ export default function AdminJobs() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[40px]">
+                      <Checkbox 
+                        checked={allAssignableSelected}
+                        onCheckedChange={toggleAllAssignable}
+                        disabled={assignableJobs.length === 0}
+                        data-testid="checkbox-select-all"
+                      />
+                    </TableHead>
                     <TableHead>Tracking #</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Vehicle</TableHead>
@@ -797,8 +894,18 @@ export default function AdminJobs() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredJobs.map((job) => (
+                  {filteredJobs.map((job) => {
+                    const isAssignable = job.status === 'pending' && !job.driverId && !getActiveAssignment(job.id);
+                    return (
                     <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                      <TableCell>
+                        <Checkbox 
+                          checked={selectedJobIds.has(job.id)}
+                          onCheckedChange={() => toggleJobSelection(job.id)}
+                          disabled={!isAssignable}
+                          data-testid={`checkbox-job-${job.id}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">{job.trackingNumber}</TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -961,7 +1068,8 @@ export default function AdminJobs() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             ) : (
@@ -1478,6 +1586,139 @@ export default function AdminJobs() {
                   <>
                     <Send className="mr-2 h-4 w-4" />
                     Send Payment Link
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Batch Assign Dialog */}
+        <Dialog open={batchAssignDialogOpen} onOpenChange={(open) => {
+          setBatchAssignDialogOpen(open);
+          if (!open) {
+            setBatchErrors([]);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Batch Assign Jobs
+              </DialogTitle>
+              <DialogDescription>
+                Assign {selectedJobIds.size} job{selectedJobIds.size > 1 ? 's' : ''} to a driver with the same driver payment.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {batchErrors.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    Failed Assignments
+                  </Label>
+                  <div className="max-h-32 overflow-y-auto border border-destructive/50 rounded p-2 bg-destructive/10">
+                    {batchErrors.map(({ jobId, error }) => {
+                      const job = jobs?.find(j => j.id === jobId);
+                      return (
+                        <div key={jobId} className="text-sm py-1" data-testid={`batch-error-${jobId}`}>
+                          <span className="font-mono text-destructive">{job?.trackingNumber || jobId}</span>
+                          <span className="text-muted-foreground ml-2">- {error}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>Selected Jobs ({selectedJobIds.size})</Label>
+                <div className="max-h-32 overflow-y-auto border rounded p-2 bg-muted/50">
+                  {Array.from(selectedJobIds).map(jobId => {
+                    const job = jobs?.find(j => j.id === jobId);
+                    const hasError = batchErrors.some(e => e.jobId === jobId);
+                    return job ? (
+                      <div key={jobId} className={`text-sm py-1 flex justify-between items-center ${hasError ? 'text-destructive' : ''}`}>
+                        <span className="font-mono">{job.trackingNumber}</span>
+                        <span className="text-muted-foreground">{job.pickupPostcode} → {job.deliveryPostcode}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="batch-driver">Select Driver *</Label>
+                <Select value={batchDriverId} onValueChange={setBatchDriverId}>
+                  <SelectTrigger id="batch-driver" data-testid="select-batch-driver">
+                    <SelectValue placeholder="Choose a driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allDriversWithInfo.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        <div className="flex items-center gap-2">
+                          {driver.driverCode && (
+                            <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                          )}
+                          <span>{driver.name}</span>
+                          {driver.isAvailable && (
+                            <Badge variant="secondary" className="text-xs">Online</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="batch-driver-price">Driver Payment per Job (£) *</Label>
+                <Input
+                  id="batch-driver-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 15.00"
+                  value={batchDriverPrice}
+                  onChange={(e) => setBatchDriverPrice(e.target.value)}
+                  data-testid="input-batch-driver-price"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Total: £{((parseFloat(batchDriverPrice) || 0) * selectedJobIds.size).toFixed(2)} for {selectedJobIds.size} job{selectedJobIds.size > 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setBatchAssignDialogOpen(false);
+                  setBatchDriverId('');
+                  setBatchDriverPrice('');
+                  setBatchErrors([]);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (!batchDriverId || !batchDriverPrice || !user?.id) return;
+                  batchAssignMutation.mutate({
+                    jobIds: Array.from(selectedJobIds),
+                    driverId: batchDriverId,
+                    driverPrice: batchDriverPrice,
+                    assignedBy: user.id
+                  });
+                }}
+                disabled={!batchDriverId || !batchDriverPrice || batchAssignMutation.isPending}
+                data-testid="button-confirm-batch-assign"
+              >
+                {batchAssignMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Assign {selectedJobIds.size} Job{selectedJobIds.size > 1 ? 's' : ''}
                   </>
                 )}
               </Button>
