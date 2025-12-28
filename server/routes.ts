@@ -312,11 +312,12 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/jobs/:id/assign", asyncHandler(async (req, res) => {
-    const { driverId, dispatcherId } = req.body;
+    const { driverId, dispatcherId, driverPrice } = req.body;
     
     // Validate driver is active before assignment
+    let driver = null;
     if (driverId) {
-      const driver = await storage.getDriver(driverId);
+      driver = await storage.getDriver(driverId);
       if (!driver) {
         return res.status(404).json({ error: "Driver not found" });
       }
@@ -326,10 +327,35 @@ export async function registerRoutes(
     }
     
     const previousJob = await storage.getJob(req.params.id);
-    const job = await storage.assignDriver(req.params.id, driverId, dispatcherId);
-    if (!job) {
+    if (!previousJob) {
       return res.status(404).json({ error: "Job not found" });
     }
+    
+    const job = await storage.assignDriver(req.params.id, driverId, dispatcherId);
+    if (!job) {
+      return res.status(404).json({ error: "Failed to assign job" });
+    }
+    
+    // Also create a job assignment record so it appears in mobile app's job offers
+    if (driverId && driver) {
+      try {
+        const finalDriverPrice = driverPrice || job.driverPrice || job.totalPrice || "0";
+        
+        const assignment = await storage.createJobAssignment({
+          jobId: job.id,
+          driverId: driver.id,
+          assignedBy: "admin", // Map assigns as admin
+          driverPrice: finalDriverPrice,
+          status: "sent", // Immediately sent so driver sees it
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
+        });
+        console.log(`[Jobs] Created job assignment ${assignment.id} for driver ${driver.driverCode || driver.id}`);
+      } catch (err) {
+        console.error(`[Jobs] Failed to create job assignment:`, err);
+        // Continue anyway - the job is still assigned
+      }
+    }
+    
     // Broadcast job assignment for real-time updates
     broadcastJobUpdate({
       id: job.id,
