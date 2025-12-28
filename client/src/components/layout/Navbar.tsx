@@ -118,7 +118,11 @@ export function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem 
-                  onSelect={() => setLocation(getDashboardPath())}
+                  onSelect={() => {
+                    const path = getDashboardPath();
+                    console.log('[Nav] Dashboard clicked, navigating to:', path);
+                    setLocation(path);
+                  }}
                   className="cursor-pointer" 
                   data-testid="link-dashboard"
                 >
