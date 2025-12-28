@@ -593,7 +593,7 @@ export default function AdminDrivers() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by code, name, email, or registration..."
+                  placeholder="Search by Driver ID, name, email, or registration..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -613,7 +613,7 @@ export default function AdminDrivers() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
+                    <TableHead>Driver ID</TableHead>
                     <TableHead>Driver</TableHead>
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Registration</TableHead>
