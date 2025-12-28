@@ -13,6 +13,9 @@ interface DriverLocation {
   speed?: number;
   accuracy?: number;
   timestamp: number;
+  isAvailable?: boolean;
+  driverCode?: string;
+  driverName?: string;
 }
 
 interface AuthMessage {
@@ -60,6 +63,18 @@ interface BulkSnapshotMessage {
 interface DriverOfflineMessage {
   type: 'driver:offline';
   payload: { driverId: string };
+}
+
+interface DriverOnlineMessage {
+  type: 'driver:online';
+  payload: {
+    driverId: string;
+    isAvailable: boolean;
+    driverCode?: string;
+    driverName?: string;
+    lat?: number;
+    lng?: number;
+  };
 }
 
 interface AuthSuccessMessage {
@@ -115,6 +130,7 @@ type OutgoingMessage =
   | OutgoingLocationMessage 
   | BulkSnapshotMessage 
   | DriverOfflineMessage 
+  | DriverOnlineMessage
   | AuthSuccessMessage 
   | ErrorMessage
   | JobStatusUpdateMessage
@@ -672,4 +688,62 @@ export function broadcastLocationUpdate(
   lastUpdateTime.set(driverId, Date.now());
   
   broadcastLocation(location);
+}
+
+export async function broadcastDriverAvailability(
+  driverId: string,
+  isAvailable: boolean
+): Promise<void> {
+  try {
+    const driver = await storage.getDriver(driverId);
+    if (!driver) {
+      log(`broadcastDriverAvailability: driver ${driverId} not found`, 'realtime');
+      return;
+    }
+
+    const lat = driver.currentLatitude ? parseFloat(driver.currentLatitude) : undefined;
+    const lng = driver.currentLongitude ? parseFloat(driver.currentLongitude) : undefined;
+
+    const driverName = driver.fullName || 'Unknown Driver';
+    
+    const message: DriverOnlineMessage = {
+      type: 'driver:online',
+      payload: {
+        driverId,
+        isAvailable,
+        driverCode: driver.driverCode || undefined,
+        driverName,
+        lat,
+        lng,
+      },
+    };
+
+    log(`Broadcasting driver ${isAvailable ? 'ONLINE' : 'OFFLINE'}: ${driver.driverCode || driverId}`, 'realtime');
+
+    if (isAvailable && lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+      const location: DriverLocation = {
+        driverId,
+        lat,
+        lng,
+        timestamp: Date.now(),
+        isAvailable: true,
+        driverCode: driver.driverCode || undefined,
+        driverName,
+      };
+      locationCache.set(driverId, location);
+      lastUpdateTime.set(driverId, Date.now());
+      broadcastLocation(location);
+    } else if (!isAvailable) {
+      locationCache.delete(driverId);
+      lastUpdateTime.delete(driverId);
+    }
+
+    observerConnections.forEach((client) => {
+      if (client.isSubscribed && client.ws.readyState === WebSocket.OPEN) {
+        sendMessage(client.ws, message);
+      }
+    });
+  } catch (error) {
+    log(`Error in broadcastDriverAvailability: ${error}`, 'realtime');
+  }
 }

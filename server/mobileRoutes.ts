@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { requireSupabaseAuth, requireDriverRole } from "./mobileAuth";
-import { broadcastLocationUpdate } from "./realtime";
+import { broadcastLocationUpdate, broadcastDriverAvailability } from "./realtime";
 import { db } from "./db";
 import { jobs as jobsTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -283,6 +283,10 @@ export function registerMobileRoutes(app: Express): void {
           code: "DRIVER_NOT_FOUND"
         });
       }
+
+      // Broadcast driver online/offline status to admin maps
+      await broadcastDriverAvailability(driver.id, isAvailable);
+      console.log(`[Mobile] Driver ${driver.driverCode || driver.id} is now ${isAvailable ? 'ONLINE' : 'OFFLINE'}`);
 
       res.json({
         success: true,

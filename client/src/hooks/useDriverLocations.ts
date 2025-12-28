@@ -11,6 +11,9 @@ export interface DriverLocation {
   speed?: number;
   accuracy?: number;
   timestamp: number;
+  isAvailable?: boolean;
+  driverCode?: string;
+  driverName?: string;
 }
 
 interface WebSocketMessage {
@@ -160,6 +163,33 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
                   updated.delete(message.payload.driverId);
                   return updated;
                 });
+              }
+              break;
+
+            case 'driver:online':
+              if (message.payload) {
+                const { driverId, isAvailable, driverCode, driverName, lat, lng } = message.payload;
+                if (isAvailable && lat !== undefined && lng !== undefined) {
+                  setLocations(prev => {
+                    const updated = new Map(prev);
+                    updated.set(driverId, {
+                      driverId,
+                      lat,
+                      lng,
+                      timestamp: Date.now(),
+                      isAvailable: true,
+                      driverCode,
+                      driverName,
+                    });
+                    return updated;
+                  });
+                } else if (!isAvailable) {
+                  setLocations(prev => {
+                    const updated = new Map(prev);
+                    updated.delete(driverId);
+                    return updated;
+                  });
+                }
               }
               break;
 
