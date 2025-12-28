@@ -244,13 +244,18 @@ export async function registerRoutes(
   // Weekly driver jobs for payment reference
   app.get("/api/driver-jobs/weekly", asyncHandler(async (req, res) => {
     const { db } = await import("./db");
-    const { gte, lte, and, isNotNull, inArray } = await import("drizzle-orm");
+    const { gte, lte, and, or, isNotNull, inArray } = await import("drizzle-orm");
     const { jobs } = await import("@shared/schema");
+    type JobStatus = "pending" | "assigned" | "accepted" | "on_the_way_pickup" | "arrived_pickup" | "collected" | "on_the_way_delivery" | "delivered" | "cancelled";
     
-    // Get start and end dates from query, default to current week
+    // Get start and end dates from query, default to current week (Monday to Sunday)
     const now = new Date();
+    const dayOfWeek = now.getDay();
+    // Handle Sunday (0) as end of week, so Monday is start
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
+    startOfWeek.setDate(now.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
     
     const endOfWeek = new Date(startOfWeek);
@@ -264,7 +269,10 @@ export async function registerRoutes(
       ? new Date(req.query.endDate as string) 
       : endOfWeek;
     
+    const completedStatuses: JobStatus[] = ['delivered', 'collected'];
+    
     // Get jobs that have a driver assigned and are delivered/completed
+    // Filter by deliveredAt (or actualDeliveryTime, or createdAt as fallback)
     const weeklyJobs = await db
       .select({
         id: jobs.id,
@@ -285,12 +293,18 @@ export async function registerRoutes(
       .where(
         and(
           isNotNull(jobs.driverId),
-          gte(jobs.createdAt, startDate),
-          lte(jobs.createdAt, endDate),
-          inArray(jobs.status, ['delivered', 'completed', 'collected'])
+          inArray(jobs.status, completedStatuses),
+          or(
+            // Jobs delivered in this week
+            and(isNotNull(jobs.deliveredAt), gte(jobs.deliveredAt, startDate), lte(jobs.deliveredAt, endDate)),
+            // Or jobs with actualDeliveryTime in this week (fallback)
+            and(isNotNull(jobs.actualDeliveryTime), gte(jobs.actualDeliveryTime, startDate), lte(jobs.actualDeliveryTime, endDate)),
+            // Or jobs created in this week as last fallback (for legacy data without delivery timestamps)
+            and(gte(jobs.createdAt, startDate), lte(jobs.createdAt, endDate))
+          )
         )
       )
-      .orderBy(jobs.createdAt);
+      .orderBy(jobs.deliveredAt);
     
     res.json(weeklyJobs);
   }));

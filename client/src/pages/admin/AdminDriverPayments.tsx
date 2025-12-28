@@ -40,6 +40,12 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
   Search,
   CheckCircle,
   Clock,
@@ -50,12 +56,37 @@ import {
   TrendingUp,
   Users,
   Filter,
+  Calendar,
+  MapPin,
+  ChevronRight,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { insertDriverPaymentSchema } from '@shared/schema';
 import type { Driver, DriverPayment, Job } from '@shared/schema';
+
+interface WeeklyJob {
+  id: string;
+  trackingNumber: string;
+  driverId: string;
+  pickupPostcode: string;
+  pickupAddress: string;
+  deliveryPostcode: string;
+  deliveryAddress: string;
+  status: string;
+  driverPrice: string | null;
+  totalPrice: string;
+  deliveredAt: string | null;
+  actualDeliveryTime: string | null;
+  createdAt: string;
+}
+
+interface DriverJobGroup {
+  driver: Driver;
+  jobs: WeeklyJob[];
+  totalEarnings: number;
+}
 
 const paymentFormSchema = insertDriverPaymentSchema
   .pick({ driverId: true, description: true })
@@ -99,6 +130,33 @@ export default function AdminDriverPayments() {
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
   });
+
+  const { data: weeklyJobs = [], isLoading: weeklyJobsLoading } = useQuery<WeeklyJob[]>({
+    queryKey: ['/api/driver-jobs/weekly'],
+  });
+
+  // Group weekly jobs by driver
+  const driverJobGroups: DriverJobGroup[] = (() => {
+    const groupMap = new Map<string, WeeklyJob[]>();
+    
+    weeklyJobs.forEach(job => {
+      const existing = groupMap.get(job.driverId) || [];
+      existing.push(job);
+      groupMap.set(job.driverId, existing);
+    });
+    
+    const groups: DriverJobGroup[] = [];
+    groupMap.forEach((driverJobs, driverId) => {
+      const driver = drivers.find(d => d.id === driverId);
+      if (driver) {
+        const totalEarnings = driverJobs.reduce((sum, job) => 
+          sum + parseFloat(job.driverPrice || job.totalPrice || '0'), 0);
+        groups.push({ driver, jobs: driverJobs, totalEarnings });
+      }
+    });
+    
+    return groups.sort((a, b) => b.totalEarnings - a.totalEarnings);
+  })();
 
   const markPaidMutation = useMutation({
     mutationFn: async ({ paymentId, reference }: { paymentId: string; reference: string }) => {
@@ -475,6 +533,122 @@ export default function AdminDriverPayments() {
                 <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">No payments found</p>
                 <p className="text-sm text-muted-foreground">Payments will appear here when jobs are completed</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-weekly-jobs">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <CardTitle>Weekly Job Reference</CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Completed jobs this week for payment reference
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {weeklyJobsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : driverJobGroups.length > 0 ? (
+              <Accordion type="multiple" className="w-full">
+                {driverJobGroups.map((group) => (
+                  <AccordionItem key={group.driver.id} value={group.driver.id} data-testid={`accordion-driver-${group.driver.id}`}>
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex flex-1 items-center justify-between pr-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{group.driver.fullName}</span>
+                            <span className="text-xs text-muted-foreground font-mono">{group.driver.driverCode || 'No ID'}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge variant="outline" data-testid={`badge-job-count-${group.driver.id}`}>
+                            {group.jobs.length} job{group.jobs.length !== 1 ? 's' : ''}
+                          </Badge>
+                          <span className="font-semibold text-green-600">{formatPrice(group.totalEarnings)}</span>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Job Number</TableHead>
+                              <TableHead>Pickup</TableHead>
+                              <TableHead>Delivery</TableHead>
+                              <TableHead>Date</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.jobs.map((job) => (
+                              <TableRow key={job.id} data-testid={`row-weekly-job-${job.id}`}>
+                                <TableCell>
+                                  <span className="font-mono text-sm font-medium">{job.trackingNumber}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-start gap-1">
+                                    <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-medium">{job.pickupPostcode}</span>
+                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                        {job.pickupAddress}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-start gap-1">
+                                    <ChevronRight className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-medium">{job.deliveryPostcode}</span>
+                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                        {job.deliveryAddress}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-sm">
+                                    {formatDate(job.deliveredAt || job.actualDeliveryTime || job.createdAt)}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className="font-medium text-green-600">
+                                    {formatPrice(job.driverPrice || job.totalPrice)}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-muted/50">
+                              <TableCell colSpan={4} className="font-medium text-right">
+                                Total for {group.driver.fullName}:
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-bold text-green-600">{formatPrice(group.totalEarnings)}</span>
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No completed jobs this week</p>
+                <p className="text-sm text-muted-foreground">Completed deliveries will appear here</p>
               </div>
             )}
           </CardContent>
