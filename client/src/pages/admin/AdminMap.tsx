@@ -820,7 +820,7 @@ export default function AdminMap() {
           <DialogHeader>
             <DialogTitle>Assign Job to Driver</DialogTitle>
             <DialogDescription>
-              Select an available driver to assign this job to.
+              Select a verified driver to assign this job to. Online drivers are marked with a badge.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -829,12 +829,18 @@ export default function AdminMap() {
                 <SelectValue placeholder="Select a driver" />
               </SelectTrigger>
               <SelectContent>
-                {availableDrivers.length > 0 ? (
-                  availableDrivers.map((driver) => (
+                {activeDrivers.length > 0 ? (
+                  activeDrivers.map((driver) => (
                     <SelectItem key={driver.id} value={driver.id}>
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4" />
+                        {driver.driverCode && (
+                          <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                        )}
                         <span>{driver.fullName || driver.vehicleRegistration || 'Driver'}</span>
+                        {driver.isAvailable && (
+                          <Badge variant="secondary" className="text-xs text-green-600">Online</Badge>
+                        )}
                         <span className="text-muted-foreground text-xs capitalize">
                           ({driver.vehicleType?.replace('_', ' ')})
                         </span>
@@ -843,7 +849,7 @@ export default function AdminMap() {
                   ))
                 ) : (
                   <SelectItem value="none" disabled>
-                    No available drivers
+                    No verified drivers
                   </SelectItem>
                 )}
               </SelectContent>
