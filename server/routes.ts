@@ -99,11 +99,77 @@ const uploadDocument = multer({
   }
 });
 
-function generateTrackingNumber(): string {
+// Sequential counter for tracking numbers within each year
+let lastJobSequence = 0;
+let lastJobYear = 0;
+let initializingYear: Promise<void> | null = null;
+
+async function generateTrackingNumber(): Promise<string> {
   const prefix = "RC";
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${prefix}${timestamp}${random}`;
+  const currentYear = new Date().getFullYear();
+  
+  // Handle year change with proper locking to prevent race conditions
+  if (currentYear !== lastJobYear) {
+    // If initialization is already in progress, wait for it
+    if (initializingYear) {
+      await initializingYear;
+    }
+    
+    // Double-check after waiting
+    if (currentYear !== lastJobYear) {
+      // Start initialization - store promise so other callers can wait
+      initializingYear = (async () => {
+        // Query database to find the highest sequence number for this year
+        try {
+          const { db } = await import("./db");
+          const { jobs } = await import("@shared/schema");
+          const { like, desc } = await import("drizzle-orm");
+          
+          const pattern = `RC${currentYear}%`;
+          const latestJobs = await db.select({ trackingNumber: jobs.trackingNumber })
+            .from(jobs)
+            .where(like(jobs.trackingNumber, pattern))
+            .orderBy(desc(jobs.trackingNumber))
+            .limit(1);
+          
+          let newSequence = 0;
+          if (latestJobs.length > 0) {
+            // Extract sequence number from tracking number (e.g., RC2024004JKL -> 004)
+            const match = latestJobs[0].trackingNumber.match(/RC\d{4}(\d{3})/);
+            if (match) {
+              newSequence = parseInt(match[1], 10);
+            }
+          }
+          
+          // Update atomically after DB query completes
+          lastJobSequence = newSequence;
+          lastJobYear = currentYear;
+        } catch (error) {
+          console.error('[TrackingNumber] Error fetching last sequence:', error);
+          // Still update year to prevent repeated failures
+          lastJobYear = currentYear;
+          lastJobSequence = 0;
+        }
+      })();
+      
+      await initializingYear;
+      initializingYear = null;
+    }
+  }
+  
+  // Increment sequence atomically
+  lastJobSequence++;
+  const currentSequence = lastJobSequence;
+  
+  // Generate random 3-letter suffix
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Excluding I and O to avoid confusion
+  const randomSuffix = Array.from({ length: 3 }, () => 
+    letters.charAt(Math.floor(Math.random() * letters.length))
+  ).join('');
+  
+  // Format: RC + YYYY + NNN (3-digit padded) + XXX (3 random letters)
+  const sequenceStr = currentSequence.toString().padStart(3, '0');
+  return `${prefix}${currentYear}${sequenceStr}${randomSuffix}`;
 }
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
@@ -200,10 +266,13 @@ export async function registerRoutes(
   }));
 
   app.post("/api/jobs", asyncHandler(async (req, res) => {
+    // Generate tracking number first
+    const trackingNumber = await generateTrackingNumber();
+    
     // Preprocess data to handle type coercion
     const preprocessedBody = {
       ...req.body,
-      trackingNumber: generateTrackingNumber(),
+      trackingNumber,
       // Convert weight to string if it's a number (schema expects decimal as string)
       weight: typeof req.body.weight === 'number' ? String(req.body.weight) : req.body.weight,
       // Convert date strings to Date objects
@@ -2064,7 +2133,7 @@ export async function registerRoutes(
     }
 
     const metadata = paymentIntent.metadata || bookingData || {};
-    const trackingNumber = generateTrackingNumber();
+    const trackingNumber = await generateTrackingNumber();
     const totalPrice = parseFloat(metadata.totalPrice) || (paymentIntent.amount / 100);
 
     const jobData = {
@@ -2168,7 +2237,7 @@ export async function registerRoutes(
       return res.status(403).json({ error: "Pay Later is not enabled for this account" });
     }
 
-    const trackingNumber = generateTrackingNumber();
+    const trackingNumber = await generateTrackingNumber();
     
     const jobData = {
       trackingNumber,
@@ -2247,7 +2316,7 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Invalid booking session" });
     }
 
-    const trackingNumber = generateTrackingNumber();
+    const trackingNumber = await generateTrackingNumber();
     const totalPrice = parseFloat(metadata.totalPrice || '0');
     
     const jobData = {
