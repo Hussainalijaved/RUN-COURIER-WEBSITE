@@ -6,6 +6,43 @@ import { db } from "./db";
 import { jobs as jobsTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import type { JobStatus, Job } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+// POD uploads directory
+const podUploadsDir = path.join(process.cwd(), 'uploads', 'pod');
+if (!fs.existsSync(podUploadsDir)) {
+  fs.mkdirSync(podUploadsDir, { recursive: true });
+}
+
+// Multer storage for POD uploads
+const podStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, podUploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const jobId = req.params.jobId || 'unknown';
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '') || '.jpg';
+    const type = file.fieldname === 'signature' ? 'sig' : 'photo';
+    cb(null, `pod_${jobId}_${type}_${timestamp}_${random}${ext}`);
+  }
+});
+
+const uploadPod = multer({
+  storage: podStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images are allowed.'));
+    }
+  }
+});
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -503,6 +540,110 @@ export function registerMobileRoutes(app: Express): void {
 
       res.json({
         success: true,
+        pod: {
+          photoUrl: updatedJob.podPhotoUrl,
+          signatureUrl: updatedJob.podSignatureUrl,
+        },
+      });
+    })
+  );
+
+  // POD File Upload endpoint - accepts actual image files
+  // Fields: 'photo' for delivery photo, 'signature' for recipient signature
+  app.post("/api/mobile/v1/driver/jobs/:jobId/pod/upload",
+    requireSupabaseAuth,
+    requireDriverRole,
+    (req, res, next) => {
+      uploadPod.fields([
+        { name: 'photo', maxCount: 1 },
+        { name: 'signature', maxCount: 1 }
+      ])(req, res, (err) => {
+        if (err) {
+          if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              return res.status(400).json({ error: "File size exceeds 10MB limit", code: "FILE_TOO_LARGE" });
+            }
+            return res.status(400).json({ error: err.message, code: "UPLOAD_ERROR" });
+          }
+          return res.status(400).json({ error: err.message || "Invalid file", code: "INVALID_FILE" });
+        }
+        next();
+      });
+    },
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+      
+      const { jobId } = req.params;
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      const job = await storage.getJob(jobId);
+
+      if (!job) {
+        return res.status(404).json({ 
+          error: "Job not found",
+          code: "JOB_NOT_FOUND"
+        });
+      }
+
+      if (job.driverId !== driver.id) {
+        return res.status(403).json({ 
+          error: "This job is not assigned to you",
+          code: "NOT_YOUR_JOB"
+        });
+      }
+
+      if (!["on_the_way_delivery", "delivered"].includes(job.status)) {
+        return res.status(400).json({ 
+          error: "POD can only be uploaded during delivery phase",
+          code: "INVALID_POD_TIMING"
+        });
+      }
+
+      // Build URLs for uploaded files
+      let podPhotoUrl: string | undefined;
+      let podSignatureUrl: string | undefined;
+
+      if (files['photo'] && files['photo'][0]) {
+        podPhotoUrl = `/uploads/pod/${files['photo'][0].filename}`;
+      }
+
+      if (files['signature'] && files['signature'][0]) {
+        podSignatureUrl = `/uploads/pod/${files['signature'][0].filename}`;
+      }
+
+      if (!podPhotoUrl && !podSignatureUrl) {
+        return res.status(400).json({ 
+          error: "At least one file (photo or signature) is required",
+          code: "NO_FILES_UPLOADED"
+        });
+      }
+
+      // Keep existing POD if not uploading new one
+      const finalPhotoUrl = podPhotoUrl || job.podPhotoUrl || undefined;
+      const finalSignatureUrl = podSignatureUrl || job.podSignatureUrl || undefined;
+
+      const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl);
+
+      if (!updatedJob) {
+        return res.status(500).json({ 
+          error: "Failed to save POD",
+          code: "POD_SAVE_FAILED"
+        });
+      }
+
+      console.log(`[POD Upload] Job ${jobId}: photo=${podPhotoUrl || 'none'}, signature=${podSignatureUrl || 'none'}`);
+
+      res.json({
+        success: true,
+        message: "Proof of Delivery uploaded successfully",
         pod: {
           photoUrl: updatedJob.podPhotoUrl,
           signatureUrl: updatedJob.podSignatureUrl,
