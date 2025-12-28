@@ -299,6 +299,7 @@ export const jobAssignments = pgTable("job_assignments", {
   assignedBy: varchar("assigned_by", { length: 36 }).notNull(),
   driverPrice: decimal("driver_price", { precision: 10, scale: 2 }).notNull(),
   status: text("status").$type<JobAssignmentStatus>().notNull().default("pending"),
+  batchGroupId: varchar("batch_group_id", { length: 36 }),
   sentAt: timestamp("sent_at"),
   respondedAt: timestamp("responded_at"),
   cancelledAt: timestamp("cancelled_at"),

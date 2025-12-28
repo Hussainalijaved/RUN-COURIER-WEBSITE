@@ -2743,6 +2743,94 @@ export async function registerRoutes(
     res.status(201).json(assignment);
   }));
 
+  // Batch assign multiple jobs to a driver
+  app.post("/api/job-assignments/batch", asyncHandler(async (req, res) => {
+    const { jobIds, driverId, assignedBy, driverPrice, expiresAt } = req.body;
+    
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json({ error: "At least one job is required" });
+    }
+    if (!driverId || !assignedBy || !driverPrice) {
+      return res.status(400).json({ error: "Driver ID, assigned by, and driver price are required" });
+    }
+
+    // Verify driver exists and is active
+    const driver = await storage.getDriver(driverId);
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+    if (driver.isActive === false) {
+      return res.status(400).json({ error: "Cannot assign jobs to a deactivated driver" });
+    }
+
+    const driverUserId = driver.userId;
+    if (!driverUserId) {
+      return res.status(400).json({ error: "Driver has no associated user account" });
+    }
+
+    // Generate a batch group ID
+    const batchGroupId = crypto.randomUUID();
+    const assignments: any[] = [];
+    const errors: { jobId: string; error: string }[] = [];
+
+    for (const jobId of jobIds) {
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        errors.push({ jobId, error: "Job not found" });
+        continue;
+      }
+
+      // Check if job already has an active assignment
+      const existingAssignment = await storage.getActiveAssignmentForJob(jobId);
+      if (existingAssignment) {
+        errors.push({ jobId, error: "Job already has an active assignment" });
+        continue;
+      }
+
+      // Create the assignment
+      const assignment = await storage.createJobAssignment({
+        jobId,
+        driverId,
+        assignedBy,
+        driverPrice,
+        status: "sent",
+        sentAt: new Date(),
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        batchGroupId,
+      });
+
+      // Update job status to "assigned" and set driverId
+      await storage.updateJob(jobId, {
+        status: "assigned" as any,
+        driverId: driverId,
+        driverPrice: driverPrice
+      });
+
+      assignments.push(assignment);
+    }
+
+    // Create single notification for batch assignment
+    if (assignments.length > 0) {
+      await storage.createNotification({
+        userId: driverUserId,
+        title: `${assignments.length} New Job Assignment${assignments.length > 1 ? 's' : ''}`,
+        message: `You have been assigned ${assignments.length} job${assignments.length > 1 ? 's' : ''}. Driver payment: £${driverPrice} each. Please review and respond.`,
+        type: "job_assigned",
+        data: { batchGroupId, assignmentCount: assignments.length },
+      });
+    }
+
+    console.log(`[Job Assignment Batch] ${assignments.length} jobs assigned to driver ${driverId} (batch: ${batchGroupId})`);
+
+    res.status(201).json({
+      batchGroupId,
+      assignments,
+      errors: errors.length > 0 ? errors : undefined,
+      successCount: assignments.length,
+      errorCount: errors.length,
+    });
+  }));
+
   app.patch("/api/job-assignments/:id", asyncHandler(async (req, res) => {
     const assignment = await storage.updateJobAssignment(req.params.id, req.body);
     if (!assignment) {
