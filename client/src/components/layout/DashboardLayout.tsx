@@ -66,6 +66,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/customers', label: 'Customers', icon: Users },
     { href: '/admin/map', label: 'Live Map', icon: MapPin },
     { href: '/admin/documents', label: 'Documents', icon: FileText },
+    { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   ],
   driver: [
