@@ -42,6 +42,7 @@ import {
   Filter,
   MoreHorizontal,
   Eye,
+  EyeOff,
   UserPlus,
   XCircle,
   MapPin,
@@ -304,6 +305,24 @@ export default function AdminJobs() {
       customerName: customerName || undefined 
     });
   };
+
+  const toggleDriverVisibilityMutation = useMutation({
+    mutationFn: async ({ jobId, hidden }: { jobId: string; hidden: boolean }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/driver-visibility`, { hidden, adminId: 'admin' });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ 
+        title: variables.hidden ? 'Job hidden from driver' : 'Job visible to driver',
+        description: variables.hidden 
+          ? 'This job will no longer appear in the driver mobile app.' 
+          : 'This job is now visible in the driver mobile app.'
+      });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update job visibility', variant: 'destructive' });
+    },
+  });
 
   const resendPaymentLinkMutation = useMutation({
     mutationFn: async ({ jobId }: { jobId: string }) => {
@@ -810,6 +829,27 @@ export default function AdminJobs() {
                                 Cancel Job
                               </DropdownMenuItem>
                             )}
+                            {/* Hide/Unhide from driver mobile app */}
+                            <DropdownMenuItem 
+                              onClick={() => toggleDriverVisibilityMutation.mutate({ 
+                                jobId: job.id, 
+                                hidden: !(job as any).driverHidden 
+                              })}
+                              disabled={toggleDriverVisibilityMutation.isPending}
+                              data-testid={`menu-toggle-visibility-${job.id}`}
+                            >
+                              {(job as any).driverHidden ? (
+                                <>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Show to Driver
+                                </>
+                              ) : (
+                                <>
+                                  <EyeOff className="mr-2 h-4 w-4" />
+                                  Hide from Driver
+                                </>
+                              )}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
