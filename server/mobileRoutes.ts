@@ -311,6 +311,9 @@ export function registerMobileRoutes(app: Express): void {
       memoryJobs.forEach(j => jobMap.set(j.id, j));
       dbJobs.forEach(j => jobMap.set(j.id, j));
       let jobs = Array.from(jobMap.values());
+      
+      // Filter out hidden jobs (unless viewing completed/history)
+      jobs = jobs.filter(j => (j as any).driverHidden !== true);
 
       if (status === "active") {
         jobs = jobs.filter(j => 
@@ -764,10 +767,14 @@ export function registerMobileRoutes(app: Express): void {
       
       const allAssignments = [...assignments, ...pendingAssignments];
       
-      // Enrich with job details
+      // Enrich with job details and filter hidden jobs
       const enrichedOffers = await Promise.all(
         allAssignments.map(async (assignment) => {
           const job = await storage.getJob(assignment.jobId);
+          // Skip if job is hidden from driver view
+          if (job && (job as any).driverHidden === true) {
+            return null;
+          }
           return {
             id: assignment.id,
             jobId: assignment.jobId,
@@ -797,10 +804,13 @@ export function registerMobileRoutes(app: Express): void {
         })
       );
       
+      // Filter out null entries (hidden jobs) and jobs without data
+      const visibleOffers = enrichedOffers.filter(o => o !== null && o.job !== null);
+      
       res.json({
         success: true,
-        offers: enrichedOffers.filter(o => o.job !== null),
-        count: enrichedOffers.filter(o => o.job !== null).length
+        offers: visibleOffers,
+        count: visibleOffers.length
       });
     })
   );
