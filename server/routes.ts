@@ -241,6 +241,60 @@ export async function registerRoutes(
     res.json({ success: true, message: "Test email sent", result });
   }));
 
+  // Weekly driver jobs for payment reference
+  app.get("/api/driver-jobs/weekly", asyncHandler(async (req, res) => {
+    const { db } = await import("./db");
+    const { gte, lte, and, isNotNull, inArray } = await import("drizzle-orm");
+    const { jobs } = await import("@shared/schema");
+    
+    // Get start and end dates from query, default to current week
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    const startDate = req.query.startDate 
+      ? new Date(req.query.startDate as string) 
+      : startOfWeek;
+    const endDate = req.query.endDate 
+      ? new Date(req.query.endDate as string) 
+      : endOfWeek;
+    
+    // Get jobs that have a driver assigned and are delivered/completed
+    const weeklyJobs = await db
+      .select({
+        id: jobs.id,
+        trackingNumber: jobs.trackingNumber,
+        driverId: jobs.driverId,
+        pickupPostcode: jobs.pickupPostcode,
+        pickupAddress: jobs.pickupAddress,
+        deliveryPostcode: jobs.deliveryPostcode,
+        deliveryAddress: jobs.deliveryAddress,
+        status: jobs.status,
+        driverPrice: jobs.driverPrice,
+        totalPrice: jobs.totalPrice,
+        deliveredAt: jobs.deliveredAt,
+        actualDeliveryTime: jobs.actualDeliveryTime,
+        createdAt: jobs.createdAt,
+      })
+      .from(jobs)
+      .where(
+        and(
+          isNotNull(jobs.driverId),
+          gte(jobs.createdAt, startDate),
+          lte(jobs.createdAt, endDate),
+          inArray(jobs.status, ['delivered', 'completed', 'collected'])
+        )
+      )
+      .orderBy(jobs.createdAt);
+    
+    res.json(weeklyJobs);
+  }));
+
   // Track by tracking number - must be before :id route
   // Query database directly for public tracking (doesn't require auth)
   app.get("/api/jobs/track/:trackingNumber", asyncHandler(async (req, res) => {
