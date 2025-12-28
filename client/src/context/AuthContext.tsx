@@ -17,11 +17,19 @@ function extractUserFromSession(session: any): AuthUser | null {
   if (!session?.user) return null;
   
   const metadata = session.user.user_metadata;
+  
+  // Normalize role - 'business' and 'individual' are userTypes, not roles
+  // If they're stored as role by mistake, map them to 'customer'
+  let role = metadata?.role || 'customer';
+  if (role === 'business' || role === 'individual') {
+    role = 'customer';
+  }
+  
   return {
     id: session.user.id,
     email: session.user.email || '',
     fullName: metadata?.fullName || metadata?.full_name || 'User',
-    role: metadata?.role || 'customer',
+    role: role as UserRole,
     userType: metadata?.userType || 'individual',
     companyName: metadata?.companyName,
     phone: metadata?.phone,
