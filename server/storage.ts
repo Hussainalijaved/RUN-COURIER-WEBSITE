@@ -29,6 +29,7 @@ import {
   jobs,
   users,
   paymentLinks,
+  jobAssignments,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -1712,11 +1713,42 @@ export class MemStorage implements IStorage {
   }
 
   async getJobAssignment(id: string): Promise<JobAssignment | undefined> {
-    return this.jobAssignments.get(id);
+    // Check memory first
+    let assignment = this.jobAssignments.get(id);
+    if (assignment) return assignment;
+    
+    // Check database
+    try {
+      const dbResult = await db.select().from(jobAssignments).where(eq(jobAssignments.id, id));
+      if (dbResult.length > 0) {
+        assignment = dbResult[0];
+        this.jobAssignments.set(id, assignment);
+        return assignment;
+      }
+    } catch (err) {
+      console.error("[Storage] Failed to get job assignment from database:", err);
+    }
+    
+    return undefined;
   }
 
   async getJobAssignments(filters?: { jobId?: string; driverId?: string; status?: JobAssignmentStatus }): Promise<JobAssignment[]> {
+    // Get from memory first
     let assignments = Array.from(this.jobAssignments.values());
+    
+    // Also get from database and merge
+    try {
+      const dbAssignments = await db.select().from(jobAssignments);
+      const seenIds = new Set(assignments.map(a => a.id));
+      for (const dbAssign of dbAssignments) {
+        if (!seenIds.has(dbAssign.id)) {
+          assignments.push(dbAssign);
+          this.jobAssignments.set(dbAssign.id, dbAssign);
+        }
+      }
+    } catch (err) {
+      console.error("[Storage] Failed to get job assignments from database:", err);
+    }
     
     if (filters?.jobId) {
       assignments = assignments.filter(a => a.jobId === filters.jobId);
@@ -1737,6 +1769,7 @@ export class MemStorage implements IStorage {
 
   async createJobAssignment(assignment: InsertJobAssignment): Promise<JobAssignment> {
     const id = randomUUID();
+    const now = new Date();
     const newAssignment: JobAssignment = {
       id,
       jobId: assignment.jobId,
@@ -1744,23 +1777,41 @@ export class MemStorage implements IStorage {
       assignedBy: assignment.assignedBy,
       driverPrice: assignment.driverPrice,
       status: (assignment.status || "pending") as JobAssignmentStatus,
-      sentAt: assignment.sentAt || null,
+      sentAt: assignment.status === "sent" ? now : (assignment.sentAt || null),
       respondedAt: assignment.respondedAt || null,
       cancelledAt: assignment.cancelledAt || null,
       cancellationReason: assignment.cancellationReason || null,
       rejectionReason: assignment.rejectionReason || null,
       expiresAt: assignment.expiresAt || null,
-      createdAt: new Date(),
+      createdAt: now,
     };
     this.jobAssignments.set(id, newAssignment);
+    
+    // Also persist to database
+    try {
+      await db.insert(jobAssignments).values(newAssignment);
+      console.log(`[Storage] Job assignment ${id} saved to database`);
+    } catch (err) {
+      console.error(`[Storage] Failed to save job assignment to database:`, err);
+    }
+    
     return newAssignment;
   }
 
   async updateJobAssignment(id: string, data: Partial<JobAssignment>): Promise<JobAssignment | undefined> {
-    const assignment = this.jobAssignments.get(id);
+    let assignment = await this.getJobAssignment(id);
     if (!assignment) return undefined;
     const updated = { ...assignment, ...data };
     this.jobAssignments.set(id, updated);
+    
+    // Also update in database
+    try {
+      await db.update(jobAssignments).set(data).where(eq(jobAssignments.id, id));
+      console.log(`[Storage] Job assignment ${id} updated in database`);
+    } catch (err) {
+      console.error(`[Storage] Failed to update job assignment in database:`, err);
+    }
+    
     return updated;
   }
 
