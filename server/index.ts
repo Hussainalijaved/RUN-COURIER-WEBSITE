@@ -8,6 +8,24 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 import { setupRealtimeServer, hydrateLocationCache } from './realtime';
+import { db } from './db';
+import { sql } from 'drizzle-orm';
+
+// Run startup migrations to add new columns if they don't exist
+async function runStartupMigrations() {
+  try {
+    // Add driver visibility columns to jobs table if they don't exist
+    await db.execute(sql`
+      ALTER TABLE jobs 
+      ADD COLUMN IF NOT EXISTS driver_hidden BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS driver_hidden_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS driver_hidden_by VARCHAR(36)
+    `);
+    console.log('Startup migrations completed successfully');
+  } catch (error) {
+    console.error('Startup migration error (may be harmless if columns already exist):', error);
+  }
+}
 
 const app = express();
 
@@ -197,6 +215,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run startup migrations to add new columns
+  await runStartupMigrations();
+  
   await registerRoutes(httpServer, app);
 
   setupRealtimeServer(httpServer);

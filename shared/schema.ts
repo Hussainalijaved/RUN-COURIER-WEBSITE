@@ -161,6 +161,9 @@ export const jobs = pgTable("jobs", {
   estimatedDeliveryTime: timestamp("estimated_delivery_time"),
   actualPickupTime: timestamp("actual_pickup_time"),
   actualDeliveryTime: timestamp("actual_delivery_time"),
+  driverHidden: boolean("driver_hidden").default(false),
+  driverHiddenAt: timestamp("driver_hidden_at"),
+  driverHiddenBy: varchar("driver_hidden_by", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

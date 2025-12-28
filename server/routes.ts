@@ -434,6 +434,44 @@ export async function registerRoutes(
     res.status(204).send();
   }));
 
+  // Toggle job visibility for driver mobile app (admin only)
+  app.patch("/api/jobs/:id/driver-visibility", asyncHandler(async (req, res) => {
+    const { hidden, adminId } = req.body;
+    const jobId = req.params.id;
+    
+    if (typeof hidden !== 'boolean') {
+      return res.status(400).json({ error: "hidden field must be a boolean" });
+    }
+    
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    // Update job visibility in database
+    const { db } = await import("./db");
+    const { jobs: jobsTable } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const updateData: any = {
+      driverHidden: hidden,
+      driverHiddenAt: hidden ? new Date() : null,
+      driverHiddenBy: hidden ? (adminId || null) : null,
+    };
+    
+    await db.update(jobsTable)
+      .set(updateData)
+      .where(eq(jobsTable.id, jobId));
+    
+    // Also update in-memory storage
+    await storage.updateJob(jobId, updateData);
+    
+    console.log(`[Jobs] Job ${jobId} visibility for driver: ${hidden ? 'hidden' : 'visible'} by admin ${adminId || 'unknown'}`);
+    
+    const updatedJob = await storage.getJob(jobId);
+    res.json(updatedJob);
+  }));
+
   app.get("/api/drivers", asyncHandler(async (req, res) => {
     const { isAvailable, isVerified, vehicleType, includeInactive } = req.query;
     const drivers = await storage.getDrivers({
