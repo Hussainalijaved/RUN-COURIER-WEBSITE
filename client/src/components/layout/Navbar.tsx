@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
@@ -57,11 +57,6 @@ export function Navbar() {
       default: return '/customer';
     }
   };
-
-  const handleNavClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    e.preventDefault();
-    setLocation(href);
-  }, [setLocation]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -122,18 +117,19 @@ export function Navbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem asChild>
-                  <a 
-                    href={getDashboardPath()} 
-                    onClick={(e) => handleNavClick(e, getDashboardPath())}
-                    className="w-full cursor-pointer" 
-                    data-testid="link-dashboard"
-                  >
-                    Dashboard
-                  </a>
+                <DropdownMenuItem 
+                  onSelect={() => setLocation(getDashboardPath())}
+                  className="cursor-pointer" 
+                  data-testid="link-dashboard"
+                >
+                  Dashboard
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer" data-testid="button-logout">
+                <DropdownMenuItem 
+                  onSelect={signOut} 
+                  className="text-destructive cursor-pointer" 
+                  data-testid="button-logout"
+                >
                   <LogOut className="h-4 w-4 mr-2" />
                   Sign Out
                 </DropdownMenuItem>
@@ -196,15 +192,15 @@ export function Navbar() {
                 <div className="border-t border-border pt-4 mt-4">
                   {user ? (
                     <>
-                      <a 
-                        href={getDashboardPath()} 
-                        onClick={(e) => {
-                          handleNavClick(e, getDashboardPath());
+                      <Button 
+                        className="w-full mb-2"
+                        onClick={() => {
+                          setLocation(getDashboardPath());
                           setIsOpen(false);
                         }}
                       >
-                        <Button className="w-full mb-2">Dashboard</Button>
-                      </a>
+                        Dashboard
+                      </Button>
                       <Button
                         variant="outline"
                         className="w-full"
