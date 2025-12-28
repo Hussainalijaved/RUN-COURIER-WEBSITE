@@ -420,6 +420,17 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
+      // Require POD (photo or signature) before marking as delivered
+      if (status === "delivered") {
+        if (!job.podPhotoUrl && !job.podSignatureUrl) {
+          return res.status(400).json({ 
+            error: "Proof of Delivery (photo or signature) is required before marking as delivered",
+            code: "POD_REQUIRED",
+            hint: "Please upload POD using the /api/mobile/v1/driver/jobs/:jobId/pod endpoint first"
+          });
+        }
+      }
+
       const updatedJob = await storage.updateJobStatus(jobId, status, rejectionReason);
 
       if (!updatedJob) {

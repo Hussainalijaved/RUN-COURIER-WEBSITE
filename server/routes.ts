@@ -279,9 +279,24 @@ export async function registerRoutes(
   app.patch("/api/jobs/:id/status", asyncHandler(async (req, res) => {
     const { status, rejectionReason } = req.body;
     const previousJob = await storage.getJob(req.params.id);
+    
+    if (!previousJob) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    // Require POD (photo or signature) before marking as delivered
+    if (status === "delivered") {
+      if (!previousJob.podPhotoUrl && !previousJob.podSignatureUrl) {
+        return res.status(400).json({ 
+          error: "Proof of Delivery (photo or signature) is required before marking as delivered. POD must be submitted from the mobile app.",
+          code: "POD_REQUIRED"
+        });
+      }
+    }
+    
     const job = await storage.updateJobStatus(req.params.id, status, rejectionReason);
     if (!job) {
-      return res.status(404).json({ error: "Job not found" });
+      return res.status(404).json({ error: "Failed to update job status" });
     }
     // Broadcast job status update for real-time updates
     broadcastJobUpdate({
