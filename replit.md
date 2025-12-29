@@ -100,10 +100,38 @@ Driver IDs follow the format: **RC** + 2 numbers + 1 letter (e.g., RC02C, RC15A,
 ### Admin Job Assignment System
 Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments via a "Job Offers" tab. Assignment statuses are tracked (pending, sent, accepted, rejected, cancelled, expired), and assignment history is maintained.
 
+## Supabase-Only Architecture Migration (IN PROGRESS)
+
+The platform is transitioning to a Supabase-only backend architecture to enable:
+- Website hosting on Hostinger (runcourier.co.uk) connecting directly to Supabase
+- Mobile app (com.runcourier.driver) sharing the same Supabase backend
+- No dependency on Replit backend for production
+
+### Edge Functions (supabase/functions/)
+Privileged operations that require service-role access are handled via Supabase Edge Functions:
+- `create-job` - Creates jobs with tracking number generation
+- `update-job-status` - Updates job status with POD validation
+- `assign-driver` - Assigns drivers to jobs (admin/dispatcher only)
+- `stripe-create-payment-intent` - Creates Stripe payment intents
+- `stripe-webhook` - Handles Stripe webhook events
+- `send-email` - Sends transactional emails via Resend
+
+### RLS Policies (supabase/rls-policies.sql)
+Row Level Security policies control data access:
+- Customers can only access their own jobs and invoices
+- Drivers can only access assigned jobs and their own profile
+- Admins/dispatchers have full access
+- Public tracking via Edge Functions (not direct table access)
+
+### Frontend Client (client/src/lib/supabaseFunctions.ts)
+Client library for calling Edge Functions with proper authentication.
+
+### Deployment Guide (supabase/DEPLOYMENT.md)
+Instructions for deploying Edge Functions and configuring RLS policies.
+
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculation, and route visualization.
--   **Supabase Services**: Utilized for authentication and user management.
--   **Neon Database**: Provides serverless PostgreSQL hosting.
--   **Stripe**: Integrated for immediate payment processing, managing customer IDs for "Pay Later" invoicing, and dynamic checkout sessions.
--   **Resend**: Used for transactional email notifications to `info@runcourier.co.uk` for various system events (new jobs, driver applications, document uploads, invoice generation).
+-   **Supabase Services**: Authentication, database, realtime subscriptions, and Edge Functions for privileged operations.
+-   **Stripe**: Integrated for immediate payment processing via Edge Functions, managing customer IDs for "Pay Later" invoicing.
+-   **Resend**: Transactional emails sent via Edge Function `send-email` to `info@runcourier.co.uk`.
