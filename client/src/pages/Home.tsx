@@ -402,7 +402,7 @@ export default function Home() {
               <p className="text-white/80 text-sm">Track deliveries on the go</p>
             </div>
             <a 
-              href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
+              href="https://apps.apple.com/app/run-courier-driver/id6756506175" 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center gap-3 bg-black text-white px-6 py-3 rounded-xl hover:bg-gray-900 transition-colors"

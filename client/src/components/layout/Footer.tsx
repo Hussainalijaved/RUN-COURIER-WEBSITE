@@ -88,7 +88,7 @@ export function Footer() {
                 <SiTrustpilot className="h-4 w-4" />
               </a>
               <a 
-                href="https://apps.apple.com/gb/app/run-courier/id6752310068" 
+                href="https://apps.apple.com/app/run-courier-driver/id6756506175" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
