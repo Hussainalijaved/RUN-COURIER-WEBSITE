@@ -129,6 +129,7 @@ export default function AdminDrivers() {
   const [editDbsChecked, setEditDbsChecked] = useState(false);
   const [editDbsCertificateUrl, setEditDbsCertificateUrl] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editPostcode, setEditPostcode] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
   const [nationalitySearch, setNationalitySearch] = useState('');
   const [nationalityOpen, setNationalityOpen] = useState(false);
@@ -376,6 +377,7 @@ export default function AdminDrivers() {
     setEditDbsChecked(driver.dbsChecked ?? false);
     setEditDbsCertificateUrl(driver.dbsCertificateUrl || '');
     setEditAddress(driver.address || '');
+    setEditPostcode(driver.postcode || '');
     setEditMode(false);
     setProfileDialogOpen(true);
   };
@@ -400,6 +402,7 @@ export default function AdminDrivers() {
         dbsChecked: editDbsChecked,
         dbsCertificateUrl: editDbsCertificateUrl,
         address: editAddress,
+        postcode: editPostcode,
       },
     });
   };
@@ -887,14 +890,24 @@ export default function AdminDrivers() {
                         </div>
                       )}
                       {editMode ? (
-                        <div className="space-y-2">
-                          <Label>Address</Label>
-                          <Input
-                            value={editAddress}
-                            onChange={(e) => setEditAddress(e.target.value)}
-                            placeholder="Full address"
-                          />
-                        </div>
+                        <>
+                          <div className="space-y-2">
+                            <Label>Address</Label>
+                            <Input
+                              value={editAddress}
+                              onChange={(e) => setEditAddress(e.target.value)}
+                              placeholder="Full address"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Postcode</Label>
+                            <Input
+                              value={editPostcode}
+                              onChange={(e) => setEditPostcode(e.target.value.toUpperCase())}
+                              placeholder="SW1A 1AA"
+                            />
+                          </div>
+                        </>
                       ) : (
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
