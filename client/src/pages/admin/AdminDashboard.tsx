@@ -130,8 +130,10 @@ export default function AdminDashboard() {
     return driverId.length > 20 ? `${driverId.substring(0, 8)}...` : driverId;
   };
 
-  const formatPrice = (price: string | number) => {
+  const formatPrice = (price: string | number | undefined | null) => {
+    if (price === undefined || price === null) return '£0.00';
     const num = typeof price === 'string' ? parseFloat(price) : price;
+    if (isNaN(num)) return '£0.00';
     return `£${num.toFixed(2)}`;
   };
 
