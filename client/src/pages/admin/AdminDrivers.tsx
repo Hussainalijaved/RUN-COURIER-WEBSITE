@@ -128,6 +128,7 @@ export default function AdminDrivers() {
   const [editRightToWorkShareCode, setEditRightToWorkShareCode] = useState('');
   const [editDbsChecked, setEditDbsChecked] = useState(false);
   const [editDbsCertificateUrl, setEditDbsCertificateUrl] = useState('');
+  const [editAddress, setEditAddress] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
   const [nationalitySearch, setNationalitySearch] = useState('');
   const [nationalityOpen, setNationalityOpen] = useState(false);
@@ -374,6 +375,7 @@ export default function AdminDrivers() {
     setEditRightToWorkShareCode(driver.rightToWorkShareCode || '');
     setEditDbsChecked(driver.dbsChecked ?? false);
     setEditDbsCertificateUrl(driver.dbsCertificateUrl || '');
+    setEditAddress(driver.address || '');
     setEditMode(false);
     setProfileDialogOpen(true);
   };
@@ -397,6 +399,7 @@ export default function AdminDrivers() {
         rightToWorkShareCode: editRightToWorkShareCode,
         dbsChecked: editDbsChecked,
         dbsCertificateUrl: editDbsCertificateUrl,
+        address: editAddress,
       },
     });
   };
@@ -883,10 +886,21 @@ export default function AdminDrivers() {
                           <span>{getDriverInfo(selectedDriver).phone || '—'}</span>
                         </div>
                       )}
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{selectedDriver.address || selectedDriver.postcode || '—'}</span>
-                      </div>
+                      {editMode ? (
+                        <div className="space-y-2">
+                          <Label>Address</Label>
+                          <Input
+                            value={editAddress}
+                            onChange={(e) => setEditAddress(e.target.value)}
+                            placeholder="Full address"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span>{selectedDriver.address || selectedDriver.postcode || '—'}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
