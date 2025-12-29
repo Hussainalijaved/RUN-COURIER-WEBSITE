@@ -12,10 +12,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Link } from 'wouter';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import type { Job, Driver, Document, DriverApplication } from '@shared/schema';
+import {
+  useJobs,
+  useDrivers,
+  useDriverApplications,
+  usePendingDocuments,
+  useReviewDocument,
+  useAdminStats,
+} from '@/hooks/useSupabaseData';
 import {
   Package,
   Users,
@@ -91,45 +97,17 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
-    queryKey: ['/api/stats/admin'],
-  });
+  const { data: stats, isLoading: statsLoading } = useAdminStats();
 
-  const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', { limit: 10 }],
-  });
+  const { data: jobs, isLoading: jobsLoading } = useJobs({ limit: 10 });
 
-  const { data: drivers } = useQuery<Driver[]>({
-    queryKey: ['/api/drivers'],
-  });
+  const { data: drivers } = useDrivers();
 
-  const { data: documents } = useQuery<Document[]>({
-    queryKey: ['/api/documents', { status: 'pending' }],
-  });
+  const { data: documents } = usePendingDocuments();
 
-  const { data: applications } = useQuery<DriverApplication[]>({
-    queryKey: ['/api/driver-applications'],
-  });
+  const { data: applications } = useDriverApplications();
 
-  const reviewDocumentMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' }) => {
-      return apiRequest('PATCH', `/api/documents/${id}/review`, { 
-        status, 
-        reviewedBy: 'admin',
-        reviewNotes: status === 'rejected' ? 'Rejected by admin' : null
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
-      queryClient.invalidateQueries({ queryKey: ['supabase', 'driver'] });
-      toast({ title: 'Document reviewed successfully' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to review document', variant: 'destructive' });
-    },
-  });
+  const reviewDocumentMutation = useReviewDocument();
 
   const getDriverName = (driverId: string | null) => {
     if (!driverId) return '—';
@@ -336,7 +314,7 @@ export default function AdminDashboard() {
                               variant="ghost" 
                               className="h-8 w-8 text-green-500" 
                               data-testid={`button-approve-doc-${doc.id}`}
-                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'approved' })}
+                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'approved', reviewedBy: 'admin' })}
                               disabled={reviewDocumentMutation.isPending}
                             >
                               <CheckCircle className="h-4 w-4" />
@@ -346,7 +324,7 @@ export default function AdminDashboard() {
                               variant="ghost" 
                               className="h-8 w-8 text-red-500" 
                               data-testid={`button-reject-doc-${doc.id}`}
-                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'rejected' })}
+                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'rejected', reviewedBy: 'admin', reviewNotes: 'Rejected by admin' })}
                               disabled={reviewDocumentMutation.isPending}
                             >
                               <XCircle className="h-4 w-4" />

@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useJobs } from '@/hooks/useSupabaseData';
+import { supabase } from '@/lib/supabase';
 import type { Job, JobStatus } from '@shared/schema';
 
 interface CustomerStats {
