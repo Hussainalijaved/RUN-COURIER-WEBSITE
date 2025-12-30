@@ -575,18 +575,19 @@ export default function AdminJobs() {
   };
 
   // Combine Supabase drivers with local driver data
+  // IMPORTANT: Use Supabase data (isVerified, isAvailable, vehicleType) as primary source
   const allDriversWithInfo = supabaseDrivers?.map(sd => {
-    const localInfo = getDriverInfo(sd.id);
+    const localDriver = drivers?.find(d => d.id === sd.id || d.userId === sd.id);
     return {
       id: sd.id,
       name: sd.fullName,
       email: sd.email,
-      phone: sd.phone || localInfo.phone,
-      driverCode: sd.driverCode || localInfo.driverCode,
-      vehicleType: localInfo.vehicleType,
-      vehicleRegistration: localInfo.vehicleRegistration,
-      isVerified: localInfo.isVerified,
-      isAvailable: localInfo.isAvailable,
+      phone: sd.phone || localDriver?.phone || '',
+      driverCode: sd.driverCode || localDriver?.driverCode || null,
+      vehicleType: sd.vehicleType || localDriver?.vehicleType || 'car',
+      vehicleRegistration: localDriver?.vehicleRegistration || '',
+      isVerified: sd.isVerified ?? localDriver?.isVerified ?? false,
+      isAvailable: sd.isAvailable ?? localDriver?.isAvailable ?? false,
     };
   }) || [];
 

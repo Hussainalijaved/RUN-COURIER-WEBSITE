@@ -129,8 +129,35 @@ export default function AdminCreateJob() {
     queryKey: ['/api/drivers'],
   });
 
-  // Admin can assign to any verified and active driver, regardless of availability status
-  const availableDrivers = drivers?.filter(d => d.isVerified && d.isActive !== false) || [];
+  // Fetch drivers from Supabase (authoritative source)
+  interface SupabaseDriver {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string | null;
+    role: string;
+    driverCode: string | null;
+    vehicleType?: string;
+    isVerified?: boolean;
+    isAvailable?: boolean;
+    createdAt: string;
+  }
+  
+  const { data: supabaseDrivers } = useQuery<SupabaseDriver[]>({
+    queryKey: ['/api/supabase-drivers'],
+  });
+
+  // Admin can assign to ANY driver (verified or not) - they have full control
+  // Use Supabase drivers as primary source, fall back to local drivers
+  const availableDrivers = supabaseDrivers?.map(sd => ({
+    id: sd.id,
+    fullName: sd.fullName,
+    driverCode: sd.driverCode,
+    vehicleType: sd.vehicleType || 'car',
+    vehicleRegistration: drivers?.find(d => d.id === sd.id)?.vehicleRegistration || '',
+    isVerified: sd.isVerified ?? false,
+    isAvailable: sd.isAvailable ?? false,
+  })) || [];
 
   const pickupPostcode = form.watch('pickupPostcode');
   const deliveryPostcode = form.watch('deliveryPostcode');
@@ -915,8 +942,8 @@ export default function AdminCreateJob() {
                           </Select>
                           <FormDescription>
                             {availableDrivers.length === 0 
-                              ? 'No verified drivers found'
-                              : `${availableDrivers.length} verified driver${availableDrivers.length > 1 ? 's' : ''}`
+                              ? 'No drivers found'
+                              : `${availableDrivers.length} driver${availableDrivers.length > 1 ? 's' : ''} available`
                             }
                           </FormDescription>
                         </FormItem>
