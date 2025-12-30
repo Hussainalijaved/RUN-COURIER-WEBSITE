@@ -1,0 +1,132 @@
+You are working on a LIVE production courier platform called RUN COURIER.
+
+This system already has:
+- A Website
+- A Mobile App (iOS & Android)
+- Supabase as backend
+
+The current problem:
+Jobs created on the website are NOT reliably appearing in the mobile app,
+drivers cannot always receive or be assigned jobs,
+and user accounts are not behaving as a single mirrored system.
+
+THIS MUST BE FIXED WITHOUT DATA LOSS.
+
+=====================================
+ABSOLUTE NON-NEGOTIABLE RULES
+=====================================
+- Supabase is the ONLY backend.
+- There must be ONE Supabase project only.
+- DO NOT create a second backend, API server, or database.
+- DO NOT create separate logic for website vs mobile app.
+- DO NOT duplicate users, drivers, or jobs.
+- DO NOT delete, reset, or migrate existing data.
+- DO NOT change table schemas unless explicitly required and backward compatible.
+
+=====================================
+CORE PRINCIPLE (MUST FOLLOW)
+=====================================
+The website and the mobile app are NOT separate systems.
+
+They are TWO CLIENTS of THE SAME SYSTEM.
+
+They must behave like a MIRROR:
+
+- If a user registers on the website → the same user exists in the mobile app.
+- If a user registers on the mobile app → the same user exists on the website.
+- If a booking is created on the website → it MUST appear in the mobile app.
+- If a booking is created in the mobile app → it MUST appear on the website.
+- If an admin assigns a job on the website → the driver MUST see it in the app.
+- If a driver updates a job in the app → the website MUST reflect it immediately.
+
+NO EXCEPTIONS.
+
+=====================================
+AUTHENTICATION & USERS (CRITICAL)
+=====================================
+- All authentication MUST use Supabase Auth.
+- There must be ONE user identity per person.
+- auth.uid() is the ONLY source of truth for user identity.
+- Profiles must be linked using auth.uid(), not random IDs.
+
+User roles:
+- admin
+- driver
+- individual customer
+- business customer
+
+Rules:
+- Role is metadata, NOT a different account.
+- The same user can log in from website OR mobile app.
+- Data must never diverge between platforms.
+
+=====================================
+DRIVERS (VERY IMPORTANT)
+=====================================
+- Drivers must exist in ONE drivers table.
+- drivers.user_id MUST equal auth.uid().
+- Drivers can ONLY see jobs assigned to them.
+- Drivers do NOT see unassigned jobs unless explicitly allowed.
+
+=====================================
+JOBS & BOOKINGS (THIS IS THE MAIN ISSUE)
+=====================================
+There must be ONE jobs table.
+
+Jobs lifecycle:
+1. Job is created (website OR mobile app)
+2. Job is saved to Supabase
+3. Job status = "pending"
+4. Admin assigns driver
+5. assigned_driver_id is set
+6. Driver sees job instantly in mobile app
+7. Driver accepts / updates status
+8. Website reflects updates immediately
+
+Rules:
+- Job creation logic must be IDENTICAL for website and mobile app.
+- Job assignment must be done by updating ONE field in Supabase.
+- The mobile app must query jobs WHERE assigned_driver_id = auth.uid().
+
+NO polling hacks.
+NO duplicated tables.
+NO local-only state.
+
+=====================================
+REAL-TIME SYNC (REQUIRED)
+=====================================
+- Use Supabase as the real-time source of truth.
+- Any change to jobs must propagate to both clients.
+- No caching that causes mismatch.
+- No “website-only” or “app-only” jobs.
+
+=====================================
+PERMISSIONS & SECURITY
+=====================================
+- Supabase Row Level Security (RLS) MUST enforce:
+  - Customers see only their jobs
+  - Drivers see only assigned jobs
+  - Admins see all jobs
+- Do NOT rely on frontend checks for security.
+
+=====================================
+WHAT MUST BE FIXED
+=====================================
+- Ensure job assignment from website reaches mobile app.
+- Ensure drivers receive jobs once assigned.
+- Ensure accounts are mirrored between website and app.
+- Ensure bookings are identical on both platforms.
+- Remove any logic that treats website and app as separate systems.
+
+=====================================
+EXPECTED OUTPUT
+=====================================
+- Clear explanation of the correct architecture.
+- Exact data flow from website → Supabase → mobile app.
+- Identification of why jobs are currently not syncing.
+- Specific fixes required (queries, filters, role checks).
+- NO vague advice.
+- NO new backend.
+- NO data loss.
+
+The final system MUST behave as ONE unified platform with Supabase as the single source of truth.

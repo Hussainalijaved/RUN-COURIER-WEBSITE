@@ -412,3 +412,49 @@ export function subscribeToJobs(callback: (payload: { eventType: string; new: Jo
     )
     .subscribe();
 }
+
+export async function getMyDriverJobs(): Promise<Job[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+  
+  return listJobs({ driverId: userId });
+}
+
+export async function getMyDriverActiveJobs(): Promise<Job[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+  
+  const activeStatuses: JobStatus[] = ['assigned', 'accepted', 'on_the_way_pickup', 'arrived_pickup', 'collected', 'on_the_way_delivery'];
+  
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('driver_id', userId)
+    .in('status', activeStatuses)
+    .order('created_at', { ascending: false });
+
+  if (error) throw handleSupabaseError(error);
+  return (data || []).map(mapJobFromDb);
+}
+
+export async function getMyDriverPendingOffers(): Promise<Job[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+  
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('driver_id', userId)
+    .eq('status', 'assigned')
+    .order('created_at', { ascending: false });
+
+  if (error) throw handleSupabaseError(error);
+  return (data || []).map(mapJobFromDb);
+}
+
+export async function getMyCustomerJobs(): Promise<Job[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+  
+  return listJobs({ customerId: userId });
+}

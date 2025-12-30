@@ -113,12 +113,37 @@ Driver IDs follow the format: **RC** + 2 numbers + 1 letter (e.g., RC02C, RC15A,
 ### Admin Job Assignment System
 Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments via a "Job Offers" tab. Assignment statuses are tracked (pending, sent, accepted, rejected, cancelled, expired), and assignment history is maintained.
 
-## Supabase-Only Architecture Migration (IN PROGRESS)
+## Supabase-Only Architecture (CRITICAL)
 
-The platform is transitioning to a Supabase-only backend architecture to enable:
-- Website hosting on Hostinger (runcourier.co.uk) connecting directly to Supabase
-- Mobile app (com.runcourier.driver) sharing the same Supabase backend
-- No dependency on Replit backend for production
+The platform uses Supabase as the SINGLE source of truth for all data. The website and mobile app are TWO CLIENTS of THE SAME SYSTEM - they must behave as MIRRORS:
+
+### Core Principle
+- If a user registers on the website → the same user exists in the mobile app
+- If a user registers on the mobile app → the same user exists on the website
+- If a booking is created on the website → it MUST appear in the mobile app
+- If a booking is created in the mobile app → it MUST appear on the website
+- If an admin assigns a job on the website → the driver MUST see it in the app
+- If a driver updates a job in the app → the website MUST reflect it immediately
+
+### CRITICAL: Job Assignment ID Mapping
+**The `driver_id` field in the `jobs` table MUST store `auth.uid()` (the user's UUID), NOT the driver table's primary key.**
+
+This is enforced by:
+1. RLS Policy: `jobs_select_driver` checks `auth.uid() = driver_id`
+2. Edge Function: `assign-driver` sets `driver_id = driver.user_id` (NOT `driver.id`)
+
+**Why this matters**: The mobile app uses Supabase RLS to filter jobs. If `driver_id` stores the driver table ID instead of the user UUID, the RLS policy `auth.uid() = driver_id` will NEVER match, and drivers won't see their assigned jobs.
+
+### Real-Time Subscriptions
+- `useRealtimeDrivers` hook: Auto-updates driver status changes
+- `useRealtimeJobs` hook: Auto-updates job status changes
+- Both use Supabase Realtime postgres_changes subscription
+
+### Data Layer (client/src/lib/data/)
+Shared data access functions used by both website and mobile app:
+- `jobs.ts`: Job CRUD operations, driver job queries
+- `drivers.ts`: Driver CRUD operations
+- `base.ts`: Supabase client and helpers
 
 ### Edge Functions (supabase/functions/)
 Privileged operations that require service-role access are handled via Supabase Edge Functions:

@@ -80,6 +80,19 @@ serve(async (req) => {
       });
     }
 
+    // CRITICAL: driver.user_id is the auth.uid() - this is what RLS policies check
+    // The driver_id in jobs table MUST be set to user_id for drivers to see their jobs via RLS
+    const driverUserId = driver.user_id;
+    if (!driverUserId) {
+      return new Response(JSON.stringify({ 
+        error: "Driver account not properly linked to user account",
+        code: "DRIVER_NOT_LINKED"
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: existingJob, error: jobError } = await supabaseClient
       .from("jobs")
       .select("*")
@@ -127,10 +140,12 @@ serve(async (req) => {
       validatedDriverPrice = parsedDriverPrice;
     }
 
+    // CRITICAL FIX: Use driverUserId (auth.uid) so RLS policy "auth.uid() = driver_id" works
+    // This allows drivers to see their assigned jobs in the mobile app
     const { data: updatedJob, error: updateError } = await supabaseClient
       .from("jobs")
       .update({
-        driver_id: driverId,
+        driver_id: driverUserId, // MUST be user_id (auth.uid), NOT driver table ID
         dispatcher_id: dispatcherId || user.id,
         driver_price: validatedDriverPrice.toFixed(2),
         status: "assigned",
@@ -147,11 +162,12 @@ serve(async (req) => {
       });
     }
 
+    // Also use driverUserId for job_assignments so RLS works for drivers to see their assignments
     const { error: assignmentError } = await supabaseClient
       .from("job_assignments")
       .insert({
         job_id: jobId,
-        driver_id: driverId,
+        driver_id: driverUserId, // MUST be user_id (auth.uid) for RLS to work
         assigned_by: user.id,
         driver_price: validatedDriverPrice.toFixed(2),
         status: "sent",
