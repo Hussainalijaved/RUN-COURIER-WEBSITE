@@ -1143,21 +1143,23 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to fetch users from Supabase" });
       }
 
-      // Get existing drivers from Supabase database (for permanent driver codes and full names)
+      // Get existing drivers from Supabase database (for permanent driver IDs and full names)
+      // Note: Supabase uses 'driver_id' column for what we call 'driverCode' internally
       const { data: supabaseDrivers } = await supabaseAdmin
         .from('drivers')
-        .select('id, user_id, driver_code, full_name, email, phone, vehicle_type, is_verified, is_available');
+        .select('id, driver_id, full_name, email, phone, vehicle_type, approval_status, online_status');
       
-      // Build maps: by id, user_id, and email for flexible lookup
+      // Build maps: by id and email for flexible lookup
+      // IMPORTANT: driver_id from Supabase is the PERMANENT Driver ID (e.g., RC02C)
       type SupabaseDriverData = { 
         id: string; 
-        driver_code: string | null;
+        driver_id: string | null;  // This is the PERMANENT Driver ID from Supabase
         full_name: string | null;
         email: string | null;
         phone: string | null;
         vehicle_type: string | null;
-        is_verified: boolean | null;
-        is_available: boolean | null;
+        is_verified: boolean;
+        is_available: boolean;
       };
       const supabaseDriverById = new Map<string, SupabaseDriverData>();
       const supabaseDriverByEmail = new Map<string, SupabaseDriverData>();
@@ -1165,20 +1167,17 @@ export async function registerRoutes(
       for (const d of (supabaseDrivers || [])) {
         const driverData: SupabaseDriverData = { 
           id: d.id, 
-          driver_code: d.driver_code,
+          driver_id: d.driver_id,  // PERMANENT Driver ID from Supabase
           full_name: d.full_name,
           email: d.email,
           phone: d.phone,
           vehicle_type: d.vehicle_type,
-          is_verified: d.is_verified,
-          is_available: d.is_available,
+          is_verified: d.approval_status === 'approved',
+          is_available: d.online_status === 'online',
         };
         
-        // Map by id (which often matches auth user id)
+        // Map by id (which matches auth user id in Supabase)
         supabaseDriverById.set(d.id, driverData);
-        if (d.user_id) {
-          supabaseDriverById.set(d.user_id, driverData);
-        }
         // Also map by email for fallback lookup
         if (d.email) {
           supabaseDriverByEmail.set(d.email.toLowerCase(), driverData);
@@ -1202,13 +1201,16 @@ export async function registerRoutes(
       const driverUsers = [];
       for (const user of driverUsersList) {
         const supabaseDriver = findSupabaseDriver(user.id, user.email);
-        let driverCode = supabaseDriver?.driver_code || null;
+        
+        // IMPORTANT: driver_id from Supabase is the PERMANENT Driver ID - NEVER regenerate it
+        // This is the authoritative source of driver IDs
+        const permanentDriverId = supabaseDriver?.driver_id || null;
         
         // Check if driver exists locally
         let localDriver = localDriverMap.get(user.id);
         
         if (!localDriver) {
-          // Create a local driver record - use Supabase driver data if available
+          // Create a local driver record - use Supabase driver data (which is authoritative)
           localDriver = await storage.createDriver({
             userId: user.id,
             fullName: supabaseDriver?.full_name || user.user_metadata?.fullName || user.user_metadata?.full_name || null,
@@ -1217,52 +1219,36 @@ export async function registerRoutes(
             vehicleType: (supabaseDriver?.vehicle_type as any) || 'car',
             isAvailable: supabaseDriver?.is_available ?? false,
             isVerified: supabaseDriver?.is_verified ?? false,
-            driverCode: driverCode || undefined, // Use existing Supabase code if available
+            driverCode: permanentDriverId || undefined, // Use PERMANENT Supabase driver_id
           });
           localDriverMap.set(user.id, localDriver);
-        } else if (!localDriver.fullName && supabaseDriver?.full_name) {
-          // Update local driver with Supabase data if missing
-          await storage.updateDriver(localDriver.id, {
-            fullName: supabaseDriver.full_name || localDriver.fullName,
-            phone: supabaseDriver.phone || localDriver.phone,
-            vehicleType: (supabaseDriver.vehicle_type as any) || localDriver.vehicleType,
-          });
-          localDriver.fullName = supabaseDriver.full_name || localDriver.fullName;
-        }
-
-        // Driver codes are stored in our PostgreSQL database (via Drizzle), not in Supabase
-        // Use the local driver code for display purposes
-        if (!driverCode && localDriver?.driverCode) {
-          driverCode = localDriver.driverCode;
+        } else {
+          // Update local driver with Supabase data if there's a mismatch
+          const needsUpdate = (
+            (!localDriver.fullName && supabaseDriver?.full_name) ||
+            (permanentDriverId && localDriver.driverCode !== permanentDriverId)
+          );
           
-          // Sync this driver code to Supabase so Hostinger can access it
-          try {
-            await supabaseAdmin
-              .from('drivers')
-              .upsert({
-                id: localDriver.id,
-                user_id: localDriver.userId,
-                driver_code: localDriver.driverCode,
-                full_name: localDriver.fullName,
-                email: localDriver.email,
-                phone: localDriver.phone,
-                vehicle_type: localDriver.vehicleType,
-                is_available: localDriver.isAvailable ?? false,
-                is_verified: localDriver.isVerified ?? false,
-              }, { onConflict: 'id' });
-            console.log(`Synced driver code ${localDriver.driverCode} to Supabase for driver ${localDriver.id}`);
-          } catch (syncErr) {
-            console.error("Failed to sync driver code to Supabase:", syncErr);
+          if (needsUpdate) {
+            await storage.updateDriver(localDriver.id, {
+              fullName: supabaseDriver?.full_name || localDriver.fullName,
+              phone: supabaseDriver?.phone || localDriver.phone,
+              vehicleType: (supabaseDriver?.vehicle_type as any) || localDriver.vehicleType,
+              driverCode: permanentDriverId || localDriver.driverCode, // Sync permanent ID
+            });
+            localDriver.fullName = supabaseDriver?.full_name || localDriver.fullName;
+            localDriver.driverCode = permanentDriverId || localDriver.driverCode;
           }
         }
 
+        // Use the PERMANENT driver ID from Supabase as the authoritative source
         driverUsers.push({
           id: user.id,
           email: user.email,
           fullName: supabaseDriver?.full_name || localDriver?.fullName || user.user_metadata?.fullName || user.user_metadata?.full_name || 'Unknown Driver',
           phone: supabaseDriver?.phone || localDriver?.phone || user.user_metadata?.phone || null,
           role: user.user_metadata?.role || 'driver',
-          driverCode: driverCode || localDriver?.driverCode || null,
+          driverCode: permanentDriverId || localDriver?.driverCode || null, // PERMANENT ID first
           vehicleType: supabaseDriver?.vehicle_type || localDriver?.vehicleType || 'car',
           isVerified: supabaseDriver?.is_verified ?? localDriver?.isVerified ?? false,
           isAvailable: supabaseDriver?.is_available ?? localDriver?.isAvailable ?? false,
