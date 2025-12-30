@@ -2811,6 +2811,42 @@ export async function registerRoutes(
       data: { assignmentId: assignment.id, jobId },
     });
 
+    // Sync job assignment to Supabase for mobile app access
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        // Upsert job assignment to Supabase
+        await supabaseAdmin
+          .from('job_assignments')
+          .upsert({
+            id: assignment.id,
+            job_id: jobId,
+            driver_id: driverId,
+            assigned_by: assignedBy,
+            driver_price: driverPrice,
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
+        
+        // Also sync the job status update
+        await supabaseAdmin
+          .from('jobs')
+          .update({
+            status: 'assigned',
+            driver_id: driverId,
+            driver_price: driverPrice,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', jobId);
+        
+        console.log(`[Job Assignment] Synced to Supabase: assignment ${assignment.id} for job ${jobId}`);
+      }
+    } catch (syncErr) {
+      console.error('[Job Assignment] Failed to sync to Supabase:', syncErr);
+    }
+
     res.status(201).json(assignment);
   }));
 
