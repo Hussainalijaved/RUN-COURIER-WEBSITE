@@ -1,6 +1,7 @@
 import { supabase, handleSupabaseError } from './base';
 import type { Driver } from './base';
 import type { VehicleType } from '@shared/schema';
+import { supabaseFunctions, type CreateDriverData } from '../supabaseFunctions';
 
 export interface DriverFilters {
   isAvailable?: boolean;
@@ -255,4 +256,41 @@ export function subscribeToDrivers(callback: (payload: { eventType: string; new:
       }
     )
     .subscribe();
+}
+
+export async function createDriver(data: CreateDriverData): Promise<Driver> {
+  const response = await supabaseFunctions.createDriver(data);
+  return {
+    id: response.id,
+    userId: response.user_id,
+    driverCode: response.driver_id,
+    fullName: response.full_name,
+    email: response.email,
+    phone: response.phone,
+    postcode: null,
+    address: null,
+    nationality: null,
+    isBritish: false,
+    nationalInsuranceNumber: null,
+    rightToWorkShareCode: null,
+    dbsChecked: false,
+    dbsCertificateUrl: null,
+    dbsCheckDate: null,
+    vehicleType: 'car' as VehicleType,
+    vehicleRegistration: null,
+    vehicleMake: null,
+    vehicleModel: null,
+    vehicleColor: null,
+    isAvailable: response.is_available,
+    isVerified: response.is_verified,
+    currentLatitude: null,
+    currentLongitude: null,
+    lastLocationUpdate: null,
+    rating: '5.0',
+    totalJobs: 0,
+    profilePictureUrl: null,
+    isActive: response.is_active,
+    deactivatedAt: null,
+    createdAt: new Date().toISOString(),
+  };
 }

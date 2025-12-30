@@ -89,23 +89,26 @@ Instead of permanently deleting records, the system uses soft delete to preserve
 
 **UI Features**: Admin Drivers page shows Deactivate/Reactivate buttons with confirmation dialogs explaining job history preservation.
 
-### Driver ID Format
+### Driver ID Format (PERMANENT - NEVER CHANGES)
 Driver IDs follow the format: **RC** + 2 numbers + 1 letter (e.g., RC02C, RC15A, RC99Z).
 - Format: `RC` prefix + 2 random digits (00-99) + 1 random letter (A-Z)
-- Auto-generated on driver creation
-- Unique per driver, immutable after creation
-- Mobile app displays and uses this same ID
-- Note: In code, the field is named `driverCode` but displayed as "Driver ID" in the UI
+- **SUPABASE is the AUTHORITATIVE SOURCE** - driver_id column is the single source of truth
+- Generated ONLY via Supabase Edge Function `create-driver` when driver is created
+- Unique per driver, **IMMUTABLE** after creation - NEVER regenerated or changed
+- Mobile app and website both read from the same Supabase `driver_id` column
+- In code: Supabase uses `driver_id`, frontend uses `driverCode`, displayed as "Driver ID" in UI
 
-**Driver Code Sync (Hostinger Compatibility)**:
-- Driver codes are generated in the Replit backend and stored in PostgreSQL (Drizzle)
-- Driver codes are also synced to Supabase's `drivers` table (`driver_code` column)
-- This ensures Hostinger deployment can access the same driver codes directly from Supabase
-- Sync happens automatically when:
-  1. A new driver is created (synced immediately)
-  2. Admin views the drivers list (missing codes are synced)
-  3. Driver profile is updated (synced to Supabase)
-- The `driver_code` field is immutable and cannot be changed after creation
+**Driver ID Generation Flow**:
+1. Driver registers via website or mobile app
+2. `create-driver` Edge Function generates a unique driver_id in RC##L format
+3. Driver ID is stored in Supabase `drivers` table `driver_id` column
+4. This ID remains permanent and is used across all platforms
+5. Local storage syncs FROM Supabase (one-way sync, Supabase is always authoritative)
+
+**Edge Function**: `supabase/functions/create-driver/index.ts`
+- Generates unique driver_id checking against existing codes
+- Requires authentication via Supabase JWT
+- Called via `supabaseFunctions.createDriver()` in frontend
 
 ### Admin Job Assignment System
 Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments via a "Job Offers" tab. Assignment statuses are tracked (pending, sent, accepted, rejected, cancelled, expired), and assignment history is maintained.
@@ -119,6 +122,9 @@ The platform is transitioning to a Supabase-only backend architecture to enable:
 
 ### Edge Functions (supabase/functions/)
 Privileged operations that require service-role access are handled via Supabase Edge Functions:
+- `create-driver` - Creates drivers with unique driver_id generation (RC##L format)
+- `update-driver` - Updates driver information with document verification
+- `delete-driver` - Permanently deletes drivers from Supabase
 - `create-job` - Creates jobs with tracking number generation
 - `update-job-status` - Updates job status with POD validation
 - `assign-driver` - Assigns drivers to jobs (admin/dispatcher only)

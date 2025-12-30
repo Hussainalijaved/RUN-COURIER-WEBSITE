@@ -128,6 +128,29 @@ export interface DeleteDriverData {
   driverId: string;
 }
 
+export interface CreateDriverData {
+  userId: string;
+  email: string;
+  fullName?: string;
+  phone?: string;
+  postcode?: string;
+  address?: string;
+  vehicleType?: string;
+}
+
+export interface CreateDriverResponse {
+  id: string;
+  driver_id: string;
+  driverCode: string;
+  user_id: string;
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+  is_available: boolean;
+  is_verified: boolean;
+  is_active: boolean;
+}
+
 export const supabaseFunctions = {
   async createJob(data: CreateJobData) {
     return callEdgeFunction('create-job', data);
@@ -155,6 +178,10 @@ export const supabaseFunctions = {
 
   async deleteDriver(data: DeleteDriverData) {
     return callEdgeFunction('delete-driver', data);
+  },
+
+  async createDriver(data: CreateDriverData): Promise<CreateDriverResponse> {
+    return callEdgeFunction<CreateDriverResponse>('create-driver', data);
   },
 };
 
