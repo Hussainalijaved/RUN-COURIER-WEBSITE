@@ -77,6 +77,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
+import { useRealtimeDrivers } from '@/hooks/useRealtimeDrivers';
 import type { Driver, User, Document, DocumentStatus } from '@shared/schema';
 
 interface SupabaseDriver {
@@ -142,6 +143,8 @@ export default function AdminDrivers() {
   const [showInactive, setShowInactive] = useState(true);
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  useRealtimeDrivers();
 
   const { data: drivers, isLoading: driversLoading } = useQuery<Driver[]>({
     queryKey: ['/api/drivers', { includeInactive: showInactive }],
