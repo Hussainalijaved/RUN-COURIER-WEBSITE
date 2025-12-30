@@ -124,6 +124,10 @@ export interface UpdateDriverData {
   bypassDocumentCheck?: boolean;
 }
 
+export interface DeleteDriverData {
+  driverId: string;
+}
+
 export const supabaseFunctions = {
   async createJob(data: CreateJobData) {
     return callEdgeFunction('create-job', data);
@@ -147,6 +151,10 @@ export const supabaseFunctions = {
 
   async updateDriver(data: UpdateDriverData) {
     return callEdgeFunction('update-driver', data);
+  },
+
+  async deleteDriver(data: DeleteDriverData) {
+    return callEdgeFunction('delete-driver', data);
   },
 };
 

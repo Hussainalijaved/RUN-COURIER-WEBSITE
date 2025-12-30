@@ -247,12 +247,7 @@ export default function AdminDrivers() {
 
   const deleteDriverMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/api/drivers/${id}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete driver');
-      }
-      return response.json();
+      return supabaseFunctions.deleteDriver({ driverId: id });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/drivers' });

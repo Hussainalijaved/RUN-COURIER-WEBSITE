@@ -1103,6 +1103,25 @@ export async function registerRoutes(
       console.error("Failed to delete driver from PostgreSQL:", e);
     }
     
+    // Delete from Supabase drivers table
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        const { error } = await supabaseAdmin
+          .from('drivers')
+          .delete()
+          .or(`id.eq.${driverId},user_id.eq.${driverId}`);
+        
+        if (error) {
+          console.error("Failed to delete driver from Supabase:", error);
+        } else {
+          console.log(`[Drivers] Deleted driver from Supabase: ${driverId}`);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to delete driver from Supabase:", e);
+    }
+    
     console.log(`[Drivers] Permanently deleted driver ${driverId}`);
     res.json({ success: true, message: "Driver permanently deleted" });
   }));
