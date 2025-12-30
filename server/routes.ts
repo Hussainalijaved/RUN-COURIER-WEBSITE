@@ -746,6 +746,31 @@ export async function registerRoutes(
           });
           
           console.log("New driver saved to PostgreSQL:", driver.id, "with permanent code:", driver.driverCode);
+          
+          // Also sync driver code to Supabase for Hostinger deployment
+          try {
+            const { supabaseAdmin } = await import("./supabaseAdmin");
+            if (supabaseAdmin && driver.driverCode) {
+              await supabaseAdmin
+                .from('drivers')
+                .upsert({
+                  id: driver.id,
+                  user_id: driver.userId,
+                  driver_code: driver.driverCode,
+                  full_name: driver.fullName,
+                  email: driver.email,
+                  phone: driver.phone,
+                  vehicle_type: driver.vehicleType,
+                  is_available: driver.isAvailable ?? false,
+                  is_verified: driver.isVerified ?? false,
+                  rating: driver.rating ?? "5.00",
+                  total_jobs: driver.totalJobs ?? 0,
+                }, { onConflict: 'id' });
+              console.log("Driver code synced to Supabase:", driver.id, driver.driverCode);
+            }
+          } catch (syncErr) {
+            console.error("Failed to sync driver to Supabase:", syncErr);
+          }
         } catch (e) {
           console.error("Failed to insert driver into PostgreSQL:", e);
         }
@@ -796,6 +821,32 @@ export async function registerRoutes(
       if (Object.keys(updateData).length > 0) {
         await db.update(drivers).set(updateData).where(eq(drivers.id, req.params.id));
         console.log("Driver successfully updated in PostgreSQL:", req.params.id);
+      }
+      
+      // Also sync to Supabase for Hostinger deployment
+      try {
+        const { supabaseAdmin } = await import("./supabaseAdmin");
+        if (supabaseAdmin) {
+          const supabaseUpdateData: Record<string, unknown> = {};
+          if (safeBody.fullName !== undefined) supabaseUpdateData.full_name = safeBody.fullName;
+          if (safeBody.email !== undefined) supabaseUpdateData.email = safeBody.email;
+          if (safeBody.phone !== undefined) supabaseUpdateData.phone = safeBody.phone;
+          if (safeBody.vehicleType !== undefined) supabaseUpdateData.vehicle_type = safeBody.vehicleType;
+          if (safeBody.isAvailable !== undefined) supabaseUpdateData.is_available = safeBody.isAvailable;
+          if (safeBody.isVerified !== undefined) supabaseUpdateData.is_verified = safeBody.isVerified;
+          if (safeBody.address !== undefined) supabaseUpdateData.address = safeBody.address;
+          if (safeBody.postcode !== undefined) supabaseUpdateData.postcode = safeBody.postcode;
+          
+          if (Object.keys(supabaseUpdateData).length > 0) {
+            await supabaseAdmin
+              .from('drivers')
+              .update(supabaseUpdateData)
+              .eq('id', req.params.id);
+            console.log("Driver successfully synced to Supabase:", req.params.id);
+          }
+        }
+      } catch (syncErr) {
+        console.error("Failed to sync driver to Supabase:", syncErr);
       }
     } catch (e) {
       console.error("Failed to update driver in PostgreSQL:", e);
@@ -1120,6 +1171,26 @@ export async function registerRoutes(
         // Use the local driver code for display purposes
         if (!driverCode && localDriver?.driverCode) {
           driverCode = localDriver.driverCode;
+          
+          // Sync this driver code to Supabase so Hostinger can access it
+          try {
+            await supabaseAdmin
+              .from('drivers')
+              .upsert({
+                id: localDriver.id,
+                user_id: localDriver.userId,
+                driver_code: localDriver.driverCode,
+                full_name: localDriver.fullName,
+                email: localDriver.email,
+                phone: localDriver.phone,
+                vehicle_type: localDriver.vehicleType,
+                is_available: localDriver.isAvailable ?? false,
+                is_verified: localDriver.isVerified ?? false,
+              }, { onConflict: 'id' });
+            console.log(`Synced driver code ${localDriver.driverCode} to Supabase for driver ${localDriver.id}`);
+          } catch (syncErr) {
+            console.error("Failed to sync driver code to Supabase:", syncErr);
+          }
         }
 
         driverUsers.push({

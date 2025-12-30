@@ -97,6 +97,16 @@ Driver IDs follow the format: **RC** + 2 numbers + 1 letter (e.g., RC02C, RC15A,
 - Mobile app displays and uses this same ID
 - Note: In code, the field is named `driverCode` but displayed as "Driver ID" in the UI
 
+**Driver Code Sync (Hostinger Compatibility)**:
+- Driver codes are generated in the Replit backend and stored in PostgreSQL (Drizzle)
+- Driver codes are also synced to Supabase's `drivers` table (`driver_code` column)
+- This ensures Hostinger deployment can access the same driver codes directly from Supabase
+- Sync happens automatically when:
+  1. A new driver is created (synced immediately)
+  2. Admin views the drivers list (missing codes are synced)
+  3. Driver profile is updated (synced to Supabase)
+- The `driver_code` field is immutable and cannot be changed after creation
+
 ### Admin Job Assignment System
 Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments via a "Job Offers" tab. Assignment statuses are tracked (pending, sent, accepted, rejected, cancelled, expired), and assignment history is maintained.
 
