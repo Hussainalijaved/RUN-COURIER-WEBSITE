@@ -71,6 +71,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ShippingLabel } from '@/components/ShippingLabel';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
+import { supabaseFunctions } from '@/lib/supabaseFunctions';
 import type { Job, Driver, JobStatus, JobAssignment } from '@shared/schema';
 
 // Type for drivers from Supabase
@@ -212,11 +213,12 @@ export default function AdminJobs() {
 
   const assignDriverMutation = useMutation({
     mutationFn: async ({ jobId, driverId, driverPrice, assignedBy }: { jobId: string; driverId: string; driverPrice: string; assignedBy: string }) => {
-      return apiRequest('POST', '/api/job-assignments', { 
-        jobId, 
-        driverId, 
+      // Use Supabase Edge Function for job assignment (works with Hostinger-hosted website)
+      return supabaseFunctions.assignDriver({
+        jobId,
+        driverId,
         driverPrice,
-        assignedBy 
+        dispatcherId: assignedBy,
       });
     },
     onSuccess: () => {
@@ -235,12 +237,28 @@ export default function AdminJobs() {
 
   const batchAssignMutation = useMutation({
     mutationFn: async ({ jobIds, driverId, driverPrice, assignedBy }: { jobIds: string[]; driverId: string; driverPrice: string; assignedBy: string }) => {
-      return apiRequest('POST', '/api/job-assignments/batch', { 
-        jobIds, 
-        driverId, 
-        driverPrice,
-        assignedBy 
-      });
+      // Use Supabase Edge Function for each job assignment (works with Hostinger-hosted website)
+      const results = await Promise.allSettled(
+        jobIds.map(jobId => 
+          supabaseFunctions.assignDriver({
+            jobId,
+            driverId,
+            driverPrice,
+            dispatcherId: assignedBy,
+          })
+        )
+      );
+      
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      const errors = results
+        .map((r, i) => ({ jobId: jobIds[i], result: r }))
+        .filter(({ result }) => result.status === 'rejected')
+        .map(({ jobId, result }) => ({
+          jobId,
+          error: (result as PromiseRejectedResult).reason?.message || 'Unknown error'
+        }));
+      
+      return { successCount, errorCount: errors.length, errors };
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
