@@ -391,73 +391,57 @@ export async function registerRoutes(
     const job = await storage.createJob(data);
     
     // CRITICAL: Also create job in Supabase for mobile app sync
-    // Mobile app queries Supabase directly, so jobs must exist there
+    // Mobile app queries Supabase directly using RLS, so jobs must exist there
+    // NOTE: Supabase jobs table has different schema than local PostgreSQL
     console.log('[Jobs] Attempting to sync job to Supabase...');
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       console.log('[Jobs] supabaseAdmin available:', !!supabaseAdmin);
       if (supabaseAdmin) {
-        // Convert camelCase to snake_case for Supabase
+        // Map local job fields to Supabase jobs table columns
+        // Supabase uses: dropoff_address, price_customer, price_driver, etc.
+        // DO NOT include 'id' - let Supabase auto-generate it
         const supabaseJobData = {
-          id: job.id,
           tracking_number: job.trackingNumber,
-          customer_id: job.customerId,
-          driver_id: job.driverId, // Already resolved to user_id above
-          dispatcher_id: job.dispatcherId,
-          vendor_id: job.vendorId,
-          status: job.status,
+          driver_id: job.driverId, // Already resolved to user UUID for RLS
+          user_id: job.customerId !== 'admin-created' ? job.customerId : null,
+          status: job.status === 'assigned' ? 'pending' : job.status, // Mobile expects 'pending' for new assignments
           vehicle_type: job.vehicleType,
           pickup_address: job.pickupAddress,
-          pickup_postcode: job.pickupPostcode,
-          pickup_latitude: job.pickupLatitude,
-          pickup_longitude: job.pickupLongitude,
-          pickup_instructions: job.pickupInstructions,
-          pickup_building_name: job.pickupBuildingName,
-          pickup_contact_name: job.pickupContactName,
-          pickup_contact_phone: job.pickupContactPhone,
-          delivery_address: job.deliveryAddress,
-          delivery_postcode: job.deliveryPostcode,
-          delivery_latitude: job.deliveryLatitude,
-          delivery_longitude: job.deliveryLongitude,
-          delivery_instructions: job.deliveryInstructions,
-          delivery_building_name: job.deliveryBuildingName,
+          pickup_lat: job.pickupLatitude ? parseFloat(String(job.pickupLatitude)) : null,
+          pickup_lng: job.pickupLongitude ? parseFloat(String(job.pickupLongitude)) : null,
+          pickup_building_number: job.pickupBuildingName,
+          dropoff_address: job.deliveryAddress,
+          dropoff_lat: job.deliveryLatitude ? parseFloat(String(job.deliveryLatitude)) : null,
+          dropoff_lng: job.deliveryLongitude ? parseFloat(String(job.deliveryLongitude)) : null,
+          dropoff_building_number: job.deliveryBuildingName,
           recipient_name: job.recipientName,
           recipient_phone: job.recipientPhone,
-          weight: job.weight,
-          distance: job.distance,
-          is_multi_drop: job.isMultiDrop,
-          is_return_trip: job.isReturnTrip,
-          return_to_same_location: job.returnToSameLocation,
-          return_address: job.returnAddress,
-          return_postcode: job.returnPostcode,
-          is_scheduled: job.isScheduled,
-          scheduled_pickup_time: job.scheduledPickupTime,
-          scheduled_delivery_time: job.scheduledDeliveryTime,
-          is_central_london: job.isCentralLondon,
-          is_rush_hour: job.isRushHour,
-          base_price: job.basePrice,
-          distance_price: job.distancePrice,
-          weight_surcharge: job.weightSurcharge,
-          multi_drop_charge: job.multiDropCharge,
-          return_trip_charge: job.returnTripCharge,
-          central_london_charge: job.centralLondonCharge,
-          waiting_time_charge: job.waitingTimeCharge,
-          total_price: job.totalPrice,
-          driver_price: job.driverPrice,
-          payment_status: job.paymentStatus,
-          payment_intent_id: job.paymentIntentId,
-          created_at: job.createdAt?.toISOString(),
-          updated_at: job.updatedAt?.toISOString(),
+          sender_name: job.pickupContactName,
+          sender_phone: job.pickupContactPhone,
+          parcel_weight: job.weight ? parseFloat(String(job.weight)) : null,
+          distance_miles: job.distance ? parseFloat(String(job.distance)) : null,
+          price_customer: job.totalPrice ? parseFloat(String(job.totalPrice)) : null,
+          price_driver: job.driverPrice ? parseFloat(String(job.driverPrice)) : null,
+          scheduled_pickup_time: job.scheduledPickupTime?.toISOString() || null,
+          notes: job.pickupInstructions || job.deliveryInstructions || null,
+          payment_status: job.paymentStatus || 'pending',
+          priority: 'normal',
+          is_guest: job.customerId === 'admin-created',
         };
         
-        const { error: supabaseError } = await supabaseAdmin
+        console.log('[Jobs] Supabase job data:', JSON.stringify(supabaseJobData, null, 2));
+        
+        const { data: insertedJob, error: supabaseError } = await supabaseAdmin
           .from('jobs')
-          .upsert(supabaseJobData, { onConflict: 'id' });
+          .insert(supabaseJobData)
+          .select('id, tracking_number')
+          .single();
         
         if (supabaseError) {
           console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
         } else {
-          console.log(`[Jobs] Job ${job.id} synced to Supabase for mobile app`);
+          console.log(`[Jobs] Job synced to Supabase with id ${insertedJob?.id}, tracking: ${insertedJob?.tracking_number}`);
         }
       } else {
         console.error('[Jobs] supabaseAdmin is null - cannot sync to Supabase! Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
