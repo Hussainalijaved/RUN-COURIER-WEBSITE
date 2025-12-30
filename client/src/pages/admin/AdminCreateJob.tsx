@@ -63,6 +63,8 @@ const createJobSchema = z.object({
   deliveryInstructions: z.string().optional(),
   recipientName: z.string().min(2, 'Recipient name is required'),
   recipientPhone: z.string().min(10, 'Valid phone number is required'),
+  senderName: z.string().optional(),
+  senderPhone: z.string().optional(),
   weight: z.coerce.number().min(0.1, 'Weight must be greater than 0'),
   vehicleType: z.enum(['motorbike', 'car', 'small_van', 'medium_van']),
   isMultiDrop: z.boolean().default(false),
@@ -108,6 +110,8 @@ export default function AdminCreateJob() {
       pickupAddress: '',
       pickupPostcode: '',
       pickupInstructions: '',
+      senderName: '',
+      senderPhone: '',
       deliveryAddress: '',
       deliveryPostcode: '',
       deliveryInstructions: '',
@@ -220,6 +224,8 @@ export default function AdminCreateJob() {
       const jobData = {
         ...data,
         customerId: 'admin-created',
+        pickupContactName: data.senderName || null,
+        pickupContactPhone: data.senderPhone || null,
         distance: distance.toString(),
         basePrice: quote?.baseCharge.toString() || '0',
         distancePrice: quote?.distanceCharge.toString() || '0',
@@ -381,6 +387,50 @@ export default function AdminCreateJob() {
                         </FormItem>
                       )}
                     />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="senderName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sender Name</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  {...field}
+                                  className="pl-10"
+                                  placeholder="Sender name"
+                                  data-testid="input-sender-name"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="senderPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sender Phone</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  {...field}
+                                  className="pl-10"
+                                  placeholder="07123456789"
+                                  data-testid="input-sender-phone"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
