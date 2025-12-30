@@ -76,6 +76,7 @@ import { cn } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { supabaseFunctions } from '@/lib/supabaseFunctions';
 import type { Driver, User, Document, DocumentStatus } from '@shared/schema';
 
 interface SupabaseDriver {
@@ -160,42 +161,38 @@ export default function AdminDrivers() {
 
   const verifyDriverMutation = useMutation({
     mutationFn: async ({ id, isVerified }: { id: string; isVerified: boolean }) => {
-      const response = await apiRequest('PATCH', `/api/drivers/${id}/verify`, { isVerified });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(JSON.stringify(errorData));
-      }
-      return response.json();
+      // Use Supabase Edge Function for driver verification (works with Hostinger-hosted website)
+      return supabaseFunctions.updateDriver({ driverId: id, isVerified });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
       toast({ title: 'Driver status updated successfully' });
     },
     onError: (error: Error) => {
-      try {
-        const errorData = JSON.parse(error.message);
-        if (errorData.details && Array.isArray(errorData.details)) {
-          toast({ 
-            title: 'Cannot activate driver', 
-            description: errorData.details.join('. '),
-            variant: 'destructive',
-            duration: 8000
-          });
-        } else {
-          toast({ title: errorData.error || 'Failed to update driver', variant: 'destructive' });
-        }
-      } catch {
-        toast({ title: 'Failed to update driver', variant: 'destructive' });
-      }
+      toast({ title: error.message || 'Failed to update driver', variant: 'destructive' });
     },
   });
 
   const updateDriverMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Driver> }) => {
-      const response = await apiRequest('PATCH', `/api/drivers/${id}`, data);
-      return response.json();
+      // Use Supabase Edge Function for driver updates (works with Hostinger-hosted website)
+      return supabaseFunctions.updateDriver({
+        driverId: id,
+        isVerified: data.isVerified ?? undefined,
+        isAvailable: data.isAvailable ?? undefined,
+        isActive: data.isActive ?? undefined,
+        fullName: data.fullName ?? undefined,
+        phone: data.phone ?? undefined,
+        address: data.address ?? undefined,
+        postcode: data.postcode ?? undefined,
+        vehicleType: data.vehicleType ?? undefined,
+        vehicleRegistration: data.vehicleRegistration ?? undefined,
+        vehicleMake: data.vehicleMake ?? undefined,
+        vehicleModel: data.vehicleModel ?? undefined,
+        vehicleColor: data.vehicleColor ?? undefined,
+      });
     },
-    onSuccess: (updatedDriver) => {
+    onSuccess: (updatedDriver: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
       if (selectedDriver && updatedDriver) {
         setSelectedDriver({ ...selectedDriver, ...updatedDriver });
@@ -203,8 +200,8 @@ export default function AdminDrivers() {
       toast({ title: 'Driver updated successfully' });
       setEditMode(false);
     },
-    onError: () => {
-      toast({ title: 'Failed to update driver', variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({ title: error.message || 'Failed to update driver', variant: 'destructive' });
     },
   });
 

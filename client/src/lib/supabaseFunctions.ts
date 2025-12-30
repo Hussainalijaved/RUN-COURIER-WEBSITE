@@ -107,6 +107,23 @@ export interface SendEmailData {
   replyTo?: string;
 }
 
+export interface UpdateDriverData {
+  driverId: string;
+  isVerified?: boolean;
+  isAvailable?: boolean;
+  isActive?: boolean;
+  fullName?: string;
+  phone?: string;
+  address?: string;
+  postcode?: string;
+  vehicleType?: string;
+  vehicleRegistration?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
+  bypassDocumentCheck?: boolean;
+}
+
 export const supabaseFunctions = {
   async createJob(data: CreateJobData) {
     return callEdgeFunction('create-job', data);
@@ -126,6 +143,10 @@ export const supabaseFunctions = {
 
   async sendEmail(data: SendEmailData) {
     return callEdgeFunction('send-email', data);
+  },
+
+  async updateDriver(data: UpdateDriverData) {
+    return callEdgeFunction('update-driver', data);
   },
 };
 
