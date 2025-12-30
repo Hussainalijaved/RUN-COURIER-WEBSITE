@@ -334,6 +334,8 @@ export async function registerRoutes(
   }));
 
   app.post("/api/jobs", asyncHandler(async (req, res) => {
+    console.log('[Jobs] POST /api/jobs - Creating new job with driverId:', req.body.driverId);
+    
     // Generate tracking number first
     const trackingNumber = await generateTrackingNumber();
     
@@ -390,8 +392,10 @@ export async function registerRoutes(
     
     // CRITICAL: Also create job in Supabase for mobile app sync
     // Mobile app queries Supabase directly, so jobs must exist there
+    console.log('[Jobs] Attempting to sync job to Supabase...');
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
+      console.log('[Jobs] supabaseAdmin available:', !!supabaseAdmin);
       if (supabaseAdmin) {
         // Convert camelCase to snake_case for Supabase
         const supabaseJobData = {
@@ -455,6 +459,8 @@ export async function registerRoutes(
         } else {
           console.log(`[Jobs] Job ${job.id} synced to Supabase for mobile app`);
         }
+      } else {
+        console.error('[Jobs] supabaseAdmin is null - cannot sync to Supabase! Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
       }
     } catch (syncErr) {
       console.error('[Jobs] Error syncing job to Supabase:', syncErr);
