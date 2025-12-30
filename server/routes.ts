@@ -337,10 +337,37 @@ export async function registerRoutes(
     // Generate tracking number first
     const trackingNumber = await generateTrackingNumber();
     
+    // CRITICAL: If driverId is provided, we need to convert it to user_id for RLS compatibility
+    // The mobile app uses RLS policy: auth.uid() = driver_id
+    // So we must store the driver's auth user UUID, NOT the driver table primary key
+    let resolvedDriverId = req.body.driverId || null;
+    
+    if (resolvedDriverId) {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        // Look up driver in Supabase to get their user_id
+        const { data: driverData } = await supabaseAdmin
+          .from('drivers')
+          .select('id, user_id')
+          .eq('id', resolvedDriverId)
+          .single();
+        
+        if (driverData?.user_id) {
+          // Use the driver's auth user_id (which matches auth.uid() for RLS)
+          resolvedDriverId = driverData.user_id;
+          console.log(`[Jobs] Resolved driver table ID ${req.body.driverId} to user_id ${resolvedDriverId}`);
+        } else {
+          // Driver ID might already be a user_id, keep it as is
+          console.log(`[Jobs] Driver ID ${resolvedDriverId} - no user_id mapping found, using as-is`);
+        }
+      }
+    }
+    
     // Preprocess data to handle type coercion
     const preprocessedBody = {
       ...req.body,
       trackingNumber,
+      driverId: resolvedDriverId, // Use the resolved user_id
       // Convert weight to string if it's a number (schema expects decimal as string)
       weight: typeof req.body.weight === 'number' ? String(req.body.weight) : req.body.weight,
       // Convert date strings to Date objects
@@ -360,6 +387,79 @@ export async function registerRoutes(
     
     const data = insertJobSchema.parse(preprocessedBody);
     const job = await storage.createJob(data);
+    
+    // CRITICAL: Also create job in Supabase for mobile app sync
+    // Mobile app queries Supabase directly, so jobs must exist there
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        // Convert camelCase to snake_case for Supabase
+        const supabaseJobData = {
+          id: job.id,
+          tracking_number: job.trackingNumber,
+          customer_id: job.customerId,
+          driver_id: job.driverId, // Already resolved to user_id above
+          dispatcher_id: job.dispatcherId,
+          vendor_id: job.vendorId,
+          status: job.status,
+          vehicle_type: job.vehicleType,
+          pickup_address: job.pickupAddress,
+          pickup_postcode: job.pickupPostcode,
+          pickup_latitude: job.pickupLatitude,
+          pickup_longitude: job.pickupLongitude,
+          pickup_instructions: job.pickupInstructions,
+          pickup_building_name: job.pickupBuildingName,
+          pickup_contact_name: job.pickupContactName,
+          pickup_contact_phone: job.pickupContactPhone,
+          delivery_address: job.deliveryAddress,
+          delivery_postcode: job.deliveryPostcode,
+          delivery_latitude: job.deliveryLatitude,
+          delivery_longitude: job.deliveryLongitude,
+          delivery_instructions: job.deliveryInstructions,
+          delivery_building_name: job.deliveryBuildingName,
+          recipient_name: job.recipientName,
+          recipient_phone: job.recipientPhone,
+          weight: job.weight,
+          distance: job.distance,
+          is_multi_drop: job.isMultiDrop,
+          is_return_trip: job.isReturnTrip,
+          return_to_same_location: job.returnToSameLocation,
+          return_address: job.returnAddress,
+          return_postcode: job.returnPostcode,
+          is_scheduled: job.isScheduled,
+          scheduled_pickup_time: job.scheduledPickupTime,
+          scheduled_delivery_time: job.scheduledDeliveryTime,
+          is_central_london: job.isCentralLondon,
+          is_rush_hour: job.isRushHour,
+          base_price: job.basePrice,
+          distance_price: job.distancePrice,
+          weight_surcharge: job.weightSurcharge,
+          multi_drop_charge: job.multiDropCharge,
+          return_trip_charge: job.returnTripCharge,
+          central_london_charge: job.centralLondonCharge,
+          waiting_time_charge: job.waitingTimeCharge,
+          total_price: job.totalPrice,
+          driver_price: job.driverPrice,
+          payment_status: job.paymentStatus,
+          payment_intent_id: job.paymentIntentId,
+          created_at: job.createdAt?.toISOString(),
+          updated_at: job.updatedAt?.toISOString(),
+        };
+        
+        const { error: supabaseError } = await supabaseAdmin
+          .from('jobs')
+          .upsert(supabaseJobData, { onConflict: 'id' });
+        
+        if (supabaseError) {
+          console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
+        } else {
+          console.log(`[Jobs] Job ${job.id} synced to Supabase for mobile app`);
+        }
+      }
+    } catch (syncErr) {
+      console.error('[Jobs] Error syncing job to Supabase:', syncErr);
+    }
+    
     // Broadcast job created event for real-time updates
     broadcastJobCreated({
       id: job.id,
