@@ -82,6 +82,9 @@ interface SupabaseDriver {
   phone: string | null;
   role: string;
   driverCode: string | null;
+  vehicleType?: string;
+  isVerified?: boolean;
+  isAvailable?: boolean;
   createdAt: string;
 }
 
