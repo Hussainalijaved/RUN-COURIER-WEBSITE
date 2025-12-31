@@ -1,3 +1,4 @@
+import { supabaseAdmin } from './supabaseAdmin';
 import { 
   type User, type InsertUser,
   type Driver, type InsertDriver,
@@ -1732,4 +1733,28 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Use SupabaseStorage when Supabase is configured, otherwise fall back to MemStorage
+// Note: Dynamic import to avoid circular dependency
+async function createStorage(): Promise<IStorage> {
+  if (supabaseAdmin) {
+    const { SupabaseStorage } = await import('./supabaseStorage');
+    console.log('[Storage] Using Supabase storage');
+    return new SupabaseStorage();
+  }
+  console.log('[Storage] Using Memory storage');
+  return new MemStorage();
+}
+
+// For immediate synchronous access, default to MemStorage until async init completes
+let _storage: IStorage = new MemStorage();
+
+// Initialize async storage
+createStorage().then(s => {
+  _storage = s;
+}).catch(err => {
+  console.error('[Storage] Failed to initialize Supabase storage, using MemStorage:', err);
+});
+
+export const storage: IStorage = new Proxy({} as IStorage, {
+  get: (_, prop) => (_storage as any)[prop]?.bind?.(_storage) ?? (_storage as any)[prop]
+});
