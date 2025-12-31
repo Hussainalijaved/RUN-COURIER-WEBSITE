@@ -1,10 +1,24 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { supabase } from "./supabase";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
+}
+
+// Get Supabase access token for authenticated API requests
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return { "Authorization": `Bearer ${session.access_token}` };
+    }
+  } catch (error) {
+    console.warn("[Auth] Failed to get session for API request");
+  }
+  return {};
 }
 
 const REPLIT_BACKEND_HOST = 'run-courier-site--almashriqi2010.replit.app';
@@ -49,13 +63,17 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const backendUrl = getBackendUrl(url);
+  const authHeaders = await getAuthHeaders();
   
   console.log(`[API] ${method} ${backendUrl}`);
   
   try {
     const res = await fetch(backendUrl, {
       method,
-      headers: data ? { "Content-Type": "application/json" } : {},
+      headers: {
+        ...authHeaders,
+        ...(data ? { "Content-Type": "application/json" } : {}),
+      },
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
     });
@@ -100,7 +118,10 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const url = buildUrlFromQueryKey(queryKey);
     const backendUrl = getBackendUrl(url);
+    const authHeaders = await getAuthHeaders();
+    
     const res = await fetch(backendUrl, {
+      headers: authHeaders,
       credentials: "include",
     });
 
