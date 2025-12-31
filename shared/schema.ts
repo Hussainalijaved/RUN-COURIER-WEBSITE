@@ -4,7 +4,10 @@ import { z } from "zod";
 
 export type UserRole = "admin" | "driver" | "customer" | "dispatcher" | "vendor";
 export type UserType = "individual" | "business";
-export type JobStatus = "pending" | "assigned" | "accepted" | "on_the_way_pickup" | "arrived_pickup" | "collected" | "on_the_way_delivery" | "delivered" | "cancelled";
+// CRITICAL: Job status values must match Supabase and mobile app
+// Flow: pending -> assigned/offered -> accepted -> arrived_pickup -> picked_up -> on_the_way -> delivered
+// Legacy: on_the_way_pickup, collected, on_the_way_delivery (kept for backward compatibility)
+export type JobStatus = "pending" | "assigned" | "offered" | "accepted" | "arrived_pickup" | "picked_up" | "on_the_way" | "delivered" | "cancelled" | "on_the_way_pickup" | "collected" | "on_the_way_delivery";
 export type VehicleType = "motorbike" | "car" | "small_van" | "medium_van";
 export type DocumentType = 
   | "id_passport" | "driving_licence" | "right_to_work" | "vehicle_photo" | "insurance" | "goods_in_transit" | "hire_reward"
@@ -37,10 +40,14 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// SCHEMA MAPPING (Local Drizzle ↔ Supabase):
+// - Local: drivers.id (primary key), drivers.userId, drivers.driverCode
+// - Supabase: drivers.id (=auth.uid), drivers.driver_id (=RC##L code)
+// The mobileAuth.ts and routes.ts handle the mapping between these schemas
 export const drivers = pgTable("drivers", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  driverCode: text("driver_code").unique(),
+  userId: varchar("user_id", { length: 36 }).notNull(), // Maps to Supabase drivers.id (auth.uid)
+  driverCode: text("driver_code").unique(), // Maps to Supabase drivers.driver_id (RC##L format)
   fullName: text("full_name"),
   email: text("email"),
   phone: text("phone"),
