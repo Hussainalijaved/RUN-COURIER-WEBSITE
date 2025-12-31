@@ -637,6 +637,36 @@ export async function registerRoutes(
     await storage.updateJob(req.params.id, { driverPrice: finalDriverPrice });
     console.log(`[Jobs] Updated job ${job.id} with driver_price: £${finalDriverPrice}`);
     
+    // Auto-geocode job coordinates if missing (for mobile app map preview)
+    if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude) ||
+        job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+      try {
+        const geoUpdates: any = {};
+        if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) {
+          const pickupResult = await geocodeAddress(job.pickupAddress);
+          if (pickupResult) {
+            geoUpdates.pickupLatitude = pickupResult.lat;
+            geoUpdates.pickupLongitude = pickupResult.lng;
+            console.log(`[Jobs] Geocoded pickup for job ${job.id}: ${pickupResult.lat}, ${pickupResult.lng}`);
+          }
+        }
+        if (job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+          const deliveryResult = await geocodeAddress(job.deliveryAddress);
+          if (deliveryResult) {
+            geoUpdates.deliveryLatitude = deliveryResult.lat;
+            geoUpdates.deliveryLongitude = deliveryResult.lng;
+            console.log(`[Jobs] Geocoded delivery for job ${job.id}: ${deliveryResult.lat}, ${deliveryResult.lng}`);
+          }
+        }
+        if (Object.keys(geoUpdates).length > 0) {
+          await storage.updateJob(req.params.id, geoUpdates);
+        }
+      } catch (geoErr) {
+        console.error(`[Jobs] Geocoding failed for job ${job.id}:`, geoErr);
+        // Continue anyway - map preview will be unavailable but job still works
+      }
+    }
+    
     // Also create a job assignment record so it appears in mobile app's job offers
     if (driverId && driver) {
       try {
@@ -3044,6 +3074,36 @@ export async function registerRoutes(
       driverPrice: driverPrice
     });
     console.log(`[Job Assignment] Job ${jobId} assigned to driver ${driverId} with price £${driverPrice}`);
+    
+    // Auto-geocode job coordinates if missing (for mobile app map preview)
+    if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude) ||
+        job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+      try {
+        const geoUpdates: any = {};
+        if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) {
+          const pickupResult = await geocodeAddress(job.pickupAddress);
+          if (pickupResult) {
+            geoUpdates.pickupLatitude = pickupResult.lat;
+            geoUpdates.pickupLongitude = pickupResult.lng;
+            console.log(`[Job Assignment] Geocoded pickup for job ${jobId}: ${pickupResult.lat}, ${pickupResult.lng}`);
+          }
+        }
+        if (job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+          const deliveryResult = await geocodeAddress(job.deliveryAddress);
+          if (deliveryResult) {
+            geoUpdates.deliveryLatitude = deliveryResult.lat;
+            geoUpdates.deliveryLongitude = deliveryResult.lng;
+            console.log(`[Job Assignment] Geocoded delivery for job ${jobId}: ${deliveryResult.lat}, ${deliveryResult.lng}`);
+          }
+        }
+        if (Object.keys(geoUpdates).length > 0) {
+          await storage.updateJob(jobId, geoUpdates);
+        }
+      } catch (geoErr) {
+        console.error(`[Job Assignment] Geocoding failed for job ${jobId}:`, geoErr);
+        // Continue anyway - map preview will be unavailable but job still works
+      }
+    }
 
     // Create notification for driver
     await storage.createNotification({
