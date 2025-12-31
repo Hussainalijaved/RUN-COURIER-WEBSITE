@@ -356,29 +356,10 @@ export default function AdminJobs() {
     },
   });
 
-  // Withdraw assignment - uses backend API for reliability
+  // Unassign driver from job - works with or without assignment records
   const withdrawAssignmentMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      // First find the active assignment for this job
-      const assignmentsRes = await fetch(`/api/job-assignments?jobId=${jobId}`);
-      if (!assignmentsRes.ok) throw new Error('Failed to fetch assignments');
-      const assignments = await assignmentsRes.json();
-      
-      // Find the active assignment (sent, pending, or accepted)
-      const activeAssignment = assignments.find((a: any) => 
-        ['sent', 'pending', 'accepted'].includes(a.status)
-      );
-      
-      if (!activeAssignment) {
-        throw new Error('No active assignment found for this job');
-      }
-      
-      // Use withdraw for pending/sent, remove for accepted
-      const endpoint = ['pending', 'sent'].includes(activeAssignment.status)
-        ? `/api/job-assignments/${activeAssignment.id}/withdraw`
-        : `/api/job-assignments/${activeAssignment.id}/remove`;
-      
-      const response = await fetch(endpoint, {
+      const response = await fetch(`/api/jobs/${jobId}/unassign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminUserId: user?.id, reason: 'Withdrawn by admin' }),
@@ -386,17 +367,17 @@ export default function AdminJobs() {
       
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to withdraw assignment');
+        throw new Error(error.error || 'Failed to unassign driver');
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
-      toast({ title: 'Assignment withdrawn', description: 'The job is now available for reassignment to another driver.' });
+      toast({ title: 'Driver unassigned', description: 'The job is now available for reassignment to another driver.' });
     },
     onError: (error: any) => {
-      toast({ title: 'Failed to withdraw assignment', description: error?.message || 'Please try again', variant: 'destructive' });
+      toast({ title: 'Failed to unassign driver', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 

@@ -3394,6 +3394,70 @@ export async function registerRoutes(
     res.json(updated);
   }));
 
+  // Admin: Unassign driver from job (works with or without assignment record)
+  app.patch("/api/jobs/:id/unassign", asyncHandler(async (req, res) => {
+    const { adminUserId, reason } = req.body;
+    const jobId = req.params.id;
+    
+    if (!adminUserId) {
+      return res.status(400).json({ error: "adminUserId is required" });
+    }
+
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    if (!job.driverId) {
+      return res.status(400).json({ error: "Job has no driver assigned" });
+    }
+
+    const previousDriverId = job.driverId;
+
+    // Try to find and cancel any active assignment
+    const assignments = await storage.getJobAssignments({ jobId });
+    const activeAssignment = assignments.find(a => 
+      ['sent', 'pending', 'accepted'].includes(a.status)
+    );
+
+    if (activeAssignment) {
+      // Cancel the assignment record
+      await storage.updateJobAssignment(activeAssignment.id, {
+        status: "cancelled" as any,
+        cancelledAt: new Date(),
+        cancellationReason: reason || "Unassigned by admin"
+      });
+      console.log(`[Job Unassign] Cancelled assignment ${activeAssignment.id}`);
+    }
+
+    // Clear driver from job and reset status
+    await storage.updateJob(jobId, {
+      driverId: null,
+      driverPrice: null,
+      status: "pending" as any
+    });
+    console.log(`[Job Unassign] Job ${job.trackingNumber} unassigned from driver, status reset to pending`);
+
+    // Notify the driver
+    const driver = await storage.getDriver(previousDriverId);
+    if (driver?.userId) {
+      await storage.createNotification({
+        userId: driver.userId,
+        title: "Job Unassigned",
+        message: `Job ${job.trackingNumber} has been unassigned from you by admin.${reason ? ` Reason: ${reason}` : ""}`,
+        type: "job_unassigned",
+        data: { jobId, trackingNumber: job.trackingNumber },
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Driver unassigned from job",
+      jobId,
+      previousDriverId
+    });
+  }));
+
   // Delivery Contacts routes (for business customers to save delivery details)
   app.get("/api/delivery-contacts", asyncHandler(async (req, res) => {
     const customerId = req.query.customerId as string;
