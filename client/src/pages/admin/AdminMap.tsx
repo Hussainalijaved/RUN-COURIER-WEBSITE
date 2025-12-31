@@ -235,10 +235,13 @@ export default function AdminMap() {
           strokeWeight: 2,
         });
       } else {
+        const driverLabel = driver.driverCode 
+          ? `${driver.driverCode} · ${driver.fullName || 'Driver'}` 
+          : driver.fullName || driver.vehicleRegistration || 'Driver';
         const marker = new google.maps.Marker({
           position: location,
           map,
-          title: driver.fullName || driver.vehicleRegistration || 'Driver',
+          title: driverLabel,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 12,
@@ -261,9 +264,12 @@ export default function AdminMap() {
             infoWindowRef.current = new google.maps.InfoWindow();
           }
           const vehicleType = driver.vehicleType?.replace(/_/g, ' ') || 'Unknown';
+          const driverDisplay = driver.driverCode 
+            ? `${driver.driverCode} · ${driver.fullName || 'Driver'}` 
+            : driver.fullName || 'Driver';
           infoWindowRef.current.setContent(`
             <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
-              <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${driver.fullName || 'Driver'}</div>
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${driverDisplay}</div>
               <div style="font-size: 12px; color: #666; text-transform: capitalize;">Vehicle: ${vehicleType}</div>
             </div>
           `);
@@ -660,6 +666,10 @@ export default function AdminMap() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm truncate">
+                                {driver.driverCode && (
+                                  <span className="font-mono font-bold text-blue-600 mr-1">{driver.driverCode}</span>
+                                )}
+                                <span className="text-muted-foreground">·</span>{' '}
                                 {driver.fullName || driver.vehicleRegistration || 'Driver'}
                               </div>
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -694,6 +704,10 @@ export default function AdminMap() {
               {selectedDriver && (
                 <div className="border-t p-4">
                   <h4 className="font-semibold mb-3">
+                    {selectedDriver.driverCode && (
+                      <span className="font-mono font-bold text-blue-600 mr-1">{selectedDriver.driverCode}</span>
+                    )}
+                    <span className="text-muted-foreground">·</span>{' '}
                     {selectedDriver.fullName || selectedDriver.vehicleRegistration || 'Driver'}
                   </h4>
                   <div className="space-y-2 text-sm">

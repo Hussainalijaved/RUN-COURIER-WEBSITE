@@ -1365,7 +1365,10 @@ export default function AdminJobs() {
                     <p className="text-sm">
                       <span className="font-medium">Summary:</span> Assign to{' '}
                       <span className="font-semibold">
-                        {allDriversWithInfo.find(d => d.id === selectedDriverForAssign)?.name}
+                        {(() => {
+                          const d = allDriversWithInfo.find(d => d.id === selectedDriverForAssign);
+                          return d?.driverCode ? `${d.driverCode} · ${d.name}` : d?.name;
+                        })()}
                       </span>{' '}
                       for <span className="font-semibold">£{parseFloat(assignDriverPrice).toFixed(2)}</span>
                     </p>
