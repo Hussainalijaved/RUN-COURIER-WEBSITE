@@ -631,6 +631,28 @@ export default function Quote() {
                             setDistance(0);
                             setEstimatedTime(0);
                             setMultiDropStops([]);
+                            updateBooking({
+                              pickupPostcode: '',
+                              deliveryPostcode: '',
+                              vehicleType: undefined,
+                              weight: 1,
+                              isMultiDrop: false,
+                              isReturnTrip: false,
+                              returnToSameLocation: true,
+                              returnPostcode: '',
+                              multiDropStops: [],
+                              distance: 0,
+                              estimatedTime: 0,
+                              totalPrice: 0,
+                              basePrice: 0,
+                              distancePrice: 0,
+                              weightSurcharge: 0,
+                              rushHourCharge: 0,
+                              centralLondonCharge: 0,
+                              multiDropCharge: 0,
+                              returnTripCharge: 0,
+                              waitingTimeCharge: 0,
+                            });
                           }}
                           data-testid="button-new-quote"
                         >
