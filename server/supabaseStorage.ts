@@ -140,7 +140,9 @@ function mapDbToJob(dbJob: any): Job {
     paymentStatus: dbJob.payment_status,
     paymentIntentId: dbJob.payment_intent_id,
     podPhotoUrl: dbJob.pod_photo_url,
+    podPhotos: dbJob.pod_photos || [],
     podSignatureUrl: dbJob.pod_signature_url,
+    podNotes: dbJob.pod_notes,
     podRecipientName: dbJob.pod_recipient_name,
     deliveredAt: dbJob.delivered_at ? new Date(dbJob.delivered_at) : null,
     rejectionReason: dbJob.rejection_reason,
@@ -841,7 +843,9 @@ export class SupabaseStorage implements IStorage {
     if (data.paymentStatus !== undefined) dbData.payment_status = data.paymentStatus;
     if (data.paymentIntentId !== undefined) dbData.payment_intent_id = data.paymentIntentId;
     if (data.podPhotoUrl !== undefined) dbData.pod_photo_url = data.podPhotoUrl;
+    if (data.podPhotos !== undefined) dbData.pod_photos = data.podPhotos;
     if (data.podSignatureUrl !== undefined) dbData.pod_signature_url = data.podSignatureUrl;
+    if (data.podNotes !== undefined) dbData.pod_notes = data.podNotes;
     if (data.podRecipientName !== undefined) dbData.pod_recipient_name = data.podRecipientName;
     if (data.deliveredAt !== undefined) dbData.delivered_at = data.deliveredAt;
     if (data.rejectionReason !== undefined) dbData.rejection_reason = data.rejectionReason;
@@ -891,8 +895,21 @@ export class SupabaseStorage implements IStorage {
     return this.updateJob(id, { driverId, dispatcherId, status: 'assigned' });
   }
 
-  async updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string): Promise<Job | undefined> {
-    return this.updateJob(id, { podPhotoUrl, podSignatureUrl, podRecipientName });
+  async updateJobPOD(
+    id: string, 
+    podPhotoUrl?: string, 
+    podSignatureUrl?: string, 
+    podRecipientName?: string,
+    podPhotos?: string[],
+    podNotes?: string
+  ): Promise<Job | undefined> {
+    const updates: any = {};
+    if (podPhotoUrl !== undefined) updates.podPhotoUrl = podPhotoUrl;
+    if (podSignatureUrl !== undefined) updates.podSignatureUrl = podSignatureUrl;
+    if (podRecipientName !== undefined) updates.podRecipientName = podRecipientName;
+    if (podPhotos !== undefined) updates.podPhotos = podPhotos;
+    if (podNotes !== undefined) updates.podNotes = podNotes;
+    return this.updateJob(id, updates);
   }
 
   async deleteJob(id: string): Promise<void> {

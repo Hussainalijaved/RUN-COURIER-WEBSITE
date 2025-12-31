@@ -65,7 +65,7 @@ export interface IStorage {
   updateJob(id: string, data: Partial<Job>): Promise<Job | undefined>;
   updateJobStatus(id: string, status: JobStatus, rejectionReason?: string): Promise<Job | undefined>;
   assignDriver(id: string, driverId: string, dispatcherId?: string): Promise<Job | undefined>;
-  updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string): Promise<Job | undefined>;
+  updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string, podPhotos?: string[], podNotes?: string): Promise<Job | undefined>;
   deleteJob(id: string): Promise<void>;
 
   getDocument(id: string): Promise<Document | undefined>;
@@ -666,7 +666,9 @@ export class MemStorage implements IStorage {
       paymentStatus: insertJob.paymentStatus || "pending",
       paymentIntentId: insertJob.paymentIntentId || null,
       podPhotoUrl: insertJob.podPhotoUrl || null,
+      podPhotos: insertJob.podPhotos || [],
       podSignatureUrl: insertJob.podSignatureUrl || null,
+      podNotes: insertJob.podNotes || null,
       podRecipientName: insertJob.podRecipientName || null,
       deliveredAt: insertJob.deliveredAt || null,
       rejectionReason: insertJob.rejectionReason || null,
@@ -674,6 +676,9 @@ export class MemStorage implements IStorage {
       estimatedDeliveryTime: insertJob.estimatedDeliveryTime || null,
       actualPickupTime: insertJob.actualPickupTime || null,
       actualDeliveryTime: insertJob.actualDeliveryTime || null,
+      driverHidden: insertJob.driverHidden || false,
+      driverHiddenAt: insertJob.driverHiddenAt || null,
+      driverHiddenBy: insertJob.driverHiddenBy || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -781,12 +786,14 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string): Promise<Job | undefined> {
-    return this.updateJob(id, { 
-      podPhotoUrl: podPhotoUrl || null, 
-      podSignatureUrl: podSignatureUrl || null,
-      podRecipientName: podRecipientName || null
-    });
+  async updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string, podPhotos?: string[], podNotes?: string): Promise<Job | undefined> {
+    const updates: Partial<Job> = {};
+    if (podPhotoUrl !== undefined) updates.podPhotoUrl = podPhotoUrl || null;
+    if (podSignatureUrl !== undefined) updates.podSignatureUrl = podSignatureUrl || null;
+    if (podRecipientName !== undefined) updates.podRecipientName = podRecipientName || null;
+    if (podPhotos !== undefined) updates.podPhotos = podPhotos;
+    if (podNotes !== undefined) updates.podNotes = podNotes || null;
+    return this.updateJob(id, updates);
   }
 
   async deleteJob(id: string): Promise<void> {
@@ -1411,6 +1418,13 @@ export class MemStorage implements IStorage {
       cancellationReason: assignment.cancellationReason || null,
       rejectionReason: assignment.rejectionReason || null,
       expiresAt: assignment.expiresAt || null,
+      batchGroupId: assignment.batchGroupId || null,
+      withdrawnAt: assignment.withdrawnAt || null,
+      withdrawnBy: assignment.withdrawnBy || null,
+      removedAt: assignment.removedAt || null,
+      removedBy: assignment.removedBy || null,
+      cleanedAt: assignment.cleanedAt || null,
+      cleanedBy: assignment.cleanedBy || null,
       createdAt: now,
     };
     this.jobAssignments.set(id, newAssignment);
