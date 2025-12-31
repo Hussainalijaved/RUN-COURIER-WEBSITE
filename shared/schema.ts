@@ -471,6 +471,27 @@ export const bookingQuoteSchema = z.object({
   deliveryTime: z.string().optional(),
 });
 
+// Driver push notification device registrations (for Expo push notifications)
+export const driverDevices = pgTable("driver_devices", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  driverId: varchar("driver_id", { length: 36 }).notNull(), // Supabase auth.uid()
+  pushToken: text("push_token").notNull(), // Expo push token
+  platform: text("platform").$type<"ios" | "android">().notNull(),
+  appVersion: text("app_version"),
+  deviceInfo: text("device_info"), // Device model/info
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDriverDeviceSchema = createInsertSchema(driverDevices).omit({
+  id: true,
+  createdAt: true,
+  lastSeenAt: true,
+});
+
+export type InsertDriverDevice = z.infer<typeof insertDriverDeviceSchema>;
+export type DriverDevice = typeof driverDevices.$inferSelect;
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type BookingQuoteInput = z.infer<typeof bookingQuoteSchema>;

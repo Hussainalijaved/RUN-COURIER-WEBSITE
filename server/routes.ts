@@ -26,6 +26,7 @@ import { sendNewJobNotification, sendDriverApplicationNotification, sendDocument
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned } from "./realtime";
 import { geocodeAddress } from "./geocoding";
+import { sendJobOfferNotification } from "./pushNotifications";
 
 // Server-side pricing configuration - SINGLE SOURCE OF TRUTH
 // This must match the client-side config in client/src/lib/pricing.ts
@@ -659,6 +660,20 @@ export async function registerRoutes(
         driverPrice: job.driverPrice,
       });
       console.log(`[Jobs] Job ${job.id} assigned to driver ${job.driverId}, notification sent`);
+      
+      // Send push notification to driver's mobile device
+      sendJobOfferNotification(job.driverId, {
+        jobId: job.id,
+        trackingNumber: job.trackingNumber,
+        pickupAddress: job.pickupAddress,
+        deliveryAddress: job.deliveryAddress,
+        driverPrice: job.driverPrice,
+        vehicleType: job.vehicleType,
+      }).then(result => {
+        if (result.success) {
+          console.log(`[Jobs] Push notification sent to ${result.sentCount} device(s) for driver ${job.driverId}`);
+        }
+      }).catch(err => console.error('[Jobs] Failed to send push notification:', err));
     }
     res.json(job);
   }));
@@ -3005,6 +3020,22 @@ export async function registerRoutes(
       type: "job_assigned",
       data: { assignmentId: assignment.id, jobId },
     });
+
+    // Send push notification to driver's mobile device (with sound)
+    sendJobOfferNotification(driverId, {
+      jobId,
+      trackingNumber: job.trackingNumber,
+      pickupAddress: job.pickupAddress,
+      deliveryAddress: job.deliveryAddress,
+      driverPrice: driverPrice,
+      vehicleType: job.vehicleType,
+    }).then(result => {
+      if (result.success) {
+        console.log(`[Job Assignment] Push notification sent to ${result.sentCount} device(s) for driver ${driverId}`);
+      } else {
+        console.log(`[Job Assignment] No push devices registered for driver ${driverId}`);
+      }
+    }).catch(err => console.error('[Job Assignment] Failed to send push notification:', err));
 
     // Note: SupabaseStorage already handles Supabase writes directly
     // No need for redundant sync here

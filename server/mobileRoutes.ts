@@ -9,6 +9,7 @@ import type { JobStatus, Job } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import { supabaseAdmin } from "./supabaseAdmin";
+import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "./pushNotifications";
 
 // Helper to map Supabase job to local Job format for mobile API response
 function mapSupabaseJobToMobileFormat(job: any) {
@@ -148,10 +149,110 @@ export function registerMobileRoutes(app: Express): void {
         location: "/api/mobile/v1/driver/location",
         availability: "/api/mobile/v1/driver/availability",
         status: "/api/driver/status",
-        websocket: "/ws/realtime"
+        websocket: "/ws/realtime",
+        pushToken: "/api/mobile/v1/driver/push-token"
       }
     });
   });
+
+  // Register push notification token for driver
+  app.post("/api/mobile/v1/driver/push-token",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { pushToken, platform, appVersion, deviceInfo } = req.body;
+
+      if (!pushToken || typeof pushToken !== 'string') {
+        return res.status(400).json({ 
+          error: "Push token is required",
+          code: "INVALID_PUSH_TOKEN"
+        });
+      }
+
+      if (!platform || !['ios', 'android'].includes(platform)) {
+        return res.status(400).json({ 
+          error: "Platform must be 'ios' or 'android'",
+          code: "INVALID_PLATFORM"
+        });
+      }
+
+      const result = await registerDriverDevice(
+        driver.id,
+        pushToken,
+        platform,
+        appVersion,
+        deviceInfo
+      );
+
+      if (result.success) {
+        console.log(`[Push Token] Registered for driver ${driver.driverCode || driver.id}`);
+        res.json({
+          success: true,
+          deviceId: result.deviceId,
+          message: "Push token registered successfully"
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error || "Failed to register push token"
+        });
+      }
+    })
+  );
+
+  // Unregister push notification token
+  app.delete("/api/mobile/v1/driver/push-token",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { pushToken } = req.body;
+
+      if (!pushToken || typeof pushToken !== 'string') {
+        return res.status(400).json({ 
+          error: "Push token is required",
+          code: "INVALID_PUSH_TOKEN"
+        });
+      }
+
+      const result = await unregisterDriverDevice(driver.id, pushToken);
+
+      if (result.success) {
+        console.log(`[Push Token] Unregistered for driver ${driver.driverCode || driver.id}`);
+        res.json({
+          success: true,
+          message: "Push token unregistered successfully"
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error || "Failed to unregister push token"
+        });
+      }
+    })
+  );
+
+  // Get registered devices for current driver (for debugging)
+  app.get("/api/mobile/v1/driver/devices",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const devices = await getDriverDevices(driver.id);
+
+      res.json({
+        success: true,
+        devices: devices.map(d => ({
+          id: d.id,
+          platform: d.platform,
+          appVersion: d.appVersion,
+          lastSeenAt: d.lastSeenAt,
+          createdAt: d.createdAt
+        }))
+      });
+    })
+  );
 
   // Combined status endpoint for mobile app - handles both online status and location
   // This is what the mobile app calls when going online/offline
