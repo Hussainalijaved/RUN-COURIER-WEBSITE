@@ -409,7 +409,7 @@ export async function registerRoutes(
       console.log('[Jobs] supabaseAdmin available:', !!supabaseAdmin);
       if (supabaseAdmin) {
         // Map local job fields to Supabase jobs table columns
-        // Supabase uses: dropoff_address, price_customer, price_driver, etc.
+        // Supabase uses: dropoff_address, price_customer, driver_price, etc.
         // DO NOT include 'id' - let Supabase auto-generate it
         // CRITICAL: Many columns have NOT NULL constraints - use defaults!
         const supabaseJobData = {
@@ -444,7 +444,7 @@ export async function registerRoutes(
           parcel_weight: job.weight ? parseFloat(String(job.weight)) : 1,
           distance_miles: job.distance ? parseFloat(String(job.distance)) : 0,
           price_customer: job.totalPrice ? parseFloat(String(job.totalPrice)) : 0,
-          price_driver: job.driverPrice ? parseFloat(String(job.driverPrice)) : 0,
+          driver_price: job.driverPrice ? parseFloat(String(job.driverPrice)) : null,
           // Required time fields (NOT NULL - use current time as default)
           scheduled_pickup_time: job.scheduledPickupTime?.toISOString() || new Date().toISOString(),
           notes: job.pickupInstructions || job.deliveryInstructions || '', // NOT NULL
