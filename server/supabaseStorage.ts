@@ -710,6 +710,21 @@ export class SupabaseStorage implements IStorage {
     });
   }
 
+  async deleteDriver(id: string): Promise<boolean> {
+    const supabase = this.checkSupabase();
+    const { error } = await supabase
+      .from('drivers')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('[SupabaseStorage] Error deleting driver:', id, error);
+      return false;
+    }
+    console.log(`[SupabaseStorage] Permanently deleted driver ${id}`);
+    return true;
+  }
+
   async getJob(id: string): Promise<Job | undefined> {
     const supabase = this.checkSupabase();
     const { data, error } = await supabase

@@ -57,6 +57,7 @@ export interface IStorage {
   verifyDriver(id: string, isVerified: boolean): Promise<Driver | undefined>;
   deactivateDriver(id: string): Promise<Driver | undefined>;
   reactivateDriver(id: string): Promise<Driver | undefined>;
+  deleteDriver(id: string): Promise<boolean>;
 
   getJob(id: string): Promise<Job | undefined>;
   getJobByTrackingNumber(trackingNumber: string): Promise<Job | undefined>;
