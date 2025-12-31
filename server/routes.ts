@@ -2989,7 +2989,18 @@ export async function registerRoutes(
     // Check for existing active assignment
     const existingAssignment = await storage.getActiveAssignmentForJob(jobId);
     if (existingAssignment) {
-      return res.status(400).json({ error: "Job already has an active assignment. Cancel it first before reassigning." });
+      // Allow reassignment to the same driver with updated price
+      if (existingAssignment.driverId === driverId) {
+        // Cancel the old assignment and create a new one with updated price
+        await storage.updateJobAssignment(existingAssignment.id, {
+          status: "cancelled",
+          cancelledAt: new Date(),
+          cancellationReason: "Reassigned with updated price"
+        });
+        console.log(`[Job Assignment] Cancelled old assignment ${existingAssignment.id} for price update reassignment`);
+      } else {
+        return res.status(400).json({ error: "Job already has an active assignment to another driver. Cancel it first before reassigning." });
+      }
     }
 
     // Create the assignment
