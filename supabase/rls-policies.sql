@@ -50,10 +50,12 @@ CREATE POLICY "users_update_admin" ON users
 -- ============================================
 -- DRIVERS TABLE POLICIES
 -- ============================================
+-- CRITICAL: The drivers table uses 'id' as the auth.uid() directly
+-- There is NO separate 'user_id' column - the 'id' column IS the auth identifier
 
 -- Drivers can read their own profile
 CREATE POLICY "drivers_select_own" ON drivers
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING (auth.uid() = id);
 
 -- Admins and dispatchers can read all drivers
 CREATE POLICY "drivers_select_admin_dispatcher" ON drivers
@@ -61,7 +63,7 @@ CREATE POLICY "drivers_select_admin_dispatcher" ON drivers
 
 -- Drivers can update their own profile (limited fields)
 CREATE POLICY "drivers_update_own" ON drivers
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = id);
 
 -- Admins can update any driver
 CREATE POLICY "drivers_update_admin" ON drivers

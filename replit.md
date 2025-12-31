@@ -125,14 +125,23 @@ The platform uses Supabase as the SINGLE source of truth for all data. The websi
 - If an admin assigns a job on the website → the driver MUST see it in the app
 - If a driver updates a job in the app → the website MUST reflect it immediately
 
-### CRITICAL: Job Assignment ID Mapping
-**The `driver_id` field in the `jobs` table MUST store `auth.uid()` (the user's UUID), NOT the driver table's primary key.**
+### CRITICAL: Drivers Table Schema
+**The Supabase `drivers` table uses `id` as the auth.uid() directly - there is NO separate `user_id` column.**
+
+Key understanding:
+- `drivers.id` = auth.uid() (the user's UUID from Supabase Auth)
+- `drivers.driver_id` = RC##L format code (e.g., RC01A, RC02C) - display ID only
+- These are DIFFERENT columns with different purposes
+
+### Job Assignment ID Mapping
+**The `driver_id` field in the `jobs` table stores `auth.uid()` (which equals `drivers.id`).**
 
 This is enforced by:
 1. RLS Policy: `jobs_select_driver` checks `auth.uid() = driver_id`
-2. Edge Function: `assign-driver` sets `driver_id = driver.user_id` (NOT `driver.id`)
+2. Edge Function: `assign-driver` sets `driver_id = driver.id` (the auth.uid)
+3. RLS Policy: `drivers_select_own` checks `auth.uid() = id`
 
-**Why this matters**: The mobile app uses Supabase RLS to filter jobs. If `driver_id` stores the driver table ID instead of the user UUID, the RLS policy `auth.uid() = driver_id` will NEVER match, and drivers won't see their assigned jobs.
+**Why this matters**: The mobile app uses Supabase RLS to filter jobs. The `driver_id` in jobs table must match the driver's `id` (which is their auth.uid) for RLS to work correctly.
 
 ### Real-Time Subscriptions
 - `useRealtimeDrivers` hook: Auto-updates driver status changes

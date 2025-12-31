@@ -80,18 +80,10 @@ serve(async (req) => {
       });
     }
 
-    // CRITICAL: driver.user_id is the auth.uid() - this is what RLS policies check
-    // The driver_id in jobs table MUST be set to user_id for drivers to see their jobs via RLS
-    const driverUserId = driver.user_id;
-    if (!driverUserId) {
-      return new Response(JSON.stringify({ 
-        error: "Driver account not properly linked to user account",
-        code: "DRIVER_NOT_LINKED"
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // CRITICAL: In the Supabase drivers table, the 'id' column IS the auth.uid()
+    // There is no separate 'user_id' column - the table uses 'id' directly as the auth identifier
+    // The driver_id in jobs table MUST be set to this id for drivers to see their jobs via RLS
+    const driverUserId = driver.id;
 
     const { data: existingJob, error: jobError } = await supabaseClient
       .from("jobs")

@@ -77,10 +77,12 @@ serve(async (req) => {
       });
     }
 
+    // In the Supabase drivers table, 'id' IS the auth.uid (userId)
+    // There is no separate 'user_id' column - check if driver with this id already exists
     const { data: existingDriver } = await supabaseClient
       .from("drivers")
       .select("id")
-      .eq("user_id", userId)
+      .eq("id", userId)
       .single();
 
     if (existingDriver) {
@@ -102,22 +104,20 @@ serve(async (req) => {
     
     const driverId = generateDriverId(existingCodes);
 
+    // In Supabase drivers table, 'id' IS the auth.uid - use userId as the primary key
     const { data: newDriver, error: insertError } = await supabaseClient
       .from("drivers")
       .insert({
-        user_id: userId,
-        driver_id: driverId,
+        id: userId, // id column IS the auth.uid
+        driver_id: driverId, // This is the RC##L format driver code
         email: email,
         full_name: fullName || null,
         phone: phone || null,
         postcode: postcode || null,
         address: address || null,
         vehicle_type: vehicleType || 'car',
-        is_available: false,
-        is_verified: false,
-        is_active: true,
-        rating: '5.0',
-        total_jobs: 0,
+        approval_status: 'pending',
+        online_status: 'offline',
         created_at: new Date().toISOString(),
       })
       .select()
