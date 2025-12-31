@@ -339,28 +339,36 @@ export async function registerRoutes(
     // Generate tracking number first
     const trackingNumber = await generateTrackingNumber();
     
-    // CRITICAL: If driverId is provided, we need to convert it to user_id for RLS compatibility
+    // CRITICAL: If driverId is provided, we need to convert it to Supabase auth.uid for RLS compatibility
     // The mobile app uses RLS policy: auth.uid() = driver_id
-    // So we must store the driver's auth user UUID, NOT the driver table primary key
+    // In Supabase, drivers.id IS the auth.uid (not a separate user_id column)
+    // So we must look up the driver in Supabase and use their id field
     let resolvedDriverId = req.body.driverId || null;
+    let supabaseDriverId: string | null = null;
     
     if (resolvedDriverId) {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       if (supabaseAdmin) {
-        // Look up driver in Supabase to get their user_id
-        const { data: driverData } = await supabaseAdmin
-          .from('drivers')
-          .select('id, user_id')
-          .eq('id', resolvedDriverId)
-          .single();
+        // First, get the local driver's email to look them up in Supabase
+        const localDriver = await storage.getDriver(resolvedDriverId);
         
-        if (driverData?.user_id) {
-          // Use the driver's auth user_id (which matches auth.uid() for RLS)
-          resolvedDriverId = driverData.user_id;
-          console.log(`[Jobs] Resolved driver table ID ${req.body.driverId} to user_id ${resolvedDriverId}`);
+        if (localDriver?.email) {
+          // Look up driver in Supabase by email to get their id (which is auth.uid)
+          const { data: supabaseDriver, error } = await supabaseAdmin
+            .from('drivers')
+            .select('id, email, driver_id')
+            .eq('email', localDriver.email)
+            .single();
+          
+          if (supabaseDriver?.id) {
+            // In Supabase, the id column IS the auth.uid()
+            supabaseDriverId = supabaseDriver.id;
+            console.log(`[Jobs] Resolved local driver ${localDriver.email} to Supabase auth.uid ${supabaseDriverId}`);
+          } else {
+            console.log(`[Jobs] Could not find driver in Supabase by email ${localDriver.email}:`, error?.message);
+          }
         } else {
-          // Driver ID might already be a user_id, keep it as is
-          console.log(`[Jobs] Driver ID ${resolvedDriverId} - no user_id mapping found, using as-is`);
+          console.log(`[Jobs] Local driver ${resolvedDriverId} has no email, cannot resolve Supabase ID`);
         }
       }
     }
@@ -405,8 +413,8 @@ export async function registerRoutes(
         const supabaseJobData = {
           // Required tracking
           tracking_number: job.trackingNumber,
-          // Driver/customer IDs
-          driver_id: job.driverId, // Already resolved to user UUID for RLS
+          // Driver/customer IDs - CRITICAL: Use Supabase auth.uid, NOT local driver UUID
+          driver_id: supabaseDriverId, // Must be Supabase auth.uid for RLS
           user_id: job.customerId !== 'admin-created' ? job.customerId : null,
           // Status and type (NOT NULL)
           status: job.status === 'assigned' ? 'pending' : job.status,
