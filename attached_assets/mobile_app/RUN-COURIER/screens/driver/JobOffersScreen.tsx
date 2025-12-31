@@ -324,8 +324,9 @@ export function JobOffersScreen({ navigation }: any) {
     try {
       // FREEZE PREVENTION: Race query against timeout
       // Query jobs assigned to either driver.id or auth user.id
+      // SECURITY: Query driver_jobs_view instead of jobs table to hide customer pricing
       const queryPromise = supabase
-        .from('jobs')
+        .from('driver_jobs_view')
         .select('*')
         .in('driver_id', allDriverIds)
         .in('status', ['assigned', 'offered'])
@@ -524,7 +525,7 @@ export function JobOffersScreen({ navigation }: any) {
           deliveryAddress: selectedJob.dropoff_address || selectedJob.delivery_address || selectedJob.delivery_postcode || 'N/A',
           driverName,
           rejectionReason: selectedReason,
-          price: selectedJob.price_customer ?? selectedJob.price ?? 0,
+          price: selectedJob.driver_price ?? 0,  // SECURITY: Use driver_price only
           scheduledPickupTime: selectedJob.scheduled_pickup_time,
         });
       } catch (emailError) {
@@ -625,7 +626,8 @@ export function JobOffersScreen({ navigation }: any) {
           ) : (
             <View style={styles.jobsList}>
               {jobs.map((job) => {
-                const jobPrice = job.price_customer ?? job.price ?? 0;
+                // SECURITY: Use driver_price ONLY - never show customer pricing
+                const jobPrice = job.driver_price ?? 0;
                 const pickupLocation = job.pickup_address || 'Pickup location';
                 const dropoffLocation = job.dropoff_address || job.delivery_address || 'Delivery location';
                   

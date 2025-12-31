@@ -294,6 +294,7 @@ export type Job = {
   delivery_address?: string;
   distance?: number;
   price?: number;
+  driver_price?: number;  // CRITICAL: This is the ONLY price drivers should ever see
   customer_name?: string;
   customer_phone?: string;
   customer_email?: string;

@@ -28,8 +28,9 @@ export function CompletedJobsScreen() {
     if (!driverId || allDriverIds.length === 0) return;
 
     try {
+      // SECURITY: Query driver_jobs_view instead of jobs table to hide customer pricing
       const { data, error } = await supabase
-        .from('jobs')
+        .from('driver_jobs_view')
         .select('*')
         .in('driver_id', allDriverIds)
         .in('status', ['delivered', 'failed'])
@@ -40,7 +41,8 @@ export function CompletedJobsScreen() {
       const completedJobs: Job[] = data || [];
       setJobs(completedJobs);
       const deliveredJobs = completedJobs.filter(j => j.status === 'delivered');
-      const earnings = deliveredJobs.reduce((sum: number, job: Job) => sum + (job.price_customer ?? job.price ?? 0), 0);
+      // SECURITY: Use driver_price ONLY - never show customer pricing to drivers
+      const earnings = deliveredJobs.reduce((sum: number, job: Job) => sum + (job.driver_price ?? 0), 0);
       setTotalEarnings(earnings);
     } catch (error) {
       console.error('Error fetching completed jobs:', error);
@@ -149,7 +151,7 @@ export function CompletedJobsScreen() {
                     ) : (
                       <View style={[styles.earningsBadge, { backgroundColor: theme.success + '15' }]}>
                         <ThemedText type="h4" style={{ color: theme.success }}>
-                          £{(job.price_customer ?? job.price ?? 0).toFixed(2)}
+                          £{(job.driver_price ?? 0).toFixed(2)}
                         </ThemedText>
                       </View>
                     )}

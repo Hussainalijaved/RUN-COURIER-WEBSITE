@@ -154,8 +154,9 @@ export function ActiveJobScreen({ navigation }: any) {
     try {
       // FREEZE PREVENTION: Race query against timeout
       // Query jobs assigned to either driver.id or auth user.id
+      // SECURITY: Query driver_jobs_view instead of jobs table to hide customer pricing
       const queryPromise = supabase
-        .from('jobs')
+        .from('driver_jobs_view')
         .select('*')
         .in('driver_id', allDriverIds)
         .in('status', ['accepted', 'arrived_pickup', 'picked_up', 'on_the_way'])
@@ -1610,7 +1611,7 @@ export function ActiveJobScreen({ navigation }: any) {
                   Earnings
                 </ThemedText>
                 <ThemedText style={[styles.price, { color: theme.success }]}>
-                  £{(activeJob.price_customer ?? activeJob.price ?? 0).toFixed(2)}
+                  £{(activeJob.driver_price ?? 0).toFixed(2)}
                 </ThemedText>
               </View>
             </View>
