@@ -12,34 +12,38 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "./pushNotifications";
 
 // Helper to map Supabase job to local Job format for mobile API response
+// CRITICAL: Only expose driver_price to drivers, NEVER total_price or customer pricing
 function mapSupabaseJobToMobileFormat(job: any) {
   return {
     id: String(job.id),
     trackingNumber: job.tracking_number,
     status: job.status,
-    pickupAddress: job.pickup_address,
-    pickupPostcode: null,
-    pickupInstructions: job.notes,
-    pickupLatitude: job.pickup_lat?.toString() || null,
-    pickupLongitude: job.pickup_lng?.toString() || null,
-    deliveryAddress: job.dropoff_address,
-    deliveryPostcode: null,
-    deliveryInstructions: null,
-    deliveryLatitude: job.dropoff_lat?.toString() || null,
-    deliveryLongitude: job.dropoff_lng?.toString() || null,
+    pickupAddress: job.pickup_address || job.dropoff_address,
+    pickupPostcode: job.pickup_postcode || null,
+    pickupInstructions: job.pickup_instructions || job.notes,
+    pickupLatitude: job.pickup_latitude?.toString() || job.pickup_lat?.toString() || null,
+    pickupLongitude: job.pickup_longitude?.toString() || job.pickup_lng?.toString() || null,
+    deliveryAddress: job.delivery_address || job.dropoff_address,
+    deliveryPostcode: job.delivery_postcode || null,
+    deliveryInstructions: job.delivery_instructions || null,
+    deliveryLatitude: job.delivery_latitude?.toString() || job.dropoff_lat?.toString() || null,
+    deliveryLongitude: job.delivery_longitude?.toString() || job.dropoff_lng?.toString() || null,
     recipientName: job.recipient_name,
     recipientPhone: job.recipient_phone,
-    senderName: job.sender_name,
-    senderPhone: job.sender_phone,
+    senderName: job.sender_name || job.pickup_contact_name,
+    senderPhone: job.sender_phone || job.pickup_contact_phone,
     vehicleType: job.vehicle_type,
-    distance: job.distance_miles?.toString() || null,
-    weight: job.parcel_weight?.toString() || null,
-    driverPrice: job.price_driver?.toString() || null,
+    distance: job.distance?.toString() || job.distance_miles?.toString() || null,
+    weight: job.weight?.toString() || job.parcel_weight?.toString() || null,
+    // CRITICAL: Use driver_price column (admin-set price), NEVER total_price
+    driverPrice: job.driver_price?.toString() || null,
     scheduledPickupTime: job.scheduled_pickup_time,
-    isMultiDrop: false,
-    isReturnTrip: false,
+    isMultiDrop: job.is_multi_drop || false,
+    isReturnTrip: job.is_return_trip || false,
     createdAt: job.created_at,
     updatedAt: job.updated_at,
+    // SECURITY: Explicitly exclude customer pricing fields - these must NEVER be exposed to drivers
+    // Excluded: total_price, base_price, distance_price, weight_surcharge, etc.
   };
 }
 
@@ -545,10 +549,10 @@ export function registerMobileRoutes(app: Express): void {
           
           let filteredJobs = supabaseJobs;
           
-          // CRITICAL: Only show jobs to drivers that have a price set by admin
-          // Jobs without price_driver should not appear in the driver's app
-          filteredJobs = filteredJobs.filter(j => j.price_driver != null);
-          console.log(`[Mobile Jobs] After price filter: ${filteredJobs.length} jobs with price set`);
+          // CRITICAL: Only show jobs to drivers that have a driver_price set by admin
+          // Jobs without driver_price should not appear in the driver's app
+          filteredJobs = filteredJobs.filter(j => j.driver_price != null);
+          console.log(`[Mobile Jobs] After driver_price filter: ${filteredJobs.length} jobs with admin-set price`);
           
           // Apply status filters
           // "active" = jobs the driver has ACCEPTED and is working on
@@ -746,7 +750,8 @@ export function registerMobileRoutes(app: Express): void {
           vehicleType: supabaseJob.vehicle_type,
           distance: supabaseJob.distance_miles?.toString() || supabaseJob.distance || null,
           weight: supabaseJob.parcel_weight?.toString() || supabaseJob.weight || null,
-          driverPrice: supabaseJob.price_driver?.toString() || supabaseJob.driver_price || null,
+          // CRITICAL: Use driver_price (admin-set), NEVER total_price
+          driverPrice: supabaseJob.driver_price?.toString() || null,
           scheduledPickupTime: supabaseJob.scheduled_pickup_time,
           isMultiDrop: supabaseJob.is_multi_drop || false,
           isReturnTrip: supabaseJob.is_return_trip || false,
