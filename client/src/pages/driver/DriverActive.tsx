@@ -20,7 +20,8 @@ import {
   useDriverJobs,
   useUpdateJobStatus,
 } from '@/hooks/useSupabaseDriver';
-import type { Job, JobStatus } from '@shared/schema';
+import type { JobStatus } from '@shared/schema';
+import type { DriverJob } from '@/lib/data/base';
 
 const getStatusLabel = (status: JobStatus) => {
   const labels: Record<string, string> = {
@@ -68,7 +69,7 @@ export default function DriverActive() {
     !['delivered', 'cancelled', 'pending'].includes(j.status)
   );
 
-  const advanceStatus = (job: Job) => {
+  const advanceStatus = (job: DriverJob) => {
     const currentIndex = statusFlow.indexOf(job.status);
     if (currentIndex < statusFlow.length - 1) {
       const nextStatus = statusFlow[currentIndex + 1];

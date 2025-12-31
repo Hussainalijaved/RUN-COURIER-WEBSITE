@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import type { Driver, Job, Document as DriverDocument } from '@shared/schema';
+import type { Driver, Document as DriverDocument } from '@shared/schema';
+import type { DriverJob } from '@/lib/data/base';
 
 export function useDriver() {
   const { user } = useAuth();
@@ -67,20 +68,71 @@ export function useDriver() {
   });
 }
 
+// CRITICAL SECURITY: Only select driver-safe columns - NEVER include total_price or customer pricing
+const DRIVER_SAFE_JOB_COLUMNS = `
+  id,
+  tracking_number,
+  customer_id,
+  driver_id,
+  dispatcher_id,
+  vendor_id,
+  status,
+  vehicle_type,
+  pickup_address,
+  pickup_postcode,
+  pickup_latitude,
+  pickup_longitude,
+  pickup_instructions,
+  pickup_contact_name,
+  pickup_contact_phone,
+  delivery_address,
+  delivery_postcode,
+  delivery_latitude,
+  delivery_longitude,
+  delivery_instructions,
+  recipient_name,
+  recipient_phone,
+  sender_name,
+  sender_phone,
+  parcel_description,
+  parcel_weight,
+  parcel_dimensions,
+  weight,
+  distance,
+  distance_miles,
+  is_multi_drop,
+  is_return_trip,
+  is_urgent,
+  is_fragile,
+  requires_signature,
+  driver_price,
+  scheduled_pickup_time,
+  estimated_delivery_time,
+  actual_pickup_time,
+  actual_delivery_time,
+  pod_signature_url,
+  pod_photo_url,
+  pod_notes,
+  created_at,
+  updated_at
+`;
+
 export function useDriverJobs(driverId: string | undefined) {
   return useQuery({
     queryKey: ['supabase', 'jobs', { driverId }],
     queryFn: async () => {
       if (!driverId) return [];
       
+      // CRITICAL: Only fetch driver-safe columns - NEVER use select('*')
       const { data, error } = await supabase
         .from('jobs')
-        .select('*')
+        .select(DRIVER_SAFE_JOB_COLUMNS)
         .eq('driver_id', driverId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
+      // SECURITY: Return DriverJob type - never cast to Job which includes customer pricing fields
       return (data || []).map(job => ({
         id: job.id,
         trackingNumber: job.tracking_number,
@@ -95,6 +147,8 @@ export function useDriverJobs(driverId: string | undefined) {
         pickupLatitude: job.pickup_latitude,
         pickupLongitude: job.pickup_longitude,
         pickupInstructions: job.pickup_instructions,
+        pickupContactName: job.pickup_contact_name,
+        pickupContactPhone: job.pickup_contact_phone,
         deliveryAddress: job.delivery_address,
         deliveryPostcode: job.delivery_postcode,
         deliveryLatitude: job.delivery_latitude,
@@ -102,17 +156,31 @@ export function useDriverJobs(driverId: string | undefined) {
         deliveryInstructions: job.delivery_instructions,
         recipientName: job.recipient_name,
         recipientPhone: job.recipient_phone,
+        senderName: job.sender_name,
+        senderPhone: job.sender_phone,
+        parcelDescription: job.parcel_description,
+        parcelWeight: job.parcel_weight,
+        parcelDimensions: job.parcel_dimensions,
         weight: job.weight,
         distance: job.distance,
+        distanceMiles: job.distance_miles,
         isMultiDrop: job.is_multi_drop,
         isReturnTrip: job.is_return_trip,
-        basePrice: job.base_price,
-        distancePrice: job.distance_price,
-        weightSurcharge: job.weight_surcharge,
-        totalPrice: job.total_price,
+        isUrgent: job.is_urgent,
+        isFragile: job.is_fragile,
+        requiresSignature: job.requires_signature,
+        // CRITICAL: Use driver_price ONLY - never expose customer pricing
+        driverPrice: job.driver_price,
+        scheduledPickupTime: job.scheduled_pickup_time,
+        estimatedDeliveryTime: job.estimated_delivery_time,
+        actualPickupTime: job.actual_pickup_time,
+        actualDeliveryTime: job.actual_delivery_time,
+        podSignatureUrl: job.pod_signature_url,
+        podPhotoUrl: job.pod_photo_url,
+        podNotes: job.pod_notes,
         createdAt: job.created_at,
         updatedAt: job.updated_at,
-      })) as Job[];
+      })) as DriverJob[];
     },
     enabled: !!driverId,
   });
@@ -122,33 +190,83 @@ export function useAvailableJobs(enabled: boolean) {
   return useQuery({
     queryKey: ['supabase', 'jobs', { status: 'pending' }],
     queryFn: async () => {
+      // CRITICAL: Only select driver-safe columns for available jobs
+      // NOTE: Available jobs may not have driver_price set yet, but we still must NOT expose total_price
       const { data, error } = await supabase
         .from('jobs')
-        .select('*')
+        .select(`
+          id,
+          tracking_number,
+          customer_id,
+          driver_id,
+          status,
+          vehicle_type,
+          pickup_address,
+          pickup_postcode,
+          delivery_address,
+          delivery_postcode,
+          recipient_name,
+          recipient_phone,
+          weight,
+          distance,
+          driver_price,
+          created_at
+        `)
         .eq('status', 'pending')
         .is('driver_id', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
+      // SECURITY: Return DriverJob type - never cast to Job which includes customer pricing fields
       return (data || []).map(job => ({
         id: job.id,
         trackingNumber: job.tracking_number,
         customerId: job.customer_id,
         driverId: job.driver_id,
+        dispatcherId: null,
+        vendorId: null,
         status: job.status,
         vehicleType: job.vehicle_type,
         pickupAddress: job.pickup_address,
         pickupPostcode: job.pickup_postcode,
+        pickupLatitude: null,
+        pickupLongitude: null,
+        pickupInstructions: null,
+        pickupContactName: null,
+        pickupContactPhone: null,
         deliveryAddress: job.delivery_address,
         deliveryPostcode: job.delivery_postcode,
+        deliveryLatitude: null,
+        deliveryLongitude: null,
+        deliveryInstructions: null,
         recipientName: job.recipient_name,
         recipientPhone: job.recipient_phone,
+        senderName: null,
+        senderPhone: null,
+        parcelDescription: null,
+        parcelWeight: null,
+        parcelDimensions: null,
         weight: job.weight,
         distance: job.distance,
-        totalPrice: job.total_price,
+        distanceMiles: null,
+        isMultiDrop: false,
+        isReturnTrip: false,
+        isUrgent: false,
+        isFragile: false,
+        requiresSignature: false,
+        // CRITICAL: Use driver_price ONLY - NEVER expose total_price
+        driverPrice: job.driver_price,
+        scheduledPickupTime: null,
+        estimatedDeliveryTime: null,
+        actualPickupTime: null,
+        actualDeliveryTime: null,
+        podSignatureUrl: null,
+        podPhotoUrl: null,
+        podNotes: null,
         createdAt: job.created_at,
-      })) as Job[];
+        updatedAt: job.created_at, // Use created_at as fallback since updated_at not fetched
+      })) as DriverJob[];
     },
     enabled,
   });
@@ -275,18 +393,20 @@ export function useUpdateDriverProfile() {
 
 export function useDriverStats(driverId: string | undefined) {
   const { data: jobs } = useDriverJobs(driverId);
+  // Type safety: jobs is DriverJob[] which only contains driverPrice, not totalPrice
 
   const stats = {
     totalJobs: jobs?.length || 0,
-    completedJobs: jobs?.filter(j => j.status === 'delivered').length || 0,
-    activeJobs: jobs?.filter(j => !['delivered', 'cancelled', 'pending'].includes(j.status)).length || 0,
-    todaysJobs: jobs?.filter(j => {
+    completedJobs: jobs?.filter((j: DriverJob) => j.status === 'delivered').length || 0,
+    activeJobs: jobs?.filter((j: DriverJob) => !['delivered', 'cancelled', 'pending'].includes(j.status)).length || 0,
+    todaysJobs: jobs?.filter((j: DriverJob) => {
       const today = new Date();
       const jobDate = new Date(j.createdAt || '');
       return jobDate.toDateString() === today.toDateString();
     }).length || 0,
-    totalEarnings: jobs?.filter(j => j.status === 'delivered')
-      .reduce((sum, j) => sum + parseFloat(j.totalPrice?.toString() || '0'), 0) || 0,
+    // CRITICAL: Use driverPrice for earnings - DriverJob type ensures totalPrice is never available
+    totalEarnings: jobs?.filter((j: DriverJob) => j.status === 'delivered')
+      .reduce((sum: number, j: DriverJob) => sum + parseFloat(j.driverPrice?.toString() || '0'), 0) || 0,
   };
 
   return stats;

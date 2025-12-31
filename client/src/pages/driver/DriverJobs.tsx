@@ -45,7 +45,8 @@ import {
   useRespondToAssignment,
   useDeclineJob,
 } from '@/hooks/useSupabaseDriver';
-import type { JobStatus, Job } from '@shared/schema';
+import type { JobStatus } from '@shared/schema';
+import type { DriverJob } from '@/lib/data/base';
 
 const REJECTION_REASONS = [
   'Unacceptable rate',
@@ -65,7 +66,7 @@ const formatPrice = (price: string | number | null) => {
 };
 
 // Drivers should ONLY see the admin-set driver price, never the customer's total price
-const getDriverPayment = (job: { driverPrice?: string | null; totalPrice?: string | number }): number | null => {
+const getDriverPayment = (job: { driverPrice?: string | null }): number | null => {
   if (job.driverPrice) {
     return parseFloat(job.driverPrice);
   }
@@ -111,7 +112,7 @@ export default function DriverJobs() {
   const [jobDeclineReason, setJobDeclineReason] = useState<string>('');
   const [jobCustomReason, setJobCustomReason] = useState('');
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [selectedJobForDetails, setSelectedJobForDetails] = useState<Job | null>(null);
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<DriverJob | null>(null);
   const prevAssignedCountRef = useRef<number>(0);
   const prevPendingCountRef = useRef<number>(0);
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.8 });
@@ -271,7 +272,7 @@ export default function DriverJobs() {
     );
   };
 
-  const handleViewDetails = (job: Job) => {
+  const handleViewDetails = (job: DriverJob) => {
     setSelectedJobForDetails(job);
     setViewDetailsOpen(true);
   };

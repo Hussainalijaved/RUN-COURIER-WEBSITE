@@ -34,7 +34,8 @@ import {
   useAcceptJob,
   useDriverDocuments,
 } from '@/hooks/useSupabaseDriver';
-import type { Job, JobStatus } from '@shared/schema';
+import type { JobStatus } from '@shared/schema';
+import type { DriverJob } from '@/lib/data/base';
 
 const formatPrice = (price: string | number | null | undefined) => {
   if (price === null || price === undefined) return '£0.00';
@@ -124,7 +125,7 @@ export default function DriverDashboard() {
     !['delivered', 'cancelled', 'pending'].includes(j.status)
   );
 
-  const advanceStatus = (job: Job) => {
+  const advanceStatus = (job: DriverJob) => {
     const currentIndex = statusFlow.indexOf(job.status);
     if (currentIndex < statusFlow.length - 1) {
       const nextStatus = statusFlow[currentIndex + 1];

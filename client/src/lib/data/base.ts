@@ -73,6 +73,59 @@ export type Job = {
   updatedAt: string;
 };
 
+/**
+ * SECURITY: Driver-safe job type that excludes customer pricing fields.
+ * Drivers should ONLY see their admin-set driver_price, never total_price or pricing breakdown.
+ * This type is intentionally minimal to prevent accidental price leakage.
+ */
+export type DriverJob = {
+  id: string;
+  trackingNumber: string;
+  customerId: string;
+  driverId: string | null;
+  dispatcherId: string | null;
+  vendorId: string | null;
+  status: JobStatus;
+  vehicleType: VehicleType;
+  pickupAddress: string;
+  pickupPostcode: string;
+  pickupLatitude: string | null;
+  pickupLongitude: string | null;
+  pickupInstructions: string | null;
+  pickupContactName: string | null;
+  pickupContactPhone: string | null;
+  deliveryAddress: string;
+  deliveryPostcode: string;
+  deliveryLatitude: string | null;
+  deliveryLongitude: string | null;
+  deliveryInstructions: string | null;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  senderName: string | null;
+  senderPhone: string | null;
+  parcelDescription: string | null;
+  parcelWeight: string | null;
+  parcelDimensions: string | null;
+  weight: string | null;
+  distance: string | null;
+  distanceMiles: string | null;
+  isMultiDrop: boolean;
+  isReturnTrip: boolean;
+  isUrgent: boolean;
+  isFragile: boolean;
+  requiresSignature: boolean;
+  driverPrice: string | null;
+  scheduledPickupTime: string | null;
+  estimatedDeliveryTime: string | null;
+  actualPickupTime: string | null;
+  actualDeliveryTime: string | null;
+  podSignatureUrl: string | null;
+  podPhotoUrl: string | null;
+  podNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Driver = {
   id: string;
   userId: string;
