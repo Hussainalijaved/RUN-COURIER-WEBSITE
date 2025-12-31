@@ -422,7 +422,7 @@ export async function registerRoutes(
           priority: 'normal',
           booking_type: 'on-demand',
           payment_status: job.paymentStatus || 'pending',
-          is_guest: job.customerId === 'admin-created',
+          is_guest: false, // CRITICAL: Must be false for mobile app visibility
           // Pickup details (lat/lng are NOT NULL - use 0 as default)
           pickup_address: job.pickupAddress || '',
           pickup_lat: job.pickupLatitude ? parseFloat(String(job.pickupLatitude)) : 0,
