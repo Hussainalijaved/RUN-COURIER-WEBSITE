@@ -4291,13 +4291,32 @@ export async function registerRoutes(
   app.post("/api/webhooks/payment-links", asyncHandler(async (req, res) => {
     const stripe = await getUncachableStripeClient();
     const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    // SECURITY: Require webhook secret to be configured
+    if (!webhookSecret) {
+      console.error('[Webhook] STRIPE_WEBHOOK_SECRET is not configured - rejecting webhook');
+      return res.status(500).json({ error: 'Webhook configuration error' });
+    }
+    
+    if (!sig) {
+      console.error('[Webhook] Missing stripe-signature header');
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
     
     let event;
     try {
+      // Use rawBody for signature verification (set by express.json verify option)
+      const rawBody = (req as any).rawBody;
+      if (!rawBody) {
+        console.error('[Webhook] Raw body not available for signature verification');
+        return res.status(400).json({ error: 'Raw body not available' });
+      }
+      
       event = stripe.webhooks.constructEvent(
-        req.body,
+        rawBody,
         sig as string,
-        process.env.STRIPE_WEBHOOK_SECRET || ''
+        webhookSecret
       );
     } catch (err: any) {
       console.error(`[Webhook] Signature verification failed:`, err.message);
