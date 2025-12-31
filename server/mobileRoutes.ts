@@ -692,12 +692,23 @@ export function registerMobileRoutes(app: Express): void {
     }
 
     try {
+      console.log(`[POD Upload] Processing ${type} for job ${jobId}, data length: ${base64Data?.length || 0}`);
+      
+      if (!base64Data || typeof base64Data !== 'string') {
+        console.error('[POD Upload] Invalid base64 data - empty or not a string');
+        return null;
+      }
+
       // Handle base64 data - remove data URL prefix if present
       let base64String = base64Data;
       let contentType = 'image/jpeg';
       
       if (base64Data.includes(',')) {
         const parts = base64Data.split(',');
+        if (parts.length < 2 || !parts[1]) {
+          console.error('[POD Upload] Invalid base64 data URL format - missing data after comma');
+          return null;
+        }
         base64String = parts[1];
         // Extract content type from data URL
         const match = parts[0].match(/data:([^;]+);/);
@@ -706,7 +717,20 @@ export function registerMobileRoutes(app: Express): void {
         }
       }
 
+      if (!base64String || base64String.length === 0) {
+        console.error('[POD Upload] Empty base64 string after parsing');
+        return null;
+      }
+
+      console.log(`[POD Upload] Creating buffer from base64 string, length: ${base64String.length}, contentType: ${contentType}`);
       const buffer = Buffer.from(base64String, 'base64');
+      
+      if (buffer.length === 0) {
+        console.error('[POD Upload] Buffer is empty after base64 decode');
+        return null;
+      }
+      
+      console.log(`[POD Upload] Buffer created, size: ${buffer.length} bytes`);
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 8);
       const ext = contentType.includes('png') ? '.png' : '.jpg';
