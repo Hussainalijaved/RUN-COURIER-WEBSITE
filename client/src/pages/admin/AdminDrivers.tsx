@@ -165,7 +165,8 @@ export default function AdminDrivers() {
   const verifyDriverMutation = useMutation({
     mutationFn: async ({ id, isVerified }: { id: string; isVerified: boolean }) => {
       // Use Supabase Edge Function for driver verification (works with Hostinger-hosted website)
-      return supabaseFunctions.updateDriver({ driverId: id, isVerified });
+      // Bypass document check since documents are stored in local Replit database, not Supabase
+      return supabaseFunctions.updateDriver({ driverId: id, isVerified, bypassDocumentCheck: true });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
