@@ -9,10 +9,11 @@
 
 -- Step 2: Update driver_price from job_assignments where admin set a different price
 -- This uses the CORRECT price from the assignment record (what admin actually set)
+-- Note: Cast job_id to match jobs.id type
 UPDATE jobs j
 SET driver_price = ja.driver_price
 FROM job_assignments ja
-WHERE j.id = ja.job_id
+WHERE j.id::text = ja.job_id::text
   AND ja.driver_price IS NOT NULL
   AND ja.driver_price != j.driver_price
   AND j.driver_price IS NOT NULL
@@ -26,8 +27,8 @@ SET driver_price = NULL
 WHERE driver_price IS NOT NULL 
   AND total_price IS NOT NULL 
   AND driver_price = total_price
-  AND id NOT IN (
-    SELECT DISTINCT job_id FROM job_assignments WHERE driver_price IS NOT NULL
+  AND id::text NOT IN (
+    SELECT DISTINCT job_id::text FROM job_assignments WHERE driver_price IS NOT NULL
   );
 
 -- Step 4: Verify the fix
