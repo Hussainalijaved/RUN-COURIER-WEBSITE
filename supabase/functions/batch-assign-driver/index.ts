@@ -123,6 +123,7 @@ serve(async (req) => {
       .map((job: any) => job.tracking_number)
       .filter((tn: string | null) => tn);
 
+    // Insert notification record
     try {
       await supabaseClient.from("notifications").insert({
         user_id: driverId,
@@ -139,6 +140,52 @@ serve(async (req) => {
       });
     } catch (notifError) {
       console.error("Failed to create notification:", notifError);
+    }
+
+    // Send push notification to driver with sound
+    try {
+      const { data: devices } = await supabaseClient
+        .from("driver_devices")
+        .select("push_token")
+        .eq("driver_id", driverId);
+
+      if (devices && devices.length > 0) {
+        const priceText = `£${result.total_driver_price.toFixed(2)}`;
+
+        const messages = devices.map((device: any) => ({
+          to: device.push_token,
+          sound: "default",
+          title: `${result.total_jobs} New Jobs Assigned!`,
+          body: `${trackingNumbers.slice(0, 3).join(", ")}${trackingNumbers.length > 3 ? "..." : ""} | Total: ${priceText}`,
+          data: {
+            type: "batch_job_assigned",
+            batchId: result.batch_id,
+            jobCount: result.total_jobs,
+            trackingNumbers: trackingNumbers,
+            screen: "JobOffers",
+          },
+          priority: "high",
+          channelId: "job-offers",
+        }));
+
+        const validMessages = messages.filter((m: any) => 
+          m.to && (m.to.startsWith("ExponentPushToken[") || m.to.startsWith("ExpoPushToken["))
+        );
+
+        if (validMessages.length > 0) {
+          await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: JSON.stringify(validMessages),
+          });
+          console.log(`Sent batch push notification to ${validMessages.length} devices for driver ${driverId}`);
+        }
+      }
+    } catch (pushError) {
+      console.error("Failed to send push notification:", pushError);
     }
 
     return new Response(JSON.stringify({

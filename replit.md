@@ -34,6 +34,14 @@ A multi-step application process allows prospective drivers to submit details fo
 ### Mobile API
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities including profile management, location updates, job management, and proof of delivery uploads, authenticated via Supabase JWT. It supports admin-to-driver job assignments, with drivers receiving offers in their mobile app.
 
+### Push Notifications
+Real-time push notifications alert drivers instantly when jobs are assigned:
+- **Device Registration**: Drivers register their Expo push tokens via `/api/mobile/v1/driver/push-token`
+- **Database Table**: `driver_devices` stores push tokens per driver with RLS policies
+- **Instant Alerts**: Edge functions (`assign-driver`, `batch-assign-driver`) send push notifications via Expo Push API with sound alerts
+- **Sound Enabled**: Push messages include `sound: "default"` and `priority: "high"` for immediate attention
+- **Channel**: Uses `job-offers` channel for proper notification grouping on Android
+
 ### Pay Later & Invoicing
 Approved business customers can utilize a "Pay Later" option for bookings, leading to weekly invoicing. An "Invoices" section provides invoice history, status tracking, and PDF download options.
 

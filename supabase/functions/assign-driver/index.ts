@@ -172,6 +172,53 @@ serve(async (req) => {
       console.error("Failed to create job assignment:", assignmentError);
     }
 
+    // Send push notification to driver
+    try {
+      const { data: devices } = await supabaseClient
+        .from("driver_devices")
+        .select("push_token")
+        .eq("driver_id", driverUserId);
+
+      if (devices && devices.length > 0) {
+        const pickupShort = updatedJob.pickup_address?.split(",")[0] || "Pickup";
+        const deliveryShort = updatedJob.delivery_address?.split(",")[0] || "Delivery";
+        const priceText = `£${validatedDriverPrice.toFixed(2)}`;
+
+        const messages = devices.map((device: any) => ({
+          to: device.push_token,
+          sound: "default",
+          title: "New Job Assigned!",
+          body: `${pickupShort} → ${deliveryShort} | ${priceText}`,
+          data: {
+            type: "job_assigned",
+            jobId: jobId,
+            trackingNumber: updatedJob.tracking_number,
+            screen: "JobOffers",
+          },
+          priority: "high",
+          channelId: "job-offers",
+        }));
+
+        const validMessages = messages.filter((m: any) => 
+          m.to && (m.to.startsWith("ExponentPushToken[") || m.to.startsWith("ExpoPushToken["))
+        );
+
+        if (validMessages.length > 0) {
+          await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: JSON.stringify(validMessages),
+          });
+          console.log(`Sent push notification to ${validMessages.length} devices for driver ${driverId}`);
+        }
+      }
+    } catch (pushError) {
+      console.error("Failed to send push notification:", pushError);
+    }
+
     return new Response(JSON.stringify(updatedJob), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
