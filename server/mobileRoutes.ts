@@ -445,12 +445,14 @@ export function registerMobileRoutes(app: Express): void {
           let filteredJobs = supabaseJobs;
           
           // Apply status filters
+          // "active" = jobs the driver has ACCEPTED and is working on
+          // "pending" = job offers waiting for driver to accept/decline
           if (status === "active") {
             filteredJobs = supabaseJobs.filter(j => 
-              ["assigned", "accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "pending"].includes(j.status)
+              ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
             );
           } else if (status === "pending") {
-            filteredJobs = supabaseJobs.filter(j => j.status === "assigned" || j.status === "pending");
+            filteredJobs = supabaseJobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
           } else if (status === "completed") {
             filteredJobs = supabaseJobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
           }
@@ -478,12 +480,14 @@ export function registerMobileRoutes(app: Express): void {
       // Filter out hidden jobs (unless viewing completed/history)
       jobs = jobs.filter(j => (j as any).driverHidden !== true);
 
+      // "active" = jobs the driver has ACCEPTED and is working on
+      // "pending" = job offers waiting for driver to accept/decline
       if (status === "active") {
         jobs = jobs.filter(j => 
-          ["assigned", "accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery"].includes(j.status)
+          ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
         );
       } else if (status === "pending") {
-        jobs = jobs.filter(j => j.status === "assigned");
+        jobs = jobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
       } else if (status === "completed") {
         jobs = jobs.filter(j => ["delivered", "cancelled"].includes(j.status));
       }
