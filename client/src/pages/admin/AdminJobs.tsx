@@ -238,13 +238,22 @@ export default function AdminJobs() {
 
   const assignDriverMutation = useMutation({
     mutationFn: async ({ jobId, driverId, driverPrice, assignedBy }: { jobId: string; driverId: string; driverPrice: string; assignedBy: string }) => {
-      // Use Supabase Edge Function for job assignment (works with Hostinger-hosted website)
-      return supabaseFunctions.assignDriver({
-        jobId,
-        driverId,
-        driverPrice,
-        dispatcherId: assignedBy,
+      // Use backend API for job assignment - supports reassigning same driver with new price
+      const response = await fetch('/api/job-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId,
+          driverId,
+          driverPrice,
+          assignedBy,
+        }),
       });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to assign driver');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
@@ -1316,7 +1325,6 @@ export default function AdminJobs() {
                         <SelectItem 
                           key={driver.id} 
                           value={driver.id}
-                          disabled={driver.id === jobToAssign?.driverId}
                         >
                           <div className="flex items-center gap-2">
                             {driver.driverCode && (
