@@ -1,0 +1,112 @@
+ROLE:
+You are a senior production engineer responsible for permanently stabilising a live courier platform (website + Expo mobile app) using Supabase. This is a ONE-TIME HARDENING TASK.
+
+ABSOLUTE RULES (NON-NEGOTIABLE):
+- Supabase is the ONLY backend (Auth, DB, Storage, Realtime).
+- Replit or any AI workspace is TEMPORARY and must not store or deploy anything.
+- Do NOT delete features.
+- Do NOT redesign UI.
+- Do NOT introduce a new backend.
+- Do NOT weaken security to “make things work”.
+- All fixes must be production-safe and auditable.
+
+CONTEXT:
+A full system audit has already been completed. The following issues were identified:
+
+P0 (CRITICAL – MUST FIX FIRST):
+1) Missing `driver_devices` table (push notifications broken)
+2) RLS policies reference incorrect column names
+3) RLS enabled status not verified on all tables
+4) Stripe webhook accepts unsigned events
+
+P1 (HIGH):
+- No realtime cleanup on logout
+- POD bucket may be public
+- Mobile mock client masks errors
+- No iOS foreground reconnection
+- Realtime subscriptions not filtered by user
+
+P2 (MEDIUM):
+- Missing foreign key constraints
+- Inconsistent timeout handling
+- No role sync trigger
+
+OBJECTIVE:
+Fix ALL listed issues ONCE AND FOREVER, in the correct priority order, without breaking existing functionality, and ensure:
+- Website and Expo app behave as a mirror
+- No infinite loading or freezes
+- Apple App Store compliance
+- Strong data privacy and payment security
+
+MANDATORY EXECUTION ORDER (DO NOT CHANGE):
+PHASE 1 — P0 CRITICAL FIXES
+PHASE 2 — P1 RELIABILITY FIXES
+PHASE 3 — P2 DATA INTEGRITY FIXES
+
+TASKS YOU MUST COMPLETE:
+
+PHASE 1 — CRITICAL
+1) Create `driver_devices` table in Supabase with:
+   - id (uuid)
+   - driver_id (auth.uid reference)
+   - device_token
+   - platform (ios/android)
+   - last_seen
+   - RLS policies (driver owns device, admin full access)
+
+2) Audit ALL RLS-enabled tables:
+   - Explicitly list which tables have RLS ON
+   - Enable RLS where missing
+   - Fix ALL policy column mismatches by aligning policies with actual schema
+   - Ensure correct access for admin, driver, customer roles
+
+3) Harden Stripe webhook:
+   - Enforce signature verification
+   - Reject unsigned events
+   - Ensure webhook updates Supabase as the source of truth
+
+PHASE 2 — RELIABILITY
+4) Ensure all Supabase Storage buckets:
+   - POD and documents are PRIVATE
+   - Use signed URLs for reads
+   - Have correct upload/read policies per role
+
+5) Fix realtime logic:
+   - Filter subscriptions by authenticated user/role
+   - Unsubscribe on logout
+   - Reconnect on iOS app foreground
+
+6) Remove mock clients or error masking:
+   - Ensure real Supabase errors surface to logs
+   - Add visible error states (no silent failures)
+
+PHASE 3 — DATA & STABILITY
+7) Add missing foreign key constraints safely
+8) Standardise network request timeouts (no infinite loading)
+9) Add role sync trigger so profile role is always consistent with auth
+
+OUTPUT REQUIREMENTS (MANDATORY):
+- Exact Supabase SQL for:
+  - Tables
+  - RLS policies
+  - Storage policies
+  - Triggers
+- Clear explanation for EACH fix:
+  - What was wrong
+  - Why this fix is correct
+  - How to verify it works
+- A FINAL VERIFICATION CHECKLIST that I can manually follow
+
+PROHIBITIONS:
+- Do NOT guess silently — if schema details are missing, ASK before fixing.
+- Do NOT apply fixes out of order.
+- Do NOT introduce breaking changes.
+
+SUCCESS CRITERIA:
+- Login → jobs load reliably
+- Admin assigns job → driver sees it immediately
+- Documents & POD visible only to authorised users
+- Push notifications functional
+- No Apple App Store rejection risks remain
+
+BEGIN EXECUTION NOW.
