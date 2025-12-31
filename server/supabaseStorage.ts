@@ -837,6 +837,14 @@ export class SupabaseStorage implements IStorage {
     if (data.driverHidden !== undefined) dbData.driver_hidden = data.driverHidden;
     if (data.driverHiddenAt !== undefined) dbData.driver_hidden_at = data.driverHiddenAt;
     if (data.driverHiddenBy !== undefined) dbData.driver_hidden_by = data.driverHiddenBy;
+    if (data.pickupLatitude !== undefined) dbData.pickup_latitude = data.pickupLatitude;
+    if (data.pickupLongitude !== undefined) dbData.pickup_longitude = data.pickupLongitude;
+    if (data.deliveryLatitude !== undefined) dbData.delivery_latitude = data.deliveryLatitude;
+    if (data.deliveryLongitude !== undefined) dbData.delivery_longitude = data.deliveryLongitude;
+    if (data.actualPickupTime !== undefined) dbData.actual_pickup_time = data.actualPickupTime;
+    if (data.actualDeliveryTime !== undefined) dbData.actual_delivery_time = data.actualDeliveryTime;
+    
+    console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
     const { data: updated, error } = await supabase
       .from('jobs')
@@ -845,7 +853,15 @@ export class SupabaseStorage implements IStorage {
       .select()
       .single();
     
-    if (error || !updated) return undefined;
+    if (error) {
+      console.error(`[SupabaseStorage] updateJob error:`, error);
+      return undefined;
+    }
+    if (!updated) {
+      console.warn(`[SupabaseStorage] updateJob ${id} returned no data`);
+      return undefined;
+    }
+    console.log(`[SupabaseStorage] updateJob ${id} success, pickup coords: ${updated.pickup_latitude}, ${updated.pickup_longitude}`);
     return mapDbToJob(updated);
   }
 

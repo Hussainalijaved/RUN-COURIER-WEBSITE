@@ -25,6 +25,7 @@ import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification } from "./emailService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned } from "./realtime";
+import { geocodeAddress } from "./geocoding";
 
 // Server-side pricing configuration - SINGLE SOURCE OF TRUTH
 // This must match the client-side config in client/src/lib/pricing.ts
@@ -554,6 +555,40 @@ export async function registerRoutes(
       updatedAt: job.updatedAt,
     });
     res.json(job);
+  }));
+
+  app.post("/api/jobs/:id/geocode", asyncHandler(async (req, res) => {
+    const job = await storage.getJob(req.params.id);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const updates: any = {};
+    
+    if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) {
+      const pickupResult = await geocodeAddress(job.pickupAddress);
+      if (pickupResult) {
+        updates.pickupLatitude = pickupResult.lat;
+        updates.pickupLongitude = pickupResult.lng;
+        console.log(`[Geocoding] Job ${job.id} pickup: ${pickupResult.lat}, ${pickupResult.lng}`);
+      }
+    }
+    
+    if (job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+      const deliveryResult = await geocodeAddress(job.deliveryAddress);
+      if (deliveryResult) {
+        updates.deliveryLatitude = deliveryResult.lat;
+        updates.deliveryLongitude = deliveryResult.lng;
+        console.log(`[Geocoding] Job ${job.id} delivery: ${deliveryResult.lat}, ${deliveryResult.lng}`);
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const updatedJob = await storage.updateJob(req.params.id, updates);
+      res.json({ success: true, job: updatedJob, geocoded: updates });
+    } else {
+      res.json({ success: true, job, message: "No geocoding needed or addresses missing" });
+    }
   }));
 
   app.patch("/api/jobs/:id/assign", asyncHandler(async (req, res) => {
