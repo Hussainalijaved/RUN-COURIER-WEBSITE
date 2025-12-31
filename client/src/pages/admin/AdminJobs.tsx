@@ -216,9 +216,10 @@ export default function AdminJobs() {
     queryKey: ['/api/drivers'],
   });
 
-  // Fetch drivers from Supabase (for names)
-  const { data: supabaseDrivers } = useQuery<SupabaseDriver[]>({
+  // Fetch drivers from Supabase (for names) - fallback to local when unavailable
+  const { data: supabaseDrivers, isError: supabaseDriversError } = useQuery<SupabaseDriver[]>({
     queryKey: ['/api/supabase-drivers'],
+    retry: false, // Don't retry on Supabase schema errors
   });
 
   // Fetch all job assignments for managing them
@@ -596,38 +597,39 @@ export default function AdminJobs() {
   };
 
   // Combine Supabase drivers with local driver data
-  // IMPORTANT: Use Supabase data as primary source, fallback to local PostgreSQL when Supabase unavailable
+  // IMPORTANT: Use Supabase data as primary source, fallback to local PostgreSQL when Supabase unavailable or has errors
   const allDriversWithInfo = useMemo(() => {
-    // If Supabase drivers available, merge with local data
-    if (supabaseDrivers && supabaseDrivers.length > 0) {
-      return supabaseDrivers.map(sd => {
-        const localDriver = drivers?.find(d => d.id === sd.id || d.userId === sd.id);
-        return {
-          id: sd.id,
-          name: sd.fullName,
-          email: sd.email,
-          phone: sd.phone || localDriver?.phone || '',
-          driverCode: sd.driverCode || localDriver?.driverCode || null,
-          vehicleType: sd.vehicleType || localDriver?.vehicleType || 'car',
-          vehicleRegistration: localDriver?.vehicleRegistration || '',
-          isVerified: sd.isVerified ?? localDriver?.isVerified ?? false,
-          isAvailable: sd.isAvailable ?? localDriver?.isAvailable ?? false,
-        };
-      });
+    // If Supabase has errors or no data, fall back to local PostgreSQL drivers immediately
+    if (supabaseDriversError || !supabaseDrivers || supabaseDrivers.length === 0) {
+      // Use local PostgreSQL drivers
+      return (drivers || []).map(d => ({
+        id: d.id,
+        name: d.fullName || 'Unknown',
+        email: d.email || '',
+        phone: d.phone || '',
+        driverCode: d.driverCode || null,
+        vehicleType: d.vehicleType || 'car',
+        vehicleRegistration: d.vehicleRegistration || '',
+        isVerified: d.isVerified ?? false,
+        isAvailable: d.isAvailable ?? false,
+      }));
     }
-    // Fallback: Use local PostgreSQL drivers when Supabase unavailable
-    return (drivers || []).map(d => ({
-      id: d.id,
-      name: d.fullName || 'Unknown',
-      email: d.email || '',
-      phone: d.phone || '',
-      driverCode: d.driverCode || null,
-      vehicleType: d.vehicleType || 'car',
-      vehicleRegistration: d.vehicleRegistration || '',
-      isVerified: d.isVerified ?? false,
-      isAvailable: d.isAvailable ?? false,
-    }));
-  }, [supabaseDrivers, drivers]);
+    // Supabase drivers available, merge with local data
+    return supabaseDrivers.map(sd => {
+      const localDriver = drivers?.find(d => d.id === sd.id || d.userId === sd.id);
+      return {
+        id: sd.id,
+        name: sd.fullName,
+        email: sd.email,
+        phone: sd.phone || localDriver?.phone || '',
+        driverCode: sd.driverCode || localDriver?.driverCode || null,
+        vehicleType: sd.vehicleType || localDriver?.vehicleType || 'car',
+        vehicleRegistration: localDriver?.vehicleRegistration || '',
+        isVerified: sd.isVerified ?? localDriver?.isVerified ?? false,
+        isAvailable: sd.isAvailable ?? localDriver?.isAvailable ?? false,
+      };
+    });
+  }, [supabaseDrivers, supabaseDriversError, drivers]);
 
   const availableDrivers = drivers?.filter((d) => d.isAvailable && d.isVerified) || [];
   const allDrivers = drivers || [];
