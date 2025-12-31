@@ -1,0 +1,128 @@
+You are working on a LIVE production courier platform called RUN COURIER.
+
+This platform has:
+- A Website (Admin + Customers)
+- A Mobile App (Drivers, Customers)
+- Supabase as the ONLY backend
+
+There is a CRITICAL requirement that MUST be implemented correctly.
+
+=====================================
+ABSOLUTE NON-NEGOTIABLE RULES
+=====================================
+- Supabase is the ONLY backend and source of truth.
+- DO NOT create another backend, API, or database.
+- DO NOT duplicate data between website and mobile app.
+- DO NOT introduce delays, background syncs, or manual refresh hacks.
+- DO NOT delete, reset, or migrate existing data.
+- DO NOT change table schemas unless absolutely necessary and backward compatible.
+
+=====================================
+CORE REQUIREMENT (MUST WORK PERFECTLY)
+=====================================
+Driver document uploads MUST be visible to the Admin IMMEDIATELY.
+
+This is NOT optional.
+
+The flow MUST be real-time and mirrored between:
+- Driver mobile app
+- Admin website
+
+=====================================
+DRIVER ONBOARDING FLOW (MANDATORY)
+=====================================
+1. Driver registers (mobile app OR website).
+2. Driver uploads required documents from the mobile app.
+3. Documents are saved directly to Supabase.
+4. The moment a document is uploaded:
+   - It MUST appear in the Admin dashboard instantly.
+   - No refresh delay.
+   - No manual sync.
+5. Admin reviews the documents.
+6. Admin approves or rejects each document.
+7. If ALL required documents are approved:
+   - Driver account status becomes ACTIVE.
+   - Driver can now receive and accept jobs.
+8. If documents are rejected:
+   - Driver remains INACTIVE.
+   - Driver is informed of rejection reason.
+
+=====================================
+DOCUMENT RULES (IMPORTANT)
+=====================================
+- Some documents REQUIRE an expiry date.
+- Some documents DO NOT require an expiry date.
+- Upload must succeed in both cases.
+- Expiry validation must be conditional.
+- Documents must never fail silently.
+
+=====================================
+DATA STRUCTURE RULES
+=====================================
+- There must be ONE driver_documents table.
+- Each document record must include:
+  - driver_id (auth.uid())
+  - document_type
+  - file_url
+  - expiry_date (only if applicable)
+  - status (pending / approved / rejected)
+  - reviewed_by (admin id)
+  - reviewed_at (timestamp)
+- Documents must be queryable by Admin immediately after upload.
+
+=====================================
+ADMIN VISIBILITY (CRITICAL)
+=====================================
+- Admin dashboard MUST show:
+  - All drivers with pending documents.
+  - All uploaded documents per driver.
+  - Document status in real time.
+- Admin must NOT rely on cached or stale data.
+- Any document uploaded from the mobile app MUST appear instantly for Admin.
+
+=====================================
+ACCOUNT ACTIVATION LOGIC
+=====================================
+- Driver account status must be derived from document status.
+- Logic MUST be centralized (Supabase-driven).
+- If ALL required documents = approved → driver.status = "active"
+- If ANY required document = pending/rejected → driver.status = "inactive"
+- No frontend-only activation logic is allowed.
+
+=====================================
+SECURITY & PERMISSIONS
+=====================================
+- Drivers can ONLY see and manage their own documents.
+- Admins can see ALL driver documents.
+- Supabase RLS must enforce this (not frontend checks).
+- Do NOT expose service role keys in frontend.
+
+=====================================
+REAL-TIME SYNC REQUIREMENT
+=====================================
+- Changes in driver_documents MUST be reflected immediately in Admin UI.
+- Changes made by Admin MUST reflect immediately in driver app.
+- Supabase must be treated as the real-time source of truth.
+
+=====================================
+WHAT MUST BE FIXED / VERIFIED
+=====================================
+- Ensure driver uploads instantly appear in Admin dashboard.
+- Ensure Admin approval instantly updates driver account status.
+- Ensure driver cannot receive jobs unless fully approved.
+- Ensure website and mobile app show identical data at all times.
+- Ensure no scenario where Admin sees outdated or missing documents.
+
+=====================================
+EXPECTED OUTPUT
+=====================================
+- Clear explanation of correct architecture.
+- Correct Supabase queries for Admin and Driver.
+- Correct approval and activation logic.
+- Identification of any missing links causing delay or invisibility.
+- NO vague advice.
+- NO new backend.
+- NO data loss.
+
+The final system MUST behave as ONE unified platform where:
+Driver uploads → Admin sees instantly → Admin approves → Driver activates.

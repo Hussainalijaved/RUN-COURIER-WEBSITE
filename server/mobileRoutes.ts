@@ -9,6 +9,39 @@ import type { JobStatus, Job } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { supabaseAdmin } from "./supabaseAdmin";
+
+// Helper to map Supabase job to local Job format for mobile API response
+function mapSupabaseJobToMobileFormat(job: any) {
+  return {
+    id: String(job.id),
+    trackingNumber: job.tracking_number,
+    status: job.status,
+    pickupAddress: job.pickup_address,
+    pickupPostcode: null,
+    pickupInstructions: job.notes,
+    pickupLatitude: job.pickup_lat?.toString() || null,
+    pickupLongitude: job.pickup_lng?.toString() || null,
+    deliveryAddress: job.dropoff_address,
+    deliveryPostcode: null,
+    deliveryInstructions: null,
+    deliveryLatitude: job.dropoff_lat?.toString() || null,
+    deliveryLongitude: job.dropoff_lng?.toString() || null,
+    recipientName: job.recipient_name,
+    recipientPhone: job.recipient_phone,
+    senderName: job.sender_name,
+    senderPhone: job.sender_phone,
+    vehicleType: job.vehicle_type,
+    distance: job.distance_miles?.toString() || null,
+    weight: job.parcel_weight?.toString() || null,
+    driverPrice: job.price_driver?.toString() || null,
+    scheduledPickupTime: job.scheduled_pickup_time,
+    isMultiDrop: false,
+    isReturnTrip: false,
+    createdAt: job.created_at,
+    updatedAt: job.updated_at,
+  };
+}
 
 // POD uploads directory
 const podUploadsDir = path.join(process.cwd(), 'uploads', 'pod');
@@ -302,7 +335,48 @@ export function registerMobileRoutes(app: Express): void {
       const driver = req.driver!;
       const { status } = req.query;
 
-      // Get jobs from both in-memory storage and database
+      console.log(`[Mobile Jobs] Fetching jobs for driver ${driver.driverCode} (${driver.id})`);
+
+      let mobileJobs: any[] = [];
+
+      // CRITICAL: Query Supabase FIRST as it's the source of truth
+      if (supabaseAdmin) {
+        console.log("[Mobile Jobs] Querying Supabase for jobs...");
+        const { data: supabaseJobs, error: supabaseError } = await supabaseAdmin
+          .from('jobs')
+          .select('*')
+          .eq('driver_id', driver.id)
+          .order('created_at', { ascending: false });
+        
+        if (supabaseError) {
+          console.log("[Mobile Jobs] Supabase query error:", supabaseError.message);
+        } else if (supabaseJobs && supabaseJobs.length > 0) {
+          console.log(`[Mobile Jobs] Found ${supabaseJobs.length} jobs in Supabase`);
+          
+          let filteredJobs = supabaseJobs;
+          
+          // Apply status filters
+          if (status === "active") {
+            filteredJobs = supabaseJobs.filter(j => 
+              ["assigned", "accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "pending"].includes(j.status)
+            );
+          } else if (status === "pending") {
+            filteredJobs = supabaseJobs.filter(j => j.status === "assigned" || j.status === "pending");
+          } else if (status === "completed") {
+            filteredJobs = supabaseJobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
+          }
+          
+          mobileJobs = filteredJobs.map(mapSupabaseJobToMobileFormat);
+          
+          return res.json({
+            jobs: mobileJobs,
+            count: mobileJobs.length,
+          });
+        }
+      }
+
+      // Fallback to local storage/database if Supabase query fails or returns empty
+      console.log("[Mobile Jobs] Falling back to local storage...");
       let memoryJobs = await storage.getJobs({ driverId: driver.id });
       const dbJobs = await db.select().from(jobsTable).where(eq(jobsTable.driverId, driver.id));
       
@@ -325,7 +399,7 @@ export function registerMobileRoutes(app: Express): void {
         jobs = jobs.filter(j => ["delivered", "cancelled"].includes(j.status));
       }
 
-      const mobileJobs = jobs.map(job => ({
+      mobileJobs = jobs.map(job => ({
         id: job.id,
         trackingNumber: job.trackingNumber,
         status: job.status,
