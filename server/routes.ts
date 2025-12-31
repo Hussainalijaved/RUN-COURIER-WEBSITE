@@ -401,33 +401,43 @@ export async function registerRoutes(
         // Map local job fields to Supabase jobs table columns
         // Supabase uses: dropoff_address, price_customer, price_driver, etc.
         // DO NOT include 'id' - let Supabase auto-generate it
+        // CRITICAL: Many columns have NOT NULL constraints - use defaults!
         const supabaseJobData = {
+          // Required tracking
           tracking_number: job.trackingNumber,
+          // Driver/customer IDs
           driver_id: job.driverId, // Already resolved to user UUID for RLS
           user_id: job.customerId !== 'admin-created' ? job.customerId : null,
-          status: job.status === 'assigned' ? 'pending' : job.status, // Mobile expects 'pending' for new assignments
-          vehicle_type: job.vehicleType,
-          pickup_address: job.pickupAddress,
-          pickup_lat: job.pickupLatitude ? parseFloat(String(job.pickupLatitude)) : null,
-          pickup_lng: job.pickupLongitude ? parseFloat(String(job.pickupLongitude)) : null,
-          pickup_building_number: job.pickupBuildingName,
-          dropoff_address: job.deliveryAddress,
-          dropoff_lat: job.deliveryLatitude ? parseFloat(String(job.deliveryLatitude)) : null,
-          dropoff_lng: job.deliveryLongitude ? parseFloat(String(job.deliveryLongitude)) : null,
-          dropoff_building_number: job.deliveryBuildingName,
-          recipient_name: job.recipientName,
-          recipient_phone: job.recipientPhone,
-          sender_name: job.pickupContactName,
-          sender_phone: job.pickupContactPhone,
-          parcel_weight: job.weight ? parseFloat(String(job.weight)) : null,
-          distance_miles: job.distance ? parseFloat(String(job.distance)) : null,
-          price_customer: job.totalPrice ? parseFloat(String(job.totalPrice)) : null,
-          price_driver: job.driverPrice ? parseFloat(String(job.driverPrice)) : null,
-          scheduled_pickup_time: job.scheduledPickupTime?.toISOString() || null,
-          notes: job.pickupInstructions || job.deliveryInstructions || null,
-          payment_status: job.paymentStatus || 'pending',
+          // Status and type (NOT NULL)
+          status: job.status === 'assigned' ? 'pending' : job.status,
+          vehicle_type: job.vehicleType || 'small_van',
           priority: 'normal',
+          booking_type: 'on-demand',
+          payment_status: job.paymentStatus || 'pending',
           is_guest: job.customerId === 'admin-created',
+          // Pickup details (lat/lng are NOT NULL - use 0 as default)
+          pickup_address: job.pickupAddress || '',
+          pickup_lat: job.pickupLatitude ? parseFloat(String(job.pickupLatitude)) : 0,
+          pickup_lng: job.pickupLongitude ? parseFloat(String(job.pickupLongitude)) : 0,
+          pickup_building_number: job.pickupBuildingName || null,
+          // Dropoff details (lat/lng are NOT NULL - use 0 as default)
+          dropoff_address: job.deliveryAddress || '',
+          dropoff_lat: job.deliveryLatitude ? parseFloat(String(job.deliveryLatitude)) : 0,
+          dropoff_lng: job.deliveryLongitude ? parseFloat(String(job.deliveryLongitude)) : 0,
+          dropoff_building_number: job.deliveryBuildingName || null,
+          // Sender/Recipient (NOT NULL)
+          sender_name: job.pickupContactName || 'Sender',
+          sender_phone: job.pickupContactPhone || '',
+          recipient_name: job.recipientName || 'Recipient',
+          recipient_phone: job.recipientPhone || '',
+          // Numeric fields (NOT NULL - use 0 as default)
+          parcel_weight: job.weight ? parseFloat(String(job.weight)) : 1,
+          distance_miles: job.distance ? parseFloat(String(job.distance)) : 0,
+          price_customer: job.totalPrice ? parseFloat(String(job.totalPrice)) : 0,
+          price_driver: job.driverPrice ? parseFloat(String(job.driverPrice)) : 0,
+          // Required time fields (NOT NULL - use current time as default)
+          scheduled_pickup_time: job.scheduledPickupTime?.toISOString() || new Date().toISOString(),
+          notes: job.pickupInstructions || job.deliveryInstructions || '', // NOT NULL
         };
         
         console.log('[Jobs] Supabase job data:', JSON.stringify(supabaseJobData, null, 2));
