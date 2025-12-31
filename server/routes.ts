@@ -4287,71 +4287,8 @@ export async function registerRoutes(
     res.json({ success: true });
   }));
 
-  // Stripe webhook for payment completion (optional backup)
-  app.post("/api/webhooks/payment-links", asyncHandler(async (req, res) => {
-    const stripe = await getUncachableStripeClient();
-    const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    
-    // SECURITY: Require webhook secret to be configured
-    if (!webhookSecret) {
-      console.error('[Webhook] STRIPE_WEBHOOK_SECRET is not configured - rejecting webhook');
-      return res.status(500).json({ error: 'Webhook configuration error' });
-    }
-    
-    if (!sig) {
-      console.error('[Webhook] Missing stripe-signature header');
-      return res.status(400).json({ error: 'Missing stripe-signature header' });
-    }
-    
-    let event;
-    try {
-      // Use rawBody for signature verification (set by express.json verify option)
-      const rawBody = (req as any).rawBody;
-      if (!rawBody) {
-        console.error('[Webhook] Raw body not available for signature verification');
-        return res.status(400).json({ error: 'Raw body not available' });
-      }
-      
-      event = stripe.webhooks.constructEvent(
-        rawBody,
-        sig as string,
-        webhookSecret
-      );
-    } catch (err: any) {
-      console.error(`[Webhook] Signature verification failed:`, err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as any;
-      
-      if (session.metadata?.type === 'payment_link' && session.metadata?.paymentLinkId) {
-        const link = await storage.getPaymentLink(session.metadata.paymentLinkId);
-        
-        if (link && link.status !== 'paid') {
-          await storage.updatePaymentLink(link.id, {
-            status: "paid",
-            paidAt: new Date(),
-            stripePaymentIntentId: session.payment_intent,
-          });
-          await storage.appendPaymentLinkAuditLog(link.id, "paid_via_webhook", undefined, `PaymentIntent: ${session.payment_intent}`);
-
-          const job = await storage.getJob(link.jobId);
-          if (job) {
-            await storage.updateJob(link.jobId, {
-              paymentStatus: "paid",
-              paymentIntentId: session.payment_intent,
-            });
-          }
-
-          console.log(`[Webhook] Payment completed via webhook for link ${link.id}`);
-        }
-      }
-    }
-
-    res.json({ received: true });
-  }));
+  // NOTE: Stripe webhook for payment-links has been moved to server/index.ts
+  // to ensure it receives raw body for signature verification (before express.json middleware)
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("API Error:", err);

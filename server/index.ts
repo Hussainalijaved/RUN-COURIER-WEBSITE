@@ -138,6 +138,7 @@ async function initStripe() {
 // Initialize Stripe but don't wait for it
 initStripe().catch(console.error);
 
+// Main Stripe webhook (managed by stripe-replit-sync)
 app.post(
   '/api/stripe/webhook/:uuid',
   express.raw({ type: 'application/json' }),
@@ -164,6 +165,77 @@ app.post(
       console.error('Webhook error:', error.message);
       res.status(400).json({ error: 'Webhook processing error' });
     }
+  }
+);
+
+// Backup Stripe webhook for payment links (uses raw body for signature verification)
+app.post(
+  '/api/webhooks/payment-links',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-08-27.basil' });
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    // SECURITY: Require webhook secret to be configured
+    if (!webhookSecret) {
+      console.error('[Webhook] STRIPE_WEBHOOK_SECRET is not configured - rejecting webhook');
+      return res.status(500).json({ error: 'Webhook configuration error' });
+    }
+    
+    if (!sig) {
+      console.error('[Webhook] Missing stripe-signature header');
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+    
+    if (!Buffer.isBuffer(req.body)) {
+      console.error('[Webhook] Raw body not available for signature verification');
+      return res.status(400).json({ error: 'Raw body not available' });
+    }
+    
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig as string,
+        webhookSecret
+      );
+    } catch (err: any) {
+      console.error(`[Webhook] Signature verification failed:`, err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as any;
+      
+      if (session.metadata?.type === 'payment_link' && session.metadata?.paymentLinkId) {
+        // Import storage lazily to avoid circular dependencies
+        const { storage } = await import('./storage');
+        const link = await storage.getPaymentLink(session.metadata.paymentLinkId);
+        
+        if (link && link.status !== 'paid') {
+          await storage.updatePaymentLink(link.id, {
+            status: "paid",
+            paidAt: new Date(),
+            stripePaymentIntentId: session.payment_intent,
+          });
+          await storage.appendPaymentLinkAuditLog(link.id, "paid_via_webhook", undefined, `PaymentIntent: ${session.payment_intent}`);
+
+          const job = await storage.getJob(link.jobId);
+          if (job) {
+            await storage.updateJob(link.jobId, {
+              paymentStatus: "paid",
+              paymentIntentId: session.payment_intent,
+            });
+          }
+
+          console.log(`[Webhook] Payment completed via webhook for link ${link.id}`);
+        }
+      }
+    }
+
+    res.json({ received: true });
   }
 );
 
