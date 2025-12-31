@@ -86,10 +86,13 @@ function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => P
 const VALID_JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   pending: [],
   assigned: ["accepted", "cancelled"],
+  offered: ["accepted", "cancelled"],
   accepted: ["on_the_way_pickup", "cancelled"],
   on_the_way_pickup: ["arrived_pickup", "cancelled"],
-  arrived_pickup: ["collected", "cancelled"],
+  arrived_pickup: ["collected", "picked_up", "cancelled"],
+  picked_up: ["on_the_way", "on_the_way_delivery", "cancelled"],
   collected: ["on_the_way_delivery", "cancelled"],
+  on_the_way: ["delivered", "cancelled"],
   on_the_way_delivery: ["delivered", "cancelled"],
   delivered: [],
   cancelled: [],
@@ -120,10 +123,72 @@ export function registerMobileRoutes(app: Express): void {
         jobOffers: "/api/mobile/v1/driver/job-offers",
         location: "/api/mobile/v1/driver/location",
         availability: "/api/mobile/v1/driver/availability",
+        status: "/api/driver/status",
         websocket: "/ws/realtime"
       }
     });
   });
+
+  // Combined status endpoint for mobile app - handles both online status and location
+  // This is what the mobile app calls when going online/offline
+  app.post("/api/driver/status",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { isOnline, latitude, longitude, heading, speed } = req.body;
+
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+
+      // Determine online status - default to current state if not specified
+      const newOnlineStatus = typeof isOnline === 'boolean' ? isOnline : (driver.isAvailable === true);
+      
+      console.log(`[Driver Status] ${driver.driverCode || driver.id} updating: online=${newOnlineStatus}, lat=${latitude}, lng=${longitude}`);
+
+      // Update availability
+      const updatedDriver = await storage.updateDriverAvailability(driver.id, newOnlineStatus);
+
+      if (!updatedDriver) {
+        return res.status(404).json({ 
+          error: "Driver not found",
+          code: "DRIVER_NOT_FOUND"
+        });
+      }
+
+      // Update location if provided
+      let locationUpdated = false;
+      if (latitude !== undefined && longitude !== undefined) {
+        const lat = parseFloat(String(latitude));
+        const lng = parseFloat(String(longitude));
+        
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          await storage.updateDriverLocation(driver.id, lat.toFixed(7), lng.toFixed(7));
+          locationUpdated = true;
+          
+          // Broadcast location update to WebSocket for admin maps
+          broadcastLocationUpdate(driver.id, lat, lng, newOnlineStatus ? "available" : "offline");
+        }
+      }
+
+      // Always broadcast availability change to WebSocket subscribers
+      // This ensures admin map gets updates even when no location is provided
+      await broadcastDriverAvailability(driver.id, newOnlineStatus === true);
+
+      res.json({
+        success: true,
+        isOnline: updatedDriver.isAvailable,
+        driverId: driver.id,
+        driverCode: driver.driverCode,
+        locationUpdated,
+      });
+    })
+  );
 
   // Debug endpoint to check auth and driver lookup
   app.get("/api/mobile/v1/debug/auth",

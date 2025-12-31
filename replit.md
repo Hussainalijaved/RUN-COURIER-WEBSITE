@@ -38,6 +38,12 @@ A multi-step application process allows prospective drivers to submit personal d
 ### Mobile API (Driver App)
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities, including profile management, location updates, availability toggling, job retrieval, job status updates, and proof of delivery uploads, all authenticated with a Supabase JWT token.
 
+**Driver Status & Location Tracking**:
+- `POST /api/driver/status` - Combined endpoint for online/offline status and GPS location updates
+  - Accepts: `{ isOnline: boolean, latitude?: number, longitude?: number, heading?: number, speed?: number }`
+  - Broadcasts location to WebSocket for admin map tracking
+  - Updates driver availability for job assignment
+
 **Mobile Job Offers Endpoints** (Admin-to-Driver Job Assignment Sync):
 - `GET /api/mobile/v1/driver/job-offers` - Get pending job offers for the driver
 - `POST /api/mobile/v1/driver/job-offers/:id/accept` - Accept a job offer
