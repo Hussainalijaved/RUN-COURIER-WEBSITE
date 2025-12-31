@@ -1,0 +1,82 @@
+ROLE:
+You are a senior backend architect fixing a critical data-privacy and business-logic issue in a live courier platform using Supabase (Postgres + RLS) with an Admin dashboard and an Expo Driver app.
+
+CRITICAL BUSINESS RULE (NON-NEGOTIABLE):
+There are TWO prices per job with STRICT VISIBILITY RULES:
+
+1) customer_price
+   - Paid by the customer
+   - Visible ONLY to admin
+   - NEVER visible to drivers
+   - Used for invoices, Stripe, admin reports
+
+2) driver_price
+   - Set by admin when assigning the job
+   - Visible ONLY to the assigned driver
+   - This is the ONLY price drivers must ever see
+
+CURRENT PROBLEM:
+Drivers can see or infer the customer price.
+This MUST be eliminated at the BACKEND level (not UI hiding).
+
+OBJECTIVE:
+Fix this ONCE AND FOREVER so:
+- Admin sees both prices
+- Driver sees ONLY driver_price
+- Customer sees ONLY their payable amount
+- No API, realtime payload, or query leaks customer_price to drivers
+
+MANDATORY IMPLEMENTATION REQUIREMENTS:
+
+BACKEND (SUPABASE):
+1) Ensure jobs table (or related tables) clearly separates:
+   - customer_price
+   - driver_price
+
+2) Enforce Row Level Security so that:
+   - Admin role can read/write both prices
+   - Driver role:
+     - CANNOT read customer_price
+     - CAN read driver_price ONLY for jobs assigned to them
+   - Customer role:
+     - CAN read customer_price ONLY for their own jobs
+     - CANNOT read driver_price
+
+3) If necessary, create role-specific views:
+   - admin_jobs_view
+   - driver_jobs_view
+   - customer_jobs_view
+   Each view must expose ONLY allowed columns.
+
+4) Ensure all driver-facing queries use ONLY driver-safe views or filtered selects.
+   No shared “jobs” query for all roles.
+
+FRONTEND RULES:
+5) Admin dashboard:
+   - Can edit both prices
+   - Assigns driver_price when assigning job
+
+6) Driver app:
+   - Receives driver_price only
+   - No reference to customer_price exists in code or payloads
+
+7) Realtime subscriptions:
+   - Must NOT broadcast customer_price to driver channels
+   - Must be role-filtered
+
+SECURITY REQUIREMENTS:
+- Do NOT rely on frontend hiding
+- Do NOT send unused fields “just in case”
+- Do NOT weaken RLS to make it work
+
+OUTPUT REQUIRED:
+- Exact SQL (tables, RLS, views if needed)
+- Explanation of how price isolation is guaranteed
+- Verification checklist proving driver can never see customer_price
+
+SUCCESS CRITERIA:
+- Admin assigns job with driver_price
+- Driver receives job with ONLY driver_price visible
+- Customer price is completely invisible to drivers at DB + API + realtime level
+
+BEGIN FIX NOW.
