@@ -811,6 +811,8 @@ export class SupabaseStorage implements IStorage {
       payment_status: insertJob.paymentStatus || 'pending',
       payment_intent_id: insertJob.paymentIntentId || null,
       notes: '',
+      priority: 'normal',
+      parcel_weight: 0,
     };
     
     const { data, error } = await supabase
