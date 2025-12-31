@@ -409,45 +409,51 @@ export async function registerRoutes(
       console.log('[Jobs] supabaseAdmin available:', !!supabaseAdmin);
       if (supabaseAdmin) {
         // Map local job fields to Supabase jobs table columns
-        // Supabase uses: dropoff_address, price_customer, driver_price, etc.
+        // Column names match the create-job edge function schema
         // DO NOT include 'id' - let Supabase auto-generate it
-        // CRITICAL: Many columns have NOT NULL constraints - use defaults!
         const supabaseJobData = {
           // Required tracking
           tracking_number: job.trackingNumber,
           // Driver/customer IDs - CRITICAL: Use Supabase auth.uid, NOT local driver UUID
           driver_id: supabaseDriverId, // Must be Supabase auth.uid for RLS
-          user_id: job.customerId !== 'admin-created' ? job.customerId : null,
-          // Status and type (NOT NULL)
+          customer_id: job.customerId !== 'admin-created' ? job.customerId : null,
+          // Status and type
           status: job.status === 'assigned' ? 'pending' : job.status,
           vehicle_type: job.vehicleType || 'small_van',
-          priority: 'normal',
-          booking_type: 'on-demand',
           payment_status: job.paymentStatus || 'pending',
-          is_guest: false, // CRITICAL: Must be false for mobile app visibility
-          // Pickup details (lat/lng are NOT NULL - use 0 as default)
+          // Pickup details
           pickup_address: job.pickupAddress || '',
-          pickup_lat: job.pickupLatitude ? parseFloat(String(job.pickupLatitude)) : 0,
-          pickup_lng: job.pickupLongitude ? parseFloat(String(job.pickupLongitude)) : 0,
-          pickup_building_number: job.pickupBuildingName || null,
-          // Dropoff details (lat/lng are NOT NULL - use 0 as default)
-          dropoff_address: job.deliveryAddress || '',
-          dropoff_lat: job.deliveryLatitude ? parseFloat(String(job.deliveryLatitude)) : 0,
-          dropoff_lng: job.deliveryLongitude ? parseFloat(String(job.deliveryLongitude)) : 0,
-          dropoff_building_number: job.deliveryBuildingName || null,
-          // Sender/Recipient (NOT NULL)
-          sender_name: job.pickupContactName || 'Sender',
-          sender_phone: job.pickupContactPhone || '',
+          pickup_postcode: job.pickupPostcode || null,
+          pickup_contact_name: job.pickupContactName || null,
+          pickup_contact_phone: job.pickupContactPhone || null,
+          pickup_instructions: job.pickupInstructions || null,
+          // Delivery details
+          delivery_address: job.deliveryAddress || '',
+          delivery_postcode: job.deliveryPostcode || null,
+          delivery_instructions: job.deliveryInstructions || null,
+          // Recipient
           recipient_name: job.recipientName || 'Recipient',
           recipient_phone: job.recipientPhone || '',
-          // Numeric fields (NOT NULL - use 0 as default)
-          parcel_weight: job.weight ? parseFloat(String(job.weight)) : 1,
-          distance_miles: job.distance ? parseFloat(String(job.distance)) : 0,
-          price_customer: job.totalPrice ? parseFloat(String(job.totalPrice)) : 0,
-          driver_price: job.driverPrice ? parseFloat(String(job.driverPrice)) : null,
-          // Required time fields (NOT NULL - use current time as default)
-          scheduled_pickup_time: job.scheduledPickupTime?.toISOString() || new Date().toISOString(),
-          notes: job.pickupInstructions || job.deliveryInstructions || '', // NOT NULL
+          // Numeric fields - use correct column names matching create-job edge function
+          weight: job.weight ? parseFloat(String(job.weight)).toFixed(2) : '1.00',
+          distance: job.distance ? parseFloat(String(job.distance)).toFixed(2) : '0.00',
+          base_price: job.basePrice ? parseFloat(String(job.basePrice)).toFixed(2) : '0.00',
+          distance_price: job.distancePrice ? parseFloat(String(job.distancePrice)).toFixed(2) : '0.00',
+          weight_surcharge: job.weightSurcharge ? parseFloat(String(job.weightSurcharge)).toFixed(2) : '0.00',
+          multi_drop_charge: job.multiDropCharge ? parseFloat(String(job.multiDropCharge)).toFixed(2) : '0.00',
+          return_trip_charge: job.returnTripCharge ? parseFloat(String(job.returnTripCharge)).toFixed(2) : '0.00',
+          central_london_charge: job.centralLondonCharge ? parseFloat(String(job.centralLondonCharge)).toFixed(2) : '0.00',
+          waiting_time_charge: job.waitingTimeCharge ? parseFloat(String(job.waitingTimeCharge)).toFixed(2) : '0.00',
+          total_price: job.totalPrice ? parseFloat(String(job.totalPrice)).toFixed(2) : '0.00',
+          // CRITICAL: driver_price is what drivers see - must be set by admin
+          driver_price: job.driverPrice ? parseFloat(String(job.driverPrice)).toFixed(2) : null,
+          // Schedule
+          scheduled_pickup_time: job.scheduledPickupTime?.toISOString() || null,
+          scheduled_delivery_time: job.scheduledDeliveryTime?.toISOString() || null,
+          is_multi_drop: job.isMultiDrop || false,
+          is_return_trip: job.isReturnTrip || false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
         
         console.log('[Jobs] Supabase job data:', JSON.stringify(supabaseJobData, null, 2));
