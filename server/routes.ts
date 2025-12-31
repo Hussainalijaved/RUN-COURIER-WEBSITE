@@ -63,6 +63,27 @@ function validateBasePrice(vehicleType: string, basePrice: number): number {
   return basePrice;
 }
 
+// SECURITY: Centralized helper to strip ALL customer pricing fields from job objects
+// This is the SINGLE SOURCE OF TRUTH for driver-safe job serialization
+// All non-admin endpoints MUST use this to prevent price leakage
+function stripCustomerPricing<T extends Record<string, any>>(job: T): Omit<T, 
+  'totalPrice' | 'basePrice' | 'distancePrice' | 'weightSurcharge' | 
+  'multiDropCharge' | 'returnTripCharge' | 'centralLondonCharge' | 'waitingTimeCharge' |
+  'priceCustomer' | 'priceCustomerCurrency' | 'invoiceAmount'
+> {
+  const { 
+    totalPrice, basePrice, distancePrice, weightSurcharge,
+    multiDropCharge, returnTripCharge, centralLondonCharge, waitingTimeCharge,
+    priceCustomer, priceCustomerCurrency, invoiceAmount,
+    // Also strip any snake_case versions
+    total_price, base_price, distance_price, weight_surcharge,
+    multi_drop_charge, return_trip_charge, central_london_charge, waiting_time_charge,
+    price_customer, price_customer_currency, invoice_amount,
+    ...safeJob 
+  } = job as any;
+  return safeJob;
+}
+
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
 if (!fs.existsSync(uploadsDir)) {
@@ -198,7 +219,26 @@ export async function registerRoutes(
       vendorId: vendorId as string | undefined,
       limit: Number(limit),
     });
-    res.json(jobs);
+    
+    // SECURITY: Default to safe (no-pricing) unless explicitly admin/dispatcher
+    // This prevents price leakage by omitting auth or using driver token
+    let isAdmin = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { verifyAccessToken } = await import("./supabaseAdmin");
+      const user = await verifyAccessToken(token);
+      isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
+    }
+    
+    if (isAdmin) {
+      // Admin/dispatcher see full pricing
+      return res.json(jobs);
+    }
+    
+    // CRITICAL: Everyone else (drivers, customers, unauthenticated) gets NO customer pricing
+    const safeJobs = jobs.map(job => stripCustomerPricing(job));
+    return res.json(safeJobs);
   }));
 
   // Test email endpoint - for testing email templates
@@ -275,6 +315,8 @@ export async function registerRoutes(
     
     // Get jobs that have a driver assigned and are delivered/completed
     // Filter by deliveredAt (or actualDeliveryTime, or createdAt as fallback)
+    // SECURITY: This endpoint is for admin payroll - includes both prices for admin use
+    // Admin sees totalPrice for customer invoice, driverPrice for driver payment
     const weeklyJobs = await db
       .select({
         id: jobs.id,
@@ -286,7 +328,7 @@ export async function registerRoutes(
         deliveryAddress: jobs.deliveryAddress,
         status: jobs.status,
         driverPrice: jobs.driverPrice,
-        totalPrice: jobs.totalPrice,
+        totalPrice: jobs.totalPrice, // Admin-only: needed for profit margin calculation
         deliveredAt: jobs.deliveredAt,
         actualDeliveryTime: jobs.actualDeliveryTime,
         createdAt: jobs.createdAt,
@@ -388,7 +430,24 @@ export async function registerRoutes(
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    res.json(job);
+    
+    // SECURITY: Public tracking endpoint must NEVER expose pricing
+    // Return only safe fields for public tracking
+    return res.json({
+      id: job.id,
+      trackingNumber: job.trackingNumber,
+      status: job.status,
+      vehicleType: job.vehicleType,
+      pickupAddress: job.pickupAddress,
+      pickupPostcode: job.pickupPostcode,
+      deliveryAddress: job.deliveryAddress,
+      deliveryPostcode: job.deliveryPostcode,
+      recipientName: job.recipientName,
+      estimatedDeliveryTime: job.estimatedDeliveryTime,
+      createdAt: job.createdAt,
+      driverName: null,
+      driverPhone: null,
+    });
   }));
 
   app.get("/api/jobs/:id", asyncHandler(async (req, res) => {
@@ -396,7 +455,23 @@ export async function registerRoutes(
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    res.json(job);
+    
+    // SECURITY: Default to safe (no-pricing) unless explicitly admin/dispatcher
+    let isAdmin = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { verifyAccessToken } = await import("./supabaseAdmin");
+      const user = await verifyAccessToken(token);
+      isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
+    }
+    
+    if (isAdmin) {
+      return res.json(job);
+    }
+    
+    // CRITICAL: Everyone else gets NO customer pricing
+    return res.json(stripCustomerPricing(job));
   }));
 
   app.post("/api/jobs", asyncHandler(async (req, res) => {
