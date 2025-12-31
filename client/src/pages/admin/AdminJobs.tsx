@@ -271,26 +271,36 @@ export default function AdminJobs() {
 
   const batchAssignMutation = useMutation({
     mutationFn: async ({ jobIds, driverId, driverPrice }: { jobIds: string[]; driverId: string; driverPrice: string }) => {
-      // Use transactional Supabase Edge Function for batch assignment
-      const driverPriceNum = parseFloat(driverPrice);
-      const jobs = jobIds.map(jobId => ({
-        jobId,
-        driverPrice: driverPriceNum,
-      }));
-      
-      return supabaseFunctions.batchAssignDriver({
-        driverId,
-        jobs,
-        notes: `Batch assignment of ${jobIds.length} jobs by admin`,
+      // Use local backend API for batch assignment
+      const response = await fetch('/api/job-assignments/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobIds,
+          driverId,
+          assignedBy: user?.id,
+          driverPrice,
+        }),
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to batch assign jobs');
+      }
+      
+      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
       
+      const successCount = data.successCount || data.assignments?.length || 0;
+      const driverPriceNum = parseFloat(batchDriverPrice) || 0;
+      const totalPrice = successCount * driverPriceNum;
+      
       toast({ 
         title: 'Batch assignment complete', 
-        description: `${data.totalJobs} job${data.totalJobs > 1 ? 's' : ''} assigned to the driver. Total: £${data.totalDriverPrice.toFixed(2)}` 
+        description: `${successCount} job${successCount > 1 ? 's' : ''} assigned to the driver. Total: £${totalPrice.toFixed(2)}` 
       });
       setBatchAssignDialogOpen(false);
       setBatchDriverId('');
