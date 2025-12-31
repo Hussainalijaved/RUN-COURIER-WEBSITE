@@ -73,6 +73,22 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+  
+  // Use refs for callbacks to avoid triggering reconnects when callbacks change
+  const onJobUpdateRef = useRef(onJobUpdate);
+  const onJobCreatedRef = useRef(onJobCreated);
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+  const onErrorRef = useRef(onError);
+  
+  // Keep refs updated with latest callbacks
+  useEffect(() => {
+    onJobUpdateRef.current = onJobUpdate;
+    onJobCreatedRef.current = onJobCreated;
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+    onErrorRef.current = onError;
+  }, [onJobUpdate, onJobCreated, onConnect, onDisconnect, onError]);
 
   const cleanup = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -161,14 +177,14 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
                 }
               }, PING_INTERVAL);
               
-              onConnect?.();
+              onConnectRef.current?.();
               break;
 
             case 'job:status_update':
               if (message.payload) {
                 const update = message.payload as JobStatusUpdate;
                 setLatestUpdate(update);
-                onJobUpdate?.(update);
+                onJobUpdateRef.current?.(update);
                 
                 queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
                 queryClient.invalidateQueries({ queryKey: ['/api/jobs', update.jobId] });
@@ -181,7 +197,7 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
             case 'job:created':
               if (message.payload) {
                 const job = message.payload as JobCreatedEvent;
-                onJobCreated?.(job);
+                onJobCreatedRef.current?.(job);
                 
                 queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
               }
@@ -190,7 +206,7 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
             case 'error':
               const errorMsg = message.payload?.message || 'Unknown error';
               setError(errorMsg);
-              onError?.(errorMsg);
+              onErrorRef.current?.(errorMsg);
               break;
 
             case 'pong':
@@ -218,7 +234,7 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
           pingIntervalRef.current = null;
         }
         
-        onDisconnect?.();
+        onDisconnectRef.current?.();
 
         if (event.code !== 1000 && enabled) {
           const delay = RECONNECT_DELAYS[Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)];
@@ -236,7 +252,7 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
       setError('Failed to create WebSocket connection');
       console.error('WebSocket creation error:', e);
     }
-  }, [enabled, user, customerId, jobId, trackingNumber, cleanup, onConnect, onDisconnect, onError, onJobUpdate, onJobCreated]);
+  }, [enabled, user, customerId, jobId, trackingNumber, cleanup]);
 
   const reconnect = useCallback(() => {
     reconnectAttemptRef.current = 0;

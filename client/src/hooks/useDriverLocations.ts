@@ -68,6 +68,18 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+  
+  // Use refs for callbacks to avoid triggering reconnects when callbacks change
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+  const onErrorRef = useRef(onError);
+  
+  // Keep refs updated with latest callbacks
+  useEffect(() => {
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+    onErrorRef.current = onError;
+  }, [onConnect, onDisconnect, onError]);
 
   const cleanup = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -149,7 +161,7 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
                 }
               }, PING_INTERVAL);
               
-              onConnect?.();
+              onConnectRef.current?.();
               break;
 
             case 'driver:bulk_snapshot':
@@ -211,7 +223,7 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
             case 'error':
               const errorMsg = message.payload?.message || 'Unknown error';
               setError(errorMsg);
-              onError?.(errorMsg);
+              onErrorRef.current?.(errorMsg);
               break;
 
             case 'pong':
@@ -239,7 +251,7 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
           pingIntervalRef.current = null;
         }
         
-        onDisconnect?.();
+        onDisconnectRef.current?.();
 
         if (event.code !== 1000 && enabled) {
           const delay = RECONNECT_DELAYS[Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)];
@@ -257,7 +269,7 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
       setError('Failed to create WebSocket connection');
       console.error('WebSocket creation error:', e);
     }
-  }, [enabled, user, cleanup, onConnect, onDisconnect, onError]);
+  }, [enabled, user, cleanup]);
 
   const reconnect = useCallback(() => {
     reconnectAttemptRef.current = 0;
