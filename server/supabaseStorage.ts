@@ -778,6 +778,7 @@ export class SupabaseStorage implements IStorage {
       pickup_contact_name: insertJob.pickupContactName || null,
       pickup_contact_phone: insertJob.pickupContactPhone || null,
       delivery_address: insertJob.deliveryAddress,
+      dropoff_address: insertJob.deliveryAddress || 'Not specified',
       delivery_postcode: insertJob.deliveryPostcode,
       delivery_latitude: insertJob.deliveryLatitude || null,
       delivery_longitude: insertJob.deliveryLongitude || null,
