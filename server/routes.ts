@@ -400,6 +400,33 @@ export async function registerRoutes(
     const data = insertJobSchema.parse(preprocessedBody);
     const job = await storage.createJob(data);
     
+    // Auto-geocode addresses for live map display
+    const geocodeUpdates: any = {};
+    if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) {
+      const pickupResult = await geocodeAddress(job.pickupAddress);
+      if (pickupResult) {
+        geocodeUpdates.pickupLatitude = pickupResult.lat;
+        geocodeUpdates.pickupLongitude = pickupResult.lng;
+        console.log(`[Geocoding] Job ${job.id} pickup: ${pickupResult.lat}, ${pickupResult.lng}`);
+      }
+    }
+    if (job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+      const deliveryResult = await geocodeAddress(job.deliveryAddress);
+      if (deliveryResult) {
+        geocodeUpdates.deliveryLatitude = deliveryResult.lat;
+        geocodeUpdates.deliveryLongitude = deliveryResult.lng;
+        console.log(`[Geocoding] Job ${job.id} delivery: ${deliveryResult.lat}, ${deliveryResult.lng}`);
+      }
+    }
+    // Update job with coordinates if geocoding succeeded
+    let finalJob = job;
+    if (Object.keys(geocodeUpdates).length > 0) {
+      const updatedJob = await storage.updateJob(job.id, geocodeUpdates);
+      if (updatedJob) {
+        finalJob = updatedJob;
+      }
+    }
+    
     // CRITICAL: Also create job in Supabase for mobile app sync
     // Mobile app queries Supabase directly using RLS, so jobs must exist there
     // NOTE: Supabase jobs table has different schema than local PostgreSQL
@@ -503,9 +530,9 @@ export async function registerRoutes(
     // Send customer confirmation if email available
     const customerEmail = req.body.customerEmail || (job as any).customerEmail;
     if (customerEmail) {
-      await sendCustomerBookingConfirmation(customerEmail, { ...job, customerEmail }).catch(err => console.error('Failed to send customer confirmation:', err));
+      await sendCustomerBookingConfirmation(customerEmail, { ...finalJob, customerEmail }).catch(err => console.error('Failed to send customer confirmation:', err));
     }
-    res.status(201).json(job);
+    res.status(201).json(finalJob);
   }));
 
   app.patch("/api/jobs/:id", asyncHandler(async (req, res) => {
@@ -596,6 +623,59 @@ export async function registerRoutes(
     } else {
       res.json({ success: true, job, message: "No geocoding needed or addresses missing" });
     }
+  }));
+
+  // Bulk geocode all jobs with missing coordinates
+  app.post("/api/jobs/geocode-all", asyncHandler(async (req, res) => {
+    const allJobs = await storage.getJobs();
+    const jobsToGeocode = allJobs.filter(job => 
+      (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) ||
+      (job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude))
+    );
+    
+    console.log(`[Geocoding] Starting bulk geocode for ${jobsToGeocode.length} jobs`);
+    
+    const results = { success: 0, failed: 0, skipped: 0 };
+    
+    for (const job of jobsToGeocode) {
+      const updates: any = {};
+      
+      if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) {
+        const pickupResult = await geocodeAddress(job.pickupAddress);
+        if (pickupResult) {
+          updates.pickupLatitude = pickupResult.lat;
+          updates.pickupLongitude = pickupResult.lng;
+        }
+      }
+      
+      if (job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+        const deliveryResult = await geocodeAddress(job.deliveryAddress);
+        if (deliveryResult) {
+          updates.deliveryLatitude = deliveryResult.lat;
+          updates.deliveryLongitude = deliveryResult.lng;
+        }
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        await storage.updateJob(job.id, updates);
+        results.success++;
+        console.log(`[Geocoding] Job ${job.id} geocoded successfully`);
+      } else {
+        results.failed++;
+      }
+      
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    results.skipped = allJobs.length - jobsToGeocode.length;
+    console.log(`[Geocoding] Bulk geocode complete: ${results.success} success, ${results.failed} failed, ${results.skipped} already had coordinates`);
+    
+    res.json({ 
+      message: `Geocoded ${results.success} jobs`,
+      ...results,
+      totalJobs: allJobs.length
+    });
   }));
 
   app.patch("/api/jobs/:id/assign", asyncHandler(async (req, res) => {

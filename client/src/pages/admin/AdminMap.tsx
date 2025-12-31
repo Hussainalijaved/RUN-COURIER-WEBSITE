@@ -158,38 +158,54 @@ export default function AdminMap() {
   }, [initMap]);
 
   useEffect(() => {
-    const geocodeJobs = async () => {
+    const loadJobLocations = async () => {
       if (!jobs || !mapLoaded) return;
       
-      const jobsToGeocode = [...pendingJobs, ...activeJobs].filter(job => 
-        job.pickupPostcode && job.deliveryPostcode && !jobLocations.has(job.id)
-      );
+      const allDisplayJobs = [...pendingJobs, ...activeJobs].filter(job => !jobLocations.has(job.id));
       
-      for (const job of jobsToGeocode) {
-        try {
-          const [pickupResult, deliveryResult] = await Promise.all([
-            geocodePostcode(job.pickupPostcode),
-            geocodePostcode(job.deliveryPostcode)
-          ]);
-          
-          if (pickupResult && deliveryResult) {
-            setJobLocations(prev => new Map(prev).set(job.id, {
-              jobId: job.id,
-              pickupLat: pickupResult.lat,
-              pickupLng: pickupResult.lng,
-              deliveryLat: deliveryResult.lat,
-              deliveryLng: deliveryResult.lng,
-              pickupPostcode: job.pickupPostcode,
-              deliveryPostcode: job.deliveryPostcode,
-            }));
+      for (const job of allDisplayJobs) {
+        // First try to use stored coordinates from the database
+        const hasStoredPickup = job.pickupLatitude && job.pickupLongitude;
+        const hasStoredDelivery = job.deliveryLatitude && job.deliveryLongitude;
+        
+        if (hasStoredPickup && hasStoredDelivery) {
+          // Use stored coordinates directly
+          setJobLocations(prev => new Map(prev).set(job.id, {
+            jobId: job.id,
+            pickupLat: parseFloat(String(job.pickupLatitude)),
+            pickupLng: parseFloat(String(job.pickupLongitude)),
+            deliveryLat: parseFloat(String(job.deliveryLatitude)),
+            deliveryLng: parseFloat(String(job.deliveryLongitude)),
+            pickupPostcode: job.pickupPostcode || job.pickupAddress?.slice(-8) || '',
+            deliveryPostcode: job.deliveryPostcode || job.deliveryAddress?.slice(-8) || '',
+          }));
+        } else if (job.pickupPostcode && job.deliveryPostcode) {
+          // Fall back to geocoding if we have postcodes
+          try {
+            const [pickupResult, deliveryResult] = await Promise.all([
+              geocodePostcode(job.pickupPostcode),
+              geocodePostcode(job.deliveryPostcode)
+            ]);
+            
+            if (pickupResult && deliveryResult) {
+              setJobLocations(prev => new Map(prev).set(job.id, {
+                jobId: job.id,
+                pickupLat: pickupResult.lat,
+                pickupLng: pickupResult.lng,
+                deliveryLat: deliveryResult.lat,
+                deliveryLng: deliveryResult.lng,
+                pickupPostcode: job.pickupPostcode,
+                deliveryPostcode: job.deliveryPostcode,
+              }));
+            }
+          } catch (error) {
+            console.error(`Failed to geocode job ${job.id}:`, error);
           }
-        } catch (error) {
-          console.error(`Failed to geocode job ${job.id}:`, error);
         }
       }
     };
     
-    geocodeJobs();
+    loadJobLocations();
   }, [jobs, mapLoaded, pendingJobs, activeJobs]);
 
   useEffect(() => {
