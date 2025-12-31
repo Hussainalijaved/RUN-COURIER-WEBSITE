@@ -752,7 +752,6 @@ export class SupabaseStorage implements IStorage {
 
   async createJob(insertJob: InsertJob): Promise<Job> {
     const supabase = this.checkSupabase();
-    const id = randomUUID();
     
     // customer_id must be a valid UUID or null - not a string like "admin-created"
     const isValidUUID = (str: string | null | undefined): boolean => {
@@ -761,8 +760,8 @@ export class SupabaseStorage implements IStorage {
       return uuidRegex.test(str);
     };
     
+    // Let the database auto-generate the id (bigint)
     const dbJob = {
-      id,
       tracking_number: insertJob.trackingNumber,
       customer_id: isValidUUID(insertJob.customerId) ? insertJob.customerId : null,
       driver_id: insertJob.driverId || null,
@@ -822,7 +821,7 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
     
-    console.log(`[SupabaseStorage] Created job ${id} with tracking ${insertJob.trackingNumber}`);
+    console.log(`[SupabaseStorage] Created job ${data.id} with tracking ${insertJob.trackingNumber}`);
     return mapDbToJob(data);
   }
 
