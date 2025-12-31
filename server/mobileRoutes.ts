@@ -672,6 +672,76 @@ export function registerMobileRoutes(app: Express): void {
     })
   );
 
+  // Helper to upload base64 image to Supabase Storage
+  async function uploadBase64ToSupabase(
+    base64Data: string,
+    jobId: string,
+    type: 'photo' | 'signature'
+  ): Promise<string | null> {
+    if (!supabaseAdmin) {
+      console.error('[POD Upload] Supabase admin client not initialized');
+      return null;
+    }
+
+    try {
+      // Handle base64 data - remove data URL prefix if present
+      let base64String = base64Data;
+      let contentType = 'image/jpeg';
+      
+      if (base64Data.includes(',')) {
+        const parts = base64Data.split(',');
+        base64String = parts[1];
+        // Extract content type from data URL
+        const match = parts[0].match(/data:([^;]+);/);
+        if (match) {
+          contentType = match[1];
+        }
+      }
+
+      const buffer = Buffer.from(base64String, 'base64');
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(2, 8);
+      const ext = contentType.includes('png') ? '.png' : '.jpg';
+      const filename = `job_${jobId}/${type}_${timestamp}_${random}${ext}`;
+
+      const bucket = 'pod-uploads';
+      
+      // Ensure bucket exists
+      const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+      if (!buckets?.find(b => b.name === bucket)) {
+        const { error: createError } = await supabaseAdmin.storage.createBucket(bucket, {
+          public: true,
+          fileSizeLimit: 10 * 1024 * 1024,
+        });
+        if (createError && !createError.message.includes('already exists')) {
+          console.error('[POD Upload] Failed to create bucket:', createError);
+        }
+      }
+
+      const { data, error } = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(filename, buffer, {
+          contentType,
+          upsert: true,
+        });
+
+      if (error) {
+        console.error('[POD Upload] Supabase upload error:', error);
+        return null;
+      }
+
+      const { data: urlData } = supabaseAdmin.storage
+        .from(bucket)
+        .getPublicUrl(filename);
+
+      console.log(`[POD Upload] Base64 ${type} uploaded to: ${urlData.publicUrl}`);
+      return urlData.publicUrl;
+    } catch (err) {
+      console.error('[POD Upload] Error processing base64:', err);
+      return null;
+    }
+  }
+
   app.post("/api/mobile/v1/driver/jobs/:jobId/pod",
     requireSupabaseAuth,
     requireDriverRole,
@@ -687,7 +757,15 @@ export function registerMobileRoutes(app: Express): void {
       }
       
       const { jobId } = req.params;
-      const { podPhotoUrl, podSignatureUrl } = req.body;
+      const { podPhotoUrl, podSignatureUrl, photo, signature, recipientName } = req.body;
+
+      console.log(`[POD Upload] Received POD for job ${jobId}:`, {
+        hasPhotoUrl: !!podPhotoUrl,
+        hasSignatureUrl: !!podSignatureUrl,
+        hasPhotoBase64: !!photo,
+        hasSignatureBase64: !!signature,
+        recipientName: recipientName || 'none'
+      });
 
       const job = await storage.getJob(jobId);
 
@@ -712,20 +790,54 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      const updatedJob = await storage.updateJobPOD(jobId, podPhotoUrl, podSignatureUrl);
+      // Handle photo - either URL or base64
+      let finalPhotoUrl = podPhotoUrl || job.podPhotoUrl;
+      if (photo && typeof photo === 'string') {
+        // It's base64 data, upload to Supabase
+        const uploadedUrl = await uploadBase64ToSupabase(photo, jobId, 'photo');
+        if (uploadedUrl) {
+          finalPhotoUrl = uploadedUrl;
+        } else {
+          return res.status(500).json({ 
+            error: "Failed to upload photo",
+            code: "PHOTO_UPLOAD_FAILED"
+          });
+        }
+      }
+
+      // Handle signature - either URL or base64
+      let finalSignatureUrl = podSignatureUrl || job.podSignatureUrl;
+      if (signature && typeof signature === 'string') {
+        // It's base64 data, upload to Supabase
+        const uploadedUrl = await uploadBase64ToSupabase(signature, jobId, 'signature');
+        if (uploadedUrl) {
+          finalSignatureUrl = uploadedUrl;
+        } else {
+          return res.status(500).json({ 
+            error: "Failed to upload signature",
+            code: "SIGNATURE_UPLOAD_FAILED"
+          });
+        }
+      }
+
+      const finalRecipientName = recipientName || job.podRecipientName;
+      const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName);
 
       if (!updatedJob) {
         return res.status(500).json({ 
-          error: "Failed to upload POD",
+          error: "Failed to save POD",
           code: "POD_UPLOAD_FAILED"
         });
       }
+
+      console.log(`[POD Upload] Job ${jobId} POD saved: photo=${finalPhotoUrl ? 'yes' : 'no'}, signature=${finalSignatureUrl ? 'yes' : 'no'}`);
 
       res.json({
         success: true,
         pod: {
           photoUrl: updatedJob.podPhotoUrl,
           signatureUrl: updatedJob.podSignatureUrl,
+          recipientName: updatedJob.podRecipientName,
         },
       });
     })
