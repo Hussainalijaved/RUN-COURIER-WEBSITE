@@ -541,23 +541,36 @@ export function registerMobileRoutes(app: Express): void {
       const driver = req.driver!;
       const { jobId } = req.params;
 
-      // Try memory first, then database
+      // Try storage first (which queries Supabase)
       let job = await storage.getJob(jobId);
-      if (!job) {
-        const dbJobs = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId));
-        if (dbJobs.length > 0) {
-          job = dbJobs[0];
+      let supabaseJob: any = null;
+      
+      // If not found, query Supabase directly
+      if (!job && supabaseAdmin) {
+        console.log(`[Job Details] Job ${jobId} not in storage, querying Supabase...`);
+        const { data, error } = await supabaseAdmin
+          .from('jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+        
+        if (!error && data) {
+          supabaseJob = data;
+          console.log(`[Job Details] Found job ${jobId} in Supabase`);
         }
       }
 
-      if (!job) {
+      if (!job && !supabaseJob) {
         return res.status(404).json({ 
           error: "Job not found",
           code: "JOB_NOT_FOUND"
         });
       }
 
-      if (job.driverId !== driver.id) {
+      // Use Supabase data if local job not found
+      const effectiveDriverId = job?.driverId || supabaseJob?.driver_id;
+      
+      if (effectiveDriverId !== driver.id) {
         return res.status(403).json({ 
           error: "This job is not assigned to you",
           code: "NOT_YOUR_JOB"
@@ -571,36 +584,71 @@ export function registerMobileRoutes(app: Express): void {
         lastUpdate: driver.lastLocationUpdate,
       };
 
-      res.json({
-        id: job.id,
-        trackingNumber: job.trackingNumber,
-        status: job.status,
-        pickupAddress: job.pickupAddress,
-        pickupPostcode: job.pickupPostcode,
-        pickupInstructions: job.pickupInstructions,
-        pickupLatitude: job.pickupLatitude,
-        pickupLongitude: job.pickupLongitude,
-        deliveryAddress: job.deliveryAddress,
-        deliveryPostcode: job.deliveryPostcode,
-        deliveryInstructions: job.deliveryInstructions,
-        deliveryLatitude: job.deliveryLatitude,
-        deliveryLongitude: job.deliveryLongitude,
-        recipientName: job.recipientName,
-        recipientPhone: job.recipientPhone,
-        vehicleType: job.vehicleType,
-        distance: job.distance,
-        weight: job.weight,
-        driverPrice: job.driverPrice,
-        scheduledPickupTime: job.scheduledPickupTime,
-        isMultiDrop: job.isMultiDrop,
-        isReturnTrip: job.isReturnTrip,
-        podPhotoUrl: job.podPhotoUrl,
-        podSignatureUrl: job.podSignatureUrl,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
-        // Driver location for map display
-        driverLocation,
-      });
+      // Build response from either source
+      if (job) {
+        res.json({
+          id: job.id,
+          trackingNumber: job.trackingNumber,
+          status: job.status,
+          pickupAddress: job.pickupAddress,
+          pickupPostcode: job.pickupPostcode,
+          pickupInstructions: job.pickupInstructions,
+          pickupLatitude: job.pickupLatitude,
+          pickupLongitude: job.pickupLongitude,
+          deliveryAddress: job.deliveryAddress,
+          deliveryPostcode: job.deliveryPostcode,
+          deliveryInstructions: job.deliveryInstructions,
+          deliveryLatitude: job.deliveryLatitude,
+          deliveryLongitude: job.deliveryLongitude,
+          recipientName: job.recipientName,
+          recipientPhone: job.recipientPhone,
+          vehicleType: job.vehicleType,
+          distance: job.distance,
+          weight: job.weight,
+          driverPrice: job.driverPrice,
+          scheduledPickupTime: job.scheduledPickupTime,
+          isMultiDrop: job.isMultiDrop,
+          isReturnTrip: job.isReturnTrip,
+          podPhotoUrl: job.podPhotoUrl,
+          podSignatureUrl: job.podSignatureUrl,
+          createdAt: job.createdAt,
+          updatedAt: job.updatedAt,
+          driverLocation,
+        });
+      } else {
+        // Map from Supabase format
+        res.json({
+          id: String(supabaseJob.id),
+          trackingNumber: supabaseJob.tracking_number,
+          status: supabaseJob.status,
+          pickupAddress: supabaseJob.pickup_address,
+          pickupPostcode: null,
+          pickupInstructions: supabaseJob.notes,
+          pickupLatitude: supabaseJob.pickup_lat?.toString() || null,
+          pickupLongitude: supabaseJob.pickup_lng?.toString() || null,
+          deliveryAddress: supabaseJob.dropoff_address,
+          deliveryPostcode: null,
+          deliveryInstructions: null,
+          deliveryLatitude: supabaseJob.dropoff_lat?.toString() || null,
+          deliveryLongitude: supabaseJob.dropoff_lng?.toString() || null,
+          recipientName: supabaseJob.recipient_name,
+          recipientPhone: supabaseJob.recipient_phone,
+          senderName: supabaseJob.sender_name,
+          senderPhone: supabaseJob.sender_phone,
+          vehicleType: supabaseJob.vehicle_type,
+          distance: supabaseJob.distance_miles?.toString() || null,
+          weight: supabaseJob.parcel_weight?.toString() || null,
+          driverPrice: supabaseJob.price_driver?.toString() || null,
+          scheduledPickupTime: supabaseJob.scheduled_pickup_time,
+          isMultiDrop: false,
+          isReturnTrip: false,
+          podPhotoUrl: supabaseJob.pod_photo_url,
+          podSignatureUrl: supabaseJob.pod_signature_url,
+          createdAt: supabaseJob.created_at,
+          updatedAt: supabaseJob.updated_at,
+          driverLocation,
+        });
+      }
     })
   );
 
@@ -621,36 +669,58 @@ export function registerMobileRoutes(app: Express): void {
       const { jobId } = req.params;
       const { status, rejectionReason } = req.body;
 
-      const job = await storage.getJob(jobId);
+      // Try storage first, then query Supabase directly
+      let job = await storage.getJob(jobId);
+      let supabaseJob: any = null;
+      
+      if (!job && supabaseAdmin) {
+        console.log(`[Status Update] Job ${jobId} not in storage, querying Supabase...`);
+        const { data, error } = await supabaseAdmin
+          .from('jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+        
+        if (!error && data) {
+          supabaseJob = data;
+          console.log(`[Status Update] Found job ${jobId} in Supabase, status: ${data.status}`);
+        }
+      }
 
-      if (!job) {
+      if (!job && !supabaseJob) {
         return res.status(404).json({ 
           error: "Job not found",
           code: "JOB_NOT_FOUND"
         });
       }
 
-      if (job.driverId !== driver.id) {
+      // Use Supabase data if local job not found
+      const effectiveDriverId = job?.driverId || supabaseJob?.driver_id;
+      const effectiveStatus = job?.status || supabaseJob?.status;
+      const existingPhotoUrl = job?.podPhotoUrl || supabaseJob?.pod_photo_url;
+      const existingSignatureUrl = job?.podSignatureUrl || supabaseJob?.pod_signature_url;
+
+      if (effectiveDriverId !== driver.id) {
         return res.status(403).json({ 
           error: "This job is not assigned to you",
           code: "NOT_YOUR_JOB"
         });
       }
 
-      const allowedTransitions = VALID_JOB_TRANSITIONS[job.status as JobStatus] || [];
+      const allowedTransitions = VALID_JOB_TRANSITIONS[effectiveStatus as JobStatus] || [];
       
       if (!allowedTransitions.includes(status)) {
         return res.status(400).json({ 
-          error: `Cannot transition from '${job.status}' to '${status}'`,
+          error: `Cannot transition from '${effectiveStatus}' to '${status}'`,
           code: "INVALID_TRANSITION",
-          currentStatus: job.status,
+          currentStatus: effectiveStatus,
           allowedTransitions,
         });
       }
 
       // Require POD (photo or signature) before marking as delivered
       if (status === "delivered") {
-        if (!job.podPhotoUrl && !job.podSignatureUrl) {
+        if (!existingPhotoUrl && !existingSignatureUrl) {
           return res.status(400).json({ 
             error: "Proof of Delivery (photo or signature) is required before marking as delivered",
             code: "POD_REQUIRED",
