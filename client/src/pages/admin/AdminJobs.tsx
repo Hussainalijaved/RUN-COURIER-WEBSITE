@@ -270,59 +270,33 @@ export default function AdminJobs() {
   });
 
   const batchAssignMutation = useMutation({
-    mutationFn: async ({ jobIds, driverId, driverPrice, assignedBy }: { jobIds: string[]; driverId: string; driverPrice: string; assignedBy: string }) => {
-      // Use Supabase Edge Function for each job assignment (works with Hostinger-hosted website)
-      const results = await Promise.allSettled(
-        jobIds.map(jobId => 
-          supabaseFunctions.assignDriver({
-            jobId,
-            driverId,
-            driverPrice,
-            dispatcherId: assignedBy,
-          })
-        )
-      );
+    mutationFn: async ({ jobIds, driverId, driverPrice }: { jobIds: string[]; driverId: string; driverPrice: string }) => {
+      // Use transactional Supabase Edge Function for batch assignment
+      const driverPriceNum = parseFloat(driverPrice);
+      const jobs = jobIds.map(jobId => ({
+        jobId,
+        driverPrice: driverPriceNum,
+      }));
       
-      const successCount = results.filter(r => r.status === 'fulfilled').length;
-      const errors = results
-        .map((r, i) => ({ jobId: jobIds[i], result: r }))
-        .filter(({ result }) => result.status === 'rejected')
-        .map(({ jobId, result }) => ({
-          jobId,
-          error: (result as PromiseRejectedResult).reason?.message || 'Unknown error'
-        }));
-      
-      return { successCount, errorCount: errors.length, errors };
+      return supabaseFunctions.batchAssignDriver({
+        driverId,
+        jobs,
+        notes: `Batch assignment of ${jobIds.length} jobs by admin`,
+      });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
-      const successCount = data.successCount || 0;
-      const errorCount = data.errorCount || 0;
-      const errors = data.errors || [];
       
-      if (errorCount > 0) {
-        // Keep dialog open and show which jobs failed
-        setBatchErrors(errors);
-        // Remove successfully assigned jobs from selection
-        const failedJobIds = new Set<string>(errors.map((e: { jobId: string }) => e.jobId));
-        setSelectedJobIds(failedJobIds);
-        toast({ 
-          title: `${successCount} assigned, ${errorCount} failed`, 
-          description: 'Some jobs could not be assigned. See the list below.',
-          variant: 'destructive'
-        });
-      } else {
-        toast({ 
-          title: 'Batch assignment complete', 
-          description: `${successCount} job${successCount > 1 ? 's' : ''} assigned to the driver.` 
-        });
-        setBatchAssignDialogOpen(false);
-        setBatchDriverId('');
-        setBatchDriverPrice('');
-        setBatchErrors([]);
-        setSelectedJobIds(new Set());
-      }
+      toast({ 
+        title: 'Batch assignment complete', 
+        description: `${data.totalJobs} job${data.totalJobs > 1 ? 's' : ''} assigned to the driver. Total: £${data.totalDriverPrice.toFixed(2)}` 
+      });
+      setBatchAssignDialogOpen(false);
+      setBatchDriverId('');
+      setBatchDriverPrice('');
+      setBatchErrors([]);
+      setSelectedJobIds(new Set());
     },
     onError: (error: any) => {
       toast({ title: 'Failed to batch assign', description: error?.message || 'Please try again', variant: 'destructive' });
@@ -1760,12 +1734,11 @@ export default function AdminJobs() {
               </Button>
               <Button 
                 onClick={() => {
-                  if (!batchDriverId || !batchDriverPrice || !user?.id) return;
+                  if (!batchDriverId || !batchDriverPrice) return;
                   batchAssignMutation.mutate({
                     jobIds: Array.from(selectedJobIds),
                     driverId: batchDriverId,
                     driverPrice: batchDriverPrice,
-                    assignedBy: user.id
                   });
                 }}
                 disabled={!batchDriverId || !batchDriverPrice || batchAssignMutation.isPending}

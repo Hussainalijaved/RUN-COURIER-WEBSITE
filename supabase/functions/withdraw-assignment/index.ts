@@ -7,7 +7,8 @@ const corsHeaders = {
 };
 
 interface WithdrawAssignmentRequest {
-  jobId: string;
+  jobId?: string;
+  batchItemIds?: string[];
   reason?: string;
 }
 
@@ -56,10 +57,70 @@ serve(async (req) => {
       });
     }
 
-    const { jobId, reason }: WithdrawAssignmentRequest = await req.json();
+    const { jobId, batchItemIds, reason }: WithdrawAssignmentRequest = await req.json();
+
+    if (batchItemIds && batchItemIds.length > 0) {
+      const { data: result, error: rpcError } = await supabaseClient.rpc('withdraw_batch_items', {
+        p_batch_item_ids: batchItemIds,
+        p_withdrawn_by: user.id,
+        p_reason: reason || null
+      });
+
+      if (rpcError) {
+        console.error("Batch withdraw RPC error:", rpcError);
+        return new Response(JSON.stringify({ error: rpcError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const withdrawnJobIds = result.items
+        .filter((item: any) => item.status === 'withdrawn')
+        .map((item: any) => item.job_id);
+
+      if (withdrawnJobIds.length > 0) {
+        const { data: withdrawnJobs } = await supabaseClient
+          .from("jobs")
+          .select("tracking_number, driver_id")
+          .in("id", withdrawnJobIds);
+
+        const driverIds = [...new Set(withdrawnJobs?.map(j => j.driver_id).filter(Boolean))];
+        
+        for (const driverId of driverIds) {
+          const driverJobs = withdrawnJobs?.filter(j => j.driver_id === driverId) || [];
+          try {
+            await supabaseClient.from("notifications").insert({
+              user_id: driverId,
+              title: `${driverJobs.length} Job(s) Withdrawn`,
+              message: `The following jobs have been withdrawn: ${driverJobs.map(j => j.tracking_number).join(", ")}`,
+              type: "job_withdrawn",
+              data: {
+                job_count: driverJobs.length,
+                tracking_numbers: driverJobs.map(j => j.tracking_number),
+                reason: reason || null
+              },
+              is_read: false,
+            });
+          } catch (notifError) {
+            console.error("Failed to create withdrawal notification:", notifError);
+          }
+        }
+      }
+
+      console.log(`[Withdraw] Batch withdrawal: ${result.withdrawn_count} jobs withdrawn by admin ${user.id}`);
+
+      return new Response(JSON.stringify({
+        success: true,
+        withdrawnCount: result.withdrawn_count,
+        items: result.items,
+        message: `${result.withdrawn_count} job(s) withdrawn successfully.`,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!jobId) {
-      return new Response(JSON.stringify({ error: "jobId is required" }), {
+      return new Response(JSON.stringify({ error: "jobId or batchItemIds is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -123,6 +184,41 @@ serve(async (req) => {
 
     if (assignmentUpdateError) {
       console.error("Failed to update job_assignments:", assignmentUpdateError);
+    }
+
+    const { error: batchItemUpdateError } = await supabaseClient
+      .from("job_assignment_batch_items")
+      .update({
+        status: "withdrawn",
+        withdrawn_at: new Date().toISOString(),
+        withdrawn_by: user.id,
+        withdrawal_reason: reason || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("job_id", jobId)
+      .in("status", ["pending", "assigned", "accepted"]);
+
+    if (batchItemUpdateError) {
+      console.error("Failed to update job_assignment_batch_items:", batchItemUpdateError);
+    }
+
+    if (previousDriverId) {
+      try {
+        await supabaseClient.from("notifications").insert({
+          user_id: previousDriverId,
+          title: "Job Withdrawn",
+          message: `Job ${job.tracking_number} has been withdrawn.`,
+          type: "job_withdrawn",
+          data: {
+            job_id: jobId,
+            tracking_number: job.tracking_number,
+            reason: reason || null
+          },
+          is_read: false,
+        });
+      } catch (notifError) {
+        console.error("Failed to create withdrawal notification:", notifError);
+      }
     }
 
     console.log(`[Withdraw] Job ${jobId} withdrawn from driver ${previousDriverId} by admin ${user.id}`);

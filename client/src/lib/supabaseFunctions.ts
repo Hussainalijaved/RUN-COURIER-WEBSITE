@@ -129,8 +129,31 @@ export interface DeleteDriverData {
 }
 
 export interface WithdrawAssignmentData {
-  jobId: string;
+  jobId?: string;
+  batchItemIds?: string[];
   reason?: string;
+}
+
+export interface BatchAssignDriverData {
+  driverId: string;
+  jobs: { jobId: string; driverPrice: number }[];
+  notes?: string;
+}
+
+export interface BatchAssignResponse {
+  success: boolean;
+  batchId: string;
+  totalJobs: number;
+  totalDriverPrice: number;
+  jobs: { job_id: string; status: string; driver_price: number }[];
+  trackingNumbers: string[];
+}
+
+export interface WithdrawBatchResponse {
+  success: boolean;
+  withdrawnCount: number;
+  items: { item_id: string; job_id?: string; status: string; error?: string }[];
+  message: string;
 }
 
 export interface CreateDriverData {
@@ -191,6 +214,17 @@ export const supabaseFunctions = {
 
   async withdrawAssignment(data: WithdrawAssignmentData) {
     return callEdgeFunction('withdraw-assignment', data);
+  },
+
+  async batchAssignDriver(data: BatchAssignDriverData): Promise<BatchAssignResponse> {
+    return callEdgeFunction<BatchAssignResponse>('batch-assign-driver', data);
+  },
+
+  async withdrawBatchItems(batchItemIds: string[], reason?: string): Promise<WithdrawBatchResponse> {
+    return callEdgeFunction<WithdrawBatchResponse>('withdraw-assignment', {
+      batchItemIds,
+      reason,
+    });
   },
 };
 

@@ -52,6 +52,15 @@ Driver IDs are permanently formatted as `RC` + 2 digits + 1 letter (e.g., RC02C)
 ### Admin Job Assignment
 Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments, with assignment statuses and history tracked.
 
+### Batch Job Assignment
+Admins can assign multiple jobs to a single driver in one action while maintaining individual job records:
+- **Database Tables**: `job_assignment_batches` (tracks batch metadata) and `job_assignment_batch_items` (individual jobs within a batch)
+- **Transactional Operations**: All-or-nothing assignment via PostgreSQL functions (`batch_assign_driver`, `withdraw_batch_items`)
+- **Driver Experience**: Drivers see jobs individually via existing RLS policies (no batch awareness on driver side)
+- **Notifications**: Grouped notification on assign, individual notifications on withdraw
+- **Admin UI**: Multi-select jobs in AdminJobs page, set single driver price applied to all selected jobs
+- **Edge Functions**: `batch-assign-driver` for transactional batch assignment, `withdraw-assignment` supports both single job and batch item withdrawal
+
 ### Supabase-Only Architecture
 Supabase is the single source of truth for all data, ensuring consistency between the web and mobile applications. Key architectural details include:
 - `drivers.id` directly maps to `auth.uid()` from Supabase Auth.
