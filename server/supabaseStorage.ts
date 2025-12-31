@@ -754,10 +754,17 @@ export class SupabaseStorage implements IStorage {
     const supabase = this.checkSupabase();
     const id = randomUUID();
     
+    // customer_id must be a valid UUID or null - not a string like "admin-created"
+    const isValidUUID = (str: string | null | undefined): boolean => {
+      if (!str) return false;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(str);
+    };
+    
     const dbJob = {
       id,
       tracking_number: insertJob.trackingNumber,
-      customer_id: insertJob.customerId,
+      customer_id: isValidUUID(insertJob.customerId) ? insertJob.customerId : null,
       driver_id: insertJob.driverId || null,
       dispatcher_id: insertJob.dispatcherId || null,
       vendor_id: insertJob.vendorId || null,
