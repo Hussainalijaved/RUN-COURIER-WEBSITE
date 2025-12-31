@@ -1559,4 +1559,81 @@ export function registerMobileRoutes(app: Express): void {
       });
     })
   );
+
+  // Withdraw from an accepted job
+  app.post("/api/mobile/v1/driver/jobs/:jobId/withdraw",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { jobId } = req.params;
+      const { reason } = req.body;
+      
+      // Get the job
+      const job = await storage.getJob(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Job not found" 
+        });
+      }
+      
+      // Check driver owns this job
+      if (job.driverId !== driver.id) {
+        return res.status(403).json({ 
+          success: false, 
+          error: "This job is not assigned to you" 
+        });
+      }
+      
+      // Can only withdraw from certain statuses (not if already delivered or cancelled)
+      const withdrawableStatuses = ["accepted", "assigned", "on_the_way_pickup", "arrived_pickup", "on_the_way", "on_the_way_delivery"];
+      if (!withdrawableStatuses.includes(job.status)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Cannot withdraw from job with status: ${job.status}` 
+        });
+      }
+      
+      // Find the active assignment for this driver and job
+      const assignments = await storage.getJobAssignments({ 
+        jobId,
+        driverId: driver.id 
+      });
+      const activeAssignment = assignments.find(a => a.status === "accepted");
+      
+      // Update assignment to withdrawn if exists
+      if (activeAssignment) {
+        await storage.updateJobAssignment(activeAssignment.id, { 
+          status: "cancelled" as any,
+          cancelledAt: new Date(),
+          cancellationReason: reason || "Withdrawn by driver"
+        });
+      }
+      
+      // Reset the job - remove driver and set status back to pending
+      await storage.updateJob(jobId, {
+        driverId: undefined,
+        driverPrice: undefined,
+        status: "pending" as any
+      });
+      
+      // Create notification for admin
+      await storage.createNotification({
+        userId: "admin", // Admin notification
+        title: "Driver Withdrew from Job",
+        message: `Driver ${driver.driverCode || driver.fullName || "Unknown"} withdrew from job ${job.trackingNumber}. Reason: ${reason || "No reason provided"}`,
+        type: "driver_withdrew_job",
+        data: { jobId, driverId: driver.id, reason: reason || null },
+      });
+      
+      console.log(`[Mobile] Driver ${driver.driverCode} withdrew from job ${job.trackingNumber}. Reason: ${reason || "None"}`);
+      
+      res.json({
+        success: true,
+        message: "Successfully withdrew from job"
+      });
+    })
+  );
 }
