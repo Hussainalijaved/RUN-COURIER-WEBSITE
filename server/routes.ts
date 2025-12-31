@@ -612,16 +612,28 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
     
+    // CRITICAL: driverPrice is REQUIRED - reject assignments without it
+    // Drivers must ONLY see admin-set prices, never customer pricing
+    if (!driverPrice || parseFloat(driverPrice) <= 0) {
+      return res.status(400).json({ 
+        error: "Driver price is required. Please specify the amount the driver will be paid for this job." 
+      });
+    }
+    const finalDriverPrice = String(driverPrice);
+    
     const job = await storage.assignDriver(req.params.id, driverId, dispatcherId);
     if (!job) {
       return res.status(404).json({ error: "Failed to assign job" });
     }
     
+    // CRITICAL: Update job with driver_price so driver sees correct amount
+    // This must happen BEFORE driver fetches the job
+    await storage.updateJob(req.params.id, { driverPrice: finalDriverPrice });
+    console.log(`[Jobs] Updated job ${job.id} with driver_price: £${finalDriverPrice}`);
+    
     // Also create a job assignment record so it appears in mobile app's job offers
     if (driverId && driver) {
       try {
-        const finalDriverPrice = driverPrice || job.driverPrice || job.totalPrice || "0";
-        
         const assignment = await storage.createJobAssignment({
           jobId: job.id,
           driverId: driver.id,
@@ -630,7 +642,7 @@ export async function registerRoutes(
           status: "sent", // Immediately sent so driver sees it
           expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
         });
-        console.log(`[Jobs] Created job assignment ${assignment.id} for driver ${driver.driverCode || driver.id}`);
+        console.log(`[Jobs] Created job assignment ${assignment.id} for driver ${driver.driverCode || driver.id} with price £${finalDriverPrice}`);
       } catch (err) {
         console.error(`[Jobs] Failed to create job assignment:`, err);
         // Continue anyway - the job is still assigned
@@ -649,6 +661,7 @@ export async function registerRoutes(
     });
     // Send specific notification to the assigned driver
     if (job.driverId) {
+      // CRITICAL: Use finalDriverPrice here, not job.driverPrice which may be stale
       broadcastJobAssigned({
         id: job.id,
         trackingNumber: job.trackingNumber,
@@ -657,9 +670,9 @@ export async function registerRoutes(
         pickupAddress: job.pickupAddress,
         deliveryAddress: job.deliveryAddress,
         vehicleType: job.vehicleType,
-        driverPrice: job.driverPrice,
+        driverPrice: finalDriverPrice, // Use admin-set price, not customer price
       });
-      console.log(`[Jobs] Job ${job.id} assigned to driver ${job.driverId}, notification sent`);
+      console.log(`[Jobs] Job ${job.id} assigned to driver ${job.driverId} with driver_price £${finalDriverPrice}, notification sent`);
       
       // Send push notification to driver's mobile device
       sendJobOfferNotification(job.driverId, {
@@ -667,7 +680,7 @@ export async function registerRoutes(
         trackingNumber: job.trackingNumber,
         pickupAddress: job.pickupAddress,
         deliveryAddress: job.deliveryAddress,
-        driverPrice: job.driverPrice,
+        driverPrice: finalDriverPrice, // Use admin-set price, not customer price
         vehicleType: job.vehicleType,
       }).then(result => {
         if (result.success) {
@@ -675,7 +688,10 @@ export async function registerRoutes(
         }
       }).catch(err => console.error('[Jobs] Failed to send push notification:', err));
     }
-    res.json(job);
+    
+    // Return the updated job with correct driver price
+    const updatedJob = await storage.getJob(req.params.id);
+    res.json(updatedJob || job);
   }));
 
   app.patch("/api/jobs/:id/pod", asyncHandler(async (req, res) => {

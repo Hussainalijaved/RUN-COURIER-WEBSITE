@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { initGoogleMaps, getMapCenter, geocodePostcode } from '@/lib/maps';
 import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -41,6 +42,7 @@ export default function AdminMap() {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [assigningJobId, setAssigningJobId] = useState<number | null>(null);
   const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
+  const [driverPriceForAssign, setDriverPriceForAssign] = useState<string>('');
   const { toast } = useToast();
 
   const { 
@@ -65,8 +67,8 @@ export default function AdminMap() {
   });
 
   const assignJobMutation = useMutation({
-    mutationFn: async ({ jobId, driverId }: { jobId: number; driverId: string }) => {
-      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId });
+    mutationFn: async ({ jobId, driverId, driverPrice }: { jobId: number; driverId: string; driverPrice: string }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId, driverPrice });
     },
     onSuccess: () => {
       toast({ title: 'Job assigned successfully' });
@@ -74,6 +76,7 @@ export default function AdminMap() {
       setShowAssignDialog(false);
       setAssigningJobId(null);
       setSelectedDriverForAssign('');
+      setDriverPriceForAssign('');
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to assign job', description: error.message, variant: 'destructive' });
@@ -449,11 +452,18 @@ export default function AdminMap() {
       setAssigningJobId(null);
     }
     setShowAssignDialog(open);
+    if (!open) {
+      setDriverPriceForAssign('');
+    }
   };
 
   const confirmAssignJob = () => {
-    if (assigningJobId && selectedDriverForAssign) {
-      assignJobMutation.mutate({ jobId: assigningJobId, driverId: selectedDriverForAssign });
+    if (assigningJobId && selectedDriverForAssign && driverPriceForAssign) {
+      assignJobMutation.mutate({ 
+        jobId: assigningJobId, 
+        driverId: selectedDriverForAssign,
+        driverPrice: driverPriceForAssign
+      });
     }
   };
 
@@ -823,37 +833,59 @@ export default function AdminMap() {
               Select a verified driver to assign this job to. Online drivers are marked with a badge.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Select value={selectedDriverForAssign} onValueChange={setSelectedDriverForAssign}>
-              <SelectTrigger data-testid="select-driver-for-assign">
-                <SelectValue placeholder="Select a driver" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeDrivers.length > 0 ? (
-                  activeDrivers.map((driver) => (
-                    <SelectItem key={driver.id} value={driver.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        {driver.driverCode && (
-                          <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
-                        )}
-                        <span>{driver.fullName || driver.vehicleRegistration || 'Driver'}</span>
-                        {driver.isAvailable && (
-                          <Badge variant="secondary" className="text-xs text-green-600">Online</Badge>
-                        )}
-                        <span className="text-muted-foreground text-xs capitalize">
-                          ({driver.vehicleType?.replace('_', ' ')})
-                        </span>
-                      </div>
+          <div className="py-4 space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Driver</label>
+              <Select value={selectedDriverForAssign} onValueChange={setSelectedDriverForAssign}>
+                <SelectTrigger data-testid="select-driver-for-assign">
+                  <SelectValue placeholder="Select a driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeDrivers.length > 0 ? (
+                    activeDrivers.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          {driver.driverCode && (
+                            <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                          )}
+                          <span>{driver.fullName || driver.vehicleRegistration || 'Driver'}</span>
+                          {driver.isAvailable && (
+                            <Badge variant="secondary" className="text-xs text-green-600">Online</Badge>
+                          )}
+                          <span className="text-muted-foreground text-xs capitalize">
+                            ({driver.vehicleType?.replace('_', ' ')})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No verified drivers
                     </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="none" disabled>
-                    No verified drivers
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Driver Payment (Required)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter driver payment amount"
+                  value={driverPriceForAssign}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDriverPriceForAssign(e.target.value)}
+                  className="pl-7"
+                  data-testid="input-driver-price-assign"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                This is the amount the driver will see and be paid. Required before driver can accept.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => handleDialogClose(false)}>
@@ -861,7 +893,7 @@ export default function AdminMap() {
             </Button>
             <Button 
               onClick={confirmAssignJob} 
-              disabled={!selectedDriverForAssign || assignJobMutation.isPending}
+              disabled={!selectedDriverForAssign || !driverPriceForAssign || assignJobMutation.isPending}
               data-testid="button-confirm-assign"
             >
               {assignJobMutation.isPending ? (
