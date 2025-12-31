@@ -109,28 +109,36 @@ serve(async (req) => {
       });
     }
 
-    const jobTotalPrice = parseFloat(existingJob.total_price);
-    let validatedDriverPrice = jobTotalPrice;
-    
-    if (driverPrice) {
-      const parsedDriverPrice = parseFloat(driverPrice);
-      if (isNaN(parsedDriverPrice) || parsedDriverPrice < 0) {
-        return new Response(JSON.stringify({ error: "Invalid driver price" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (parsedDriverPrice > jobTotalPrice * 1.5) {
-        return new Response(JSON.stringify({ 
-          error: "Driver price cannot exceed 150% of job total",
-          code: "DRIVER_PRICE_TOO_HIGH"
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      validatedDriverPrice = parsedDriverPrice;
+    // CRITICAL: Driver price MUST be provided by admin - never default to customer price
+    if (!driverPrice) {
+      return new Response(JSON.stringify({ 
+        error: "Driver price is required",
+        code: "DRIVER_PRICE_REQUIRED"
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    const parsedDriverPrice = parseFloat(driverPrice);
+    if (isNaN(parsedDriverPrice) || parsedDriverPrice < 0) {
+      return new Response(JSON.stringify({ error: "Invalid driver price" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    const jobTotalPrice = parseFloat(existingJob.total_price || "0");
+    if (jobTotalPrice > 0 && parsedDriverPrice > jobTotalPrice * 1.5) {
+      return new Response(JSON.stringify({ 
+        error: "Driver price cannot exceed 150% of job total",
+        code: "DRIVER_PRICE_TOO_HIGH"
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const validatedDriverPrice = parsedDriverPrice;
 
     // CRITICAL FIX: Use driverUserId (auth.uid) so RLS policy "auth.uid() = driver_id" works
     // This allows drivers to see their assigned jobs in the mobile app
@@ -219,7 +227,19 @@ serve(async (req) => {
       console.error("Failed to send push notification:", pushError);
     }
 
-    return new Response(JSON.stringify(updatedJob), {
+    // SECURITY: Only return driver-safe fields - NEVER include total_price/customer pricing
+    const safeResponse = {
+      success: true,
+      jobId: updatedJob.id,
+      trackingNumber: updatedJob.tracking_number,
+      status: updatedJob.status,
+      driverId: driverUserId,
+      driverPrice: validatedDriverPrice.toFixed(2),
+      pickupAddress: updatedJob.pickup_address,
+      deliveryAddress: updatedJob.delivery_address,
+    };
+    
+    return new Response(JSON.stringify(safeResponse), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

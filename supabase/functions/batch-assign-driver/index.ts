@@ -188,12 +188,22 @@ serve(async (req) => {
       console.error("Failed to send push notification:", pushError);
     }
 
+    // SECURITY: Only return driver-safe fields - NEVER include total_price/customer pricing
+    const safeJobs = result.jobs.map((job: any) => ({
+      jobId: job.job_id || job.id,
+      trackingNumber: job.tracking_number,
+      status: job.status,
+      driverPrice: job.driver_price,
+      pickupAddress: job.pickup_address,
+      deliveryAddress: job.delivery_address,
+    }));
+    
     return new Response(JSON.stringify({
       success: true,
       batchId: result.batch_id,
       totalJobs: result.total_jobs,
       totalDriverPrice: result.total_driver_price,
-      jobs: result.jobs,
+      jobs: safeJobs,
       trackingNumbers
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
