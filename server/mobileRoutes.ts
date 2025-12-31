@@ -528,6 +528,13 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
+      // Include driver's current location for map display
+      const driverLocation = {
+        latitude: driver.currentLatitude,
+        longitude: driver.currentLongitude,
+        lastUpdate: driver.lastLocationUpdate,
+      };
+
       res.json({
         id: job.id,
         trackingNumber: job.trackingNumber,
@@ -555,6 +562,8 @@ export function registerMobileRoutes(app: Express): void {
         podSignatureUrl: job.podSignatureUrl,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
+        // Driver location for map display
+        driverLocation,
       });
     })
   );
