@@ -806,6 +806,7 @@ export class SupabaseStorage implements IStorage {
       central_london_charge: insertJob.centralLondonCharge || '0',
       waiting_time_charge: insertJob.waitingTimeCharge || '0',
       total_price: insertJob.totalPrice,
+      price_customer: insertJob.totalPrice || '0',
       driver_price: insertJob.driverPrice || null,
       payment_status: insertJob.paymentStatus || 'pending',
       payment_intent_id: insertJob.paymentIntentId || null,
