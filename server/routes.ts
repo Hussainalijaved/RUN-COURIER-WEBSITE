@@ -312,13 +312,77 @@ export async function registerRoutes(
   }));
 
   // Track by tracking number - must be before :id route
-  // Query database directly for public tracking (doesn't require auth)
+  // Query Supabase directly for public tracking (doesn't require auth)
   app.get("/api/jobs/track/:trackingNumber", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    
+    const trackingNumber = req.params.trackingNumber.toUpperCase();
+    
+    // Query Supabase where jobs are actually stored
+    if (supabaseAdmin) {
+      const { data: job, error } = await supabaseAdmin
+        .from('jobs')
+        .select(`
+          id,
+          tracking_number,
+          status,
+          vehicle_type,
+          pickup_address,
+          pickup_postcode,
+          delivery_address,
+          delivery_postcode,
+          recipient_name,
+          estimated_delivery_time,
+          created_at,
+          driver_id
+        `)
+        .eq('tracking_number', trackingNumber)
+        .single();
+      
+      if (error || !job) {
+        console.log(`[Track] Job not found for tracking number ${trackingNumber}:`, error?.message);
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      // Get driver info if assigned
+      let driverName = null;
+      let driverPhone = null;
+      if (job.driver_id) {
+        const { data: driver } = await supabaseAdmin
+          .from('drivers')
+          .select('full_name, phone')
+          .eq('id', job.driver_id)
+          .single();
+        
+        if (driver) {
+          driverName = driver.full_name;
+          driverPhone = driver.phone;
+        }
+      }
+      
+      // Map snake_case to camelCase for frontend
+      return res.json({
+        id: job.id,
+        trackingNumber: job.tracking_number,
+        status: job.status,
+        vehicleType: job.vehicle_type,
+        pickupAddress: job.pickup_address,
+        pickupPostcode: job.pickup_postcode,
+        deliveryAddress: job.delivery_address,
+        deliveryPostcode: job.delivery_postcode,
+        recipientName: job.recipient_name,
+        estimatedDeliveryTime: job.estimated_delivery_time,
+        createdAt: job.created_at,
+        driverName,
+        driverPhone,
+      });
+    }
+    
+    // Fallback to Drizzle if Supabase not available
     const { db } = await import("./db");
     const { eq } = await import("drizzle-orm");
     const { jobs } = await import("@shared/schema");
     
-    const trackingNumber = req.params.trackingNumber.toUpperCase();
     const [job] = await db.select().from(jobs).where(eq(jobs.trackingNumber, trackingNumber)).limit(1);
     
     if (!job) {
