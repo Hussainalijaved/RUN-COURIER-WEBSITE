@@ -48,6 +48,15 @@ Approved business customers can utilize a "Pay Later" option for bookings, leadi
 ### Pricing Engine
 A TypeScript-based pricing engine calculates delivery costs, considering vehicle type, distance, rush hour surcharges, congestion charges, multi-drop fees, and waiting times. It includes fixed base charges for different vehicle types. Pricing configurations are synchronized between client and server.
 
+### Price Isolation (Critical Security)
+Strict separation between customer and driver pricing:
+- **customer_price** (stored as `total_price`): Visible ONLY to admin and the job's customer
+- **driver_price**: Visible ONLY to admin and the assigned driver
+- **Database Protection**: RLS policies + role-specific views (`admin_jobs_view`, `driver_jobs_view`, `customer_jobs_view`)
+- **API Protection**: All mobile endpoints use explicit column selection, NEVER `select('*')`
+- **Realtime Protection**: WebSocket payloads only include `driver_price` for driver channels
+- **Verification**: See `PRICE_ISOLATION_VERIFICATION.md` for audit checklist
+
 ### Document Upload
 A secure backend API (`POST /api/documents/upload`) handles document uploads (various image and PDF formats up to 10MB) using `multer`, with robust security measures, storing files in a structured directory.
 

@@ -534,25 +534,64 @@ export function registerMobileRoutes(app: Express): void {
       let mobileJobs: any[] = [];
 
       // CRITICAL: Query Supabase FIRST as it's the source of truth
+      // SECURITY: Explicitly select ONLY driver-safe columns - NEVER include total_price/base_price/customer pricing
       if (supabaseAdmin) {
-        console.log("[Mobile Jobs] Querying Supabase for jobs...");
+        console.log("[Mobile Jobs] Querying Supabase for jobs (driver-safe columns only)...");
         const { data: supabaseJobs, error: supabaseError } = await supabaseAdmin
           .from('jobs')
-          .select('*')
+          .select(`
+            id,
+            tracking_number,
+            status,
+            driver_price,
+            vehicle_type,
+            priority,
+            pickup_address,
+            pickup_postcode,
+            pickup_latitude,
+            pickup_longitude,
+            pickup_instructions,
+            pickup_contact_name,
+            pickup_contact_phone,
+            delivery_address,
+            delivery_postcode,
+            delivery_latitude,
+            delivery_longitude,
+            delivery_instructions,
+            recipient_name,
+            recipient_phone,
+            sender_name,
+            sender_phone,
+            parcel_description,
+            parcel_weight,
+            parcel_dimensions,
+            distance_miles,
+            scheduled_pickup_time,
+            estimated_delivery_time,
+            actual_pickup_time,
+            actual_delivery_time,
+            pod_signature_url,
+            pod_photo_url,
+            pod_notes,
+            is_multi_drop,
+            is_return_trip,
+            is_urgent,
+            is_fragile,
+            requires_signature,
+            created_at,
+            updated_at
+          `)
           .eq('driver_id', driver.id)
+          .not('driver_price', 'is', null)
           .order('created_at', { ascending: false });
         
         if (supabaseError) {
           console.log("[Mobile Jobs] Supabase query error:", supabaseError.message);
         } else if (supabaseJobs && supabaseJobs.length > 0) {
-          console.log(`[Mobile Jobs] Found ${supabaseJobs.length} jobs in Supabase`);
+          console.log(`[Mobile Jobs] Found ${supabaseJobs.length} jobs in Supabase (already filtered to driver_price != null)`);
           
           let filteredJobs = supabaseJobs;
-          
-          // CRITICAL: Only show jobs to drivers that have a driver_price set by admin
-          // Jobs without driver_price should not appear in the driver's app
-          filteredJobs = filteredJobs.filter(j => j.driver_price != null);
-          console.log(`[Mobile Jobs] After driver_price filter: ${filteredJobs.length} jobs with admin-set price`);
+          // NOTE: driver_price filter already applied in query (.not('driver_price', 'is', null))
           
           // Apply status filters
           // "active" = jobs the driver has ACCEPTED and is working on
@@ -650,12 +689,62 @@ export function registerMobileRoutes(app: Express): void {
       let job = await storage.getJob(jobId);
       let supabaseJob: any = null;
       
-      // If not found, query Supabase directly
+      // If not found, query Supabase directly with DRIVER-SAFE columns only
+      // SECURITY: Never select total_price, base_price, or other customer pricing columns
       if (!job && supabaseAdmin) {
-        console.log(`[Job Details] Job ${jobId} not in storage, querying Supabase...`);
+        console.log(`[Job Details] Job ${jobId} not in storage, querying Supabase (driver-safe columns)...`);
         const { data, error } = await supabaseAdmin
           .from('jobs')
-          .select('*')
+          .select(`
+            id,
+            tracking_number,
+            status,
+            driver_id,
+            driver_price,
+            vehicle_type,
+            priority,
+            pickup_address,
+            pickup_postcode,
+            pickup_latitude,
+            pickup_longitude,
+            pickup_instructions,
+            pickup_contact_name,
+            pickup_contact_phone,
+            delivery_address,
+            delivery_postcode,
+            delivery_latitude,
+            delivery_longitude,
+            delivery_instructions,
+            recipient_name,
+            recipient_phone,
+            sender_name,
+            sender_phone,
+            customer_name,
+            customer_phone,
+            customer_email,
+            parcel_description,
+            parcel_weight,
+            parcel_dimensions,
+            distance_miles,
+            scheduled_pickup_time,
+            estimated_delivery_time,
+            actual_pickup_time,
+            actual_delivery_time,
+            pod_signature_url,
+            pod_photo_url,
+            pod_photos,
+            pod_notes,
+            pod_recipient_name,
+            delivered_at,
+            is_multi_drop,
+            is_return_trip,
+            is_urgent,
+            is_fragile,
+            requires_signature,
+            notes,
+            created_at,
+            updated_at
+          `)
           .eq('id', jobId)
           .single();
         
@@ -790,11 +879,12 @@ export function registerMobileRoutes(app: Express): void {
       let job = await storage.getJob(jobId);
       let supabaseJob: any = null;
       
+      // SECURITY: Only select fields needed for validation - NEVER total_price/customer pricing
       if (!job && supabaseAdmin) {
         console.log(`[Status Update] Job ${jobId} not in storage, querying Supabase...`);
         const { data, error } = await supabaseAdmin
           .from('jobs')
-          .select('*')
+          .select('id, driver_id, status, pod_photo_url, pod_signature_url')
           .eq('id', jobId)
           .single();
         
@@ -1016,11 +1106,12 @@ export function registerMobileRoutes(app: Express): void {
       let job = await storage.getJob(jobId);
       let supabaseJob: any = null;
       
+      // SECURITY: Only select fields needed for POD validation - NEVER total_price/customer pricing
       if (!job && supabaseAdmin) {
         console.log(`[POD Upload] Job ${jobId} not in local storage, querying Supabase...`);
         const { data, error } = await supabaseAdmin
           .from('jobs')
-          .select('*')
+          .select('id, driver_id, status, pod_photo_url, pod_photos, pod_signature_url, pod_recipient_name, pod_notes')
           .eq('id', jobId)
           .single();
         
@@ -1171,11 +1262,12 @@ export function registerMobileRoutes(app: Express): void {
       let job = await storage.getJob(jobId);
       let supabaseJob: any = null;
       
+      // SECURITY: Only select fields needed for validation - NEVER total_price/customer pricing
       if (!job && supabaseAdmin) {
         console.log(`[POD File Upload] Job ${jobId} not in local storage, querying Supabase...`);
         const { data, error } = await supabaseAdmin
           .from('jobs')
-          .select('*')
+          .select('id, driver_id, status, pod_photo_url, pod_signature_url, pod_recipient_name')
           .eq('id', jobId)
           .single();
         
