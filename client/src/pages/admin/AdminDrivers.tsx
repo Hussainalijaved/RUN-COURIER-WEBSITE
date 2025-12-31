@@ -227,22 +227,13 @@ export default function AdminDrivers() {
 
   const updateDriverMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Driver> }) => {
-      // Use Supabase Edge Function for driver updates (works with Hostinger-hosted website)
-      return supabaseFunctions.updateDriver({
-        driverId: id,
-        isVerified: data.isVerified ?? undefined,
-        isAvailable: data.isAvailable ?? undefined,
-        isActive: data.isActive ?? undefined,
-        fullName: data.fullName ?? undefined,
-        phone: data.phone ?? undefined,
-        address: data.address ?? undefined,
-        postcode: data.postcode ?? undefined,
-        vehicleType: data.vehicleType ?? undefined,
-        vehicleRegistration: data.vehicleRegistration ?? undefined,
-        vehicleMake: data.vehicleMake ?? undefined,
-        vehicleModel: data.vehicleModel ?? undefined,
-        vehicleColor: data.vehicleColor ?? undefined,
-      });
+      // Use backend API for driver updates - more reliable than Edge Functions
+      const response = await apiRequest('PATCH', `/api/drivers/${id}`, data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update driver');
+      }
+      return response.json();
     },
     onSuccess: (updatedDriver: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
@@ -300,7 +291,13 @@ export default function AdminDrivers() {
 
   const deleteDriverMutation = useMutation({
     mutationFn: async (id: string) => {
-      return supabaseFunctions.deleteDriver({ driverId: id });
+      // Use backend API for driver deletion
+      const response = await apiRequest('DELETE', `/api/drivers/${id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete driver');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/drivers' });
