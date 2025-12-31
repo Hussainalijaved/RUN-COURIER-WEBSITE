@@ -1414,8 +1414,12 @@ export function registerMobileRoutes(app: Express): void {
               vehicleType: job.vehicleType,
               pickupAddress: job.pickupAddress,
               pickupPostcode: job.pickupPostcode,
+              pickupLatitude: job.pickupLatitude,
+              pickupLongitude: job.pickupLongitude,
               deliveryAddress: job.deliveryAddress,
               deliveryPostcode: job.deliveryPostcode,
+              deliveryLatitude: job.deliveryLatitude,
+              deliveryLongitude: job.deliveryLongitude,
               recipientName: job.recipientName,
               recipientPhone: job.recipientPhone,
               weight: job.weight,
@@ -1425,6 +1429,7 @@ export function registerMobileRoutes(app: Express): void {
               driverPrice: assignment.driverPrice,
               pickupInstructions: job.pickupInstructions,
               deliveryInstructions: job.deliveryInstructions,
+              scheduledPickupTime: job.scheduledPickupTime,
             } : null
           };
         })
