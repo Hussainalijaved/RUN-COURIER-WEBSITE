@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -147,21 +147,37 @@ export default function AdminCreateJob() {
     createdAt: string;
   }
   
-  const { data: supabaseDrivers } = useQuery<SupabaseDriver[]>({
+  const { data: supabaseDrivers, isError: supabaseDriversError } = useQuery<SupabaseDriver[]>({
     queryKey: ['/api/supabase-drivers'],
+    retry: false, // Don't retry on Supabase schema errors
   });
 
   // Admin can assign to ANY driver (verified or not) - they have full control
-  // Use Supabase drivers as primary source, fall back to local drivers
-  const availableDrivers = supabaseDrivers?.map(sd => ({
-    id: sd.id,
-    fullName: sd.fullName,
-    driverCode: sd.driverCode,
-    vehicleType: sd.vehicleType || 'car',
-    vehicleRegistration: drivers?.find(d => d.id === sd.id)?.vehicleRegistration || '',
-    isVerified: sd.isVerified ?? false,
-    isAvailable: sd.isAvailable ?? false,
-  })) || [];
+  // Use Supabase drivers as primary source, fall back to local PostgreSQL drivers when Supabase fails
+  const availableDrivers = useMemo(() => {
+    // Fallback to local PostgreSQL drivers when Supabase is unavailable or has errors
+    if (supabaseDriversError || !supabaseDrivers || supabaseDrivers.length === 0) {
+      return (drivers || []).map(d => ({
+        id: d.id,
+        fullName: d.fullName || 'Unknown',
+        driverCode: d.driverCode || null,
+        vehicleType: d.vehicleType || 'car',
+        vehicleRegistration: d.vehicleRegistration || '',
+        isVerified: d.isVerified ?? false,
+        isAvailable: d.isAvailable ?? false,
+      }));
+    }
+    // Use Supabase drivers merged with local data
+    return supabaseDrivers.map(sd => ({
+      id: sd.id,
+      fullName: sd.fullName,
+      driverCode: sd.driverCode,
+      vehicleType: sd.vehicleType || 'car',
+      vehicleRegistration: drivers?.find(d => d.id === sd.id)?.vehicleRegistration || '',
+      isVerified: sd.isVerified ?? false,
+      isAvailable: sd.isAvailable ?? false,
+    }));
+  }, [supabaseDrivers, supabaseDriversError, drivers]);
 
   const pickupPostcode = form.watch('pickupPostcode');
   const deliveryPostcode = form.watch('deliveryPostcode');
