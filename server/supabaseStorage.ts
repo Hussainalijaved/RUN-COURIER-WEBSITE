@@ -843,6 +843,10 @@ export class SupabaseStorage implements IStorage {
     if (data.deliveryLongitude !== undefined) dbData.delivery_longitude = data.deliveryLongitude;
     if (data.actualPickupTime !== undefined) dbData.actual_pickup_time = data.actualPickupTime;
     if (data.actualDeliveryTime !== undefined) dbData.actual_delivery_time = data.actualDeliveryTime;
+    if (data.deliveryAddress !== undefined) dbData.delivery_address = data.deliveryAddress;
+    if (data.deliveryPostcode !== undefined) dbData.delivery_postcode = data.deliveryPostcode;
+    if (data.pickupAddress !== undefined) dbData.pickup_address = data.pickupAddress;
+    if (data.pickupPostcode !== undefined) dbData.pickup_postcode = data.pickupPostcode;
     
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
