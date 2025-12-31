@@ -162,6 +162,7 @@ Privileged operations that require service-role access are handled via Supabase 
 - `create-job` - Creates jobs with tracking number generation
 - `update-job-status` - Updates job status with POD validation
 - `assign-driver` - Assigns drivers to jobs (admin/dispatcher only)
+- `withdraw-assignment` - Withdraws job assignment from driver, returns job to pending (admin/dispatcher only)
 - `stripe-create-payment-intent` - Creates Stripe payment intents
 - `stripe-webhook` - Handles Stripe webhook events
 - `send-email` - Sends transactional emails via Resend

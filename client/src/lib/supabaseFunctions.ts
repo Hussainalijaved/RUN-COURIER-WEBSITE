@@ -128,6 +128,11 @@ export interface DeleteDriverData {
   driverId: string;
 }
 
+export interface WithdrawAssignmentData {
+  jobId: string;
+  reason?: string;
+}
+
 export interface CreateDriverData {
   userId: string;
   email: string;
@@ -182,6 +187,10 @@ export const supabaseFunctions = {
 
   async createDriver(data: CreateDriverData): Promise<CreateDriverResponse> {
     return callEdgeFunction<CreateDriverResponse>('create-driver', data);
+  },
+
+  async withdrawAssignment(data: WithdrawAssignmentData) {
+    return callEdgeFunction('withdraw-assignment', data);
   },
 };
 

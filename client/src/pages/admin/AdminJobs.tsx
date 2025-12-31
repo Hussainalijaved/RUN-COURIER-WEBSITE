@@ -91,10 +91,13 @@ interface SupabaseDriver {
 const JOB_STATUSES: { value: JobStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'assigned', label: 'Assigned' },
+  { value: 'offered', label: 'Offered' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'on_the_way_pickup', label: 'On the Way to Pickup' },
   { value: 'arrived_pickup', label: 'Arrived at Pickup' },
+  { value: 'picked_up', label: 'Picked Up' },
   { value: 'collected', label: 'Collected' },
+  { value: 'on_the_way', label: 'On the Way' },
   { value: 'on_the_way_delivery', label: 'On the Way to Delivery' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -104,10 +107,13 @@ const getStatusBadge = (status: JobStatus) => {
   const statusConfig: Record<JobStatus, { label: string; className: string }> = {
     pending: { label: 'Pending', className: 'bg-yellow-500' },
     assigned: { label: 'Assigned', className: 'bg-blue-400' },
+    offered: { label: 'Offered', className: 'bg-blue-400' },
     accepted: { label: 'Accepted', className: 'bg-blue-500' },
     on_the_way_pickup: { label: 'To Pickup', className: 'bg-indigo-500' },
     arrived_pickup: { label: 'At Pickup', className: 'bg-purple-500' },
+    picked_up: { label: 'Picked Up', className: 'bg-cyan-500' },
     collected: { label: 'Collected', className: 'bg-cyan-500' },
+    on_the_way: { label: 'On the Way', className: 'bg-blue-600' },
     on_the_way_delivery: { label: 'Delivering', className: 'bg-blue-600' },
     delivered: { label: 'Delivered', className: 'bg-green-500' },
     cancelled: { label: 'Cancelled', className: 'bg-red-500' },
@@ -325,18 +331,18 @@ export default function AdminJobs() {
     },
   });
 
-  // Withdraw assignment (for pending/sent offers before driver responds)
+  // Withdraw assignment - uses Supabase Edge Function so it syncs with mobile app
   const withdrawAssignmentMutation = useMutation({
-    mutationFn: async (assignmentId: string) => {
-      return apiRequest('PATCH', `/api/job-assignments/${assignmentId}/withdraw`, { adminUserId: user?.id });
+    mutationFn: async (jobId: string) => {
+      return supabaseFunctions.withdrawAssignment({ jobId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
-      toast({ title: 'Offer withdrawn', description: 'The job offer has been withdrawn from the driver.' });
+      toast({ title: 'Assignment withdrawn', description: 'The job is now available for reassignment to another driver.' });
     },
     onError: (error: any) => {
-      toast({ title: 'Failed to withdraw offer', description: error?.message || 'Please try again', variant: 'destructive' });
+      toast({ title: 'Failed to withdraw assignment', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 
@@ -1043,49 +1049,18 @@ export default function AdminJobs() {
                                 </>
                               )}
                             </DropdownMenuItem>
-                            {/* Assignment Management - Withdraw/Remove/Clean */}
-                            {(() => {
-                              const assignment = getActiveAssignment(job.id);
-                              if (!assignment) return null;
-                              return (
-                                <>
-                                  {/* Withdraw - for pending/sent offers only */}
-                                  {['pending', 'sent'].includes(assignment.status) && (
-                                    <DropdownMenuItem 
-                                      onClick={() => withdrawAssignmentMutation.mutate(assignment.id)}
-                                      disabled={withdrawAssignmentMutation.isPending}
-                                      className="text-orange-600"
-                                      data-testid={`menu-withdraw-${job.id}`}
-                                    >
-                                      <Undo2 className="mr-2 h-4 w-4" />
-                                      Withdraw Offer
-                                    </DropdownMenuItem>
-                                  )}
-                                  {/* Remove - for accepted assignments */}
-                                  {assignment.status === 'accepted' && (
-                                    <DropdownMenuItem 
-                                      onClick={() => removeAssignmentMutation.mutate({ assignmentId: assignment.id })}
-                                      disabled={removeAssignmentMutation.isPending}
-                                      className="text-red-600"
-                                      data-testid={`menu-remove-${job.id}`}
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Remove from Driver
-                                    </DropdownMenuItem>
-                                  )}
-                                  {/* Clean - always available for active assignments */}
-                                  <DropdownMenuItem 
-                                    onClick={() => cleanAssignmentMutation.mutate(assignment.id)}
-                                    disabled={cleanAssignmentMutation.isPending}
-                                    className="text-blue-600"
-                                    data-testid={`menu-clean-${job.id}`}
-                                  >
-                                    <RotateCcw className="mr-2 h-4 w-4" />
-                                    Reset Job
-                                  </DropdownMenuItem>
-                                </>
-                              );
-                            })()}
+                            {/* Withdraw Assignment - show for jobs with assigned/offered status and a driver */}
+                            {job.driverId && ['assigned', 'offered', 'accepted'].includes(job.status) && (
+                              <DropdownMenuItem 
+                                onClick={() => withdrawAssignmentMutation.mutate(job.id)}
+                                disabled={withdrawAssignmentMutation.isPending}
+                                className="text-orange-600"
+                                data-testid={`menu-withdraw-${job.id}`}
+                              >
+                                <Undo2 className="mr-2 h-4 w-4" />
+                                Withdraw from Driver
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
