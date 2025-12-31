@@ -467,7 +467,12 @@ export default function Quote() {
                                 <FormControl>
                                   <Checkbox
                                     checked={field.value}
-                                    onCheckedChange={field.onChange}
+                                    onCheckedChange={(checked) => {
+                                      field.onChange(checked);
+                                      if (checked && multiDropStops.length === 0) {
+                                        setMultiDropStops(['']);
+                                      }
+                                    }}
                                     data-testid="checkbox-multi-drop"
                                   />
                                 </FormControl>
@@ -480,26 +485,37 @@ export default function Quote() {
                           />
 
                           {isMultiDrop && (
-                            <div className="space-y-3 pl-7">
-                              <Label>Additional Stops</Label>
+                            <div className="space-y-3 pl-7 p-4 bg-muted/30 rounded-lg border">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-medium">Delivery Stops</Label>
+                                <Badge variant="secondary" className="text-xs">
+                                  {multiDropStops.filter(s => s.length >= 3).length} stop{multiDropStops.filter(s => s.length >= 3).length !== 1 ? 's' : ''} added
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                Enter the postcode for each additional delivery stop
+                              </p>
                               {multiDropStops.map((stop, index) => (
                                 <div key={index} className="flex gap-2">
                                   <div className="flex-1">
                                     <PostcodeAutocomplete
                                       value={stop}
                                       onChange={(value) => updateMultiDropStop(index, value)}
-                                      placeholder={`Stop ${index + 1} postcode`}
+                                      placeholder={`Stop ${index + 1} postcode (e.g., SW1A 1AA)`}
                                       data-testid={`input-stop-${index}`}
                                     />
                                   </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => removeMultiDropStop(index)}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
+                                  {multiDropStops.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => removeMultiDropStop(index)}
+                                      data-testid={`button-remove-stop-${index}`}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               ))}
                               <Button
@@ -508,9 +524,10 @@ export default function Quote() {
                                 size="sm"
                                 onClick={addMultiDropStop}
                                 className="gap-1"
+                                data-testid="button-add-stop"
                               >
                                 <Plus className="h-3 w-3" />
-                                Add Stop
+                                Add Another Stop
                               </Button>
                             </div>
                           )}
