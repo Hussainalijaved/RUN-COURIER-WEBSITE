@@ -356,10 +356,39 @@ export default function AdminJobs() {
     },
   });
 
-  // Withdraw assignment - uses Supabase Edge Function so it syncs with mobile app
+  // Withdraw assignment - uses backend API for reliability
   const withdrawAssignmentMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      return supabaseFunctions.withdrawAssignment({ jobId });
+      // First find the active assignment for this job
+      const assignmentsRes = await fetch(`/api/job-assignments?jobId=${jobId}`);
+      if (!assignmentsRes.ok) throw new Error('Failed to fetch assignments');
+      const assignments = await assignmentsRes.json();
+      
+      // Find the active assignment (sent, pending, or accepted)
+      const activeAssignment = assignments.find((a: any) => 
+        ['sent', 'pending', 'accepted'].includes(a.status)
+      );
+      
+      if (!activeAssignment) {
+        throw new Error('No active assignment found for this job');
+      }
+      
+      // Use withdraw for pending/sent, remove for accepted
+      const endpoint = ['pending', 'sent'].includes(activeAssignment.status)
+        ? `/api/job-assignments/${activeAssignment.id}/withdraw`
+        : `/api/job-assignments/${activeAssignment.id}/remove`;
+      
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminUserId: user?.id, reason: 'Withdrawn by admin' }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to withdraw assignment');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
