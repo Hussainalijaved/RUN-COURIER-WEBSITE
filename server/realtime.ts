@@ -126,6 +126,18 @@ interface JobAssignedMessage {
   };
 }
 
+interface DocumentPendingMessage {
+  type: 'document:pending';
+  payload: {
+    documentId: string;
+    driverId: string;
+    driverName?: string;
+    documentType: string;
+    fileName: string;
+    uploadedAt: string;
+  };
+}
+
 type OutgoingMessage = 
   | OutgoingLocationMessage 
   | BulkSnapshotMessage 
@@ -136,6 +148,7 @@ type OutgoingMessage =
   | JobStatusUpdateMessage
   | JobCreatedMessage
   | JobAssignedMessage
+  | DocumentPendingMessage
   | { type: 'pong' };
 
 interface JobSubscription {
@@ -584,6 +597,47 @@ export function broadcastJobAssigned(job: {
   });
 
   log(`Broadcasted job assignment for ${job.id} to driver ${job.driverId} (${sentCount} clients)`, 'realtime');
+}
+
+export function broadcastDocumentPending(document: {
+  id: string;
+  driverId: string;
+  driverName?: string;
+  type: string;
+  fileName: string;
+  uploadedAt?: Date | null;
+}): void {
+  const message: DocumentPendingMessage = {
+    type: 'document:pending',
+    payload: {
+      documentId: document.id,
+      driverId: document.driverId,
+      driverName: document.driverName,
+      documentType: document.type,
+      fileName: document.fileName,
+      uploadedAt: document.uploadedAt?.toISOString() || new Date().toISOString(),
+    },
+  };
+
+  let sentCount = 0;
+
+  // Send only to admins/dispatchers
+  observerConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  // Also send to job subscribers who are admins
+  jobSubscribers.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  log(`Broadcasted document pending for ${document.id} (${document.type}) to ${sentCount} admin clients`, 'realtime');
 }
 
 function broadcastLocation(location: DriverLocation): void {

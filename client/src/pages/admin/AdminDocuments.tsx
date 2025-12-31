@@ -24,6 +24,7 @@ import {
 import { FileText, CheckCircle, XCircle, Clock, Eye, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeDocuments } from '@/hooks/useRealtimeDocuments';
 import type { Document, Driver, DriverApplication } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -32,6 +33,8 @@ export default function AdminDocuments() {
   const queryClient = useQueryClient();
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+
+  useRealtimeDocuments();
 
   const { data: documents, isLoading: docsLoading, isError: docsError, refetch: refetchDocs } = useQuery<Document[]>({
     queryKey: ['/api/documents'],

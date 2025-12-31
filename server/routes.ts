@@ -24,7 +24,7 @@ import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClie
 import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification } from "./emailService";
 import { createHash, randomBytes } from "crypto";
-import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned } from "./realtime";
+import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending } from "./realtime";
 import { geocodeAddress } from "./geocoding";
 import { sendJobOfferNotification } from "./pushNotifications";
 
@@ -1986,6 +1986,18 @@ export async function registerRoutes(
     await sendDocumentUploadNotification(driverName, formattedDocType).catch(err => 
       console.error('Failed to send document upload notification:', err)
     );
+
+    // Broadcast real-time update to admin dashboard
+    if (document) {
+      broadcastDocumentPending({
+        id: document.id,
+        driverId: document.driverId,
+        driverName: driverName,
+        type: document.type,
+        fileName: document.fileName,
+        uploadedAt: document.uploadedAt,
+      });
+    }
 
     res.status(201).json(document);
   }));
