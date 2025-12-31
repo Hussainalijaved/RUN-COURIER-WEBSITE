@@ -1422,7 +1422,7 @@ export function registerMobileRoutes(app: Express): void {
               distance: job.distance,
               isMultiDrop: job.isMultiDrop,
               isReturnTrip: job.isReturnTrip,
-              totalPrice: job.totalPrice,
+              driverPrice: assignment.driverPrice,
               pickupInstructions: job.pickupInstructions,
               deliveryInstructions: job.deliveryInstructions,
             } : null
