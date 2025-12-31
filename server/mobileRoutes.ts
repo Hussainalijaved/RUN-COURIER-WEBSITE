@@ -67,7 +67,7 @@ async function uploadToSupabaseStorage(
     return null;
   }
 
-  const bucket = 'pod';
+  const bucket = 'pod-images';
   
   // Ensure bucket exists (only needed once, but safe to call)
   const { data: buckets } = await supabaseAdmin.storage.listBuckets();
@@ -817,7 +817,7 @@ export function registerMobileRoutes(app: Express): void {
       const ext = contentType.includes('png') ? '.png' : '.jpg';
       const filename = `job_${jobId}/${type}_${timestamp}_${random}${ext}`;
 
-      const bucket = 'pod';
+      const bucket = 'pod-images';
       
       // Ensure bucket exists
       const { data: buckets } = await supabaseAdmin.storage.listBuckets();
