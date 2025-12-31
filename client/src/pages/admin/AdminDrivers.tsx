@@ -146,13 +146,53 @@ export default function AdminDrivers() {
 
   useRealtimeDrivers();
 
-  const { data: drivers, isLoading: driversLoading } = useQuery<Driver[]>({
+  const { data: localDrivers, isLoading: localDriversLoading } = useQuery<Driver[]>({
     queryKey: ['/api/drivers', { includeInactive: showInactive }],
   });
 
-  const { data: supabaseDrivers } = useQuery<SupabaseDriver[]>({
+  const { data: supabaseDrivers, isLoading: supabaseDriversLoading } = useQuery<SupabaseDriver[]>({
     queryKey: ['/api/supabase-drivers'],
   });
+
+  // Use Supabase drivers as source of truth, merge with local data for extra fields
+  const drivers: Driver[] = (supabaseDrivers || []).map(sd => {
+    const localDriver = localDrivers?.find(d => d.id === sd.id);
+    return {
+      id: sd.id,
+      userId: sd.id,
+      driverCode: sd.driverCode,
+      fullName: sd.fullName || localDriver?.fullName || null,
+      email: sd.email,
+      phone: sd.phone || localDriver?.phone || null,
+      postcode: localDriver?.postcode || null,
+      address: localDriver?.address || null,
+      nationality: localDriver?.nationality || null,
+      isBritish: localDriver?.isBritish || null,
+      nationalInsuranceNumber: localDriver?.nationalInsuranceNumber || null,
+      rightToWorkShareCode: localDriver?.rightToWorkShareCode || null,
+      dbsChecked: localDriver?.dbsChecked || null,
+      dbsCertificateUrl: localDriver?.dbsCertificateUrl || null,
+      dbsCheckDate: localDriver?.dbsCheckDate || null,
+      vehicleType: sd.vehicleType as VehicleType || localDriver?.vehicleType || 'car',
+      vehicleRegistration: localDriver?.vehicleRegistration || null,
+      vehicleMake: localDriver?.vehicleMake || null,
+      vehicleModel: localDriver?.vehicleModel || null,
+      vehicleColor: localDriver?.vehicleColor || null,
+      isAvailable: sd.isAvailable ?? localDriver?.isAvailable ?? false,
+      isVerified: sd.isVerified ?? localDriver?.isVerified ?? false,
+      currentLatitude: localDriver?.currentLatitude || null,
+      currentLongitude: localDriver?.currentLongitude || null,
+      lastLocationUpdate: localDriver?.lastLocationUpdate || null,
+      rating: localDriver?.rating || '5.00',
+      totalJobs: localDriver?.totalJobs || 0,
+      profilePictureUrl: localDriver?.profilePictureUrl || null,
+      isActive: localDriver?.isActive ?? true,
+      deactivatedAt: localDriver?.deactivatedAt || null,
+      createdAt: sd.createdAt ? new Date(sd.createdAt) : localDriver?.createdAt || new Date(),
+    } as Driver;
+  });
+
+  const driversLoading = localDriversLoading || supabaseDriversLoading;
 
   const { data: documents } = useQuery<Document[]>({
     queryKey: ['/api/documents'],
@@ -170,6 +210,7 @@ export default function AdminDrivers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/supabase-drivers'] });
       toast({ title: 'Driver status updated successfully' });
     },
     onError: (error: Error) => {
@@ -198,6 +239,7 @@ export default function AdminDrivers() {
     },
     onSuccess: (updatedDriver: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/supabase-drivers'] });
       if (selectedDriver && updatedDriver) {
         setSelectedDriver({ ...selectedDriver, ...updatedDriver });
       }
