@@ -810,6 +810,7 @@ export class SupabaseStorage implements IStorage {
       driver_price: insertJob.driverPrice || null,
       payment_status: insertJob.paymentStatus || 'pending',
       payment_intent_id: insertJob.paymentIntentId || null,
+      notes: '',
     };
     
     const { data, error } = await supabase
