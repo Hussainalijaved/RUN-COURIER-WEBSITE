@@ -668,7 +668,14 @@ export class SupabaseStorage implements IStorage {
       .select()
       .single();
     
-    if (error || !updated) return undefined;
+    if (error) {
+      console.error('[SupabaseStorage] Error updating driver:', id, error);
+      return undefined;
+    }
+    if (!updated) {
+      console.error('[SupabaseStorage] Driver not found for update:', id);
+      return undefined;
+    }
     return mapDbToDriver(updated);
   }
 
