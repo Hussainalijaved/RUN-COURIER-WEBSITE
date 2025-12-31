@@ -444,17 +444,22 @@ export function registerMobileRoutes(app: Express): void {
           
           let filteredJobs = supabaseJobs;
           
+          // CRITICAL: Only show jobs to drivers that have a price set by admin
+          // Jobs without price_driver should not appear in the driver's app
+          filteredJobs = filteredJobs.filter(j => j.price_driver != null);
+          console.log(`[Mobile Jobs] After price filter: ${filteredJobs.length} jobs with price set`);
+          
           // Apply status filters
           // "active" = jobs the driver has ACCEPTED and is working on
           // "pending" = job offers waiting for driver to accept/decline
           if (status === "active") {
-            filteredJobs = supabaseJobs.filter(j => 
+            filteredJobs = filteredJobs.filter(j => 
               ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
             );
           } else if (status === "pending") {
-            filteredJobs = supabaseJobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
+            filteredJobs = filteredJobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
           } else if (status === "completed") {
-            filteredJobs = supabaseJobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
+            filteredJobs = filteredJobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
           }
           
           mobileJobs = filteredJobs.map(mapSupabaseJobToMobileFormat);
@@ -479,6 +484,9 @@ export function registerMobileRoutes(app: Express): void {
       
       // Filter out hidden jobs (unless viewing completed/history)
       jobs = jobs.filter(j => (j as any).driverHidden !== true);
+      
+      // CRITICAL: Only show jobs with admin-assigned price
+      jobs = jobs.filter(j => j.driverPrice != null);
 
       // "active" = jobs the driver has ACCEPTED and is working on
       // "pending" = job offers waiting for driver to accept/decline
@@ -767,23 +775,49 @@ export function registerMobileRoutes(app: Express): void {
         recipientName: recipientName || 'none'
       });
 
-      const job = await storage.getJob(jobId);
+      // Try storage first, then query Supabase directly
+      let job = await storage.getJob(jobId);
+      let supabaseJob: any = null;
+      
+      if (!job && supabaseAdmin) {
+        console.log(`[POD Upload] Job ${jobId} not in local storage, querying Supabase...`);
+        const { data, error } = await supabaseAdmin
+          .from('jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+        
+        if (!error && data) {
+          supabaseJob = data;
+          console.log(`[POD Upload] Found job ${jobId} in Supabase, status: ${data.status}`);
+        } else {
+          console.log(`[POD Upload] Job ${jobId} not found in Supabase:`, error?.message);
+        }
+      }
 
-      if (!job) {
+      if (!job && !supabaseJob) {
         return res.status(404).json({ 
           error: "Job not found",
           code: "JOB_NOT_FOUND"
         });
       }
 
-      if (job.driverId !== driver.id) {
+      // Use Supabase job data if local job not found
+      const effectiveDriverId = job?.driverId || supabaseJob?.driver_id;
+      const effectiveStatus = job?.status || supabaseJob?.status;
+      const existingPhotoUrl = job?.podPhotoUrl || supabaseJob?.pod_photo_url;
+      const existingSignatureUrl = job?.podSignatureUrl || supabaseJob?.pod_signature_url;
+      const existingRecipientName = job?.podRecipientName || supabaseJob?.pod_recipient_name;
+
+      if (effectiveDriverId !== driver.id) {
         return res.status(403).json({ 
           error: "This job is not assigned to you",
           code: "NOT_YOUR_JOB"
         });
       }
 
-      if (!["on_the_way_delivery", "delivered"].includes(job.status)) {
+      if (!["on_the_way_delivery", "delivered"].includes(effectiveStatus)) {
+        console.log(`[POD Upload] Invalid status for job ${jobId}: ${effectiveStatus}`);
         return res.status(400).json({ 
           error: "POD can only be uploaded during delivery phase",
           code: "INVALID_POD_TIMING"
@@ -791,7 +825,7 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       // Handle photo - either URL or base64
-      let finalPhotoUrl = podPhotoUrl || job.podPhotoUrl;
+      let finalPhotoUrl = podPhotoUrl || existingPhotoUrl;
       if (photo && typeof photo === 'string') {
         // It's base64 data, upload to Supabase
         const uploadedUrl = await uploadBase64ToSupabase(photo, jobId, 'photo');
@@ -806,7 +840,7 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       // Handle signature - either URL or base64
-      let finalSignatureUrl = podSignatureUrl || job.podSignatureUrl;
+      let finalSignatureUrl = podSignatureUrl || existingSignatureUrl;
       if (signature && typeof signature === 'string') {
         // It's base64 data, upload to Supabase
         const uploadedUrl = await uploadBase64ToSupabase(signature, jobId, 'signature');
@@ -820,7 +854,7 @@ export function registerMobileRoutes(app: Express): void {
         }
       }
 
-      const finalRecipientName = recipientName || job.podRecipientName;
+      const finalRecipientName = recipientName || existingRecipientName;
       const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName);
 
       if (!updatedJob) {
@@ -880,23 +914,49 @@ export function registerMobileRoutes(app: Express): void {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       const recipientName = req.body.recipientName as string | undefined;
 
-      const job = await storage.getJob(jobId);
+      // Try storage first, then query Supabase directly
+      let job = await storage.getJob(jobId);
+      let supabaseJob: any = null;
+      
+      if (!job && supabaseAdmin) {
+        console.log(`[POD File Upload] Job ${jobId} not in local storage, querying Supabase...`);
+        const { data, error } = await supabaseAdmin
+          .from('jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+        
+        if (!error && data) {
+          supabaseJob = data;
+          console.log(`[POD File Upload] Found job ${jobId} in Supabase, status: ${data.status}`);
+        } else {
+          console.log(`[POD File Upload] Job ${jobId} not found in Supabase:`, error?.message);
+        }
+      }
 
-      if (!job) {
+      if (!job && !supabaseJob) {
         return res.status(404).json({ 
           error: "Job not found",
           code: "JOB_NOT_FOUND"
         });
       }
 
-      if (job.driverId !== driver.id) {
+      // Use Supabase job data if local job not found
+      const effectiveDriverId = job?.driverId || supabaseJob?.driver_id;
+      const effectiveStatus = job?.status || supabaseJob?.status;
+      const existingPhotoUrl = job?.podPhotoUrl || supabaseJob?.pod_photo_url;
+      const existingSignatureUrl = job?.podSignatureUrl || supabaseJob?.pod_signature_url;
+      const existingRecipientName = job?.podRecipientName || supabaseJob?.pod_recipient_name;
+
+      if (effectiveDriverId !== driver.id) {
         return res.status(403).json({ 
           error: "This job is not assigned to you",
           code: "NOT_YOUR_JOB"
         });
       }
 
-      if (!["on_the_way_delivery", "delivered"].includes(job.status)) {
+      if (!["on_the_way_delivery", "delivered"].includes(effectiveStatus)) {
+        console.log(`[POD File Upload] Invalid status for job ${jobId}: ${effectiveStatus}`);
         return res.status(400).json({ 
           error: "POD can only be uploaded during delivery phase",
           code: "INVALID_POD_TIMING"
@@ -953,9 +1013,9 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       // Keep existing POD if not uploading new one
-      const finalPhotoUrl = podPhotoUrl || job.podPhotoUrl || undefined;
-      const finalSignatureUrl = podSignatureUrl || job.podSignatureUrl || undefined;
-      const finalRecipientName = recipientName || job.podRecipientName || undefined;
+      const finalPhotoUrl = podPhotoUrl || existingPhotoUrl || undefined;
+      const finalSignatureUrl = podSignatureUrl || existingSignatureUrl || undefined;
+      const finalRecipientName = recipientName || existingRecipientName || undefined;
 
       const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName);
 
