@@ -57,16 +57,20 @@ const REJECTION_REASONS = [
   'Other (please specify)',
 ];
 
-const formatPrice = (price: string | number) => {
+const formatPrice = (price: string | number | null) => {
+  if (price === null || price === undefined) return '—';
   const num = typeof price === 'string' ? parseFloat(price) : price;
+  if (isNaN(num)) return '—';
   return `£${num.toFixed(2)}`;
 };
 
-const getDriverPayment = (job: { driverPrice?: string | null; totalPrice?: string | number }) => {
+// Drivers should ONLY see the admin-set driver price, never the customer's total price
+const getDriverPayment = (job: { driverPrice?: string | null; totalPrice?: string | number }): number | null => {
   if (job.driverPrice) {
     return parseFloat(job.driverPrice);
   }
-  return typeof job.totalPrice === 'string' ? parseFloat(job.totalPrice) : (job.totalPrice || 0);
+  // Return null if no driver price is set - drivers should not see customer pricing
+  return null;
 };
 
 const getStatusBadge = (status: JobStatus) => {

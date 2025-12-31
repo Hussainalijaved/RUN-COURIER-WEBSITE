@@ -330,7 +330,7 @@ export default function DriverDashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-primary">{formatPrice(job.totalPrice)}</div>
+                        <div className="font-bold text-primary">{job.driverPrice ? `£${parseFloat(job.driverPrice).toFixed(2)}` : '—'}</div>
                         <Button 
                           size="sm" 
                           className="mt-2" 

@@ -195,7 +195,11 @@ export default function DriverActive() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Earnings</span>
-                    <p className="font-medium text-green-600">£{parseFloat((activeJob.driverPrice || activeJob.totalPrice)?.toString() || '0').toFixed(2)}</p>
+                    <p className="font-medium text-green-600">
+                      {activeJob.driverPrice 
+                        ? `£${parseFloat(activeJob.driverPrice).toFixed(2)}` 
+                        : '—'}
+                    </p>
                   </div>
                 </div>
               </div>

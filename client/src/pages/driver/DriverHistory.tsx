@@ -45,11 +45,13 @@ export default function DriverHistory() {
     job.deliveryPostcode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getDriverPayment = (job: { driverPrice?: string | null; totalPrice?: string | number }) => {
+  // Drivers should ONLY see admin-set driver price, never the customer's total price
+  const getDriverPayment = (job: { driverPrice?: string | null; totalPrice?: string | number }): number => {
     if (job.driverPrice) {
       return parseFloat(job.driverPrice);
     }
-    return typeof job.totalPrice === 'string' ? parseFloat(job.totalPrice) : (job.totalPrice || 0);
+    // Return 0 if no driver price is set - drivers should not see customer pricing
+    return 0;
   };
 
   const totalEarnings = completedJobs.reduce((sum, job) => {
