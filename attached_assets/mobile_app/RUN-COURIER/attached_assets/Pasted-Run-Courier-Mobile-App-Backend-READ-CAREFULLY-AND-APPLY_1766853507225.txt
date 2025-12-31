@@ -1,0 +1,134 @@
+Run Courier Mobile App + Backend
+
+READ CAREFULLY AND APPLY ALL STEPS — DO NOT SKIP ANYTHING
+
+🔧 OBJECTIVE
+
+Fix the Run Courier mobile app so that:
+
+The app connects correctly to the backend
+
+Payments work (no 404 errors)
+
+Photo uploads (POD / delivery photos) work
+
+The backend is always reachable
+
+The app works correctly in TestFlight & production
+
+📌 BACKEND URL (THIS IS FINAL – DO NOT CHANGE)
+https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev
+
+✅ TASK 1 — Backend must be LIVE and deployed
+
+Ensure the backend project is deployed and running publicly (not sleeping, not suspended).
+
+Add a health endpoint:
+
+GET /health
+→ returns { status: "ok" }
+
+
+Confirm the backend is reachable from a mobile browser.
+
+✅ TASK 2 — Fix API base URL in mobile app
+
+Remove ALL hardcoded URLs.
+
+Use ONLY this environment variable everywhere:
+
+EXPO_PUBLIC_API_URL
+
+
+All API calls must use:
+
+`${process.env.EXPO_PUBLIC_API_URL}/api/...`
+
+
+Confirm the mobile app is rebuilt AFTER setting the env variable.
+
+✅ TASK 3 — Fix PAYMENT 404 error
+
+Verify these endpoints exist and are reachable:
+
+POST /api/mobile/stripe/create-payment-intent
+POST /api/mobile/stripe/confirm
+
+
+Ensure Stripe keys are loaded on backend, not frontend:
+
+STRIPE_SECRET_KEY
+
+
+Return clear JSON errors if payment fails (no silent errors).
+
+✅ TASK 4 — FIX PHOTO / POD UPLOAD (CRITICAL)
+
+The current error:
+
+“Failed to upload photos. Please check your connection”
+
+This is NOT a network issue — it is a backend/storage issue.
+
+Backend must:
+
+Accept multipart uploads:
+
+POST /api/mobile/upload
+
+
+Use Supabase Storage (NOT local filesystem).
+
+Ensure:
+
+Bucket exists (example: delivery-photos)
+
+Bucket permissions allow uploads
+
+Uses SUPABASE_SERVICE_ROLE_KEY
+
+Return uploaded file URL in response.
+
+Example response:
+{
+  "success": true,
+  "url": "https://supabase-url/storage/v1/object/public/delivery-photos/xxx.jpg"
+}
+
+✅ TASK 5 — Mobile App Upload Fix
+
+Use FormData correctly.
+
+Do NOT convert images to base64.
+
+Add proper error logging:
+
+console.log(uploadError.response?.data)
+
+
+Show real backend error, not generic “check your connection”.
+
+✅ TASK 6 — Fix Replit sleep / suspension issue
+
+Ensure deployment is resumed.
+
+Backend must not return:
+
+"The app is currently not running"
+
+
+If needed, configure always-on deployment.
+
+✅ TASK 7 — Versioning (IMPORTANT FOR APPLE)
+
+Increment app version EVERY TIME:
+
+{
+  "version": "1.0.1",
+  "ios": {
+    "buildNumber": "2"
+  }
+}
+
+
+Version in the app UI must match App Store Connect.

@@ -1,0 +1,126 @@
+I confirm:
+✅ Google Distance Matrix API is already implemented in my BACKEND
+✅ Mobile app must NEVER call Google APIs directly
+✅ Mobile app must behave exactly like the website
+
+OBJECTIVE
+
+Fix price calculation so Estimated Price updates automatically (not £0.00) using backend distance calculation.
+
+STRICT RULES
+
+DO NOT change UI design or layout
+
+DO NOT require user to manually enter distance
+
+DO NOT expose Google API key in the mobile app
+
+DO NOT remove existing booking fields
+
+Keep Estimated Price = £0.00 until all required inputs exist
+
+REQUIRED BACKEND FLOW (MANDATORY)
+
+When pickup postcode/address is selected:
+
+Store:
+
+pickupPostcode
+
+pickupAddressLabel
+
+pickupLatLng (from backend response)
+
+When delivery postcode/address is selected:
+
+Store:
+
+deliveryPostcode
+
+deliveryAddressLabel
+
+deliveryLatLng
+
+When BOTH pickupLatLng and deliveryLatLng exist:
+
+Call EXISTING backend endpoint that uses Google Distance Matrix API
+
+Backend returns:
+
+distanceMeters
+
+distanceMiles
+
+⚠️ IMPORTANT
+Use the SAME backend endpoint and logic already used by the WEBSITE.
+Do NOT create a new Google API integration.
+
+REQUIRED FRONTEND LOGIC
+
+Save distanceMiles in state (do NOT show distance input field)
+
+Automatically trigger calculatePrice() when ALL are true:
+
+pickupLatLng exists
+
+deliveryLatLng exists
+
+distanceMiles > 0
+
+vehicleType selected
+
+If ANY required value is missing:
+
+Estimated Price must remain £0.00
+
+No error popup
+
+DEBUGGING (MANDATORY – DO NOT SKIP)
+
+Add console logs:
+
+console.log("BACKEND DISTANCE RESPONSE", {
+  pickupLatLng,
+  deliveryLatLng,
+  distanceMiles
+});
+
+console.log("PRICE INPUTS", {
+  vehicleType,
+  distanceMiles,
+  weightKg,
+  isAsap,
+  isReturn
+});
+
+console.log("FINAL ESTIMATED PRICE", estimatedPrice);
+
+BACKEND REQUIREMENT CHECK
+
+If backend endpoint is missing or unreachable:
+
+STOP
+
+Do NOT implement frontend workaround
+
+Ask me before proceeding
+
+FINAL OUTPUT REQUIRED
+
+List files changed
+
+Show exact function that calls backend distance API
+
+Show updated calculatePrice() trigger logic
+
+Run test case:
+
+Pickup: EC1A 1BB
+Delivery: W1A 1HQ
+Vehicle: Small Van
+
+Expected:
+
+distanceMiles > 0
+
+Estimated Price > £0.00

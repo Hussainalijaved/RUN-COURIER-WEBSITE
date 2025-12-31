@@ -1,0 +1,207 @@
+PROOF OF DELIVERY (POD) FOR ALL JOBS
+
+FEATURE: MANDATORY PROOF OF DELIVERY FOR ALL COMPLETED JOBS
+
+You are working on a production courier platform (Run Courier) with:
+
+Customer app (Individual & Business)
+
+Driver app
+
+Admin panel
+
+Supabase backend
+
+iOS & Android (Expo / React Native)
+
+🎯 REQUIREMENT (NON-NEGOTIABLE)
+
+EVERY JOB — whether created by:
+
+✅ Individual customer
+
+✅ Business customer
+
+✅ Admin booking
+
+MUST include Proof of Delivery (POD) before the job can be completed.
+
+No exceptions.
+
+🚫 CURRENT PROBLEMS TO FIX
+
+Some jobs can be completed without POD
+
+POD is inconsistent between individual & business jobs
+
+Customers cannot always see delivery proof
+
+Drivers can complete delivery too early
+
+This is not acceptable for a professional courier service.
+
+✅ REQUIRED POD RULES (IMPLEMENT ALL)
+1️⃣ POD IS MANDATORY FOR JOB COMPLETION
+
+Driver CANNOT complete delivery unless at least one POD is provided.
+
+POD can include:
+
+📸 One or more delivery photos (minimum 1, unlimited max)
+
+✍️ Optional digital signature (future-ready)
+
+📝 Optional delivery notes
+
+If no POD → “Complete Delivery” must be disabled.
+
+2️⃣ DRIVER POD FLOW (VERY IMPORTANT)
+
+When driver taps Complete Delivery:
+
+Open Proof of Delivery screen
+
+Driver must:
+
+Take one or multiple photos
+
+See thumbnails of uploaded photos
+
+Remove & retake photos if needed
+
+Show clear counter:
+
+“1 photo added”
+
+“2 photos added”
+
+Only enable Final Complete Delivery button when:
+
+At least 1 photo exists
+
+3️⃣ PHOTO REQUIREMENTS
+
+Use device camera (no gallery upload for now)
+
+High enough resolution for evidence
+
+Store securely (Supabase Storage or equivalent)
+
+Each photo linked to:
+
+Job ID
+
+Driver ID
+
+Timestamp
+
+GPS coordinates (if available)
+
+4️⃣ JOB STATUS LOGIC (STRICT)
+
+Job status flow MUST be:
+
+Assigned
+→ Picked Up
+→ Out for Delivery
+→ POD Required
+→ Delivered (ONLY after POD)
+
+
+If POD is missing → job CANNOT move to “Delivered”.
+
+5️⃣ CUSTOMER VISIBILITY (CRITICAL)
+
+After job is completed:
+
+Individual Customer:
+
+Can see POD photos in:
+
+App
+
+Order details screen
+
+Clear label: “Proof of Delivery”
+
+Business Customer:
+
+Can see POD photos in:
+
+App / Dashboard
+
+Order history
+
+Same POD data as individual users
+
+⚠️ No difference between individual & business POD rules.
+
+6️⃣ ADMIN VISIBILITY
+
+Admin must be able to:
+
+View all POD photos
+
+Download POD
+
+Verify delivery proof
+
+Use POD in disputes / claims
+
+7️⃣ FAILED DELIVERY HANDLING
+
+If driver selects Failed Delivery:
+
+POD NOT required
+
+Driver MUST select reason
+
+Optional photo upload for evidence
+
+8️⃣ BACKEND / DATABASE REQUIREMENTS
+
+Ensure:
+
+jobs table includes:
+
+pod_required = true
+
+pod_completed = true/false
+
+job_pod_photos table or storage mapping:
+
+job_id
+
+photo_url
+
+uploaded_at
+
+driver_id
+
+9️⃣ UX / UI REQUIREMENTS
+
+Clear “Proof of Delivery” section
+
+Clean professional design
+
+No confusing buttons
+
+No hidden steps
+
+This is legal delivery evidence, not a demo feature.
+
+10️⃣ FINAL VALIDATION CHECKLIST (MANDATORY)
+
+Before finishing, confirm:
+
+✅ All jobs require POD
+
+✅ Driver cannot bypass POD
+
+✅ Customers can always see POD
+
+✅ Business & individual jobs behave the same
+
+✅ Admin has full access
+
+✅ Works on iOS & Android

@@ -1,0 +1,170 @@
+TWO PAYMENT OPTIONS (VERY IMPORTANT)
+
+Business users have EXACTLY TWO options:
+
+🅰️ Option 1: Pay by card (same as individual)
+
+Business users CAN pay immediately, exactly like individuals.
+
+If business chooses Pay Now:
+
+Show Pay Now button
+
+Open Stripe Payment Sheet
+
+On success:
+
+payment_status = paid
+
+payment_method = card
+
+Order proceeds normally
+
+🅱️ Option 2: Pay Later – Weekly Invoice
+
+If business has:
+
+pay_later_enabled = true
+
+OR billing_type = weekly_invoice
+
+Then:
+
+Payment is NOT required at booking
+
+Order stays:
+
+payment_status = pending
+
+payment_method = invoice
+
+UI must show:
+“Pay Later – Weekly Invoice”
+
+⚠️ IMPORTANT:
+
+Pay Later is ONLY for business
+
+Individual users must NEVER see Pay Later
+
+4️⃣ Orders list UI (MANDATORY)
+
+Each order card must show payment badge + action:
+
+Payment badges:
+
+🟢 Paid
+
+🟡 Pending Payment
+
+🔵 Pay Later – Weekly Invoice
+
+Action buttons:
+User	Payment Status	Button
+Individual	Pending	Pay Now
+Business	Pending	Pay Now
+Business	Pay Later	Invoice (Weekly)
+Any	Paid	No payment button
+
+🚫 NEVER show “Pending Payment” without an action
+
+5️⃣ Pay Now button behavior
+
+When Pay Now is tapped:
+
+Open native Stripe Payment Sheet
+
+Pass:
+
+order_id
+
+user_id
+
+amount
+
+currency
+
+Support:
+
+Card
+
+Apple Pay
+
+Google Pay
+
+🚫 No browser
+🚫 No external redirect
+
+6️⃣ After successful payment
+
+Immediately:
+
+Update database:
+
+payment_status = paid
+
+paid_at = timestamp
+
+payment_method = card
+
+Update UI instantly
+
+Remove Pay Now button
+
+Order becomes active / completed normally
+
+7️⃣ Weekly invoice behavior (Business only)
+
+For Pay Later businesses:
+
+Orders are collected weekly
+
+Admin generates weekly invoice
+
+Stripe invoice emailed automatically
+
+When invoice is paid:
+
+Update all related orders to paid
+
+🚫 Business users must NOT be forced to pay upfront if Pay Later is enabled
+
+8️⃣ Security & database rules (CRITICAL)
+
+Users can only pay their own orders
+
+Business users can only pay orders under their company
+
+Enforce using:
+
+Supabase RLS
+
+Backend validation
+
+🚫 No client-side only updates
+
+9️⃣ Acceptance checklist (DO NOT MARK DONE UNLESS ALL TRUE)
+
+✅ Individual can always pay by card
+✅ Business can choose Pay Now OR Pay Later
+✅ Orders never get stuck
+✅ “Pending Payment” always has an action
+✅ Weekly invoices still work
+✅ Stripe works on iOS & Android
+✅ App Store compliant UX
+
+🔚 Final instruction to AI
+
+Do NOT redesign pricing.
+Do NOT remove invoices.
+Do NOT break Pay Later logic.
+
+Only fix:
+
+Payment visibility
+
+Actions
+
+Stripe flow
+
+Order state consistency

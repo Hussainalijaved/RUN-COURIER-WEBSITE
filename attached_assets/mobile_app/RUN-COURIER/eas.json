@@ -1,0 +1,25 @@
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "production": {
+      "ios": {
+        "distribution": "store"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "almashriqi2010@yahoo.com"
+      },
+      "android": {
+        "track": "internal"
+      }
+    }
+  }
+}

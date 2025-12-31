@@ -1,0 +1,93 @@
+You are a senior mobile engineer and release manager with deep expertise in Expo, React Native, EAS Build, Apple App Store, TestFlight, and Google Play.
+
+Your task:
+Fix ALL production issues in this Expo React Native app so it can be successfully published and opened without errors on:
+• Apple TestFlight
+• Apple App Store
+• Google Play Store
+
+CRITICAL RULES (DO NOT BREAK THESE):
+1. Do NOT remove or redesign any existing features.
+2. Do NOT change business logic, UI flow, or navigation unless required to prevent crashes.
+3. Do NOT introduce new libraries unless absolutely necessary for stability or store compliance.
+4. Preserve all current screens, roles, and functionality (Driver app).
+5. The app must work in PRODUCTION mode (not only dev/preview).
+
+KNOWN ISSUES TO FIX:
+• App opens in TestFlight but shows: “Something went wrong – Please reload the app”
+• Android EAS build fails during Gradle phase
+• Environment variables work in development but NOT in production
+• App crashes on cold start in production
+• Missing production-safe guards (null session, async init)
+• App Store & Play Store compliance issues
+
+REQUIRED FIXES (MANDATORY):
+
+### 1️⃣ ENVIRONMENT VARIABLES (MOST IMPORTANT)
+- Audit all environment variables (Supabase, API URLs, keys).
+- Ensure ALL runtime variables are accessed using:
+  Constants.expoConfig.extra
+- Replace any usage of:
+  process.env.X
+- Ensure ALL public variables are prefixed with:
+  EXPO_PUBLIC_
+- Make the app safe if env variables are missing (fail gracefully, not crash).
+
+### 2️⃣ SUPABASE / BACKEND INIT SAFETY
+- Ensure Supabase (or any backend client) initializes safely.
+- Add guards so the app does NOT crash if:
+  - Session is null
+  - User is not logged in
+  - Network is unavailable
+- First screen must show a loading state, never crash.
+
+### 3️⃣ PRODUCTION BOOT SEQUENCE
+- Fix startup logic so the app:
+  - Waits for async initialization
+  - Handles errors silently in UI
+  - Logs errors but does NOT crash
+- Add a fallback screen if initialization fails.
+
+### 4️⃣ ANDROID GRADLE BUILD FIX
+- Diagnose and fix Gradle build failure.
+- Ensure:
+  - Correct Java version
+  - Compatible Gradle wrapper
+  - Compatible Expo SDK
+  - No deprecated Android config
+- App must build successfully using:
+  eas build -p android --profile production
+
+### 5️⃣ IOS APP STORE COMPLIANCE
+- Ensure:
+  - Proper bundle identifier
+  - No forbidden permissions
+  - Correct production configuration
+  - App launches cleanly on TestFlight
+- App must be eligible for “Add for Review” in App Store Connect.
+
+### 6️⃣ ERROR HANDLING & STABILITY
+- Replace any crash-prone code with:
+  try/catch
+  defensive checks
+- No red screens
+- No fatal runtime crashes
+- No unhandled promise rejections
+
+### 7️⃣ FINAL DELIVERY REQUIREMENTS
+At the end, provide:
+1. Confirmation that the app opens successfully on TestFlight
+2. Confirmation Android build completes successfully
+3. Commands used:
+   - eas build (iOS & Android)
+   - eas submit
+4. Summary of all fixes applied
+5. Confirmation the app is ready for App Store & Play Store review
+
+OUTPUT FORMAT:
+- Make fixes directly in the code.
+- Explain changes briefly but clearly.
+- Do NOT ask questions unless something is missing.
+- Assume this app is going live to real customers.
+
+This is a production release task. Act accordingly.

@@ -1,0 +1,234 @@
+Rebuild the entire “Manage Documents” system for the Run Courier Driver App.
+This prompt MUST override all mock data, MUST save to Supabase, MUST load from Supabase, and MUST update existing records.
+Do NOT use temporary state, mock values, or local-only saving.
+Everything must sync with Supabase.
+
+🔵 1. Mandatory Supabase Requirements
+Use these exact Supabase structures:
+Storage Bucket:
+
+driver-documents
+
+Folder structure MUST be:
+
+driver-documents/{driver_id}/{document_type}/{filename}
+
+Database Table:
+
+drivers_documents
+
+Fields:
+
+id (uuid)
+driver_id (uuid)
+document_type (text)
+file_url (text)
+status (text)    // pending, verified, rejected
+expiry_date (date)
+metadata (jsonb) // extra info
+uploaded_at (timestamp)
+updated_at (timestamp)
+
+Saving Rules:
+
+When a driver uploads ANY document:
+
+Upload file → Supabase storage
+
+Get public URL
+
+Insert or update row in drivers_documents
+
+Set status = 'pending' automatically
+
+Set updated_at = now()
+
+Return updated row
+
+Re-render UI with updated data
+
+Loading Rules:
+
+When the screen opens:
+
+Fetch all documents where driver_id = currentDriver.id
+
+Map results into categories
+
+Pre-fill UI with:
+
+file_url
+
+status
+
+expiry_date
+
+metadata (if any)
+
+Show missing items as "Not Uploaded"
+
+Editing Rules:
+
+If driver replaces a document:
+
+Upload NEW file
+
+Overwrite database row with new file_url
+
+Keep old row but update timestamps
+
+Reset status → "pending"
+
+Refresh UI
+
+🔵 2. Document List (Full & Final)
+A. Personal Documents
+
+Profile Photo
+
+National Insurance Number
+
+Field: NI Number
+
+Upload: NI document
+
+Nationality (British / Other)
+
+Right to Work (Share Code)
+
+Only required if nationality ≠ British
+
+Upload + expiry
+
+DBS Certificate (upload + expiry)
+
+Address Proof (upload)
+
+B. Vehicle Photos (based on vehicle type)
+Motorbike:
+
+Front
+
+Back
+
+Car:
+
+Front
+
+Back
+
+Small Van & Medium Van:
+
+Front
+
+Back
+
+Left Side
+
+Right Side
+
+Load Space
+
+C. Insurance Documents
+Motorbike:
+
+Motorbike Insurance (upload + expiry)
+
+Car:
+
+Car Insurance (upload + expiry)
+
+Goods in Transit (upload + expiry)
+
+Small Van / Medium Van:
+
+Hire & Reward Insurance
+
+Goods in Transit Insurance
+
+🔵 3. UI Requirements
+
+Build:
+
+Screen 1: Manage Documents
+
+Show progress circle
+
+Show categories
+
+Each item clickable → opens detail page
+
+Status icons (pending, verified, rejected)
+
+Real-time updates after editing
+
+Screen 2: Document Detail
+
+Contains:
+
+Title
+
+Current File Preview
+
+Upload/Replace button
+
+Expiry date (when required)
+
+Save button
+
+Delete/Reset button
+
+After saving:
+
+Upload to Supabase
+
+Update database
+
+Navigate back and refresh
+
+🔵 4. Logic Requirements
+Nationality Logic:
+IF nationality = "British" → hide Right to Work
+IF ≠ British → show Right to Work
+
+Vehicle Type Logic:
+
+Based on driver record:
+
+motorbike
+car
+small van
+medium van
+
+
+Only show required documents.
+
+🔵 5. Completion Percentage Logic
+percentage = verified_documents / total_required_documents * 100
+
+
+Count required documents depending on nationality + vehicle type.
+
+Show progress circle.
+
+🔵 6. NO MOCK DATA RULE
+
+You MUST remove all mock data and temporary arrays.
+Everything must be loaded from Supabase.
+If something doesn't exist in Supabase yet → display “Not Uploaded”.
+
+🔵 7. Deliverables (very important)
+
+You MUST deliver:
+
+✓ Full functional React Native components
+✓ All storage uploads working
+✓ All saves go to Supabase
+✓ All updates go to Supabase
+✓ All data loads from Supabase
+✓ Works with Expo Go
+✓ Works for iOS & Android
+✓ Every document editable
+📌 END OF PROMPT
+
+Generate ONLY the Driver Documents Module using these rules. It must be fully functional and connected to Supabase.

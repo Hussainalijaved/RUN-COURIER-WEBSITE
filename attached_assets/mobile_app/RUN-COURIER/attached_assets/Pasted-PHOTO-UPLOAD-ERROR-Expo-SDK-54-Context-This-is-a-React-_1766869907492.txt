@@ -1,0 +1,134 @@
+PHOTO UPLOAD ERROR (Expo SDK 54)
+
+Context
+This is a React Native Expo mobile app (SDK 54+) for Run Courier.
+Drivers must upload proof of delivery photos when completing a job.
+
+Currently, the app fails with this error:
+
+readAsStringAsync imported from "expo-file-system" is deprecated
+
+This happens when the driver taps “Complete Delivery”.
+
+❌ PROBLEM (DO NOT IGNORE)
+
+App uses expo-file-system.readAsStringAsync
+
+This API is deprecated in Expo SDK 54
+
+Upload fails before reaching backend
+
+Driver cannot complete jobs
+
+🎯 GOAL
+
+Fix photo upload so:
+
+Drivers can complete delivery
+
+Works on iOS TestFlight
+
+Uses supported Expo SDK 54 APIs
+
+Uploads photos correctly to backend
+
+🔧 REQUIRED FIX (MANDATORY)
+OPTION A (RECOMMENDED – CLEAN FIX)
+
+DO NOT read files as base64 strings
+
+Instead:
+
+Use FormData
+
+Send image as binary file
+
+Use fetch() with multipart/form-data
+
+✅ This is the correct production approach
+
+📸 REQUIRED IMPLEMENTATION (EXAMPLE)
+
+Replace any code like this ❌:
+
+FileSystem.readAsStringAsync(uri, { encoding: 'base64' })
+
+
+With this ✅:
+
+const formData = new FormData();
+
+formData.append('photo', {
+  uri: image.uri,
+  name: 'delivery.jpg',
+  type: 'image/jpeg',
+});
+
+await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/jobs/${jobId}/upload-proof`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'multipart/form-data',
+  },
+  body: formData,
+});
+
+🔐 BACKEND REQUIREMENTS (VERIFY)
+
+Ensure backend supports:
+
+multipart/form-data
+
+Field name: photo
+
+Correct jobId param
+
+Auth token required
+
+Example (Node / Express):
+
+multer().single('photo')
+
+🧠 DEBUGGING (REQUIRED)
+
+Log upload request URL
+
+Log backend response
+
+If upload fails, show real error message
+
+Do NOT show generic “check connection” message
+
+🚫 DO NOT DO
+
+❌ Do NOT use deprecated APIs
+
+❌ Do NOT convert images to base64
+
+❌ Do NOT use expo-file-system/legacy
+
+❌ Do NOT suppress the error
+
+🍏 COMPATIBILITY
+
+Expo SDK: 54
+
+iOS: TestFlight
+
+App Version: 1.0.6
+
+iOS Build: 12
+
+✅ FINAL RESULT EXPECTED
+
+Driver taps Complete Delivery
+
+Photos upload successfully
+
+Job status updates to Completed
+
+No Expo deprecation warnings
+
+Works in production
+
+Apply the fix, test on a real device, and confirm success.

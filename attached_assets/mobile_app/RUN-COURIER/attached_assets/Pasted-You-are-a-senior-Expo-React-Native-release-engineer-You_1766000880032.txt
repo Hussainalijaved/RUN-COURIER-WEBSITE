@@ -1,0 +1,192 @@
+You are a senior Expo + React Native release engineer. Your task is to fully fix, stabilize, and prepare this Expo app for production, then make it successfully publishable to Apple TestFlight and Google Play without errors.
+
+PROJECT CONTEXT:
+
+App name: RUN COURIER DRIVER
+
+Platform: Expo (EAS Build & Submit)
+
+Backend: Supabase
+
+Current problems:
+
+TestFlight app opens but shows “Something went wrong”
+
+Android build fails (Gradle error)
+
+eas.json validation errors
+
+Missing / unstable environment variables in production
+
+Build & submit flow inconsistent
+
+Goal: Clean, stable production build for iOS & Android
+
+🔧 REQUIRED TASKS (DO ALL — NO SKIPPING)
+1️⃣ Fix eas.json (CRITICAL)
+
+Remove all empty or invalid submit keys
+
+DO NOT include submit section unless absolutely required
+
+Ensure only valid production build config exists
+
+Final required structure:
+
+{
+  "build": {
+    "production": {
+      "ios": {
+        "distribution": "app-store"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  }
+}
+
+2️⃣ Fix App Versioning (MANDATORY)
+
+Increment app version and build numbers so Apple & Google accept the upload
+
+iOS
+
+expo.version → increment (e.g. 1.0.1)
+
+ios.buildNumber → increment (string)
+
+Android
+
+android.versionCode → increment (number)
+
+Ensure values are synced correctly in app.json or app.config.js.
+
+3️⃣ Fix Environment Variables (PRODUCTION SAFE)
+
+App MUST NOT crash if env variables are missing
+
+Load Supabase config only via EAS secrets
+
+Add a safe fallback screen instead of crashing
+
+Requirements:
+
+Use process.env.EXPO_PUBLIC_SUPABASE_URL
+
+Use process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+If missing, show a clear setup message, not “Something went wrong”
+
+4️⃣ Ensure EAS Secrets Compatibility
+
+The app must rely on EAS secrets, not local .env.
+
+Required secrets (project scope):
+
+EXPO_PUBLIC_SUPABASE_URL
+
+EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+Code must work correctly in:
+
+Local dev
+
+EAS build
+
+TestFlight
+
+Play Store
+
+5️⃣ Fix iOS Runtime Crash (TESTFLIGHT ISSUE)
+
+Investigate and fix causes of:
+
+Blank screen
+
+“Something went wrong” on launch
+
+Specifically check:
+
+Supabase initialization timing
+
+Async config loading
+
+Navigation stack errors
+
+Missing permissions
+
+Unhandled promise rejections
+
+App must open cleanly on TestFlight.
+
+6️⃣ Fix Android Build Failure
+
+Diagnose Gradle error
+
+Ensure:
+
+Compatible Expo SDK
+
+Compatible Android Gradle Plugin
+
+Compatible dependencies
+
+Ensure build succeeds via:
+
+eas build -p android --profile production
+
+7️⃣ Verify Store Compliance
+
+Ensure:
+
+iOS permissions configured correctly:
+
+Location
+
+Camera (if used)
+
+Encryption settings
+
+Android permissions declared correctly
+
+No forbidden APIs
+
+App does NOT crash on startup
+
+8️⃣ Provide Final Commands (CLEAR & CORRECT)
+
+At the end, output exact commands for the user:
+
+eas login
+eas build -p ios --profile production
+eas submit -p ios
+
+eas build -p android --profile production
+eas submit -p android
+
+9️⃣ DO NOT:
+
+Do NOT remove features
+
+Do NOT change UI design
+
+Do NOT change business logic
+
+Do NOT downgrade SDK
+
+Do NOT introduce breaking changes
+
+🎯 FINAL RESULT EXPECTED
+
+✅ iOS app opens correctly on TestFlight
+
+✅ Android build succeeds
+
+✅ Both platforms ready for store review
+
+✅ No config, build, or runtime errors
+
+✅ Clean, production-ready state
+
+Start immediately. Apply fixes directly to the project. Explain changes briefly, then provide final build commands.

@@ -1,0 +1,76 @@
+You are a senior Expo + React Native engineer.
+
+PROJECT CONTEXT:
+This is an Expo mobile app for a courier service (Run Courier), built in Replit.
+The backend is already deployed and ACTIVE at:
+
+https://expo-messenger--almashriqi2010.replit.app
+
+CURRENT PROBLEMS:
+1. The mobile app is NOT connecting to the backend (no API requests reaching server).
+2. Payment screen shows errors (404 / service unavailable).
+3. Photo upload fails when driver completes a job.
+4. The app may still be using localhost, spock.replit.dev, or an old backend URL.
+5. expo-file-system error: readAsStringAsync is deprecated.
+6. The app must be ready for iOS TestFlight submission.
+7. Version must be: 1.0.6
+8. iOS build number must be: 12
+
+YOUR TASKS (DO ALL OF THEM):
+
+1. SEARCH THE ENTIRE PROJECT for any backend URL usage:
+   - localhost
+   - 127.0.0.1
+   - spock.replit.dev
+   - old replit preview URLs
+   - hardcoded fetch/axios URLs
+
+2. CREATE or UPDATE a single source of truth for the API URL:
+   - Use EXPO_PUBLIC_API_URL
+   - Set it to:
+     https://expo-messenger--almashriqi2010.replit.app
+
+3. ENSURE ALL API CALLS use ONLY this variable:
+   - fetch(`${EXPO_PUBLIC_API_URL}/api/...`)
+   - axios baseURL = EXPO_PUBLIC_API_URL
+
+4. FIX STRIPE INTEGRATION:
+   - Ensure mobile app uses the SAME Stripe account as the website
+   - Use the existing Stripe backend endpoints
+   - Do NOT create mock or test-only Stripe logic
+   - Ensure payment intent creation uses the backend, not client-side secrets
+
+5. FIX PHOTO UPLOAD ERROR:
+   - Remove deprecated readAsStringAsync from expo-file-system
+   - Migrate to the modern Expo filesystem API:
+     - Use File and Directory APIs OR
+     - Import legacy API correctly from "expo-file-system/legacy"
+   - Ensure photo upload sends multipart/form-data correctly
+   - Ensure upload endpoint uses EXPO_PUBLIC_API_URL
+
+6. VERIFY DRIVER COMPLETE DELIVERY FLOW:
+   - Pickup → Delivery → Upload photos → Complete job
+   - No connection errors
+   - No filesystem errors
+   - No 404 errors
+
+7. ENSURE APP CONFIG IS CORRECT FOR iOS:
+   - app.json / app.config.js:
+     - version: "1.0.6"
+     - ios.buildNumber: "12"
+   - Ensure no invalid version formatting
+
+8. RESTART AND VERIFY:
+   - Restart Expo server
+   - Confirm backend receives requests
+   - Add minimal console logs to verify API connectivity
+
+9. DO NOT REMOVE ANY FEATURES.
+10. DO NOT CHANGE UI OR BUSINESS LOGIC.
+11. ONLY FIX CONNECTIVITY, CONFIGURATION, STRIPE, AND UPLOAD ISSUES.
+
+OUTPUT EXPECTATION:
+- Make all changes directly in the project
+- Ensure the app is production-ready
+- Ensure it can be built and submitted to TestFlight without errors
+- Explain briefly what was changed and why

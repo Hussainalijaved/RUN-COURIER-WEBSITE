@@ -1,0 +1,55 @@
+Fix the entire driver document upload system for the mobile app so all documents work properly.
+
+Apply the following rules:
+
+1. Document Storage
+   - Use Supabase Storage bucket: "driver_documents"
+   - Create folder path: driver_documents/{driver_id}/{document_type}.jpg
+   - Generate public URL after upload.
+   - Save the uploaded file URL into Supabase table: driver_documents
+
+2. Document Types to support:
+   - DBS Certificate
+   - Driving Licence
+   - Vehicle Insurance (Hire & Reward)
+   - Goods in Transit Insurance
+   - Vehicle Photo (Front)
+   - Vehicle Photo (Back)
+   - Vehicle Photo (Left)
+   - Vehicle Photo (Right)
+   - Vehicle Load Space
+   - National Insurance Number
+   - Share Code (Right to Work Document)
+   - Vehicle Registration Number
+   - MOT (optional – upload field only)
+
+3. Conditional Logic:
+   - If nationality = “British”: hide "Share Code" upload
+   - If nationality != “British”: show and require "Share Code"
+   - Motorbike: Requires Driving Licence, Motorbike Insurance
+   - Car: Requires Driving Licence, Hire & Reward, Goods in Transit, Vehicle Photos x2
+   - Small Van / Medium Van: Requires Driving Licence, Hire & Reward, Goods in Transit, Vehicle Photos x5
+
+4. Screen Fixes:
+   - The “Select Image” button must open image picker.
+   - The selected image must show in the preview box before saving.
+   - The “Save Document” button must:
+       a) Upload image to Supabase Storage
+       b) Update driver_documents record in Supabase with:
+          - file_url
+          - document_type
+          - expiry_date (if included)
+          - status = "pending_review"
+       c) Return to Manage Documents screen with updated status.
+
+5. Driver Linking:
+   - Make sure uploads use the current authenticated user (driver_id).
+   - If driver profile already exists on the website, sync using the same driver_id.
+
+6. UI:
+   - Show correct status badge: Not Uploaded / Pending Review / Verified
+   - Show uploaded image preview on reopen.
+
+7. IMPORTANT:
+   - Apply this fix to ALL document screens, not only Vehicle Photo (Front).
+   - Ensure all uploads save and display on profile page.

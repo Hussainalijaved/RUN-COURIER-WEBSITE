@@ -1,0 +1,85 @@
+You are a senior Expo + React Native engineer.
+
+I have a DRIVER mobile app built with Expo.
+There is a CRITICAL issue when the driver completes a job:
+
+❌ Proof of Delivery photo upload fails
+❌ Error shows:
+"Photo upload failed: Method readAsStringAsync imported from expo-file-system is deprecated"
+
+YOUR TASK:
+Fix ONLY the Proof of Delivery (POD) upload flow.
+Do NOT change any other features.
+
+==============================
+WHAT IS BROKEN
+==============================
+
+- POD photos fail to upload
+- App uses deprecated expo-file-system API
+- Job cannot be completed
+- Error appears after clicking "Complete Delivery"
+
+==============================
+REQUIREMENTS
+==============================
+
+1️⃣ REMOVE deprecated API
+- Do NOT use readAsStringAsync
+- Do NOT use base64 uploads
+
+2️⃣ IMPLEMENT correct upload method
+- Use FormData
+- Upload photos as binary files
+- Use multipart/form-data
+- Compatible with iOS & Android
+
+3️⃣ POD DATA TO SEND
+Each POD submission must include:
+- jobId
+- photos[] (one or more)
+- recipientName (optional)
+- signature (optional)
+- notes (optional)
+
+4️⃣ BACKEND COMMUNICATION
+- Send request to existing backend endpoint
+- Handle success & error responses correctly
+- On success:
+  ✔ Mark job as DELIVERED
+  ✔ Prevent duplicate submission
+  ✔ Show success confirmation
+
+5️⃣ ERROR HANDLING
+- If upload fails:
+  - Show clear error message
+  - Allow retry
+- Do NOT silently fail
+
+==============================
+WHAT TO DO
+==============================
+
+- FIND the POD upload code yourself
+- FIND where expo-file-system is used
+- REPLACE it with a proper FormData upload
+- ENSURE compatibility with Expo SDK 54+
+
+==============================
+OUTPUT REQUIRED
+==============================
+
+After fixing:
+1. Show the updated upload code
+2. List files changed
+3. Confirm POD upload works on real device
+4. Confirm job can be completed successfully
+
+DO NOT change:
+- Job logic
+- UI design
+- Backend logic
+- Payment
+- Tracking
+
+FIX ONLY POD UPLOAD.

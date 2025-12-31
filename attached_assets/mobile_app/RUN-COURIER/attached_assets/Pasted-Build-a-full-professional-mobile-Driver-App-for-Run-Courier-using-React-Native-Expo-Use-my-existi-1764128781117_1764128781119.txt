@@ -1,0 +1,178 @@
+Build a full professional mobile Driver App for Run Courier using React Native + Expo.
+Use my existing Supabase backend.
+The mobile app must sync 100% with the website (same drivers table, same login, same profile data).
+Below are the full requirements. DO NOT guess — follow everything exactly.
+
+🔵 1. Authentication
+
+Register with email + password only
+
+Login with the same email/password used on the website
+
+After login, load driver record from drivers table using auth.user().id
+
+If no driver row exists → create new row in drivers with:
+
+id = auth.user.id
+
+status = "pending_verification"
+
+created_at
+
+🔵 2. Driver Profile Fields (must match website exactly)
+
+Store all fields in Supabase drivers table:
+
+Basic info
+
+full_name
+
+email
+
+phone
+
+postcode
+
+address
+
+profile_photo_url
+
+Vehicle Type (must match website)
+
+"motorbike"
+
+"car"
+
+"small_van"
+
+"medium_van"
+
+Documents (conditional)
+
+motorbike → only Insurance
+
+car → Insurance + Goods in Transit
+
+small van / medium van → Hire & Reward Insurance + Goods in Transit
+
+Document fields:
+
+insurance_url
+
+goods_in_transit_url
+
+hire_and_reward_url
+
+Admin verification
+
+status: "pending_verification" / "verified"
+
+status_reason (optional)
+
+🔵 3. Driver App Screens
+
+Build the following screens fully functional:
+
+A. Authentication
+
+Login
+
+Register
+
+Forgot password
+
+B. Home (Job List)
+
+Show:
+
+Available jobs
+
+Assigned jobs
+
+Job details page
+
+Accept / Reject job
+
+When rejecting → choose reason:
+
+Too far
+
+Busy right now
+
+Unacceptable rate
+
+Another job
+
+C. Active Job
+
+Map showing pickup → drop-off
+
+Customer name
+
+Addresses
+
+“Arrived”, “Picked up”, “Delivered” buttons
+
+Upload POD (photo + signature)
+
+D. Completed Jobs
+
+List of completed jobs
+
+Earnings
+
+Miles
+
+E. Profile
+
+Full profile info
+
+Edit profile (save to Supabase)
+
+Change profile photo
+
+Address autocomplete from postcode (UK only)
+
+Vehicle type (4 options)
+
+Bank details (save to driver_bank_details table)
+
+Documents upload (save to Supabase storage)
+
+Logout
+
+🔵 4. Data Sync Rules
+
+After login → fetch driver row by auth.user.id
+
+All updates save instantly to Supabase
+
+If driver registers in the website → the app loads the same profile
+
+No duplication → always use the same driver.id
+
+🔵 5. UI / Branding
+
+Use:
+
+Run Courier light blue #007bff
+
+White backgrounds
+
+My official Run Courier logo (ask me where to upload it)
+
+Modern clean UI
+
+iOS + Android compatible
+
+🔵 6. VERY IMPORTANT
+
+Fix all navigation, no broken screens
+
+Every button must work
+
+Implement real-time updates with Supabase
+
+No mock data
+
+Everything fully functional end-to-end

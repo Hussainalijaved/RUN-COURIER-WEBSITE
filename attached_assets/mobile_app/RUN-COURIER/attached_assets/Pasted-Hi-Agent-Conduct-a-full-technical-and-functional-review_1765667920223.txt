@@ -1,0 +1,118 @@
+Hi Agent, Conduct a full technical and functional review of the existing web and mobile app built on Replit in order to understand the complete scope, readiness, gaps, and deployment blockers.
+⚠️ Do NOT modify, refactor, fix, or deploy anything. This is a review-only task.
+
+1️⃣ Project Architecture Review
+
+Identify the tech stack used (frontend, backend, database, APIs).
+
+Confirm whether the website and mobile app share the same backend and database.
+
+Review folder structure and overall project organization.
+
+Identify if the app is structured as:
+
+Web-only
+
+Web + mobile wrapper (Capacitor/Cordova/etc.)
+
+API-first architecture
+
+2️⃣ Authentication & User Flow
+
+Review how user authentication is implemented.
+
+Check session persistence, login/logout flow, and role handling (user/admin).
+
+Identify any issues that could affect mobile app persistence.
+
+3️⃣ Stripe Integration Review (NO CHANGES)
+
+Confirm:
+
+Stripe is currently in test mode or live mode
+
+Where Stripe keys are stored and referenced
+
+Identify why Stripe Live activation is blocking deployment
+
+Check webhook setup and environment variable usage
+
+Highlight what is required to safely switch to Stripe Live
+
+4️⃣ Deployment Readiness Check
+
+Review current deployment configuration for:
+
+Web hosting
+
+Mobile build readiness (Android & iOS)
+
+Identify blockers for:
+
+Play Store submission
+
+App Store submission
+
+Confirm whether Apple Developer & Google Play Console requirements are met
+
+5️⃣ Mobile App Integration Review
+
+Confirm how the mobile app is integrated with the web app
+
+Check:
+
+API usage
+
+Shared backend logic
+
+Environment configs for mobile builds
+
+Identify gaps preventing full web ↔ mobile integration
+
+6️⃣ Environment & Configuration Audit
+
+Review environment variables (read-only)
+
+Check config files (.env, deployment configs, etc.)
+
+Identify missing or misconfigured variables affecting production
+
+7️⃣ Security & Stability Overview
+
+High-level review of:
+
+API exposure
+
+Payment security flow
+
+Auth security risks
+
+No code changes — flag risks only
+
+8️⃣ Scope Definition Output
+
+Provide a clear written report covering:
+
+Current state of the app
+
+What is complete
+
+What is partially complete
+
+What is missing
+
+What must be fixed before going live
+
+Estimated effort areas (no pricing yet)
+
+🚫 Important Rules
+
+❌ Do NOT edit code
+
+❌ Do NOT deploy
+
+❌ Do NOT connect live services
+
+❌ Do NOT change Stripe settings
+
+This review is purely diagnostic to define the exact scope, timeline, and cost for the client.

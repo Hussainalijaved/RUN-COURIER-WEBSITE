@@ -1,0 +1,114 @@
+You are a senior iOS App Store compliance engineer.
+Your task is to fix all App Store Review rejections and ensure the app is 100% compliant with Apple App Store Guidelines 4.0 (Design) and 5.1.1 (Privacy & Permissions).
+
+⚠️ CRITICAL RULES — MUST FOLLOW EXACTLY
+
+Do NOT remove, disable, or change any existing business logic or features
+
+Do NOT add new features
+
+Do NOT introduce breaking changes
+
+Fix ONLY layout and permission-request flow
+
+Changes must work on iPhone 17 Pro Max (iOS 26+) and iPad
+
+Assume reviewers test with Dynamic Text enabled
+
+FIX 1 — UI OVERLAP (Guideline 4.0)
+
+Target screen: Enable Permissions screen
+
+Required UI changes:
+
+Remove all fixed heights, absolute positioning, and hard-coded sizes
+
+Wrap the entire screen in a scrollable safe container (ScrollView / SingleChildScrollView)
+
+Respect Safe Area Insets on all devices
+
+Ensure text wraps naturally and never overlaps
+
+Maintain minimum 16pt font size
+
+Add vertical spacing between elements (icon → title → description → button)
+
+Support Dynamic Type and large accessibility text
+
+Verify no overlap on:
+
+iPhone 17 Pro Max
+
+iPad Pro
+
+Portrait & Landscape
+
+The screen must remain fully readable and usable at all text sizes.
+
+FIX 2 — PERMISSION FLOW (Guideline 5.1.1) ⚠️
+This is mandatory:
+
+The app currently uses a custom permission explanation screen that allows the user to delay, skip, or exit before the iOS system permission dialog.
+
+THIS IS NOT ALLOWED.
+
+You must implement ONE of the following compliant flows:
+OPTION A (Preferred):
+
+Remove the custom permission screen entirely
+
+Trigger the iOS system permission request immediately when the related feature is accessed
+
+OPTION B (Allowed only if exact):
+
+Keep the explanation screen
+
+Remove ALL exit, close, skip, back, or delay buttons
+
+Display ONE SINGLE BUTTON ONLY
+
+Button action must immediately trigger the native iOS permission request
+
+The user must not be able to proceed without reaching the system permission popup
+
+Explicitly forbidden:
+
+“Continue” without triggering permission
+
+“Later”, “Skip”, “Not Now”
+
+Close (X) button
+
+Back navigation
+
+POST-DENIAL HANDLING (Allowed)
+
+If the user denies permission:
+
+Show a clear message that the feature requires access
+
+Provide a button labeled “Open Settings”
+
+Link directly to the app’s iOS Settings page
+
+FINAL VERIFICATION
+
+After implementing fixes:
+
+Test on iPhone Pro Max & iPad simulators
+
+Test with large accessibility text enabled
+
+Perform a fresh install
+
+Ensure permission popup appears correctly every time
+
+Confirm explicitly that:
+
+No UI overlaps exist
+
+Permission flow fully complies with Apple Guideline 5.1.1
+
+The app is safe to resubmit to App Store Connect
+
+DO NOT STOP until all requirements are satisfied.

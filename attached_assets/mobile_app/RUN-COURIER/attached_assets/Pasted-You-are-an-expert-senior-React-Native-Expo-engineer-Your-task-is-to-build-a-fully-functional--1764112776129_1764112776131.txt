@@ -1,0 +1,276 @@
+You are an expert senior React Native / Expo engineer.  
+Your task is to build a fully functional, professional, production-ready 
+**Run Courier DRIVER MOBILE APP** for iOS and Android.
+
+=========================================================
+🔵 BRAND & DESIGN
+=========================================================
+Use Run Courier brand:
+• Primary color: #007bff (light blue)
+• Secondary color: #ffffff (white)
+• Clean, modern UI (courier style)
+• Logo displayed on splash screen, login, and headers
+
+=========================================================
+🔵 TECH REQUIREMENTS
+=========================================================
+• Build using React Native + Expo (latest stable SDK)
+• Use Supabase for:
+  - Authentication
+  - Realtime driver location
+  - Driver profile
+  - Documents upload
+  - Job offers
+  - Job status updates
+  - Completed jobs
+• Use Google Maps SDK:
+  - Mini map for job offer (pickup + delivery pins)
+  - Live route navigation (Maps + Waze)
+  - Background location tracking
+• Use Google Places API (UK only) for postcode autocomplete
+
+=========================================================
+🔵 APP MODULES
+=========================================================
+
+#########################################################
+# 1. AUTHENTICATION
+#########################################################
+• Email + password login  
+• Email + password signup  
+• Email verification required  
+• Keep user logged in (persistent session)
+• If driver has no profile → redirect to Profile Setup
+
+#########################################################
+# 2. DRIVER PROFILE SETUP
+#########################################################
+Driver must complete the full profile after signup.
+
+Fields required:
+• Full Name  
+• Email  
+• Phone  
+• Nationality  
+• Postcode  
+• Full Address  
+• Profile Picture (upload to Supabase Storage)
+• Vehicle Type (motorbike, car, small_van, medium_van)
+• Vehicle Registration Number  
+• Bank Details (account holder name, sort code, account number)
+
+#########################################################
+# 3. DOCUMENTS UPLOAD
+#########################################################
+Show required documents dynamically based on vehicle type.
+
+Motorbike:
+• Motorbike insurance
+• 2 photos (front, back)
+
+Car:
+• Car insurance
+• Goods in transit
+• 2 photos (front, back)
+
+Small/Medium Van:
+• Hire & Reward insurance
+• Goods in transit
+• 5 photos (front, back, left, right, loading space)
+
+ALL DRIVERS:
+• DBS Certificate
+
+Documents must upload to Supabase Storage.
+
+#########################################################
+# 4. JOB OFFERS LIST
+#########################################################
+Fetch jobs from Supabase where:
+• status = "waiting_for_driver"
+• assigned_driver = this driver OR null (dispatch logic)
+
+Each job card shows:
+• Pickup postcode
+• Delivery postcode
+• Distance
+• Price
+• Vehicle required
+• Weight
+• Mini map preview (pickup + drop pins)
+
+Buttons:
+• Accept Job
+• Reject Job (opens modal with reasons):
+  - Too far
+  - Busy right now
+  - Unacceptable rate
+  - Another job
+
+#########################################################
+# 5. ACTIVE JOB WORKFLOW
+#########################################################
+When job is accepted:
+
+• Show job details screen:
+  - Pickup postcode
+  - Delivery postcode
+  - Distance
+  - Price
+  - Vehicle
+  - Weight
+  - Map with route preview
+
+Status flow:
+1. “Navigate to Pickup”
+   → Button opens Google Maps or Waze
+2. “Picked Up” button
+3. “Navigate to Delivery”
+   → Open Maps/Waze
+4. “Delivered” button
+5. Upload POD:
+   - Take/upload photo
+   - Signature capture
+
+After POD upload:
+→ status = "completed"
+→ store time, distance, location.
+
+#########################################################
+# 6. LIVE LOCATION TRACKING
+#########################################################
+Driver location must update to Supabase every 5–10 seconds.
+
+Use Expo Location:
+• Background location enabled
+• Save latitude, longitude to drivers table
+• Admin app will track this in real time
+
+#########################################################
+# 7. COMPLETED JOBS
+#########################################################
+Show list of:
+• Date
+• Price/earnings
+• Distance
+• Job reference
+
+Fetch from Supabase:
+jobs where assigned_driver = this driver AND status = "completed".
+
+#########################################################
+# 8. DRIVER EARNINGS
+#########################################################
+Weekly summary:
+• Total jobs
+• Total earnings
+• Total miles
+
+Compute from Supabase job data.
+
+#########################################################
+# 9. NOTIFICATIONS
+#########################################################
+When a new job is assigned:
+• Push notification AND
+• Sound alert (mp3)  
+
+Use Expo Notifications or Supabase triggers.
+
+#########################################################
+# 10. DRIVER SETTINGS
+#########################################################
+• Edit Profile
+• Edit Documents
+• Change Profile Picture
+• Update Bank Details
+• Delete Account (Supabase delete user + related data)
+• Logout
+
+#########################################################
+# 11. NAVIGATION & SCREENS
+#########################################################
+
+Root:
+• SplashScreen (logo)
+• AuthNavigator
+• DriverNavigator
+
+AuthNavigator:
+• LoginScreen
+• SignupScreen
+• EmailVerificationScreen
+
+DriverNavigator (bottom tabs):
+1. Home (Job Offers)
+2. Active Job
+3. Completed Jobs
+4. Profile
+
+#########################################################
+# 12. DATA STRUCTURE (Supabase)
+#########################################################
+Use existing tables:
+
+drivers:
+  id
+  user_id
+  name
+  phone
+  nationality
+  postcode
+  address
+  profile_picture_url
+  vehicle_type
+  reg_number
+  documents (JSON)
+  bank_details (JSON)
+  status
+  latitude
+  longitude
+
+jobs:
+  id
+  pickup_postcode
+  delivery_postcode
+  distance
+  price
+  status
+  assigned_driver
+  weight
+  vehicle_required
+  created_at
+  updated_at
+  pod_photo
+  pod_signature
+
+#########################################################
+# 13. QUALITY RULES
+#########################################################
+• Clean folder structure (screens, components, hooks, services)
+• Error handling everywhere
+• Loading states / skeleton screens
+• Works on iOS + Android
+• No hard-coded URLs — use .env + Supabase client
+• Professional UI
+
+=========================================================
+Generate the full app now:
+- All screens
+- Navigation
+- Components
+- Context providers
+- Supabase service
+- Location service
+- Document upload code
+- POD upload
+- Maps integration
+- UK postcode autocomplete
+- Background location tracking
+- Push notifications
+- Driver profile system
+- Clean styling with primary blue theme
+
+Output must be complete and build-ready.
+=========================================================
+

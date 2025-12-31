@@ -1,0 +1,231 @@
+You are a senior React Native engineer, Supabase backend engineer, security auditor, and App Store / Google Play compliance specialist.
+
+Your task is to fix this entire mobile app, make all existing features work perfectly, remove crashes and build errors, and deliver a clean, secure, publish-ready codebase for iOS (App Store/TestFlight) and Android (Google Play AAB).
+
+🚫 ABSOLUTE RULES (NON-NEGOTIABLE)
+
+DO NOT delete any feature.
+Every feature must remain available and functional.
+
+DO NOT redesign the UI (no visual changes, no layout changes).
+
+DO NOT change or redesign the Driver section (UI, flows, logic, pages).
+You may ONLY fix bugs if something is broken.
+
+DO NOT rename:
+
+routes or pages
+
+Supabase tables or columns
+
+storage buckets
+
+existing environment variable names
+
+DO NOT expose secrets in the mobile app (no service keys, no SMTP, no Stripe secret keys).
+
+🎯 FINAL GOAL
+
+App runs without crashes
+
+All features work reliably
+
+Clean Metro bundling (no errors)
+
+Secure Supabase access (RLS enforced)
+
+Apple App Store will approve
+
+Google Play will approve
+
+🔥 PHASE 1 — FIX CURRENT CRASH (CRITICAL)
+
+The app currently crashes with Metro error:
+
+UnableToResolveError: cannot resolve node:stream
+caused by @react-email/render/dist/node/index.mjs
+
+REQUIRED FIX (KEEP FEATURE)
+
+The email feature must stay, but:
+
+Email rendering and sending must be server-side only
+
+Mobile app must NOT import any Node-only libraries
+
+Actions:
+
+Move all email rendering/sending logic to a Supabase Edge Function:
+
+Function name: send-email
+
+Runtime: Node (server-side)
+
+Uses existing email templates and logic
+
+Uses email provider securely (env vars only)
+
+Mobile app:
+
+Remove all Node-only imports from mobile code
+
+Call the Edge Function via HTTPS
+
+Handle success/failure cleanly (no UI redesign)
+
+Ensure Metro bundler succeeds:
+
+No stream, fs, path, crypto, or Node core modules in mobile bundle
+
+App boots successfully on Android and iOS
+
+🔐 PHASE 2 — SECURITY & SUPABASE FIXES
+
+Backend uses Supabase.
+
+A) Environment & secrets
+
+Mobile app must contain ONLY:
+
+Supabase URL
+
+Supabase anon key
+
+Move ALL sensitive logic to Edge Functions:
+
+email
+
+admin-only actions
+
+Stripe server logic (if used)
+
+B) Row Level Security (MANDATORY)
+
+Enable RLS on all sensitive tables
+
+Enforce:
+
+users see only their own data
+
+drivers see only jobs assigned to them
+
+admin access verified securely (not client flag)
+
+C) Storage security
+
+Fix storage policies:
+
+private buckets for documents & POD
+
+users access only their own uploads
+
+drivers access only assigned job files
+
+Fix all 401 / 403 issues properly (no public buckets)
+
+⚙️ PHASE 3 — FIX ALL FUNCTIONAL ISSUES
+
+Audit and fix without redesign:
+
+Authentication (login, signup, logout, session restore)
+
+Role separation (user / business / driver / admin)
+
+Job creation, assignment, acceptance, rejection
+
+Navigation buttons (maps open correctly)
+
+Uploads (documents, vehicle images, POD)
+
+Stripe payments (pay now / pay later) without crashes
+
+Infinite loading, blank screens, dead buttons
+
+Network error handling with retry/fallback
+
+📜 PHASE 4 — APP STORE & PLAY STORE COMPLIANCE
+Permissions
+
+Request only required permissions
+
+Request permissions only when feature is used
+
+iOS Info.plist includes proper usage descriptions
+
+Android manifest minimal & correct
+
+Privacy
+
+In-app Privacy Policy link must exist
+
+Data usage must match actual behavior
+
+Account deletion (REQUIRED)
+
+In-app “Delete Account” for user/business accounts
+
+Secure deletion/anonymization via Supabase
+
+Driver section must remain unchanged
+
+🚀 PHASE 5 — RELEASE BUILD READINESS
+
+Remove all debug logs in release builds
+
+No test keys in production
+
+Ensure clean builds:
+
+Android (AAB)
+
+iOS (TestFlight IPA)
+
+📦 FINAL REQUIRED OUTPUT
+
+When finished, output ONLY:
+
+Build status:
+
+Android Release ✅ / ❌
+
+iOS Release ✅ / ❌
+
+Feature status:
+
+All features working ✅ / ❌ (list any broken)
+
+Driver section:
+
+Confirm unchanged ✅
+
+Security:
+
+RLS enabled ✅
+
+Storage secured ✅
+
+Secrets safe ✅
+
+Files changed:
+
+List files + short reason
+
+Build commands:
+
+clean install
+
+run dev
+
+build Android AAB
+
+build iOS TestFlight
+
+❗ IMPORTANT
+
+Do not stop until:
+
+App runs without Metro errors
+
+No Node modules are bundled into mobile
+
+App is ready for store submission

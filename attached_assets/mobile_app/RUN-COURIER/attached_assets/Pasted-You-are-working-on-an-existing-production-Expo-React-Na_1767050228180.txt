@@ -1,0 +1,97 @@
+You are working on an existing production Expo (React Native) mobile app for a courier platform (RUN COURIER).
+
+THIS IS A LIVE APP WITH REAL USERS.
+ANY DATA LOSS IS UNACCEPTABLE.
+
+========================
+ABSOLUTE NON-NEGOTIABLE RULES
+========================
+- DO NOT delete, reset, truncate, migrate, or modify ANY Supabase tables.
+- DO NOT create a new Supabase project.
+- DO NOT change existing table schemas.
+- DO NOT remove or alter existing records (drivers, users, documents, jobs).
+- DO NOT introduce a custom backend, API server, or Replit backend.
+- DO NOT add Edge Functions at this stage.
+- DO NOT store data in Expo, Replit, or local state beyond temporary UI needs.
+- Supabase is the ONLY backend and single source of truth.
+
+========================
+ARCHITECTURE REQUIREMENTS
+========================
+- Mobile app and website MUST share the SAME Supabase project.
+- Mobile app must use ONLY:
+  - EXPO_PUBLIC_SUPABASE_URL
+  - EXPO_PUBLIC_SUPABASE_ANON_KEY
+- All data must be saved directly to Supabase tables and Supabase Storage.
+- Authentication must use Supabase Auth only.
+- Authorization must rely on Supabase Row Level Security (RLS), not client logic.
+- No service role key, database credentials, or backend secrets in the mobile app.
+
+========================
+CRITICAL BUGS THAT MUST BE FIXED
+========================
+
+1) DOCUMENT UPLOAD BUG (BLOCKING)
+- Some driver documents REQUIRE an expiry date.
+- Some driver documents DO NOT require an expiry date (e.g. DBS certificate).
+- Current behavior crashes with:
+  "Cannot read properties of undefined (reading 'Base64')"
+- This causes Save buttons to appear non-functional, especially on iPad.
+- Apple rejected the app due to this issue.
+
+REQUIRED FIX:
+- Explicitly define document rules (which documents require expiry dates).
+- Validate expiry date ONLY for documents that require it.
+- Guard ALL access to file.base64 (never assume it exists).
+- Allow uploads to succeed when expiry date is not required.
+- Never crash or silently fail when expiry date is missing for non-expiry documents.
+- Ensure the Save button always responds.
+
+2) UI INTERACTION SAFETY (APPLE REVIEW)
+- Ensure no invisible overlays, loading states, or absolute-positioned views block touches.
+- Ensure buttons remain clickable on iPhone AND iPad.
+- Ensure loading states always resolve (no infinite loading).
+- Replace fragile Touchable components with Pressable where necessary.
+- Wrap main screens in SafeAreaView for iPad compatibility.
+
+========================
+DOCUMENT UPLOAD LOGIC (MANDATORY)
+========================
+- File selection must be validated before upload.
+- If file is missing or invalid, show a clear error message.
+- Base64 conversion must only happen if the file exists.
+- Upload files to Supabase Storage.
+- Save document metadata (URL, type, expiry_date if applicable) to Supabase tables.
+- expiry_date must ONLY be saved when the document requires it.
+- No null or undefined values that can break the UI.
+
+========================
+SYNC GUARANTEE
+========================
+- Any document uploaded in the mobile app must immediately be visible to the website.
+- Any document updated on the website must be reflected in the mobile app.
+- Supabase is the single source of truth for all document data.
+
+========================
+QUALITY & SAFETY REQUIREMENTS
+========================
+- No runtime JavaScript errors.
+- No silent failures.
+- All buttons must remain responsive after login.
+- App must work correctly on:
+  - iPhone
+  - iPad (iPadOS latest)
+- Must be fully compliant with Apple App Store Guideline 2.1 (App Completeness).
+
+========================
+EXPECTED OUTCOME
+========================
+- All driver documents upload correctly.
+- Documents with expiry dates require dates.
+- Documents without expiry dates upload without dates.
+- No crashes, no dead buttons, no blocked UI.
+- 100% Supabase-only backend.
+- Zero data loss.
+- Stable, App Store–ready build.
+
+DO NOT PROCEED unless ALL above rules are respected.

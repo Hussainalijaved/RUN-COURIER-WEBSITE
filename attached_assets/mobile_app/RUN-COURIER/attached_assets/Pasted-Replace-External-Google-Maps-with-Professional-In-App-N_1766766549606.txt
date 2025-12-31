@@ -1,0 +1,199 @@
+Replace External Google Maps with Professional In-App Navigation (Driver App)
+
+You are working on a professional same-day courier mobile app (iOS & Android) similar to Uber, Bolt, Gophr, CitySprint.
+
+❌ Current problem (must be fixed):
+
+When a driver taps the navigation icon, the app opens external Google Maps
+
+This looks unprofessional and breaks the in-app experience
+
+✅ Required solution (OPTION A – MANDATORY):
+Implement a fully in-app navigation experience using Google Maps SDK embedded inside the app.
+
+🎯 REQUIRED BEHAVIOUR (STRICT)
+1️⃣ In-App Map Only
+
+DO NOT open Google Maps, Apple Maps, or any external app
+
+Navigation must stay inside the app
+
+Use:
+
+Google Maps SDK for iOS & Android
+
+OR react-native-maps + Google Directions API
+
+2️⃣ Job Offer Map Preview
+
+When a driver receives a job offer:
+
+Show an embedded map
+
+Display:
+
+Pickup pin (blue)
+
+Delivery pin (red)
+
+Route line between them
+
+Show:
+
+Estimated distance
+
+Estimated time
+
+3️⃣ Active Job – Live Navigation Screen
+
+After driver accepts the job:
+
+Create a dedicated in-app navigation screen with:
+
+Fullscreen Google Map
+
+Live driver GPS location
+
+Turn-by-turn route polyline
+
+Auto-recenter button
+
+Zoom controls
+
+Map style matching app branding (clean, professional)
+
+📌 Buttons on screen:
+
+Navigate to Pickup
+
+Navigate to Delivery
+
+Start Navigation
+
+Recenter Map
+
+4️⃣ Pickup → Delivery Flow
+
+Navigate to Pickup first
+
+After pickup confirmation → automatically switch route to Delivery
+
+Route must update dynamically
+
+5️⃣ No External Redirects (VERY IMPORTANT)
+
+Disable all external map intents
+
+The navigation icon must only open the in-app map
+
+External apps are NOT allowed under any condition
+
+📦 Proof of Delivery (MANDATORY)
+POD Rules:
+
+Every job (Individual & Business) MUST have POD
+
+Driver must:
+
+Take 1 or more photos (no limit)
+
+Photos are mandatory before “Complete Delivery”
+
+Show:
+
+Photo preview grid
+
+Add more photos button
+
+Delete photo option before submit
+
+Completion Rules:
+
+“Complete Delivery” button stays disabled
+until at least 1 POD photo is uploaded
+
+Upload POD photos to storage
+
+Save URLs in the job record
+
+POD must be visible to:
+
+Customer
+
+Business account
+
+Admin
+
+📷 Barcode Scanner Fix (Critical)
+
+Fix the X close button in barcode scanner modal
+
+X must:
+
+Always close the scanner
+
+Work even if camera is active
+
+Add:
+
+Swipe down to close
+
+Hardware back button support (Android)
+
+🔐 Google Maps API Configuration
+
+Use Google Maps SDK
+
+Restrict API key properly:
+
+iOS: Bundle ID (com.runcourier.driver)
+
+Android: Package name + SHA-1
+
+Enable APIs:
+
+Maps SDK
+
+Places API
+
+Directions API
+
+Distance Matrix API
+
+🧠 UX / UI REQUIREMENTS
+
+Smooth animations
+
+No flickering map reloads
+
+Professional courier-grade UI
+
+Behaviour similar to:
+
+Uber Driver
+
+Bolt Driver
+
+Gophr Driver
+
+🚫 DO NOT DO
+
+❌ Do NOT open external Google Maps
+
+❌ Do NOT rely on browser URLs
+
+❌ Do NOT skip POD
+
+❌ Do NOT leave navigation outside the app
+
+✅ FINAL RESULT EXPECTATION
+
+A fully professional courier driver app where:
+
+Jobs open with an in-app map
+
+Navigation stays inside the app
+
+POD is mandatory and visible to customers
+
+The app feels like a real logistics company, not a prototype

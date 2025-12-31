@@ -1,0 +1,64 @@
+TASK: Update the mobile app to correctly connect to the new backend URL and prepare a clean TestFlight build.
+
+CONTEXT:
+This is a React Native / Expo mobile app already submitted to TestFlight before.
+The backend URL has changed and the app must be rebuilt to reflect this change.
+
+NEW BACKEND BASE URL (USE THIS EXACTLY, NO MODIFICATIONS):
+https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev
+
+REQUIREMENTS (MANDATORY):
+
+1. Locate the central API configuration used for all network requests (fetch / axios).
+   - This may be in a file like:
+     - api.ts / api.js
+     - config.ts / config.js
+     - services folder
+     - axios.create(...)
+     - or environment variables
+
+2. Set the API base URL to the new backend URL above.
+   - Prefer using an Expo environment variable:
+     EXPO_PUBLIC_API_URL
+   - Example:
+     const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+3. Ensure ALL API calls use this base URL:
+   - Driver login
+   - Jobs
+   - Job assignment
+   - POD upload
+   - Failed delivery reasons
+   - Payments
+   - Profile & documents
+
+4. Remove any old / hardcoded backend URLs.
+   - There must be ZERO references to old URLs anywhere in the codebase.
+
+5. Confirm the app is connecting to:
+   https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev/api/mobile/v1/...
+
+6. After updating the code:
+   - Increment iOS buildNumber
+   - Increment Android versionCode
+   - Do NOT change the bundle identifier
+
+7. Prepare the app for TestFlight:
+   - Ensure production configuration
+   - Ensure no development URLs remain
+   - Ensure no console errors
+
+8. Build instructions:
+   - Expo EAS build for iOS using production profile
+   - Output must be a valid .ipa for App Store Connect
+
+IMPORTANT RULES:
+- Do NOT assume the URL updates automatically
+- Do NOT leave placeholders
+- Do NOT skip rebuild steps
+- The app MUST require a fresh install to take effect
+
+FINAL OUTPUT EXPECTED:
+- Mobile app code updated with the new backend URL
+- Ready-to-upload TestFlight build
+- Confirmation of where the API base URL is defined

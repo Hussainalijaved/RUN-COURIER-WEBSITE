@@ -1,0 +1,271 @@
+already have a fully working Driver mobile app connected to Supabase.
+The Driver section is COMPLETE, FINAL, and PERFECT.
+
+🚫 YOU MUST NOT MODIFY, TOUCH, REFACTOR, OPTIMIZE, RENAME, OR CHANGE ANYTHING RELATED TO DRIVERS.
+This includes (but is not limited to):
+
+Driver screens
+
+Driver navigation
+
+Driver logic
+
+Driver database tables
+
+Driver permissions
+
+Driver job flow
+
+Driver UI/UX
+
+Driver authentication
+
+Driver earnings
+
+Driver POD flow
+
+⚠️ Any change to the driver section is NOT allowed.
+
+Your task is ONLY to ADD new user roles alongside the existing driver system.
+
+1️⃣ APP STRUCTURE (STRICT)
+
+Keep ONE single mobile app
+
+Use Supabase Auth + Database
+
+Existing driver role stays exactly as-is
+
+ADD two new roles only:
+
+individual_user
+
+business_user
+
+After login:
+
+The app must automatically detect the user role
+
+Redirect to the correct dashboard
+
+No role switching
+
+One account = one role
+
+2️⃣ DRIVER SECTION (LOCKED / READ-ONLY)
+
+🚫 DO NOT TOUCH THIS SECTION
+
+Driver behavior remains exactly the same:
+
+Drivers cannot create bookings
+
+Drivers only see jobs assigned by admin
+
+Drivers can:
+
+Accept / reject jobs
+
+Navigate to pickup & delivery
+
+Update job status
+
+Upload POD
+
+View earnings & job history
+
+No pricing visibility
+
+No payment handling
+
+This must work identically to the current live version.
+
+3️⃣ INDIVIDUAL USER (NEW – ADD ONLY)
+
+Create a completely separate flow for Individual Users.
+
+Features:
+
+Create bookings:
+
+Pickup postcode
+
+Delivery postcode
+
+Date & time
+
+Weight
+
+Vehicle type
+
+Multi-drop
+
+Return trip
+
+Stripe Pay Now only
+
+Real-time tracking
+
+Job status updates
+
+View POD (photos/signature)
+
+Order history
+
+User profile:
+
+Name
+
+Email
+
+Phone
+
+Address
+
+Delete account option
+
+Restrictions:
+
+Individuals cannot:
+
+Assign drivers
+
+See other users’ jobs
+
+Access admin tools
+
+See driver data
+
+4️⃣ BUSINESS USER (NEW – ADD ONLY)
+
+Business users have extended functionality.
+
+Features:
+
+Create bookings (same as individual)
+
+Choose payment method:
+
+Pay Now
+
+Pay Later
+
+Each business must have a Stripe Customer ID
+
+Pay Later logic:
+
+Jobs linked to Stripe Customer ID
+
+Weekly invoices generated automatically
+
+Admin can mark bank transfers as paid
+
+Live tracking
+
+POD access
+
+Full order history
+
+Business profile:
+
+Company name
+
+Registration number
+
+Address
+
+Contact person
+
+Phone & email
+
+Restrictions:
+
+Businesses cannot:
+
+See drivers’ earnings
+
+Assign drivers
+
+See other businesses’ jobs
+
+Access admin controls
+
+5️⃣ PAYMENTS (STRIPE)
+
+Reuse existing Stripe integration
+
+Support:
+
+Pay Now (card)
+
+Pay Later (invoice)
+
+Payment status must sync with Supabase
+
+Payments must not affect drivers in any way
+
+Drivers never see prices or payments
+
+6️⃣ DATABASE & BACKEND (SUPABASE)
+
+Keep all existing driver tables untouched
+
+ADD new tables/columns only if required for users
+
+Use strict Row Level Security (RLS):
+
+Drivers → existing policies
+
+Individual users → own data only
+
+Business users → own company data only
+
+No shared write access between roles
+
+7️⃣ UI / UX RULES
+
+Separate dashboards per role
+
+Clean, professional design
+
+Blue / light-blue theme
+
+Fully responsive
+
+No placeholder data
+
+No demo content
+
+iOS & Android compliant
+
+8️⃣ ADMIN LOGIC (NO ADMIN UI IN APP)
+
+Admin actions happen externally (admin panel / website)
+
+App only reflects admin decisions
+
+No admin screens inside the mobile app
+
+9️⃣ ABSOLUTE RULES (NON-NEGOTIABLE)
+
+❌ Do NOT edit driver code
+❌ Do NOT rename driver routes
+❌ Do NOT add conditions inside driver flows
+❌ Do NOT merge user logic into driver logic
+❌ Do NOT “improve” or “optimize” drivers
+
+✅ ONLY add new user screens
+✅ ONLY add new user backend logic
+✅ Driver app must behave exactly the same
+
+✅ ACCEPTANCE CRITERIA
+
+Driver app works exactly as before
+
+Users can book, pay, and track
+
+Businesses can use Pay Later invoicing
+
+No data leakage between roles
+
+App passes Apple App Store & Google Play review

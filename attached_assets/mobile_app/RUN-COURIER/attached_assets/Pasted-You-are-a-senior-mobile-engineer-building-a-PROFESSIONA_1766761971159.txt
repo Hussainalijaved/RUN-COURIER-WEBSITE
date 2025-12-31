@@ -1,0 +1,73 @@
+You are a senior mobile engineer building a PROFESSIONAL courier driver app.
+This is NOT a demo and NOT a consumer Google Maps view.
+
+GOAL:
+When a driver receives a job and opens it, the map MUST look like a professional courier company (Uber / Gophr / CitySprint style).
+
+CURRENT PROBLEM:
+The app opens the default Google Maps UI showing:
+- "Your location"
+- "Dropped pin"
+- Google UI controls
+This looks unprofessional and unacceptable.
+
+REQUIRED SOLUTION (OPTION A – STRICT):
+
+1. USE AN IN-APP MAP ONLY
+- Use Google Maps SDK inside the app (react-native-maps or equivalent)
+- DO NOT open Google Maps automatically
+- DO NOT show “Dropped pin” or default Google UI
+
+2. MAP DISPLAY REQUIREMENTS
+Inside the app, show:
+- Clean embedded map
+- Custom company-style markers:
+  - Pickup marker (📍 or custom branded icon)
+  - Delivery marker (📦 or flag icon)
+- Route polyline drawn between pickup → delivery using Google Directions API
+- Fit camera to show both points
+
+3. INFORMATION OVERLAY (REQUIRED)
+Overlay card or header on the map showing:
+- Distance (miles)
+- Estimated driving time
+- Job ID or reference
+- Pickup address (short)
+- Delivery address (short)
+
+4. NAVIGATION BUTTON (ONLY OPTION TO OPEN GOOGLE MAPS)
+- Show a button: “Start Navigation”
+- ONLY when pressed:
+  - Open Google Maps or Apple Maps with navigation intent
+  - Pre-filled destination
+- No auto-opening maps
+
+5. UX / UI RULES
+- No Google UI labels like “Your location”, “Dropped pin”
+- No unnecessary map buttons
+- Clean courier-style UI
+- Works on iOS and Android
+
+6. TECHNICAL RULES
+- Use Google Directions API for route + ETA
+- Use Google Distance Matrix API if already implemented
+- Use existing GOOGLE_MAPS_API_KEY
+- Client-side only (no backend dependency)
+- Must work inside Expo / React Native
+
+7. FILES TO MODIFY (EXAMPLE – adjust if needed)
+- DriverJobDetailsScreen.tsx
+- DriverMap.tsx
+- navigation/openExternalNavigation.ts
+
+8. DELIVERABLES REQUIRED
+- Implement the map correctly
+- Remove old Google Maps external auto-open behavior
+- Confirm where each change was made
+- Do NOT simplify or remove features
+
+IMPORTANT:
+If anything is unclear, ASK QUESTIONS BEFORE CODING.
+Do NOT choose shortcuts.
+Do NOT downgrade functionality.
+This is production-grade courier software.

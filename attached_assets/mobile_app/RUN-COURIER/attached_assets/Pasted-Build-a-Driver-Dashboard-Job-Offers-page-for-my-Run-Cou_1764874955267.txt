@@ -1,0 +1,142 @@
+Build a Driver Dashboard – Job Offers page for my Run Courier driver portal, exactly like the reference screenshot.
+
+Tech & Data
+
+Frontend: responsive, mobile-first.
+
+Backend: use my existing jobs table (Supabase / API).
+
+Each job has: id, pickupPostcode, dropoffPostcode, distanceMiles, driverAmount, status, driverId, rejectReason.
+
+Show only jobs where status = "offered" and driverId = current logged-in driver.
+
+Layout
+
+Top bar:
+
+Left: small Run Courier logo.
+
+Center text: “Driver Dashboard” (large, bold).
+
+Under it: “Welcome, {driverName}”.
+
+Right: “Logout” link/icon.
+
+Tabs under the header:
+
+Left tab: “My Profile”.
+
+Right tab: “Job Offers” (active, highlighted).
+
+Section title: “Pending Job Offers”.
+
+Job card (repeatable list):
+
+Card with light background and shadow.
+
+Title: “New Job Offer”.
+
+Under it small text: “ID: {id}”.
+
+Right side, big green amount: “£{driverAmount}”.
+
+Row 1 (Pickup):
+
+Blue pin icon.
+
+Bold label “Pickup”.
+
+Under it: pickupPostcode (e.g. “ha46lw”).
+
+Row 2 (Drop-off):
+
+Red pin icon.
+
+Bold label “Drop-off”.
+
+Under it: dropoffPostcode.
+
+Row 3 (Distance):
+
+Route icon.
+
+Text: “Distance: {distanceMiles} miles”.
+
+Buttons at bottom of card:
+
+Left button: green “Accept” with thumbs-up icon.
+
+Right button: red “Reject” with thumbs-down icon.
+
+Buttons fill the width of the card, with space between them, exactly like the screenshot.
+
+Behaviour / Logic
+
+Accept button
+
+On tap:
+
+Update the job in the database:
+
+status = "accepted".
+
+acceptTime = now().
+
+Hide it from “Pending Job Offers”.
+
+(Optional) Navigate driver to an “Active Job” page.
+
+Reject button with reasons
+
+On tap:
+
+Open a modal / bottom sheet titled “Reject Job”.
+
+Inside the modal, show radio buttons or selectable list for reasons:
+
+“Too far”
+
+“Busy right now”
+
+“Unacceptable rate”
+
+“Have another job”
+
+Also include a small text field “Other reason (optional)”.
+
+The Confirm Reject button is disabled until one reason is selected.
+
+When driver confirms:
+
+Save rejectReason (selected option + optional text).
+
+Set status = "rejected".
+
+Hide this job from the list.
+
+Navigation when tapping the pins
+
+Make the whole Pickup row clickable.
+
+On tap, open external navigation in a new window:
+
+For web: open
+https://www.google.com/maps/dir/?api=1&destination={urlEncodedPickupPostcode}
+
+Make the whole Drop-off row clickable.
+
+On tap, open:
+
+https://www.google.com/maps/dir/?api=1&destination={urlEncodedDropoffPostcode}
+
+Use window.open(...) / external URL launcher so it opens Google Maps (or the default maps app) for turn-by-turn navigation.
+
+Design
+
+Page background: very light blue.
+
+Card background: white, with rounded corners and soft shadow.
+
+Fonts: same style as screenshot – bold titles, normal body text.
+
+Keep spacing, font sizes, and layout as close as possible to the screenshot.

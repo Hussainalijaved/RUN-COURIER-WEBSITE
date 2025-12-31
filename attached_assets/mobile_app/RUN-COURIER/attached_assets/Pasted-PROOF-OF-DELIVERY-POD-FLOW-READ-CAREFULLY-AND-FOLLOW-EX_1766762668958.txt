@@ -1,0 +1,138 @@
+PROOF OF DELIVERY (POD) FLOW
+
+READ CAREFULLY AND FOLLOW EXACTLY — PRODUCTION APP
+
+You are working on a production courier driver mobile app (React Native + Expo) called Run Courier.
+
+🎯 GOAL
+
+Implement a professional Proof of Delivery (POD) flow that allows drivers to take multiple photos, validate them, and complete the job only after POD is provided.
+
+This must work reliably for real courier operations.
+
+🚫 NOT ALLOWED
+
+❌ Do NOT allow delivery completion without POD
+
+❌ Do NOT limit to only 1 photo
+
+❌ Do NOT auto-complete delivery without driver confirmation
+
+❌ Do NOT use temporary local images only (must upload)
+
+✅ REQUIRED POD BEHAVIOUR
+1️⃣ POD MODAL / SCREEN
+
+When the driver taps “Complete Delivery”:
+
+Open a bottom sheet or full screen modal titled:
+
+“Proof of Delivery”
+
+2️⃣ PHOTO CAPTURE (MANDATORY)
+
+Inside POD screen:
+
+Allow the driver to take 1 or more photos
+
+Use device camera only (no gallery upload unless explicitly enabled)
+
+Show thumbnails of captured photos
+
+Allow:
+
+➕ Add more photos
+
+❌ Remove a photo before submitting
+
+Minimum requirement:
+
+At least 1 photo required
+
+No maximum limit (or set safe limit like 5–10)
+
+3️⃣ OPTIONAL POD DATA (RECOMMENDED)
+
+Include optional fields:
+
+Recipient name (text)
+
+Delivery notes (text)
+
+Signature (optional – can be phase 2)
+
+These fields are optional, photos are mandatory.
+
+4️⃣ VALIDATION RULES (STRICT)
+
+Before enabling “Complete Delivery” button:
+
+✅ At least 1 photo exists
+
+✅ Photos uploaded successfully
+
+❌ If upload fails → show error, do NOT complete job
+
+Disable button until conditions are met.
+
+5️⃣ UPLOAD LOGIC (IMPORTANT)
+
+When submitting POD:
+
+Upload images to storage (Supabase / S3 / Firebase)
+
+Store:
+
+jobId
+
+driverId
+
+image URLs
+
+timestamp
+
+GPS location (if available)
+
+Only after successful upload:
+➡️ Mark job as DELIVERED
+
+6️⃣ UX REQUIREMENTS
+
+Show upload progress indicator
+
+Disable buttons while uploading
+
+Show success confirmation:
+“Delivery completed successfully”
+
+7️⃣ BACKEND / DATA UPDATE
+
+On success:
+
+Update job status → DELIVERED
+
+Save POD data linked to job
+
+Lock job from further edits
+
+8️⃣ FILE STRUCTURE (USE OR CREATE)
+
+screens/driver/ProofOfDeliveryModal.tsx
+
+components/PODImagePicker.tsx
+
+services/podUploadService.ts
+
+Keep logic reusable and clean.
+
+9️⃣ FINAL CHECK (MANDATORY)
+
+Before finishing, confirm:
+
+Driver cannot complete delivery without photos
+
+Multiple photos work correctly
+
+Job status updates only after successful upload
+
+UX feels professional and reliable

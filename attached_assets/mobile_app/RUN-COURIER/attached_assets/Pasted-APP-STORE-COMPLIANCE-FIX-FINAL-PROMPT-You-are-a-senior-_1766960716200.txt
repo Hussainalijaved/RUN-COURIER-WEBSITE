@@ -1,0 +1,92 @@
+APP STORE COMPLIANCE FIX — FINAL PROMPT
+
+You are a senior Apple App Store compliance engineer.
+Your task is to make the app 100% compliant with Apple App Store Guidelines 5.1.1 and 5.1.5.
+
+❗ This app has been rejected multiple times.
+❗ Any remaining violation will cause permanent rejection.
+
+ABSOLUTE RULES (MUST FOLLOW)
+
+Do NOT block app usage if permissions are denied
+
+Do NOT show any permission screen on app launch
+
+Do NOT require Location or Camera to enter the app
+
+Do NOT include Continue, Skip, Close, Back, or Delay before permission
+
+Do NOT force permissions to proceed
+
+FIX 1 — PERMISSION REQUEST FLOW (Guideline 5.1.1)
+REQUIRED BEHAVIOR:
+
+Remove ALL custom permission screens shown on startup
+
+The app must launch normally without asking for permissions
+
+Only request Camera or Location permission at the moment the user taps a feature that needs it
+
+When permission is needed:
+
+Trigger the native iOS system permission dialog immediately
+
+NO custom modal before it
+
+NO explanation screen with buttons
+
+❌ Forbidden:
+
+Any screen before permission
+
+Any “Continue” button
+
+Any ability to delay permission
+
+FIX 2 — LOCATION IS OPTIONAL (Guideline 5.1.5)
+The app MUST:
+
+Be fully usable when Location Services are OFF
+
+Allow login, browsing, profile access, and navigation without location
+
+If location is disabled:
+
+Disable ONLY location-dependent features (maps, tracking, auto-detect address)
+
+Show a non-blocking message:
+“Location access improves accuracy. You can enable it anytime in Settings.”
+
+Provide optional Open Settings button
+
+❌ The app must NEVER:
+
+Freeze
+
+Block navigation
+
+Show a mandatory permission wall
+
+TECHNICAL REQUIREMENTS
+
+Permissions requested ONLY inside feature handlers (not on launch)
+
+Gracefully handle denied permissions
+
+Use fallback UI when location is unavailable
+
+FINAL VALIDATION (MANDATORY)
+
+Before completion:
+
+Test fresh install
+
+Launch app with Location OFF
+
+Launch app with Camera OFF
+
+Confirm app still works
+
+Confirm no permission shown until user action
+
+Only finish when the app is safe to resubmit to App Store Connect.

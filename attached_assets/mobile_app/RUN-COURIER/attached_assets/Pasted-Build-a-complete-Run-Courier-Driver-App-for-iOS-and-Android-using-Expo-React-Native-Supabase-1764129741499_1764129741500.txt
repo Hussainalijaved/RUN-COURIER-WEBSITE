@@ -1,0 +1,342 @@
+Build a complete “Run Courier – Driver App” for iOS and Android using Expo + React Native + Supabase.
+Use a clean, modern UI with light-blue branding and the official Run Courier logo.
+This app must fully sync with my existing Run Courier website (Supabase backend).
+
+🔵 1. Authentication (Supabase Auth)
+
+Implement:
+
+Email + Password sign up
+
+Email + Password login
+
+Password reset
+
+Token persistence
+
+Redirect to Driver Dashboard after login
+
+If driver already exists in Supabase, load their full profile
+
+All login sessions must sync with the website.
+
+🔵 2. Driver Profile (Fully Editable)
+
+Create a full profile screen with:
+
+Profile Photo (upload to Supabase Storage)
+
+Full Name
+
+Email (read-only)
+
+Phone Number
+
+Postcode
+
+Address
+
+Nationality
+
+If nationality = British → hide “Right to Work” requirement
+
+Otherwise → show Right to Work Share Code upload
+
+National Insurance Number
+
+Vehicle Type selector:
+
+Motorbike
+
+Car
+
+Small Van
+
+Medium Van
+
+Vehicle Registration Number (number plate)
+
+Auto-load profile data on login
+
+“Save Changes” must update Supabase drivers table
+
+🔵 3. Documents Module (Very Important)
+
+Create a complete document centre with upload, preview, status, and expiry.
+
+Required Personal Documents (for all drivers):
+
+Profile Photo
+
+National Insurance Number
+
+Nationality
+
+Right to Work (ONLY if not British)
+
+Address Proof (PDF or image)
+
+DBS Certificate
+
+Upload
+
+Status
+
+Expiry date
+
+Vehicle Photos (depend on vehicle type):
+Motorbike
+
+Front photo
+
+Back photo
+
+Car
+
+Front photo
+
+Back photo
+
+Small & Medium Van
+
+Front photo
+
+Back photo
+
+Left side
+
+Right side
+
+Load space
+
+Insurance Documents:
+Motorbike
+
+Motorbike Insurance
+
+Car
+
+Car Insurance
+
+Goods in Transit Insurance
+
+Small Van / Medium Van
+
+Hire & Reward Insurance
+
+Goods in Transit Insurance
+
+For Every Document:
+
+Each document must have:
+
+Upload button
+
+Preview uploaded file
+
+Status (Pending, Verified, Rejected)
+
+Expiry date (for insurance & right to work)
+
+Replace / Edit function
+
+Save to Supabase Storage
+
+Document status saved under drivers_documents table
+
+Real-time status updates from admin dashboard
+
+🔵 4. Jobs System (Same as Website)
+
+Create the following screens:
+
+Jobs List
+
+All available jobs
+
+Distance, price, pickup, destination
+
+Accept or Reject buttons
+
+Accepted Job
+
+Pickup details
+
+Drop-off details
+
+Live small map preview
+
+Job notes
+
+Offer price
+
+“Mark Picked Up” → “Mark Delivered” workflow
+
+Upload POD (image or signature)
+
+Completed Jobs
+
+Job history
+
+Total earnings
+
+Total miles
+
+Earnings Dashboard
+
+Weekly earnings
+
+Total miles
+
+Job count
+
+Pull statistics from Supabase
+
+🔵 5. Live Location Tracking
+
+Implement:
+
+Ask for iOS & Android permissions
+
+Send driver’s live GPS location to Supabase every 10 seconds
+
+Admin can see drivers list + last known location
+
+Use expo-location + Supabase realtime channel.
+
+🔵 6. Settings Screen
+
+Include:
+
+Notifications on/off
+
+Dark mode toggle (optional)
+
+Language selector (optional)
+
+Logout button
+
+Delete account button (permanent delete from Supabase)
+
+🔵 7. UI/UX Requirements
+
+Use Run Courier logo on splash screen & login screen
+
+Light blue + white theme
+
+Rounded cards
+
+Clean iconography
+
+Smooth animations
+
+Responsive for all devices
+
+Look premium and modern
+
+🔵 8. Folder Structure
+
+Use a clean modular structure:
+
+/src
+  /screens
+  /components
+  /navigation
+  /services
+  /hooks
+  /context
+  /utils
+  /theme
+
+🔵 9. Supabase Tables
+
+The app must use the following:
+
+drivers
+
+id
+
+email
+
+full_name
+
+phone_number
+
+postcode
+
+address
+
+nationality
+
+national_insurance
+
+vehicle_type
+
+vehicle_registration
+
+profile_photo
+
+created_at
+
+drivers_documents
+
+id
+
+driver_id
+
+document_type
+
+file_url
+
+status (Pending, Verified, Rejected)
+
+expiry_date
+
+uploaded_at
+
+jobs
+
+(Already exists — connect to existing website structure)
+
+driver_locations
+
+driver_id
+
+lat
+
+lng
+
+timestamp
+
+🔵 10. IMPORTANT RULE
+
+Everything must be fully synced with the existing Supabase backend.
+No mock data.
+No dummy storage.
+Everything real-time.
+
+🔵 11. Deliverables
+
+When finished, the app must include:
+
+Full driver onboarding
+
+Document upload centre
+
+Job workflow
+
+Earnings
+
+Notifications
+
+Location tracking
+
+Settings
+
+Beautiful design
+
+Works on iOS & Android
+
+No bugs
+
+Fully connected with my live backend

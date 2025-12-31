@@ -1,0 +1,129 @@
+You are a senior React Native / Expo + EAS engineer. My app builds and submits to App Store Connect via EAS, but the TestFlight build opens and shows a full-screen error: “Something went wrong. Please reload the app to continue.” It’s a startup crash / blank-screen in production.
+
+Your job: Fix ALL issues required to produce a stable iOS TestFlight build and resubmit it. Do not remove features. Do not redesign UI. Only stabilize and make production-safe.
+
+Constraints
+
+Keep the existing app features and screens.
+
+Keep bundle identifier: com.runcourier.driver
+
+Keep EAS usage (EAS Build + EAS Submit).
+
+Ensure the app never hard-crashes on startup. If anything fails (network, env vars, Supabase, auth, config), show a friendly error screen and allow retry.
+
+Add logs for debugging without exposing secrets.
+
+Ensure iOS + Android builds work (but prioritize iOS TestFlight first).
+
+Make minimal, correct changes. Commit all changes with clear messages.
+
+Step 1 — Fix EAS config (mandatory)
+
+Open eas.json. If it contains any submit.* keys or empty values like submit.production.ios.appAppleId, remove them.
+
+Replace eas.json with this exact valid config (unless you can justify a better minimal equivalent):
+
+{
+  "build": {
+    "production": {
+      "ios": { "distribution": "app-store" },
+      "android": { "buildType": "app-bundle" }
+    }
+  }
+}
+
+
+Ensure app.json / app.config.js has the correct ios.bundleIdentifier = "com.runcourier.driver" and versioning is consistent.
+
+Step 2 — Find the real startup failure
+
+Identify the exact code path that triggers the “Something went wrong” screen. Search for that string and trace the component.
+
+Determine whether the app is crashing due to:
+
+missing env vars (e.g., Supabase URL / key)
+
+failing initial network/auth bootstrap
+
+runtime exception in root navigator/provider
+
+invalid configuration in production (TestFlight)
+
+Add robust error handling so this never becomes a blank/blocked state.
+
+Step 3 — Production-safe environment variables
+
+Audit every required env var (Supabase URL/key, API base URL, Stripe publishable key, maps keys, etc.).
+
+Implement a single config module that:
+
+safely reads env values
+
+validates presence
+
+provides defaults where safe
+
+never crashes when missing; instead returns a “ConfigMissing” state
+
+Add a dedicated screen/component:
+
+Title: “Setup issue”
+
+Shows which config items are missing (names only, not values)
+
+Button: Retry (re-check config + retry bootstrap)
+
+Step 4 — App bootstrap hardening (no startup crash)
+
+Add an Error Boundary at the highest level (App root) to catch all uncaught exceptions and show a fallback UI with “Try Again”.
+
+Wrap all async startup logic (session restore, profile fetch, permissions) with try/catch.
+
+Ensure navigation does not render before bootstrap is ready:
+
+Show loading screen while bootstrapping
+
+On failure show safe error screen with retry
+
+Ensure the app works even if the user is logged out (show login screen).
+
+Ensure offline/poor network doesn’t break startup.
+
+Step 5 — iOS-specific checks
+
+Confirm required iOS permissions strings exist in Info.plist via Expo config (if location is used, add the correct usage descriptions).
+
+Ensure no native modules are misconfigured for production builds.
+
+Ensure expo-updates / runtime version settings are correct (if used).
+
+Step 6 — Android build fix (secondary, but do it if fast)
+
+Android build currently fails at “Run gradlew” with unknown error.
+
+Open the build logs and identify the precise Gradle error.
+
+Fix it minimally (version mismatch, Kotlin, AGP, missing maven repos, duplicate classes, Hermes/JSC, etc.) without removing features.
+
+Ensure eas build -p android --profile production produces an AAB.
+
+Step 7 — Deliverables
+
+After changes:
+
+Provide a summary of exactly what you changed and why.
+
+Provide exact commands to run:
+
+eas login
+
+eas build -p ios --profile production
+
+eas submit -p ios
+
+Confirm the app will no longer show the TestFlight “Something went wrong” screen on launch.
+
+If anything depends on secrets, instruct me exactly where to set them in EAS (project secrets / environment variables) with the exact variable names.
+
+Proceed now: inspect the repo, implement changes, and prepare it for TestFlight resubmission.
