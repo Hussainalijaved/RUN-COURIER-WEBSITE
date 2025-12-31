@@ -26,7 +26,7 @@ UPDATE jobs
 SET driver_price = NULL
 WHERE driver_price IS NOT NULL 
   AND total_price IS NOT NULL 
-  AND driver_price = total_price
+  AND driver_price::numeric = total_price::numeric
   AND id::text NOT IN (
     SELECT DISTINCT job_id::text FROM job_assignments WHERE driver_price IS NOT NULL
   );
