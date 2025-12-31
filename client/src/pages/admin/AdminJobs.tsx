@@ -627,9 +627,10 @@ export default function AdminJobs() {
   const availableDrivers = drivers?.filter((d) => d.isAvailable && d.isVerified) || [];
   const allDrivers = drivers || [];
 
-  // Multi-select helpers
+  // Multi-select helpers - allow selecting jobs that are pending or have been offered but not yet picked up
   const assignableJobs = filteredJobs.filter(job => 
-    job.status === 'pending' && !job.driverId && !getActiveAssignment(job.id)
+    ['pending', 'offered', 'assigned'].includes(job.status) && 
+    !['picked_up', 'on_the_way_delivery', 'delivered', 'cancelled'].includes(job.status)
   );
   const allAssignableSelected = assignableJobs.length > 0 && 
     assignableJobs.every(job => selectedJobIds.has(job.id));
@@ -962,7 +963,8 @@ export default function AdminJobs() {
                 </TableHeader>
                 <TableBody>
                   {filteredJobs.map((job) => {
-                    const isAssignable = job.status === 'pending' && !job.driverId && !getActiveAssignment(job.id);
+                    const isAssignable = ['pending', 'offered', 'assigned'].includes(job.status) && 
+                      !['picked_up', 'on_the_way_delivery', 'delivered', 'cancelled'].includes(job.status);
                     return (
                     <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
                       <TableCell>
