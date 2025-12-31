@@ -765,7 +765,7 @@ export function registerMobileRoutes(app: Express): void {
   async function uploadBase64ToSupabase(
     base64Data: string,
     jobId: string,
-    type: 'photo' | 'signature'
+    type: string
   ): Promise<string | null> {
     if (!supabaseAdmin) {
       console.error('[POD Upload] Supabase admin client not initialized');
@@ -870,14 +870,40 @@ export function registerMobileRoutes(app: Express): void {
       }
       
       const { jobId } = req.params;
-      const { podPhotoUrl, podSignatureUrl, photo, signature, recipientName } = req.body;
+      const { podPhotoUrl, podSignatureUrl, photo, signature, recipientName, photos, podPhotos, podNotes, notes } = req.body;
+
+      // Extract base64 data - handle multiple formats mobile app might send
+      // Could be: string, { base64: string }, { uri: string, base64: string }
+      const extractBase64 = (data: any): string | null => {
+        if (!data) return null;
+        if (typeof data === 'string') return data;
+        if (typeof data === 'object') {
+          if (data.base64) return data.base64;
+          if (data.uri && data.uri.startsWith('data:')) return data.uri;
+        }
+        return null;
+      };
+
+      const photoBase64 = extractBase64(photo);
+      const signatureBase64 = extractBase64(signature);
+
+      // Handle photos array - could be array of strings or array of objects
+      let photosBase64Array: string[] = [];
+      const photosArray = photos || podPhotos;
+      if (Array.isArray(photosArray)) {
+        photosBase64Array = photosArray.map(p => extractBase64(p)).filter((p): p is string => p !== null);
+      }
 
       console.log(`[POD Upload] Received POD for job ${jobId}:`, {
         hasPhotoUrl: !!podPhotoUrl,
         hasSignatureUrl: !!podSignatureUrl,
-        hasPhotoBase64: !!photo,
-        hasSignatureBase64: !!signature,
-        recipientName: recipientName || 'none'
+        hasPhotoBase64: !!photoBase64,
+        hasSignatureBase64: !!signatureBase64,
+        photosArrayCount: photosBase64Array.length,
+        recipientName: recipientName || 'none',
+        notes: podNotes || notes || 'none',
+        rawPhotoType: typeof photo,
+        rawSignatureType: typeof signature
       });
 
       // Try storage first, then query Supabase directly
@@ -911,8 +937,10 @@ export function registerMobileRoutes(app: Express): void {
       const effectiveDriverId = job?.driverId || supabaseJob?.driver_id;
       const effectiveStatus = job?.status || supabaseJob?.status;
       const existingPhotoUrl = job?.podPhotoUrl || supabaseJob?.pod_photo_url;
+      const existingPhotos: string[] = job?.podPhotos || supabaseJob?.pod_photos || [];
       const existingSignatureUrl = job?.podSignatureUrl || supabaseJob?.pod_signature_url;
       const existingRecipientName = job?.podRecipientName || supabaseJob?.pod_recipient_name;
+      const existingNotes = job?.podNotes || supabaseJob?.pod_notes;
 
       if (effectiveDriverId !== driver.id) {
         return res.status(403).json({ 
@@ -931,9 +959,9 @@ export function registerMobileRoutes(app: Express): void {
 
       // Handle photo - either URL or base64
       let finalPhotoUrl = podPhotoUrl || existingPhotoUrl;
-      if (photo && typeof photo === 'string') {
+      if (photoBase64) {
         // It's base64 data, upload to Supabase
-        const uploadedUrl = await uploadBase64ToSupabase(photo, jobId, 'photo');
+        const uploadedUrl = await uploadBase64ToSupabase(photoBase64, jobId, 'photo');
         if (uploadedUrl) {
           finalPhotoUrl = uploadedUrl;
         } else {
@@ -944,11 +972,22 @@ export function registerMobileRoutes(app: Express): void {
         }
       }
 
+      // Handle multiple photos array
+      let finalPhotosArray: string[] = existingPhotos || [];
+      if (photosBase64Array.length > 0) {
+        for (let i = 0; i < photosBase64Array.length; i++) {
+          const uploadedUrl = await uploadBase64ToSupabase(photosBase64Array[i], jobId, `photo_${i}`);
+          if (uploadedUrl) {
+            finalPhotosArray.push(uploadedUrl);
+          }
+        }
+      }
+
       // Handle signature - either URL or base64
       let finalSignatureUrl = podSignatureUrl || existingSignatureUrl;
-      if (signature && typeof signature === 'string') {
+      if (signatureBase64) {
         // It's base64 data, upload to Supabase
-        const uploadedUrl = await uploadBase64ToSupabase(signature, jobId, 'signature');
+        const uploadedUrl = await uploadBase64ToSupabase(signatureBase64, jobId, 'signature');
         if (uploadedUrl) {
           finalSignatureUrl = uploadedUrl;
         } else {
@@ -960,7 +999,8 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       const finalRecipientName = recipientName || existingRecipientName;
-      const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName);
+      const finalNotes = podNotes || notes || existingNotes;
+      const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName, finalPhotosArray, finalNotes);
 
       if (!updatedJob) {
         return res.status(500).json({ 
@@ -969,14 +1009,16 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      console.log(`[POD Upload] Job ${jobId} POD saved: photo=${finalPhotoUrl ? 'yes' : 'no'}, signature=${finalSignatureUrl ? 'yes' : 'no'}`);
+      console.log(`[POD Upload] Job ${jobId} POD saved: photo=${finalPhotoUrl ? 'yes' : 'no'}, photos=${finalPhotosArray.length}, signature=${finalSignatureUrl ? 'yes' : 'no'}`);
 
       res.json({
         success: true,
         pod: {
           photoUrl: updatedJob.podPhotoUrl,
+          photos: updatedJob.podPhotos || [],
           signatureUrl: updatedJob.podSignatureUrl,
           recipientName: updatedJob.podRecipientName,
+          notes: updatedJob.podNotes,
         },
       });
     })
