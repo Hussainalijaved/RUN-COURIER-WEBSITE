@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getWebSocketUrl } from '@/lib/queryClient';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface DriverLocation {
   driverId: string;
@@ -14,6 +15,20 @@ export interface DriverLocation {
   isAvailable?: boolean;
   driverCode?: string;
   driverName?: string;
+}
+
+// Supabase driver_locations table row type
+interface SupabaseDriverLocation {
+  id: string;
+  driver_id: string;
+  job_id: string | null;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  heading: number | null;
+  speed: number | null;
+  updated_at: string;
+  is_moving: boolean;
 }
 
 interface WebSocketMessage {
@@ -261,6 +276,114 @@ export function useDriverLocations(options: UseDriverLocationsOptions = {}): Use
       cleanup();
     };
   }, [enabled, user, connect, cleanup]);
+
+  // Supabase real-time subscription for driver_locations table
+  // This provides a reliable fallback/supplement to WebSocket updates
+  const supabaseChannelRef = useRef<RealtimeChannel | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !user) return;
+
+    // Fetch initial locations from Supabase
+    const fetchInitialLocations = async () => {
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('driver_locations')
+          .select('driver_id, latitude, longitude, accuracy, heading, speed, updated_at, is_moving')
+          .order('updated_at', { ascending: false });
+
+        if (fetchError) {
+          console.log('[DriverLocations] Supabase fetch error (table may not exist yet):', fetchError.message);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          setLocations(prev => {
+            const updated = new Map(prev);
+            data.forEach((loc) => {
+              // Only update if we don't have a more recent WebSocket update
+              const existing = updated.get(loc.driver_id);
+              const locTimestamp = new Date(loc.updated_at).getTime();
+              if (!existing || existing.timestamp < locTimestamp) {
+                updated.set(loc.driver_id, {
+                  driverId: loc.driver_id,
+                  lat: Number(loc.latitude),
+                  lng: Number(loc.longitude),
+                  accuracy: loc.accuracy ? Number(loc.accuracy) : undefined,
+                  heading: loc.heading ? Number(loc.heading) : undefined,
+                  speed: loc.speed ? Number(loc.speed) : undefined,
+                  timestamp: locTimestamp,
+                  isAvailable: loc.is_moving,
+                });
+              }
+            });
+            return updated;
+          });
+        }
+      } catch (err) {
+        console.log('[DriverLocations] Initial fetch failed:', err);
+      }
+    };
+
+    fetchInitialLocations();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('driver_locations_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'driver_locations',
+        },
+        (payload) => {
+          if (!mountedRef.current) return;
+          
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const loc = payload.new as SupabaseDriverLocation;
+            const locTimestamp = new Date(loc.updated_at).getTime();
+            
+            setLocations(prev => {
+              const updated = new Map(prev);
+              const existing = updated.get(loc.driver_id);
+              
+              // Only update if this is more recent
+              if (!existing || existing.timestamp < locTimestamp) {
+                updated.set(loc.driver_id, {
+                  driverId: loc.driver_id,
+                  lat: Number(loc.latitude),
+                  lng: Number(loc.longitude),
+                  accuracy: loc.accuracy ? Number(loc.accuracy) : undefined,
+                  heading: loc.heading ? Number(loc.heading) : undefined,
+                  speed: loc.speed ? Number(loc.speed) : undefined,
+                  timestamp: locTimestamp,
+                  isAvailable: loc.is_moving,
+                });
+              }
+              return updated;
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const loc = payload.old as SupabaseDriverLocation;
+            setLocations(prev => {
+              const updated = new Map(prev);
+              updated.delete(loc.driver_id);
+              return updated;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    supabaseChannelRef.current = channel;
+
+    return () => {
+      if (supabaseChannelRef.current) {
+        supabase.removeChannel(supabaseChannelRef.current);
+        supabaseChannelRef.current = null;
+      }
+    };
+  }, [enabled, user]);
 
   return {
     locations,

@@ -1,0 +1,101 @@
+ROLE:
+You are a senior mobile + backend engineer fixing a critical GPS tracking issue in a live courier driver app built with Expo (React Native) and Supabase.
+
+PROBLEM:
+Driver accepts a job → GPS tracking shows “active” → UI displays “Location data unavailable”.
+This is NOT acceptable.
+
+OBJECTIVE:
+Fix GPS tracking end-to-end so that:
+- Driver location is always stored correctly
+- Active job map shows the driver location reliably
+- No false “Location unavailable” state when tracking is running
+
+STRICT RULES:
+- Supabase is the ONLY backend
+- Do NOT add a new service
+- Do NOT fake data
+- Do NOT bypass RLS
+- Fix root cause, not UI masking
+
+EXPECTED DATA FLOW (MANDATORY):
+1) When a driver ACCEPTS a job:
+   - Start background GPS tracking
+   - Capture location updates (lat, lng, accuracy, timestamp)
+   - Write location to Supabase linked to:
+     - job_id
+     - driver_id
+
+2) Supabase must have ONE source of truth for live location:
+   - Table: driver_locations (or equivalent)
+   - Stores last known location per job/driver
+
+3) Active Job screen must:
+   - Read the LAST known location immediately
+   - Subscribe to realtime updates
+   - Update map on every change
+
+BACKEND TASKS (SUPABASE):
+1) Verify or create `driver_locations` table with:
+   - id
+   - driver_id
+   - job_id
+   - latitude
+   - longitude
+   - accuracy
+   - updated_at
+
+2) Enable RLS with policies:
+   - Driver can write ONLY their own location
+   - Admin can read all
+   - Customers can read ONLY location for their job (optional)
+   - No anonymous access
+
+3) Ensure location updates are UPSERTED (not duplicated).
+
+MOBILE (EXPO) TASKS:
+4) Verify location permissions:
+   - Foreground + background (iOS)
+   - Handle denied permissions gracefully
+
+5) Ensure location tracking:
+   - Starts ONLY when job is accepted
+   - Stops when job is completed/cancelled
+   - Continues in foreground and background
+
+6) Ensure location is written to Supabase on interval (e.g. 5–10s)
+   - Handle offline mode
+   - Retry failed writes
+
+FRONTEND UI TASKS:
+7) Replace “Location data unavailable” logic:
+   - If no location yet → show “Waiting for GPS signal…”
+   - If last update is stale → show “Last updated X min ago”
+
+REALTIME:
+8) Subscribe to driver_locations filtered by:
+   - job_id
+   - driver_id
+9) Unsubscribe on job completion
+
+DEBUGGING REQUIREMENTS:
+10) Add logs for:
+   - Location permission granted
+   - Location captured
+   - Location written to Supabase
+   - Location received from Supabase
+
+OUTPUT REQUIRED:
+- SQL for driver_locations table + RLS
+- Exact fixes in Expo location tracking logic
+- Realtime subscription logic
+- Explanation of WHY the issue happened and HOW it’s fixed
+- Verification checklist (step-by-step)
+
+SUCCESS CRITERIA:
+- Accept job → map shows driver location within seconds
+- No “Location data unavailable” while GPS is active
+- Admin can see driver moving
+- System survives app backgrounding (iOS)
+
+BEGIN FIX NOW.
