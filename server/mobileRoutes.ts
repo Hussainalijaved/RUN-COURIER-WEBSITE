@@ -8,7 +8,6 @@ import { eq } from "drizzle-orm";
 import type { JobStatus, Job } from "@shared/schema";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import { supabaseAdmin } from "./supabaseAdmin";
 
 // Helper to map Supabase job to local Job format for mobile API response
@@ -43,29 +42,9 @@ function mapSupabaseJobToMobileFormat(job: any) {
   };
 }
 
-// POD uploads directory
-const podUploadsDir = path.join(process.cwd(), 'uploads', 'pod');
-if (!fs.existsSync(podUploadsDir)) {
-  fs.mkdirSync(podUploadsDir, { recursive: true });
-}
-
-// Multer storage for POD uploads
-const podStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, podUploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const jobId = req.params.jobId || 'unknown';
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '') || '.jpg';
-    const type = file.fieldname === 'signature' ? 'sig' : 'photo';
-    cb(null, `pod_${jobId}_${type}_${timestamp}_${random}${ext}`);
-  }
-});
-
+// POD uploads - use memory storage for Supabase upload
 const uploadPod = multer({
-  storage: podStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -76,6 +55,51 @@ const uploadPod = multer({
     }
   }
 });
+
+// Upload file to Supabase Storage and return public URL
+async function uploadToSupabaseStorage(
+  buffer: Buffer,
+  filename: string,
+  contentType: string
+): Promise<string | null> {
+  if (!supabaseAdmin) {
+    console.error('[POD Upload] Supabase admin client not initialized');
+    return null;
+  }
+
+  const bucket = 'pod-uploads';
+  
+  // Ensure bucket exists (only needed once, but safe to call)
+  const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+  if (!buckets?.find(b => b.name === bucket)) {
+    const { error: createError } = await supabaseAdmin.storage.createBucket(bucket, {
+      public: true,
+      fileSizeLimit: 10 * 1024 * 1024, // 10MB
+    });
+    if (createError && !createError.message.includes('already exists')) {
+      console.error('[POD Upload] Failed to create bucket:', createError);
+    }
+  }
+
+  const { data, error } = await supabaseAdmin.storage
+    .from(bucket)
+    .upload(filename, buffer, {
+      contentType,
+      upsert: true,
+    });
+
+  if (error) {
+    console.error('[POD Upload] Supabase upload error:', error);
+    return null;
+  }
+
+  // Get public URL
+  const { data: urlData } = supabaseAdmin.storage
+    .from(bucket)
+    .getPublicUrl(filename);
+
+  return urlData.publicUrl;
+}
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -763,16 +787,46 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      // Build URLs for uploaded files
+      // Upload files to Supabase Storage
       let podPhotoUrl: string | undefined;
       let podSignatureUrl: string | undefined;
 
       if (files['photo'] && files['photo'][0]) {
-        podPhotoUrl = `/uploads/pod/${files['photo'][0].filename}`;
+        const file = files['photo'][0];
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 8);
+        const ext = path.extname(file.originalname) || '.jpg';
+        const filename = `job_${jobId}/photo_${timestamp}_${random}${ext}`;
+        
+        const url = await uploadToSupabaseStorage(file.buffer, filename, file.mimetype);
+        if (url) {
+          podPhotoUrl = url;
+          console.log(`[POD Upload] Photo uploaded to Supabase: ${url}`);
+        } else {
+          return res.status(500).json({ 
+            error: "Failed to upload photo to storage",
+            code: "PHOTO_UPLOAD_FAILED"
+          });
+        }
       }
 
       if (files['signature'] && files['signature'][0]) {
-        podSignatureUrl = `/uploads/pod/${files['signature'][0].filename}`;
+        const file = files['signature'][0];
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 8);
+        const ext = path.extname(file.originalname) || '.png';
+        const filename = `job_${jobId}/signature_${timestamp}_${random}${ext}`;
+        
+        const url = await uploadToSupabaseStorage(file.buffer, filename, file.mimetype);
+        if (url) {
+          podSignatureUrl = url;
+          console.log(`[POD Upload] Signature uploaded to Supabase: ${url}`);
+        } else {
+          return res.status(500).json({ 
+            error: "Failed to upload signature to storage",
+            code: "SIGNATURE_UPLOAD_FAILED"
+          });
+        }
       }
 
       if (!podPhotoUrl && !podSignatureUrl) {
@@ -791,7 +845,7 @@ export function registerMobileRoutes(app: Express): void {
 
       if (!updatedJob) {
         return res.status(500).json({ 
-          error: "Failed to save POD",
+          error: "Failed to save POD to database",
           code: "POD_SAVE_FAILED"
         });
       }
