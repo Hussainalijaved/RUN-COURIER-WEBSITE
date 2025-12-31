@@ -613,6 +613,30 @@ export default function Quote() {
                           Book Now
                           <ArrowRight className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => {
+                            form.reset({
+                              pickupPostcode: '',
+                              deliveryPostcode: '',
+                              weight: 1,
+                              vehicleType: '' as VehicleType,
+                              isMultiDrop: false,
+                              isReturnTrip: false,
+                              returnToSameLocation: true,
+                              returnPostcode: '',
+                            });
+                            setQuote(null);
+                            setDistance(0);
+                            setEstimatedTime(0);
+                            setMultiDropStops([]);
+                          }}
+                          data-testid="button-new-quote"
+                        >
+                          <Calculator className="h-4 w-4" />
+                          Get New Quote
+                        </Button>
                       </div>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
