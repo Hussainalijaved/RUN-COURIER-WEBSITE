@@ -633,15 +633,16 @@ export default function AdminJobs() {
     !['picked_up', 'on_the_way_delivery', 'delivered', 'cancelled'].includes(job.status)
   );
   const allAssignableSelected = assignableJobs.length > 0 && 
-    assignableJobs.every(job => selectedJobIds.has(job.id));
+    assignableJobs.every(job => selectedJobIds.has(String(job.id)));
   
-  const toggleJobSelection = (jobId: string) => {
+  const toggleJobSelection = (jobId: string | number) => {
+    const idStr = String(jobId);
     setSelectedJobIds(prev => {
       const next = new Set(prev);
-      if (next.has(jobId)) {
-        next.delete(jobId);
+      if (next.has(idStr)) {
+        next.delete(idStr);
       } else {
-        next.add(jobId);
+        next.add(idStr);
       }
       return next;
     });
@@ -651,7 +652,7 @@ export default function AdminJobs() {
     if (allAssignableSelected) {
       setSelectedJobIds(new Set());
     } else {
-      setSelectedJobIds(new Set(assignableJobs.map(job => job.id)));
+      setSelectedJobIds(new Set(assignableJobs.map(job => String(job.id))));
     }
   };
 
@@ -969,7 +970,7 @@ export default function AdminJobs() {
                     <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
                       <TableCell>
                         <Checkbox 
-                          checked={selectedJobIds.has(job.id)}
+                          checked={selectedJobIds.has(String(job.id))}
                           onCheckedChange={() => toggleJobSelection(job.id)}
                           disabled={!isAssignable}
                           data-testid={`checkbox-job-${job.id}`}
