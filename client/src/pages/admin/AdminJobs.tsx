@@ -73,6 +73,7 @@ import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
 import type { Job, Driver, JobStatus, JobAssignment } from '@shared/schema';
+import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
 
 // Type for drivers from Supabase
 interface SupabaseDriver {
@@ -154,10 +155,24 @@ export default function AdminJobs() {
   const { user } = useAuth();
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.7 });
 
-  const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
+  const { data: jobs, isLoading: jobsLoading, isError: jobsError, refetch: refetchJobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
     refetchInterval: 30000, // Poll every 30 seconds for new jobs
+    retry: 2,
+    retryDelay: 1000,
   });
+  
+  // Loading timeout detection (show message if loading takes > 10 seconds)
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (jobsLoading) {
+      timer = setTimeout(() => setLoadingTooLong(true), 10000);
+    } else {
+      setLoadingTooLong(false);
+    }
+    return () => clearTimeout(timer);
+  }, [jobsLoading]);
 
   // Real-time job updates via WebSocket
   const { isConnected: wsConnected } = useJobUpdates({
@@ -893,8 +908,20 @@ export default function AdminJobs() {
             </div>
           </CardHeader>
           <CardContent>
-            {jobsLoading ? (
+            {jobsError ? (
+              <ErrorState 
+                title="Failed to load jobs"
+                message="We couldn't fetch the job list. Please check your connection and try again."
+                onRetry={() => refetchJobs()}
+              />
+            ) : jobsLoading ? (
               <div className="space-y-4">
+                {loadingTooLong && (
+                  <LoadingTimeout 
+                    message="Loading is taking longer than expected. Please wait or try refreshing."
+                    onRetry={() => refetchJobs()}
+                  />
+                )}
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}

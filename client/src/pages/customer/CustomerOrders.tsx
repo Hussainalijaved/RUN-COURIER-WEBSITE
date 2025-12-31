@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Link, useSearch } from 'wouter';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
 import {
   Table,
   TableBody,
@@ -80,10 +82,24 @@ export default function CustomerOrders() {
   const params = new URLSearchParams(searchString);
   const filterParam = params.get('filter') as FilterType || 'all';
 
-  const { data: jobs, isLoading } = useQuery<Job[]>({
+  const { data: jobs, isLoading, isError, refetch } = useQuery<Job[]>({
     queryKey: ['/api/jobs', { customerId: user?.id }],
     enabled: !!user?.id,
+    retry: 2,
+    retryDelay: 1000,
   });
+  
+  // Loading timeout detection
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoading) {
+      timer = setTimeout(() => setLoadingTooLong(true), 10000);
+    } else {
+      setLoadingTooLong(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
   const filterJobs = (jobs: Job[], filter: FilterType): Job[] => {
     switch (filter) {
@@ -177,8 +193,20 @@ export default function CustomerOrders() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isError ? (
+              <ErrorState 
+                title="Failed to load orders"
+                message="We couldn't fetch your orders. Please check your connection and try again."
+                onRetry={() => refetch()}
+              />
+            ) : isLoading ? (
               <div className="space-y-4">
+                {loadingTooLong && (
+                  <LoadingTimeout 
+                    message="Loading is taking longer than expected. Please wait or try refreshing."
+                    onRetry={() => refetch()}
+                  />
+                )}
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}

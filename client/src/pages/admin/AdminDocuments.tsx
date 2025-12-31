@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
 import {
   Table,
   TableBody,
@@ -32,9 +33,23 @@ export default function AdminDocuments() {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
-  const { data: documents, isLoading: docsLoading } = useQuery<Document[]>({
+  const { data: documents, isLoading: docsLoading, isError: docsError, refetch: refetchDocs } = useQuery<Document[]>({
     queryKey: ['/api/documents'],
+    retry: 2,
+    retryDelay: 1000,
   });
+  
+  // Loading timeout detection
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (docsLoading) {
+      timer = setTimeout(() => setLoadingTooLong(true), 10000);
+    } else {
+      setLoadingTooLong(false);
+    }
+    return () => clearTimeout(timer);
+  }, [docsLoading]);
 
   const { data: drivers } = useQuery<Driver[]>({
     queryKey: ['/api/drivers'],
@@ -112,8 +127,22 @@ export default function AdminDocuments() {
             <CardDescription>Documents awaiting approval or rejection</CardDescription>
           </CardHeader>
           <CardContent>
-            {docsLoading ? (
-              <Skeleton className="h-96 w-full" />
+            {docsError ? (
+              <ErrorState 
+                title="Failed to load documents"
+                message="We couldn't fetch the document list. Please check your connection and try again."
+                onRetry={() => refetchDocs()}
+              />
+            ) : docsLoading ? (
+              <div className="space-y-4">
+                {loadingTooLong && (
+                  <LoadingTimeout 
+                    message="Loading is taking longer than expected. Please wait or try refreshing."
+                    onRetry={() => refetchDocs()}
+                  />
+                )}
+                <Skeleton className="h-96 w-full" />
+              </div>
             ) : pendingDocs.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>

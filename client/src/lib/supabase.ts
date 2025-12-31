@@ -112,3 +112,31 @@ export const subscribeToChannel = (
     )
     .subscribe();
 };
+
+export const getSignedUrl = async (bucket: string, path: string, expiresIn = 3600): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, expiresIn);
+    
+    if (error) {
+      console.error('Failed to get signed URL:', error);
+      return null;
+    }
+    return data.signedUrl;
+  } catch (error) {
+    console.error('Error getting signed URL:', error);
+    return null;
+  }
+};
+
+export const fetchWithTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs: number = 15000,
+  errorMessage: string = 'Request timed out'
+): Promise<T> => {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]);
+};
