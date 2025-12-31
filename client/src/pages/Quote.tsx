@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -63,24 +63,49 @@ export default function Quote() {
   const { toast } = useToast();
   const [isCalculating, setIsCalculating] = useState(false);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
-  const [distance, setDistance] = useState<number>(booking.distance || 0);
-  const [estimatedTime, setEstimatedTime] = useState<number>(booking.estimatedTime || 0);
-  const [multiDropStops, setMultiDropStops] = useState<string[]>(booking.multiDropStops || []);
+  const [distance, setDistance] = useState<number>(0);
+  const [estimatedTime, setEstimatedTime] = useState<number>(0);
+  const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
 
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
     defaultValues: {
-      pickupPostcode: booking.pickupPostcode || '',
-      deliveryPostcode: booking.deliveryPostcode || '',
-      weight: booking.weight || 1,
-      vehicleType: (booking.vehicleType || '') as VehicleType,
-      isMultiDrop: booking.isMultiDrop || false,
-      isReturnTrip: booking.isReturnTrip || false,
-      returnToSameLocation: booking.returnToSameLocation ?? true,
-      returnPostcode: booking.returnPostcode || '',
+      pickupPostcode: '',
+      deliveryPostcode: '',
+      weight: 1,
+      vehicleType: '' as VehicleType,
+      isMultiDrop: false,
+      isReturnTrip: false,
+      returnToSameLocation: true,
+      returnPostcode: '',
     },
   });
+
+  useEffect(() => {
+    updateBooking({
+      pickupPostcode: '',
+      deliveryPostcode: '',
+      vehicleType: undefined,
+      weight: 1,
+      isMultiDrop: false,
+      isReturnTrip: false,
+      returnToSameLocation: true,
+      returnPostcode: '',
+      multiDropStops: [],
+      distance: 0,
+      estimatedTime: 0,
+      totalPrice: 0,
+      basePrice: 0,
+      distancePrice: 0,
+      weightSurcharge: 0,
+      rushHourCharge: 0,
+      centralLondonCharge: 0,
+      multiDropCharge: 0,
+      returnTripCharge: 0,
+      waitingTimeCharge: 0,
+    });
+  }, []);
 
   const pickupPostcode = form.watch('pickupPostcode');
   const deliveryPostcode = form.watch('deliveryPostcode');
