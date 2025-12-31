@@ -3118,6 +3118,21 @@ export async function registerRoutes(
         type: "job_assigned",
         data: { batchGroupId, assignmentCount: assignments.length },
       });
+      
+      // Send push notification for each job in the batch
+      for (const assignment of assignments) {
+        const job = await storage.getJob(assignment.jobId);
+        if (job) {
+          sendJobOfferNotification(driverId, {
+            jobId: job.id,
+            trackingNumber: job.trackingNumber,
+            pickupAddress: job.pickupAddress,
+            deliveryAddress: job.deliveryAddress,
+            driverPrice: driverPrice,
+            vehicleType: job.vehicleType,
+          }).catch(err => console.error('[Batch Assignment] Failed to send push:', err));
+        }
+      }
     }
 
     console.log(`[Job Assignment Batch] ${assignments.length} jobs assigned to driver ${driverId} (batch: ${batchGroupId})`);

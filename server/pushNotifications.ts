@@ -1,8 +1,17 @@
-import { db } from "./db";
-import { driverDevices } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { supabaseAdmin } from "./supabaseAdmin";
 import { randomUUID } from "crypto";
 import { log } from "./index";
+
+interface DriverDevice {
+  id: string;
+  driver_id: string;
+  push_token: string;
+  platform: "ios" | "android";
+  app_version?: string;
+  device_info?: string;
+  last_seen_at?: string;
+  created_at?: string;
+}
 
 interface ExpoPushMessage {
   to: string;
@@ -29,39 +38,62 @@ export async function registerDriverDevice(
   appVersion?: string,
   deviceInfo?: string
 ): Promise<{ success: boolean; deviceId?: string; error?: string }> {
-  try {
-    const existingDevice = await db
-      .select()
-      .from(driverDevices)
-      .where(and(
-        eq(driverDevices.driverId, driverId),
-        eq(driverDevices.pushToken, pushToken)
-      ))
-      .limit(1);
+  if (!supabaseAdmin) {
+    log("Supabase admin client not initialized", "push");
+    return { success: false, error: "Supabase not configured" };
+  }
 
-    if (existingDevice.length > 0) {
-      await db
-        .update(driverDevices)
-        .set({
-          lastSeenAt: new Date(),
-          appVersion,
-          deviceInfo,
+  try {
+    const { data: existingDevice, error: selectError } = await supabaseAdmin
+      .from("driver_devices")
+      .select("*")
+      .eq("driver_id", driverId)
+      .eq("push_token", pushToken)
+      .maybeSingle();
+
+    if (selectError && !selectError.message.includes("does not exist")) {
+      log(`Error checking existing device: ${selectError.message}`, "push");
+    }
+
+    if (existingDevice) {
+      const { error: updateError } = await supabaseAdmin
+        .from("driver_devices")
+        .update({
+          last_seen_at: new Date().toISOString(),
+          app_version: appVersion,
+          device_info: deviceInfo,
         })
-        .where(eq(driverDevices.id, existingDevice[0].id));
+        .eq("id", existingDevice.id);
+
+      if (updateError) {
+        log(`Failed to update device: ${updateError.message}`, "push");
+        return { success: false, error: updateError.message };
+      }
 
       log(`Updated device registration for driver ${driverId}`, "push");
-      return { success: true, deviceId: existingDevice[0].id };
+      return { success: true, deviceId: existingDevice.id };
     }
 
     const deviceId = randomUUID();
-    await db.insert(driverDevices).values({
-      id: deviceId,
-      driverId,
-      pushToken,
-      platform,
-      appVersion,
-      deviceInfo,
-    });
+    const { error: insertError } = await supabaseAdmin
+      .from("driver_devices")
+      .insert({
+        id: deviceId,
+        driver_id: driverId,
+        push_token: pushToken,
+        platform,
+        app_version: appVersion,
+        device_info: deviceInfo,
+      });
+
+    if (insertError) {
+      if (insertError.message.includes("does not exist")) {
+        log("driver_devices table does not exist in Supabase - please create it", "push");
+        return { success: false, error: "Table not configured. Please contact admin." };
+      }
+      log(`Failed to insert device: ${insertError.message}`, "push");
+      return { success: false, error: insertError.message };
+    }
 
     log(`Registered new device for driver ${driverId}`, "push");
     return { success: true, deviceId };
@@ -75,13 +107,21 @@ export async function unregisterDriverDevice(
   driverId: string,
   pushToken: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!supabaseAdmin) {
+    return { success: false, error: "Supabase not configured" };
+  }
+
   try {
-    await db
-      .delete(driverDevices)
-      .where(and(
-        eq(driverDevices.driverId, driverId),
-        eq(driverDevices.pushToken, pushToken)
-      ));
+    const { error } = await supabaseAdmin
+      .from("driver_devices")
+      .delete()
+      .eq("driver_id", driverId)
+      .eq("push_token", pushToken);
+
+    if (error) {
+      log(`Failed to unregister device: ${error.message}`, "push");
+      return { success: false, error: error.message };
+    }
 
     log(`Unregistered device for driver ${driverId}`, "push");
     return { success: true };
@@ -91,11 +131,32 @@ export async function unregisterDriverDevice(
   }
 }
 
-export async function getDriverDevices(driverId: string) {
-  return db
-    .select()
-    .from(driverDevices)
-    .where(eq(driverDevices.driverId, driverId));
+export async function getDriverDevices(driverId: string): Promise<DriverDevice[]> {
+  if (!supabaseAdmin) {
+    log("Supabase admin client not initialized", "push");
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("driver_devices")
+      .select("*")
+      .eq("driver_id", driverId);
+
+    if (error) {
+      if (error.message.includes("does not exist")) {
+        log("driver_devices table does not exist yet", "push");
+        return [];
+      }
+      log(`Failed to get devices: ${error.message}`, "push");
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    log(`Failed to get devices: ${error}`, "push");
+    return [];
+  }
 }
 
 async function sendExpoPushNotifications(messages: ExpoPushMessage[]): Promise<ExpoPushTicket[]> {
@@ -160,7 +221,7 @@ export async function sendJobOfferNotification(
   const deliveryShort = jobDetails.deliveryAddress?.split(",")[0] || "Delivery";
 
   const messages: ExpoPushMessage[] = devices.map(device => ({
-    to: device.pushToken,
+    to: device.push_token,
     sound: "default",
     title: "New Job Offer!",
     body: `${pickupShort} → ${deliveryShort} | ${priceText}`,
@@ -206,7 +267,7 @@ export async function sendJobStatusNotification(
   const body = jobDetails.message || statusMessages[jobDetails.status] || `Job status: ${jobDetails.status}`;
 
   const messages: ExpoPushMessage[] = devices.map(device => ({
-    to: device.pushToken,
+    to: device.push_token,
     sound: "default",
     title: `Job ${jobDetails.trackingNumber}`,
     body,

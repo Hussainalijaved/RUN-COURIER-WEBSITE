@@ -246,9 +246,9 @@ export function registerMobileRoutes(app: Express): void {
         devices: devices.map(d => ({
           id: d.id,
           platform: d.platform,
-          appVersion: d.appVersion,
-          lastSeenAt: d.lastSeenAt,
-          createdAt: d.createdAt
+          appVersion: d.app_version,
+          lastSeenAt: d.last_seen_at,
+          createdAt: d.created_at
         }))
       });
     })
