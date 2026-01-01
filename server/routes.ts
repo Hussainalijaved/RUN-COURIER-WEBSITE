@@ -1941,7 +1941,59 @@ export async function registerRoutes(
   app.get("/api/documents", asyncHandler(async (req, res) => {
     const { driverId, status, type } = req.query;
     
-    // First try to get documents from PostgreSQL database for persistence
+    // Collect documents from all sources and merge (deduplicate by id)
+    const allDocuments: any[] = [];
+    const seenIds = new Set<string>();
+    
+    // 1. Fetch documents from Supabase driver_documents table (where mobile app uploads)
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      
+      if (supabaseAdmin) {
+        let query = supabaseAdmin.from('driver_documents').select('*');
+        
+        if (driverId) {
+          query = query.eq('driver_id', driverId as string);
+        }
+        if (status) {
+          query = query.eq('status', status as string);
+        }
+        if (type) {
+          query = query.or(`doc_type.eq.${type},document_type.eq.${type}`);
+        }
+        
+        const { data: supabaseDocs, error } = await query.order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('[Documents] Supabase fetch error:', error);
+        } else if (supabaseDocs) {
+          supabaseDocs.forEach((doc: any) => {
+            if (!seenIds.has(doc.id)) {
+              seenIds.add(doc.id);
+              const fileUrl = doc.file_url || doc.url || '';
+              allDocuments.push({
+                id: doc.id,
+                driverId: doc.driver_id,
+                type: doc.doc_type || doc.document_type || doc.type || 'unknown',
+                fileName: fileUrl.split('/').pop() || 'document',
+                fileUrl: fileUrl,
+                status: doc.status || 'pending',
+                expiryDate: doc.expiry_date ? new Date(doc.expiry_date) : null,
+                reviewedBy: doc.reviewed_by,
+                reviewNotes: doc.review_notes,
+                uploadedAt: doc.created_at ? new Date(doc.created_at) : (doc.uploaded_at ? new Date(doc.uploaded_at) : null),
+                reviewedAt: doc.updated_at ? new Date(doc.updated_at) : null,
+              });
+            }
+          });
+          console.log(`[Documents] Fetched ${supabaseDocs.length} documents from Supabase driver_documents`);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch documents from Supabase:", e);
+    }
+    
+    // 2. Also fetch from PostgreSQL database to get any legacy documents
     try {
       const { db } = await import("./db");
       const { documents: documentsTable } = await import("@shared/schema");
@@ -1949,7 +2001,6 @@ export async function registerRoutes(
       
       let dbDocuments;
       
-      // Build query with proper condition handling
       if (driverId && status && type) {
         dbDocuments = await db.select().from(documentsTable)
           .where(and(
@@ -1982,20 +2033,45 @@ export async function registerRoutes(
         dbDocuments = await db.select().from(documentsTable);
       }
       
-      if (dbDocuments && dbDocuments.length > 0) {
-        return res.json(dbDocuments);
+      if (dbDocuments) {
+        dbDocuments.forEach((doc: any) => {
+          if (!seenIds.has(doc.id)) {
+            seenIds.add(doc.id);
+            allDocuments.push(doc);
+          }
+        });
       }
     } catch (e) {
-      console.error("Failed to fetch documents from PostgreSQL, falling back to memory:", e);
+      console.error("Failed to fetch documents from PostgreSQL:", e);
     }
     
-    // Fallback to in-memory storage
-    const documents = await storage.getDocuments({
-      driverId: driverId as string | undefined,
-      status: status as string | undefined,
-      type: type as string | undefined,
+    // 3. Also check in-memory storage for any remaining documents
+    try {
+      const memDocs = await storage.getDocuments({
+        driverId: driverId as string | undefined,
+        status: status as string | undefined,
+        type: type as string | undefined,
+      });
+      
+      memDocs.forEach((doc: any) => {
+        if (!seenIds.has(doc.id)) {
+          seenIds.add(doc.id);
+          allDocuments.push(doc);
+        }
+      });
+    } catch (e) {
+      console.error("Failed to fetch documents from memory:", e);
+    }
+    
+    // Sort by uploadedAt descending
+    allDocuments.sort((a, b) => {
+      const dateA = new Date(a.uploadedAt || 0).getTime();
+      const dateB = new Date(b.uploadedAt || 0).getTime();
+      return dateB - dateA;
     });
-    res.json(documents);
+    
+    console.log(`[Documents] Returning ${allDocuments.length} total documents from all sources`);
+    res.json(allDocuments);
   }));
 
   app.get("/api/documents/:id", asyncHandler(async (req, res) => {
@@ -2304,8 +2380,114 @@ export async function registerRoutes(
     const { status, reviewedBy, reviewNotes } = req.body;
     const reviewedAt = new Date();
     
-    // First try in-memory storage
-    let document = await storage.reviewDocument(req.params.id, status, reviewedBy, reviewNotes);
+    let document: any = null;
+    let supabaseUpdated = false;
+    
+    // First try to update in Supabase driver_documents (where mobile app uploads)
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      
+      if (supabaseAdmin) {
+        const { data: updatedDoc, error } = await supabaseAdmin
+          .from('driver_documents')
+          .update({
+            status: status,
+            reviewed_by: reviewedBy,
+            review_notes: reviewNotes || null,
+            updated_at: reviewedAt.toISOString(),
+          })
+          .eq('id', req.params.id)
+          .select()
+          .single();
+        
+        if (!error && updatedDoc) {
+          supabaseUpdated = true;
+          console.log('[Documents] Updated document status in Supabase driver_documents:', req.params.id, '->', status);
+          
+          // Broadcast real-time update for document status change
+          broadcastDocumentPending({
+            id: updatedDoc.id,
+            driverId: updatedDoc.driver_id,
+            type: updatedDoc.doc_type || updatedDoc.document_type || 'unknown',
+            fileName: updatedDoc.file_url?.split('/').pop() || 'document',
+            uploadedAt: updatedDoc.created_at ? new Date(updatedDoc.created_at) : null,
+          });
+          
+          // Map Supabase document to expected Document format with proper Date objects
+          const fileUrl = updatedDoc.file_url || updatedDoc.url || '';
+          document = {
+            id: updatedDoc.id,
+            driverId: updatedDoc.driver_id,
+            type: updatedDoc.doc_type || updatedDoc.document_type || 'unknown',
+            fileName: fileUrl.split('/').pop() || 'document',
+            fileUrl: fileUrl,
+            status: updatedDoc.status,
+            expiryDate: updatedDoc.expiry_date ? new Date(updatedDoc.expiry_date) : null,
+            reviewedBy: updatedDoc.reviewed_by,
+            reviewNotes: updatedDoc.review_notes,
+            uploadedAt: updatedDoc.created_at ? new Date(updatedDoc.created_at) : (updatedDoc.uploaded_at ? new Date(updatedDoc.uploaded_at) : null),
+            reviewedAt: reviewedAt,
+          };
+          
+          // Also update in-memory storage for consistency
+          try {
+            await storage.reviewDocument(updatedDoc.id, status, reviewedBy, reviewNotes);
+          } catch (memErr) {
+            // Document may not exist in memory, which is fine
+            console.log('[Documents] Document not in memory storage, skipped update');
+          }
+          
+          // IMPORTANT: Sync to PostgreSQL so auto-verification logic can find this document
+          try {
+            const { db } = await import("./db");
+            const { documents: documentsTable } = await import("@shared/schema");
+            const { eq } = await import("drizzle-orm");
+            
+            // Check if document exists in PostgreSQL
+            const [existingPgDoc] = await db.select().from(documentsTable).where(eq(documentsTable.id, updatedDoc.id));
+            
+            if (existingPgDoc) {
+              // Update existing record
+              await db.update(documentsTable).set({
+                status: status,
+                reviewedBy: reviewedBy,
+                reviewNotes: reviewNotes || null,
+                reviewedAt: reviewedAt,
+              }).where(eq(documentsTable.id, updatedDoc.id));
+              console.log('[Documents] Synced Supabase document update to PostgreSQL:', updatedDoc.id);
+            } else {
+              // Insert new record for verification logic
+              const fileUrl = updatedDoc.file_url || updatedDoc.url || '';
+              const fileName = fileUrl.split('/').pop() || 'document';
+              await db.insert(documentsTable).values({
+                id: updatedDoc.id,
+                driverId: updatedDoc.driver_id,
+                type: updatedDoc.doc_type || updatedDoc.document_type || 'unknown',
+                fileName: fileName,
+                fileUrl: fileUrl,
+                status: status,
+                expiryDate: updatedDoc.expiry_date ? new Date(updatedDoc.expiry_date) : null,
+                reviewedBy: reviewedBy,
+                reviewNotes: reviewNotes || null,
+                reviewedAt: reviewedAt,
+              });
+              console.log('[Documents] Inserted Supabase document into PostgreSQL for verification:', updatedDoc.id);
+            }
+          } catch (syncError) {
+            console.error('[Documents] Failed to sync Supabase document to PostgreSQL:', syncError);
+          }
+        } else if (error) {
+          console.log('[Documents] Document not found in Supabase, trying other sources:', error.message);
+        }
+      }
+    } catch (e) {
+      console.error('[Documents] Failed to update document in Supabase:', e);
+    }
+    
+    // If not updated in Supabase, try in-memory storage
+    if (!document) {
+      document = await storage.reviewDocument(req.params.id, status, reviewedBy, reviewNotes);
+    }
     
     // If not found in memory, try updating directly in PostgreSQL
     if (!document) {
