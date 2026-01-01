@@ -142,7 +142,7 @@ export async function sendAdminNotification(
   htmlContent: string,
   textContent?: string
 ): Promise<boolean> {
-  return sendEmailNotification('sales@runcourier.co.uk', subject, htmlContent, textContent);
+  return sendEmailNotification('info@runcourier.co.uk', subject, htmlContent, textContent);
 }
 
 export async function sendWelcomeEmail(
