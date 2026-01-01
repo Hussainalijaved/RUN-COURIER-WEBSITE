@@ -902,7 +902,7 @@ export async function sendContactFormSubmission(
   const htmlContent = wrapEmailContent(content, 'Contact Form');
   const textContent = `New Contact Form Submission\n\nName: ${name}\nEmail: ${email}\n${phone ? `Phone: ${phone}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`;
 
-  return sendEmailNotification('sales@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
+  return sendEmailNotification('support@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
 }
 
 export interface PaymentLinkEmailData {
