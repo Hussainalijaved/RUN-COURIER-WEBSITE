@@ -142,7 +142,7 @@ export async function sendAdminNotification(
   htmlContent: string,
   textContent?: string
 ): Promise<boolean> {
-  return sendEmailNotification('almashriqi2010@gmail.com', subject, htmlContent, textContent);
+  return sendEmailNotification('sales@runcourier.co.uk', subject, htmlContent, textContent);
 }
 
 export async function sendWelcomeEmail(
@@ -488,7 +488,7 @@ ${jobDetails.customerEmail ? `Customer Email: ${jobDetails.customerEmail}\n` : '
 Please log in to the admin dashboard to manage this booking.
 Run Courier - www.runcourier.co.uk`;
 
-  return sendEmailNotification('almashriqi2010@gmail.com', `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
+  return sendEmailNotification('sales@runcourier.co.uk', `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
 }
 
 // Send booking confirmation email to customer
@@ -902,7 +902,7 @@ export async function sendContactFormSubmission(
   const htmlContent = wrapEmailContent(content, 'Contact Form');
   const textContent = `New Contact Form Submission\n\nName: ${name}\nEmail: ${email}\n${phone ? `Phone: ${phone}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`;
 
-  return sendEmailNotification('almashriqi2010@gmail.com', `Contact Form: ${subject}`, htmlContent, textContent);
+  return sendEmailNotification('sales@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
 }
 
 export interface PaymentLinkEmailData {
