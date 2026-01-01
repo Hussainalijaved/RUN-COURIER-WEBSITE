@@ -191,6 +191,94 @@ serve(async (req) => {
       });
     }
 
+    // Send POD email to customer when job is delivered
+    if (status === "delivered" && updatedJob.pod_photo_url) {
+      try {
+        // Get customer email
+        const { data: customer } = await supabaseClient
+          .from("users")
+          .select("email, full_name")
+          .eq("id", updatedJob.customer_id)
+          .single();
+
+        if (customer?.email) {
+          const resendApiKey = Deno.env.get("RESEND_API_KEY");
+          
+          if (resendApiKey) {
+            // Generate signed URL for POD image (valid for 7 days)
+            const podPath = updatedJob.pod_photo_url.replace(/^.*\/storage\/v1\/object\/public\//, '').replace(/^.*\/storage\/v1\/object\/sign\//, '');
+            const bucketPath = podPath.startsWith('pod/') ? podPath : `pod/${podPath}`;
+            
+            const { data: signedUrlData } = await supabaseClient
+              .storage
+              .from('pod')
+              .createSignedUrl(bucketPath.replace('pod/', ''), 604800); // 7 days
+            
+            const podImageUrl = signedUrlData?.signedUrl || updatedJob.pod_photo_url;
+            
+            const emailHtml = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Delivery Confirmation</title>
+              </head>
+              <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+                <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #1a1a1a; margin: 0;">Delivery Confirmed</h1>
+                  </div>
+                  
+                  <p style="color: #333; font-size: 16px;">Dear ${customer.full_name || 'Customer'},</p>
+                  
+                  <p style="color: #333; font-size: 16px;">Your delivery has been completed successfully.</p>
+                  
+                  <div style="background-color: #f8f9fa; border-radius: 6px; padding: 15px; margin: 20px 0;">
+                    <p style="margin: 5px 0; color: #666;"><strong>Tracking Number:</strong> ${updatedJob.tracking_number || 'N/A'}</p>
+                    <p style="margin: 5px 0; color: #666;"><strong>Delivered:</strong> ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</p>
+                  </div>
+                  
+                  <div style="margin: 25px 0;">
+                    <h3 style="color: #1a1a1a; margin-bottom: 10px;">Proof of Delivery</h3>
+                    <img src="${podImageUrl}" alt="Proof of Delivery" style="max-width: 100%; border-radius: 8px; border: 1px solid #eee;" />
+                  </div>
+                  
+                  <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+                  
+                  <p style="color: #888; font-size: 14px; text-align: center;">
+                    Thank you for choosing Run Courier.<br>
+                    <a href="https://runcourier.co.uk" style="color: #0066cc;">www.runcourier.co.uk</a>
+                  </p>
+                </div>
+              </body>
+              </html>
+            `;
+
+            await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${resendApiKey}`,
+              },
+              body: JSON.stringify({
+                from: "Run Courier <noreply@runcourier.co.uk>",
+                to: customer.email,
+                subject: `Delivery Confirmed - ${updatedJob.tracking_number || 'Your Order'}`,
+                html: emailHtml,
+                reply_to: "info@runcourier.co.uk",
+              }),
+            });
+            
+            console.log(`POD email sent to ${customer.email} for job ${updatedJob.tracking_number}`);
+          }
+        }
+      } catch (emailError) {
+        // Log but don't fail the status update if email fails
+        console.error("Failed to send POD email:", emailError);
+      }
+    }
+
     return new Response(JSON.stringify(updatedJob), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
