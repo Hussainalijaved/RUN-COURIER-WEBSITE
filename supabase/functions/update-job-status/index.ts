@@ -216,6 +216,8 @@ serve(async (req) => {
             
             const podImageUrl = signedUrlData?.signedUrl || updatedJob.pod_photo_url;
             
+            const LOGO_URL = 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev/logo-email.jpg';
+            
             const emailHtml = `
               <!DOCTYPE html>
               <html>
@@ -224,32 +226,63 @@ serve(async (req) => {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Delivery Confirmation</title>
               </head>
-              <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
-                <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <div style="text-align: center; margin-bottom: 20px;">
-                    <h1 style="color: #1a1a1a; margin: 0;">Delivery Confirmed</h1>
-                  </div>
-                  
+              <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <!-- Header with Logo -->
+                <div style="background-color: #007BFF; padding: 20px; text-align: center;">
+                  <img src="${LOGO_URL}" alt="Run Courier" style="max-width: 120px; height: auto; margin-bottom: 10px;" />
+                  <h1 style="color: white; margin: 0; font-size: 24px;">Delivery Confirmed</h1>
+                </div>
+                
+                <div style="padding: 30px; background-color: #f9f9f9;">
                   <p style="color: #333; font-size: 16px;">Dear ${customer.full_name || 'Customer'},</p>
                   
-                  <p style="color: #333; font-size: 16px;">Your delivery has been completed successfully.</p>
-                  
-                  <div style="background-color: #f8f9fa; border-radius: 6px; padding: 15px; margin: 20px 0;">
-                    <p style="margin: 5px 0; color: #666;"><strong>Tracking Number:</strong> ${updatedJob.tracking_number || 'N/A'}</p>
-                    <p style="margin: 5px 0; color: #666;"><strong>Delivered:</strong> ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</p>
-                  </div>
-                  
-                  <div style="margin: 25px 0;">
-                    <h3 style="color: #1a1a1a; margin-bottom: 10px;">Proof of Delivery</h3>
-                    <img src="${podImageUrl}" alt="Proof of Delivery" style="max-width: 100%; border-radius: 8px; border: 1px solid #eee;" />
-                  </div>
-                  
-                  <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
-                  
-                  <p style="color: #888; font-size: 14px; text-align: center;">
-                    Thank you for choosing Run Courier.<br>
-                    <a href="https://runcourier.co.uk" style="color: #0066cc;">www.runcourier.co.uk</a>
+                  <p style="color: #666; font-size: 16px;">
+                    Great news! Your delivery has been completed successfully.
                   </p>
+                  
+                  <!-- Tracking Info -->
+                  <div style="background-color: #007BFF; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center; margin-top: 20px;">
+                    <p style="margin: 0; font-size: 14px;">Tracking Number</p>
+                    <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; letter-spacing: 2px;">${updatedJob.tracking_number || 'N/A'}</p>
+                  </div>
+                  
+                  <div style="background-color: white; border-radius: 0 0 8px 8px; padding: 20px; border: 1px solid #eee; border-top: none;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 10px 0; color: #666; width: 140px;"><strong>Status:</strong></td>
+                        <td style="padding: 10px 0;">
+                          <span style="background-color: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">DELIVERED</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; color: #666;"><strong>Delivered At:</strong></td>
+                        <td style="padding: 10px 0; color: #333;">${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</td>
+                      </tr>
+                    </table>
+                  </div>
+                  
+                  <!-- Proof of Delivery -->
+                  <div style="margin: 25px 0;">
+                    <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">PROOF OF DELIVERY</h3>
+                    <div style="background-color: white; padding: 15px; border-radius: 8px; border: 1px solid #eee; text-align: center;">
+                      <img src="${podImageUrl}" alt="Proof of Delivery" style="max-width: 100%; border-radius: 8px;" />
+                    </div>
+                  </div>
+                  
+                  <p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">
+                    Thank you for choosing Run Courier for your delivery needs.
+                  </p>
+                  
+                  <!-- Footer -->
+                  <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                  <div style="text-align: center;">
+                    <img src="${LOGO_URL}" alt="Run Courier" style="max-width: 60px; height: auto; margin-bottom: 10px;" />
+                    <p style="color: #999; font-size: 12px; margin: 0;">
+                      Run Courier - Same Day Delivery Across the UK<br>
+                      <a href="https://www.runcourier.co.uk" style="color: #007BFF;">www.runcourier.co.uk</a> | 
+                      <a href="tel:+447311121217" style="color: #007BFF;">+44 7311 121 217</a>
+                    </p>
+                  </div>
                 </div>
               </body>
               </html>
