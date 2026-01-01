@@ -566,7 +566,7 @@ export default function Quote() {
                                         data-testid="checkbox-return-same"
                                       />
                                     </FormControl>
-                                    <FormLabel className="cursor-pointer">Return to pickup location (+60%)</FormLabel>
+                                    <FormLabel className="cursor-pointer">Return to pickup location</FormLabel>
                                   </FormItem>
                                 )}
                               />
