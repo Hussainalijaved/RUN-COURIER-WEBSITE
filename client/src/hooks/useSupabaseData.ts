@@ -255,6 +255,13 @@ export function useUsers(filters: UserFilters = {}) {
   });
 }
 
+export function useCustomers(limit?: number) {
+  return useQuery({
+    queryKey: ['supabase', 'users', { role: 'customer', limit }],
+    queryFn: () => listUsers({ role: 'customer', limit }),
+  });
+}
+
 export function useUser(id: string | undefined) {
   return useQuery({
     queryKey: ['supabase', 'users', id],

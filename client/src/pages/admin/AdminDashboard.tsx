@@ -21,6 +21,7 @@ import {
   usePendingDocuments,
   useReviewDocument,
   useAdminStats,
+  useCustomers,
 } from '@/hooks/useSupabaseData';
 import {
   Package,
@@ -37,6 +38,9 @@ import {
   AlertCircle,
   UserPlus,
   ClipboardCheck,
+  Mail,
+  Phone,
+  Building,
 } from 'lucide-react';
 
 interface AdminStats {
@@ -106,6 +110,8 @@ export default function AdminDashboard() {
   const { data: documents } = usePendingDocuments();
 
   const { data: applications } = useDriverApplications();
+
+  const { data: customers, isLoading: customersLoading } = useCustomers(10);
 
   const reviewDocumentMutation = useReviewDocument();
 
@@ -291,6 +297,72 @@ export default function AdminDashboard() {
           </Card>
 
           <div className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">Recent Customers</CardTitle>
+                  <CardDescription>Latest customer accounts</CardDescription>
+                </div>
+                <Link href="/admin/customers">
+                  <Button variant="ghost" size="icon" data-testid="button-view-customers">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {customersLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : customers && customers.length > 0 ? (
+                  <div className="space-y-3">
+                    {customers.slice(0, 5).map((customer) => (
+                      <div key={customer.id} className="flex items-center justify-between p-2 rounded-md hover-elevate" data-testid={`row-customer-${customer.id}`}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{customer.fullName || 'Unknown'}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              {customer.companyName && (
+                                <span className="flex items-center gap-1 truncate">
+                                  <Building className="h-3 w-3" />
+                                  {customer.companyName}
+                                </span>
+                              )}
+                              {!customer.companyName && customer.email && (
+                                <span className="flex items-center gap-1 truncate">
+                                  <Mail className="h-3 w-3" />
+                                  {customer.email}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {customer.userType && (
+                          <Badge variant={customer.userType === 'business' ? 'default' : 'secondary'} className="flex-shrink-0">
+                            {customer.userType}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                    <Link href="/admin/customers">
+                      <Button variant="ghost" size="sm" className="w-full mt-2" data-testid="button-view-all-customers">
+                        View All Customers <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4 text-center">
+                    <Users className="h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No customers yet</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base">Pending Documents</CardTitle>
