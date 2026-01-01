@@ -157,13 +157,9 @@ export function calculateQuote(
   let multiDropDistanceCharge = 0;
   let totalMultiDropDistance = 0;
   
-  if (options.isMultiDrop && options.multiDropCount && options.multiDropCount > 0) {
-    multiDropCharge = config.multiDropCharge * options.multiDropCount;
-    
-    if (options.multiDropDistances && options.multiDropDistances.length > 0) {
-      totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
-      multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
-    }
+  if (options.isMultiDrop && options.multiDropDistances && options.multiDropDistances.length > 0) {
+    totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
+    multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
   }
   
   const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge;
@@ -375,13 +371,9 @@ export async function calculateQuoteAsync(
   let multiDropDistanceCharge = 0;
   let totalMultiDropDistance = 0;
   
-  if (options.isMultiDrop && options.multiDropCount && options.multiDropCount > 0) {
-    multiDropCharge = config.multiDropCharge * options.multiDropCount;
-    
-    if (options.multiDropDistances && options.multiDropDistances.length > 0) {
-      totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
-      multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
-    }
+  if (options.isMultiDrop && options.multiDropDistances && options.multiDropDistances.length > 0) {
+    totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
+    multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
   }
   
   const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge;
