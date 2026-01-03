@@ -42,6 +42,7 @@ const contactInfo: {
     icon: Phone,
     title: 'Phone',
     details: [
+      { text: '+44 20 4634 6100' },
       { text: '+44 7311 121 217', whatsapp: 'https://wa.me/447311121217' },
       { text: '+44 7862 771 999', whatsapp: 'https://wa.me/447862771999' },
     ],

@@ -280,7 +280,7 @@ serve(async (req) => {
                     <p style="color: #999; font-size: 12px; margin: 0;">
                       Run Courier - Same Day Delivery Across the UK<br>
                       <a href="https://www.runcourier.co.uk" style="color: #007BFF;">www.runcourier.co.uk</a> | 
-                      <a href="tel:+447311121217" style="color: #007BFF;">+44 7311 121 217</a>
+                      <a href="tel:+442046346100" style="color: #007BFF;">+44 20 4634 6100</a>
                     </p>
                   </div>
                 </div>

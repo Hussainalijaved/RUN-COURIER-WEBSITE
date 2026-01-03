@@ -69,7 +69,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             </div>
             <div className="text-right">
               <p style={{ fontSize: '10px', color: '#444' }}>www.runcourier.co.uk</p>
-              <p style={{ fontSize: '10px', color: '#444' }}>+44 7311 121 217</p>
+              <p style={{ fontSize: '10px', color: '#444' }}>+44 20 4634 6100</p>
             </div>
           </div>
 
