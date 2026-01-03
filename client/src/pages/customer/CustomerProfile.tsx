@@ -383,34 +383,23 @@ export default function CustomerProfile() {
               </CardContent>
             </Card>
 
-            <Card className="border-destructive/50">
-              <CardHeader>
-                <CardTitle className="text-destructive flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  Danger Zone
-                </CardTitle>
-                <CardDescription>
-                  Permanent actions that cannot be undone
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <h4 className="font-medium">Delete Account</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Permanently delete your account and all associated data. This action cannot be undone.
-                    </p>
-                  </div>
-                  <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="destructive"
-                        data-testid="button-delete-account"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Account
-                      </Button>
-                    </AlertDialogTrigger>
+            <div className="border border-destructive/30 rounded-md p-3 bg-destructive/5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+                  <span className="text-sm text-muted-foreground">Delete your account permanently</span>
+                </div>
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive"
+                      size="sm"
+                      data-testid="button-delete-account"
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" />
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -442,10 +431,9 @@ export default function CustomerProfile() {
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </CardContent>
-            </Card>
+                </AlertDialog>
+              </div>
+            </div>
           </>
         )}
       </div>
