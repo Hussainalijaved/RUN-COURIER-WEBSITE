@@ -100,8 +100,8 @@ export default function Terms() {
             </p>
             <p className="text-muted-foreground mt-2">
               Email: info@runcourier.co.uk<br />
-              Phone: +447311121217<br />
-              Address: 112 Bredgwater Road, Ruislip, HA4 6LW
+              Phone: +44 20 4634 6100<br />
+              Address: 112 Bridgwater Road, Ruislip, HA4 6LW
             </p>
           </section>
         </div>

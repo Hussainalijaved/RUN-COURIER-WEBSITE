@@ -227,8 +227,8 @@ export default function Support() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Phone</p>
-                    <a href="tel:+447311121217" className="font-medium text-blue-600 hover:underline" data-testid="link-support-phone">
-                      +44 7311 121217
+                    <a href="tel:+442046346100" className="font-medium text-blue-600 hover:underline" data-testid="link-support-phone">
+                      +44 20 4634 6100
                     </a>
                   </div>
                 </div>
