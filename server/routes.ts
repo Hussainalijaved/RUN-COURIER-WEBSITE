@@ -23,6 +23,7 @@ import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification } from "./emailService";
+import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending } from "./realtime";
 import { geocodeAddress } from "./geocoding";
@@ -3003,6 +3004,13 @@ export async function registerRoutes(
     if (embeddedCustomerEmail) {
       await sendCustomerBookingConfirmation(embeddedCustomerEmail, job).catch(err => console.error('Failed to send customer confirmation:', err));
     }
+    
+    // Send SMS confirmation to pickup contact
+    const pickupPhone = metadata.pickupPhone || jobData.pickupContactPhone;
+    if (pickupPhone) {
+      await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode)
+        .catch(err => console.error('Failed to send SMS confirmation:', err));
+    }
 
     res.json({ 
       success: true, 
@@ -3102,6 +3110,12 @@ export async function registerRoutes(
     if (customerEmailForNotification) {
       await sendCustomerBookingConfirmation(customerEmailForNotification, job).catch(err => console.error('Failed to send customer confirmation:', err));
     }
+    
+    // Send SMS confirmation to pickup contact
+    if (bookingData.pickupPhone) {
+      await sendBookingConfirmationSMS(bookingData.pickupPhone, trackingNumber, bookingData.pickupAddress || bookingData.pickupPostcode)
+        .catch(err => console.error('Failed to send SMS confirmation:', err));
+    }
 
     res.json({ 
       success: true, 
@@ -3185,6 +3199,13 @@ export async function registerRoutes(
     const customerEmailForConfirmation = metadata.customerEmail || session.customer_email;
     if (customerEmailForConfirmation) {
       await sendCustomerBookingConfirmation(customerEmailForConfirmation, job).catch(err => console.error('Failed to send customer confirmation:', err));
+    }
+    
+    // Send SMS confirmation to pickup contact
+    const pickupPhone = metadata.pickupPhone || jobData.pickupContactPhone;
+    if (pickupPhone) {
+      await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode)
+        .catch(err => console.error('Failed to send SMS confirmation:', err));
     }
 
     res.json({ 
