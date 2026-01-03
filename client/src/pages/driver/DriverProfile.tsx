@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -397,10 +398,9 @@ export default function DriverProfile() {
                       <Phone className="h-4 w-4" />
                       Phone Number
                     </Label>
-                    <Input 
+                    <PhoneInput 
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+44 7XXX XXX XXX"
+                      onChange={setPhone}
                       data-testid="input-phone" 
                     />
                   </div>

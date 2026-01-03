@@ -7,6 +7,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1055,10 +1056,9 @@ export default function Book() {
                     </div>
                     <div className="space-y-2">
                       <Label>Phone Number</Label>
-                      <Input 
-                        placeholder="+44 7XXX XXX XXX" 
+                      <PhoneInput 
                         value={pickupPhone}
-                        onChange={(e) => setPickupPhone(e.target.value)}
+                        onChange={setPickupPhone}
                         data-testid="input-pickup-phone" 
                       />
                     </div>
@@ -1131,10 +1131,9 @@ export default function Book() {
                     </div>
                     <div className="space-y-2">
                       <Label>Phone Number</Label>
-                      <Input 
-                        placeholder="+44 7XXX XXX XXX" 
+                      <PhoneInput 
                         value={recipientPhone}
-                        onChange={(e) => setRecipientPhone(e.target.value)}
+                        onChange={setRecipientPhone}
                         data-testid="input-recipient-phone" 
                       />
                     </div>
@@ -1247,10 +1246,9 @@ export default function Book() {
                             </div>
                             <div className="space-y-2">
                               <Label>Phone Number</Label>
-                              <Input 
-                                placeholder="+44 7XXX XXX XXX" 
+                              <PhoneInput 
                                 value={stopDetail.phone}
-                                onChange={(e) => updateStopDetail(index, 'phone', e.target.value)}
+                                onChange={(val) => updateStopDetail(index, 'phone', val)}
                                 data-testid={`input-stop-${index}-phone`} 
                               />
                             </div>

@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -425,7 +426,7 @@ export default function DriverApplication() {
                         <FormItem>
                           <FormLabel>Phone Number *</FormLabel>
                           <FormControl>
-                            <Input type="tel" placeholder="+44 7XXX XXX XXX" {...field} data-testid="input-phone" />
+                            <PhoneInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} data-testid="input-phone" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

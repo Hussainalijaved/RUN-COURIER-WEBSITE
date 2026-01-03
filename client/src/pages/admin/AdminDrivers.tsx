@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -928,10 +929,9 @@ export default function AdminDrivers() {
                       {editMode ? (
                         <div className="space-y-2">
                           <Label>Phone</Label>
-                          <Input
+                          <PhoneInput
                             value={editPhone}
-                            onChange={(e) => setEditPhone(e.target.value)}
-                            placeholder="+44 7XXX XXX XXX"
+                            onChange={setEditPhone}
                           />
                         </div>
                       ) : (

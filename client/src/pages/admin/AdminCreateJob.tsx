@@ -8,6 +8,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -528,15 +529,7 @@ export default function AdminCreateJob() {
                           <FormItem>
                             <FormLabel>Recipient Phone *</FormLabel>
                             <FormControl>
-                              <div className="relative">
-                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  {...field}
-                                  className="pl-10"
-                                  placeholder="+44 7XXX XXX XXX"
-                                  data-testid="input-recipient-phone"
-                                />
-                              </div>
+                              <PhoneInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} data-testid="input-recipient-phone" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -320,7 +321,7 @@ export default function Support() {
                             <FormItem>
                               <FormLabel>Phone Number (Optional)</FormLabel>
                               <FormControl>
-                                <Input type="tel" placeholder="+44 7XXX XXXXXX" {...field} data-testid="input-phone" />
+                                <PhoneInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} data-testid="input-phone" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

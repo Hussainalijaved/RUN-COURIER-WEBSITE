@@ -7,6 +7,7 @@ import { registerSchema, type RegisterInput } from '@shared/schema';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
@@ -291,10 +292,11 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                     <FormItem>
                       <FormLabel>UK Phone Number</FormLabel>
                       <FormControl>
-                        <Input
-                          type="tel"
-                          placeholder="+44 7XXX XXX XXX"
-                          {...field}
+                        <PhoneInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
                           data-testid="input-phone"
                         />
                       </FormControl>
