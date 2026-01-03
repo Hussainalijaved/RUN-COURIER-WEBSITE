@@ -175,24 +175,26 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="bg-white/95 backdrop-blur-sm py-4 px-4 shadow-lg">
-          <div className="container mx-auto">
-            <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 lg:gap-8">
-              {heroServices.map((service) => (
-                <Link key={service.label} href={service.href}>
-                  <button
-                    className="flex items-center gap-2 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors group"
-                    data-testid={`service-tab-${service.label.toLowerCase().replace(' ', '-')}`}
-                  >
-                    <service.icon className="h-5 w-5 text-gray-500 group-hover:text-[#0077B6]" />
-                    <span className="font-medium text-sm md:text-base">{service.label}</span>
-                  </button>
-                </Link>
-              ))}
-            </div>
+      </SmoothBackground>
+
+      {/* Service Quick Links Bar */}
+      <div className="bg-white py-4 px-4 shadow-lg border-b border-gray-200">
+        <div className="container mx-auto">
+          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 lg:gap-8">
+            {heroServices.map((service) => (
+              <Link key={service.label} href={service.href}>
+                <button
+                  className="flex items-center gap-2 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors group"
+                  data-testid={`service-tab-${service.label.toLowerCase().replace(' ', '-')}`}
+                >
+                  <service.icon className="h-5 w-5 text-gray-500 group-hover:text-[#0077B6]" />
+                  <span className="font-medium text-sm md:text-base">{service.label}</span>
+                </button>
+              </Link>
+            ))}
           </div>
         </div>
-      </SmoothBackground>
+      </div>
 
       {/* Promotional Banner */}
       <section className="bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 py-4">
