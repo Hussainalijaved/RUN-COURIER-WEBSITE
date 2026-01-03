@@ -77,6 +77,8 @@ export default function Book() {
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [showEmbeddedPayment, setShowEmbeddedPayment] = useState(false);
   const [pendingBookingData, setPendingBookingData] = useState<any>(null);
+  const [prefetchedClientSecret, setPrefetchedClientSecret] = useState<string | null>(null);
+  const [prefetchedPaymentIntentId, setPrefetchedPaymentIntentId] = useState<string | null>(null);
   const [distance, setDistance] = useState<number>(booking.distance || 0);
   const [estimatedTime, setEstimatedTime] = useState<number>(booking.estimatedTime || 0);
   const [multiDropStops, setMultiDropStops] = useState<string[]>(booking.multiDropStops || []);
@@ -1517,6 +1519,19 @@ export default function Book() {
                           clearBooking();
                           setLocation(`/payment/success?tracking=${result.trackingNumber}&payLater=true`);
                         } else {
+                          // Prefetch payment intent for faster loading
+                          try {
+                            const response = await apiRequest('POST', '/api/booking/create-payment-intent', bookingData);
+                            const data = await response.json();
+                            
+                            if (data.clientSecret && data.paymentIntentId) {
+                              setPrefetchedClientSecret(data.clientSecret);
+                              setPrefetchedPaymentIntentId(data.paymentIntentId);
+                            }
+                          } catch (prefetchError) {
+                            console.log('[Payment] Prefetch failed, will retry in component');
+                          }
+                          
                           setPendingBookingData(bookingData);
                           setShowEmbeddedPayment(true);
                           setIsProcessingPayment(false);
@@ -1571,17 +1586,23 @@ export default function Book() {
               <CardContent>
                 <EmbeddedPayment
                   bookingData={pendingBookingData}
+                  prefetchedClientSecret={prefetchedClientSecret || undefined}
+                  prefetchedPaymentIntentId={prefetchedPaymentIntentId || undefined}
                   onSuccess={(trackingNumber, jobId) => {
                     toast({
                       title: 'Payment Successful!',
                       description: `Your booking has been confirmed. Tracking number: ${trackingNumber}`,
                     });
                     clearBooking();
+                    setPrefetchedClientSecret(null);
+                    setPrefetchedPaymentIntentId(null);
                     setLocation(`/payment/success?tracking=${trackingNumber}`);
                   }}
                   onCancel={() => {
                     setShowEmbeddedPayment(false);
                     setPendingBookingData(null);
+                    setPrefetchedClientSecret(null);
+                    setPrefetchedPaymentIntentId(null);
                   }}
                 />
               </CardContent>

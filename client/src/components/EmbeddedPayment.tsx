@@ -52,6 +52,8 @@ interface EmbeddedPaymentProps {
   bookingData: BookingData;
   onSuccess: (trackingNumber: string, jobId: string) => void;
   onCancel: () => void;
+  prefetchedClientSecret?: string;
+  prefetchedPaymentIntentId?: string;
 }
 
 function PaymentForm({ 
@@ -193,6 +195,11 @@ function PaymentForm({
           <PaymentElement 
             options={{
               layout: 'tabs',
+              wallets: {
+                applePay: 'auto',
+                googlePay: 'auto',
+              },
+              paymentMethodOrder: ['apple_pay', 'google_pay', 'card'],
             }}
           />
         </CardContent>
@@ -238,13 +245,25 @@ function PaymentForm({
   );
 }
 
-export function EmbeddedPayment({ bookingData, onSuccess, onCancel }: EmbeddedPaymentProps) {
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function EmbeddedPayment({ 
+  bookingData, 
+  onSuccess, 
+  onCancel, 
+  prefetchedClientSecret,
+  prefetchedPaymentIntentId 
+}: EmbeddedPaymentProps) {
+  const [clientSecret, setClientSecret] = useState<string | null>(prefetchedClientSecret || null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(prefetchedPaymentIntentId || null);
+  const [isLoading, setIsLoading] = useState(!prefetchedClientSecret);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip fetching if we have prefetched values
+    if (prefetchedClientSecret && prefetchedPaymentIntentId) {
+      console.log('[Payment] Using prefetched payment intent');
+      return;
+    }
+
     const createPaymentIntent = async () => {
       try {
         console.log('[Payment] Creating payment intent for amount:', bookingData.totalPrice);
@@ -272,14 +291,25 @@ export function EmbeddedPayment({ bookingData, onSuccess, onCancel }: EmbeddedPa
     };
 
     createPaymentIntent();
-  }, []);
+  }, [prefetchedClientSecret, prefetchedPaymentIntentId]);
 
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="pt-6 text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Initializing secure payment...</p>
+        <CardContent className="pt-6 space-y-4">
+          <div className="text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground font-medium">Setting up secure payment...</p>
+            <p className="text-xs text-muted-foreground mt-1">Apple Pay, Google Pay & Cards accepted</p>
+          </div>
+          <div className="space-y-3 animate-pulse">
+            <div className="h-12 bg-muted rounded-lg" />
+            <div className="h-12 bg-muted rounded-lg" />
+            <div className="flex gap-3">
+              <div className="h-12 bg-muted rounded-lg flex-1" />
+              <div className="h-12 bg-muted rounded-lg w-24" />
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -317,7 +347,14 @@ export function EmbeddedPayment({ bookingData, onSuccess, onCancel }: EmbeddedPa
   };
 
   return (
-    <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
+    <Elements 
+      stripe={stripePromise} 
+      options={{ 
+        clientSecret, 
+        appearance,
+        loader: 'auto',
+      }}
+    >
       <PaymentForm 
         bookingData={bookingData} 
         onSuccess={onSuccess} 
