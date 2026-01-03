@@ -3,8 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Check if Supabase is properly configured
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('placeholder'));
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials not found. Some features may not work.');
+  console.error('⚠️ SUPABASE NOT CONFIGURED: Login will not work. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.');
 }
 
 export const supabase = createClient(
