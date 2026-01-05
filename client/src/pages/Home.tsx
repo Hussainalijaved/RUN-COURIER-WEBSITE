@@ -1,5 +1,5 @@
 import { Link } from 'wouter';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,7 +25,62 @@ import {
   Star,
   CalendarClock,
   Repeat,
+  Users,
+  Timer,
+  Headphones,
 } from 'lucide-react';
+
+function useCountUp(end: number, duration: number = 2000, startOnView: boolean = true) {
+  const [count, setCount] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!startOnView) {
+      setHasStarted(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasStarted) {
+          setHasStarted(true);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasStarted, startOnView]);
+
+  useEffect(() => {
+    if (!hasStarted) return;
+
+    let startTime: number;
+    let animationFrame: number;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(easeOut * end));
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(animationFrame);
+  }, [hasStarted, end, duration]);
+
+  return { count, ref };
+}
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import heroBackground from '@assets/WhatsApp_Image_2025-09-06_at_20.08.04_32824ae2_1764877551595.jpg';
 
@@ -119,12 +174,37 @@ const features = [
   },
 ];
 
-const stats = [
-  { value: '50K+', label: 'Deliveries Completed' },
-  { value: '10K+', label: 'Happy Customers' },
-  { value: '99.8%', label: 'On-Time Rate' },
-  { value: '24/7', label: 'Service Available' },
+const statsConfig = [
+  { icon: Truck, value: 50, suffix: 'K+', label: 'Deliveries Completed' },
+  { icon: Users, value: 10, suffix: 'K+', label: 'Happy Customers' },
+  { icon: Timer, value: 99.8, suffix: '%', label: 'On-Time Delivery Rate', isDecimal: true },
+  { icon: Headphones, value: 24, suffix: '/7', label: 'Service Available' },
 ];
+
+function AnimatedStat({ icon: Icon, value, suffix, label, isDecimal }: {
+  icon: typeof Truck;
+  value: number;
+  suffix: string;
+  label: string;
+  isDecimal?: boolean;
+}) {
+  const { count, ref } = useCountUp(isDecimal ? value * 10 : value, 2000);
+  const displayValue = isDecimal ? (count / 10).toFixed(1) : count;
+
+  return (
+    <div ref={ref} className="flex flex-col items-center text-center p-6 relative group">
+      <div className="mb-4 p-3 rounded-full bg-white/10 backdrop-blur-sm">
+        <Icon className="h-8 w-8 text-white" strokeWidth={1.5} />
+      </div>
+      <div className="text-4xl md:text-5xl lg:text-6xl font-bold mb-2 tracking-tight">
+        {displayValue}{suffix}
+      </div>
+      <div className="text-white/80 text-sm md:text-base font-medium tracking-wide uppercase">
+        {label}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -294,17 +374,21 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-20 bg-gradient-to-r from-[#0077B6] via-[#0096C7] to-[#00B4D8] text-white">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
-            {stats.map((stat, idx) => (
-              <div key={idx}>
-                <div className="text-4xl lg:text-5xl font-bold mb-2">{stat.value}</div>
-                <div className="text-white/80">{stat.label}</div>
-              </div>
+      <section className="py-16 md:py-24 bg-gradient-to-br from-[#0077B6] via-[#0096C7] to-[#00B4D8] text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">Trusted by Thousands</h2>
+            <p className="text-white/70 text-sm md:text-base">Our track record speaks for itself</p>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+            {statsConfig.map((stat, idx) => (
+              <AnimatedStat key={idx} {...stat} />
             ))}
           </div>
         </div>
+        <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/2 translate-y-1/2 blur-3xl"></div>
       </section>
 
       <section className="py-12 bg-card border-y border-border">
