@@ -113,6 +113,7 @@ const DRIVER_SAFE_JOB_COLUMNS = `
   pod_signature_url,
   pod_photo_url,
   pod_notes,
+  driver_hidden,
   created_at,
   updated_at
 `;
@@ -124,10 +125,12 @@ export function useDriverJobs(driverId: string | undefined) {
       if (!driverId) return [];
       
       // CRITICAL: Only fetch driver-safe columns - NEVER use select('*')
+      // Filter out jobs hidden by admin (driver_hidden = true)
       const { data, error } = await supabase
         .from('jobs')
         .select(DRIVER_SAFE_JOB_COLUMNS)
         .eq('driver_id', driverId)
+        .or('driver_hidden.is.null,driver_hidden.eq.false')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

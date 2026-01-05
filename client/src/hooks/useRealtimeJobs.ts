@@ -64,11 +64,21 @@ export function useRealtimeDriverJobs() {
           table: 'jobs',
         },
         (payload) => {
-          console.log('[Realtime] Driver job change detected:', payload.eventType);
+          console.log('[Realtime] Driver job change detected:', payload.eventType, payload.new);
           
+          // Check if driver_hidden field changed - this means admin toggled visibility
+          const newJob = payload.new as { driver_hidden?: boolean; status?: string } | null;
+          const oldJob = payload.old as { driver_hidden?: boolean; status?: string } | null;
+          
+          if (newJob?.driver_hidden !== oldJob?.driver_hidden) {
+            console.log('[Realtime] Job visibility changed - hidden:', newJob?.driver_hidden);
+          }
+          
+          // Invalidate all driver job queries to reflect changes instantly
           queryClient.invalidateQueries({ queryKey: ['driver-jobs'] });
           queryClient.invalidateQueries({ queryKey: ['driver-active-jobs'] });
           queryClient.invalidateQueries({ queryKey: ['driver-pending-offers'] });
+          queryClient.invalidateQueries({ queryKey: ['supabase', 'jobs'] });
         }
       )
       .subscribe();

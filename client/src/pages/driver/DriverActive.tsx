@@ -20,6 +20,7 @@ import {
   useDriverJobs,
   useUpdateJobStatus,
 } from '@/hooks/useSupabaseDriver';
+import { useRealtimeDriverJobs } from '@/hooks/useRealtimeJobs';
 import type { JobStatus } from '@shared/schema';
 import type { DriverJob } from '@/lib/data/base';
 
@@ -60,6 +61,9 @@ const statusFlow: JobStatus[] = [
 
 export default function DriverActive() {
   const { toast } = useToast();
+
+  // Enable real-time updates for job visibility changes
+  useRealtimeDriverJobs();
 
   const { data: driver, isLoading: driverLoading } = useDriver();
   const { data: myJobs, isLoading: jobsLoading } = useDriverJobs(driver?.id);
