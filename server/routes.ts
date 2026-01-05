@@ -1036,6 +1036,19 @@ export async function registerRoutes(
     console.log(`[Jobs] Job ${jobId} visibility for driver: ${hidden ? 'hidden' : 'visible'} by admin ${adminId || 'unknown'}`);
     
     const updatedJob = await storage.getJob(jobId);
+    
+    // Broadcast to driver's mobile app for instant removal/appearance
+    if (job.driverId) {
+      const { broadcastJobHidden } = await import("./realtime");
+      broadcastJobHidden({
+        id: jobId,
+        trackingNumber: job.trackingNumber,
+        driverId: job.driverId,
+        hidden: hidden,
+        hiddenAt: hidden ? new Date() : null,
+      });
+    }
+    
     res.json(updatedJob);
   }));
 

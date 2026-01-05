@@ -138,6 +138,17 @@ interface DocumentPendingMessage {
   };
 }
 
+interface JobHiddenMessage {
+  type: 'job:hidden';
+  payload: {
+    jobId: string;
+    trackingNumber: string;
+    driverId: string;
+    hidden: boolean;
+    hiddenAt?: string;
+  };
+}
+
 type OutgoingMessage = 
   | OutgoingLocationMessage 
   | BulkSnapshotMessage 
@@ -149,6 +160,7 @@ type OutgoingMessage =
   | JobCreatedMessage
   | JobAssignedMessage
   | DocumentPendingMessage
+  | JobHiddenMessage
   | { type: 'pong' };
 
 interface JobSubscription {
@@ -597,6 +609,45 @@ export function broadcastJobAssigned(job: {
   });
 
   log(`Broadcasted job assignment for ${job.id} to driver ${job.driverId} (${sentCount} clients)`, 'realtime');
+}
+
+export function broadcastJobHidden(job: {
+  id: string;
+  trackingNumber: string;
+  driverId: string;
+  hidden: boolean;
+  hiddenAt?: Date | null;
+}): void {
+  const message: JobHiddenMessage = {
+    type: 'job:hidden',
+    payload: {
+      jobId: job.id,
+      trackingNumber: job.trackingNumber,
+      driverId: job.driverId,
+      hidden: job.hidden,
+      hiddenAt: job.hiddenAt?.toISOString(),
+    },
+  };
+
+  let sentCount = 0;
+
+  // Send to the specific driver whose job visibility changed
+  driverConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && client.driverId === job.driverId) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  // Also send to job subscribers who are this driver
+  jobSubscribers.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && client.driverId === job.driverId) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  log(`Broadcasted job hidden status for ${job.id} (hidden: ${job.hidden}) to driver ${job.driverId} (${sentCount} clients)`, 'realtime');
 }
 
 export function broadcastDocumentPending(document: {
