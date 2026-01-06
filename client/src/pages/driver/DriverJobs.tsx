@@ -58,10 +58,17 @@ const REJECTION_REASONS = [
   'Other (please specify)',
 ];
 
-const formatPrice = (price: string | number | null) => {
+const formatPrice = (price: string | number | null | undefined) => {
   if (price === null || price === undefined) return '—';
   const num = typeof price === 'string' ? parseFloat(price) : price;
-  if (isNaN(num)) return '—';
+  if (isNaN(num) || num === 0) return '—';
+  return `£${num.toFixed(2)}`;
+};
+
+const formatDriverPaymentFromAssignment = (driverPrice: string | number | null | undefined) => {
+  if (driverPrice === null || driverPrice === undefined) return '—';
+  const num = typeof driverPrice === 'string' ? parseFloat(driverPrice) : driverPrice;
+  if (isNaN(num) || num <= 0) return '—';
   return `£${num.toFixed(2)}`;
 };
 
@@ -356,7 +363,9 @@ export default function DriverJobs() {
                     <div className="bg-background rounded-md p-3 mb-4">
                       <div className="text-center py-2">
                         <div className="text-sm text-muted-foreground mb-1">Your Payment</div>
-                        <div className="text-3xl font-bold text-primary">£{parseFloat(assignment.driverPrice).toFixed(2)}</div>
+                        <div className="text-3xl font-bold text-primary">
+                          {formatDriverPaymentFromAssignment(assignment.driverPrice)}
+                        </div>
                       </div>
                     </div>
                     
@@ -719,13 +728,13 @@ export default function DriverJobs() {
                   Pickup
                 </h4>
                 <div className="bg-muted/50 p-3 rounded-md space-y-1">
-                  <p className="font-medium">{selectedJobForDetails.pickupContactName || 'N/A'}</p>
+                  <p className="font-medium">{selectedJobForDetails.pickupContactName || selectedJobForDetails.senderName || 'N/A'}</p>
                   <p className="text-sm">{selectedJobForDetails.pickupAddress}</p>
                   {selectedJobForDetails.pickupPostcode && (
                     <p className="text-sm font-mono">{selectedJobForDetails.pickupPostcode}</p>
                   )}
-                  {selectedJobForDetails.pickupPhone && (
-                    <p className="text-sm text-muted-foreground">{selectedJobForDetails.pickupPhone}</p>
+                  {selectedJobForDetails.pickupContactPhone && (
+                    <p className="text-sm text-muted-foreground">{selectedJobForDetails.pickupContactPhone}</p>
                   )}
                   {selectedJobForDetails.pickupInstructions && (
                     <p className="text-sm text-muted-foreground italic mt-2">
@@ -742,13 +751,13 @@ export default function DriverJobs() {
                   Delivery
                 </h4>
                 <div className="bg-muted/50 p-3 rounded-md space-y-1">
-                  <p className="font-medium">{selectedJobForDetails.deliveryContactName || 'N/A'}</p>
+                  <p className="font-medium">{selectedJobForDetails.recipientName || 'N/A'}</p>
                   <p className="text-sm">{selectedJobForDetails.deliveryAddress}</p>
                   {selectedJobForDetails.deliveryPostcode && (
                     <p className="text-sm font-mono">{selectedJobForDetails.deliveryPostcode}</p>
                   )}
-                  {selectedJobForDetails.deliveryPhone && (
-                    <p className="text-sm text-muted-foreground">{selectedJobForDetails.deliveryPhone}</p>
+                  {selectedJobForDetails.recipientPhone && (
+                    <p className="text-sm text-muted-foreground">{selectedJobForDetails.recipientPhone}</p>
                   )}
                   {selectedJobForDetails.deliveryInstructions && (
                     <p className="text-sm text-muted-foreground italic mt-2">
@@ -780,14 +789,14 @@ export default function DriverJobs() {
                     <p className="font-medium capitalize">{selectedJobForDetails.vehicleType?.replace(/_/g, ' ')}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Urgency</span>
-                    <p className="font-medium capitalize">{selectedJobForDetails.urgency}</p>
+                    <span className="text-muted-foreground">Urgent</span>
+                    <p className="font-medium">{selectedJobForDetails.isUrgent ? 'Yes' : 'No'}</p>
                   </div>
                 </div>
-                {selectedJobForDetails.packageDescription && (
+                {selectedJobForDetails.parcelDescription && (
                   <div className="mt-3">
                     <span className="text-sm text-muted-foreground">Description</span>
-                    <p className="text-sm">{selectedJobForDetails.packageDescription}</p>
+                    <p className="text-sm">{selectedJobForDetails.parcelDescription}</p>
                   </div>
                 )}
               </div>
