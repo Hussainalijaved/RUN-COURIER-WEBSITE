@@ -48,7 +48,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType } from '@shared/schema';
-import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, isRushHour, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance } from '@/lib/maps';
 
 // Helper functions for default date/time
@@ -460,12 +460,6 @@ export default function Quote() {
                               />
                             </div>
                           </div>
-                          {pickupDate && pickupTime && isRushHour(new Date(`${pickupDate}T${pickupTime}`)) && (
-                            <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              Rush hour rates apply (07:00-09:00, 17:00-19:00)
-                            </p>
-                          )}
                         </div>
 
                         <Separator />
