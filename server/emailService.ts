@@ -8,6 +8,14 @@ const LOGO_URL = 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.
 // Base URL for tracking links - uses current deployment or production
 const BASE_URL = process.env.APP_URL || 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev';
 
+// Mobile app store URLs (update these when apps are published)
+const GOOGLE_PLAY_URL = process.env.GOOGLE_PLAY_URL || 'https://play.google.com/store/apps/details?id=com.runcourier.app';
+const APP_STORE_URL = process.env.APP_STORE_URL || 'https://apps.apple.com/app/run-courier/id6739498614';
+
+// Official store badge image URLs (Google and Apple hosted)
+const GOOGLE_PLAY_BADGE_URL = 'https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png';
+const APP_STORE_BADGE_URL = 'https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg';
+
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
   return `
@@ -33,6 +41,50 @@ function getEmailFooter(): string {
   `;
 }
 
+// Reusable mobile app download section for all emails
+function getAppDownloadSection(): string {
+  return `
+    <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 24px; margin: 30px 0 20px 0; text-align: center;">
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="text-align: center; padding-bottom: 12px;">
+            <h3 style="color: #333333; font-size: 18px; font-weight: 600; margin: 0 0 8px 0; font-family: Arial, sans-serif;">
+              Get the Run Courier Mobile App
+            </h3>
+            <p style="color: #666666; font-size: 14px; margin: 0; line-height: 1.5; font-family: Arial, sans-serif;">
+              Track deliveries, receive job updates, and manage your account anytime, anywhere.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="text-align: center; padding-top: 16px;">
+            <!--[if mso]>
+            <table role="presentation" cellpadding="0" cellspacing="0" align="center">
+            <tr>
+            <td style="padding-right: 10px;">
+            <![endif]-->
+            <a href="${APP_STORE_URL}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 0 8px 8px 8px; text-decoration: none;">
+              <img src="${APP_STORE_BADGE_URL}" alt="Download on the App Store" width="135" height="40" style="border: 0; display: inline-block; vertical-align: middle; max-width: 135px; height: auto;" />
+            </a>
+            <!--[if mso]>
+            </td>
+            <td style="padding-left: 10px;">
+            <![endif]-->
+            <a href="${GOOGLE_PLAY_URL}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 0 8px 8px 8px; text-decoration: none;">
+              <img src="${GOOGLE_PLAY_BADGE_URL}" alt="Get it on Google Play" width="155" height="60" style="border: 0; display: inline-block; vertical-align: middle; max-width: 155px; height: auto;" />
+            </a>
+            <!--[if mso]>
+            </td>
+            </tr>
+            </table>
+            <![endif]-->
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+}
+
 // Wrap content in standard email template
 function wrapEmailContent(content: string, headerTitle?: string): string {
   return `
@@ -40,6 +92,7 @@ function wrapEmailContent(content: string, headerTitle?: string): string {
       ${getEmailHeader(headerTitle)}
       <div style="padding: 30px; background-color: #f9f9f9;">
         ${content}
+        ${getAppDownloadSection()}
         ${getEmailFooter()}
       </div>
     </div>
