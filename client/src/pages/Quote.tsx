@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
@@ -43,11 +44,24 @@ import {
   X,
   Calculator,
   User,
-  LogIn
+  LogIn,
+  Calendar
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType } from '@shared/schema';
-import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, isRushHour, type QuoteBreakdown } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance } from '@/lib/maps';
+
+// Helper functions for default date/time
+function getTodayDate(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getCurrentTime(): string {
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = (Math.ceil(now.getMinutes() / 15) * 15 % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
 
 const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: number }[] = [
   { type: 'motorbike', icon: Bike, name: 'Motorbike', maxWeight: 5 },
@@ -67,6 +81,8 @@ export default function Quote() {
   const [estimatedTime, setEstimatedTime] = useState<number>(0);
   const [multiDropStops, setMultiDropStops] = useState<string[]>([]);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [pickupDate, setPickupDate] = useState(getTodayDate());
+  const [pickupTime, setPickupTime] = useState(getCurrentTime());
 
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
@@ -207,6 +223,11 @@ export default function Quote() {
             });
           }
           
+          // Create scheduled time from date and time for rush hour calculation
+          const scheduledTime = pickupDate && pickupTime 
+            ? new Date(`${pickupDate}T${pickupTime}`) 
+            : new Date();
+          
           const calculatedQuote = calculateQuote(finalVehicleType, distanceResult.distance, weight, {
             pickupPostcode,
             deliveryPostcode,
@@ -216,6 +237,7 @@ export default function Quote() {
             isReturnTrip,
             returnToSameLocation,
             returnDistance,
+            scheduledTime,
           });
           setQuote(calculatedQuote);
           toast({
@@ -246,7 +268,7 @@ export default function Quote() {
     } finally {
       setIsCalculating(false);
     }
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, returnPostcode, multiDropStops, toast]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isMultiDrop, isReturnTrip, returnToSameLocation, returnPostcode, multiDropStops, pickupDate, pickupTime, toast]);
 
   const addMultiDropStop = () => {
     setMultiDropStops([...multiDropStops, '']);
@@ -268,6 +290,12 @@ export default function Quote() {
     params.set('delivery', deliveryPostcode);
     params.set('vehicle', vehicleType);
     params.set('weight', weight.toString());
+    if (pickupDate) {
+      params.set('pickupDate', pickupDate);
+    }
+    if (pickupTime) {
+      params.set('pickupTime', pickupTime);
+    }
     if (isMultiDrop) {
       params.set('multiDrop', 'true');
       if (multiDropStops.length > 0) {
@@ -402,6 +430,45 @@ export default function Quote() {
                             )}
                           />
                         </div>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calendar className="h-4 w-4 text-primary" />
+                            <Label className="text-base font-medium">Pickup Date & Time</Label>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="pickupDate">Date</Label>
+                              <Input
+                                id="pickupDate"
+                                type="date"
+                                value={pickupDate}
+                                min={getTodayDate()}
+                                onChange={(e) => setPickupDate(e.target.value)}
+                                data-testid="input-pickup-date"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="pickupTime">Time</Label>
+                              <Input
+                                id="pickupTime"
+                                type="time"
+                                step="900"
+                                value={pickupTime}
+                                onChange={(e) => setPickupTime(e.target.value)}
+                                data-testid="input-pickup-time"
+                              />
+                            </div>
+                          </div>
+                          {pickupDate && pickupTime && isRushHour(new Date(`${pickupDate}T${pickupTime}`)) && (
+                            <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Rush hour rates apply (07:00-09:00, 17:00-19:00)
+                            </p>
+                          )}
+                        </div>
+
+                        <Separator />
 
                         <div className="space-y-4">
                           <Label>Vehicle Type</Label>
