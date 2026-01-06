@@ -592,31 +592,43 @@ export function registerMobileRoutes(app: Express): void {
           console.log(`[Mobile Jobs] Found ${supabaseJobs.length} jobs in Supabase for driver ${driver.id}`);
           
           // Get job_assignments to look up driver_price (more reliable than jobs.driver_price)
-          const jobIds = supabaseJobs.map(j => j.id);
-          const { data: assignments } = await supabaseAdmin
+          // IMPORTANT: job_assignments.job_id is TEXT, jobs.id may be INTEGER - convert to strings for comparison
+          const jobIds = supabaseJobs.map(j => String(j.id));
+          console.log(`[Mobile Jobs] Looking up assignments for ${jobIds.length} job IDs:`, jobIds.slice(0, 5));
+          
+          const { data: assignments, error: assignmentsError } = await supabaseAdmin
             .from('job_assignments')
             .select('job_id, driver_price, status')
             .eq('driver_id', driver.id)
             .in('job_id', jobIds);
+          
+          if (assignmentsError) {
+            console.log(`[Mobile Jobs] Error fetching assignments:`, assignmentsError.message);
+          }
+          console.log(`[Mobile Jobs] Found ${assignments?.length || 0} matching assignments`);
           
           // Create a map of job_id -> assignment with driver_price
           const assignmentMap = new Map<string, { driver_price: number | null, status: string }>();
           if (assignments) {
             for (const a of assignments) {
               // Prefer accepted assignments, then sent, then pending
-              const existing = assignmentMap.get(a.job_id);
+              const existing = assignmentMap.get(String(a.job_id));
               if (!existing || 
                   (a.status === 'accepted' && existing.status !== 'accepted') ||
                   (a.status === 'sent' && existing.status === 'pending')) {
-                assignmentMap.set(a.job_id, { driver_price: a.driver_price, status: a.status });
+                assignmentMap.set(String(a.job_id), { driver_price: a.driver_price, status: a.status });
+                console.log(`[Mobile Jobs] Assignment for job ${a.job_id}: driver_price=${a.driver_price}, status=${a.status}`);
               }
             }
           }
           
           // Enrich jobs with driver_price from assignments (fallback to job.driver_price)
           let enrichedJobs = supabaseJobs.map(j => {
-            const assignment = assignmentMap.get(j.id);
+            const assignment = assignmentMap.get(String(j.id));
             const driverPrice = assignment?.driver_price ?? j.driver_price;
+            if (assignment) {
+              console.log(`[Mobile Jobs] Job ${j.id}: using assignment driver_price=${driverPrice}`);
+            }
             return { ...j, driver_price: driverPrice };
           });
           
@@ -803,12 +815,13 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       // Look up driver_price from job_assignments as it's more reliable than jobs.driver_price
+      // IMPORTANT: job_assignments.job_id is TEXT, so convert jobId to string
       let assignmentDriverPrice: number | null = null;
       if (supabaseAdmin) {
         const { data: assignment } = await supabaseAdmin
           .from('job_assignments')
           .select('driver_price')
-          .eq('job_id', jobId)
+          .eq('job_id', String(jobId))
           .eq('driver_id', driver.id)
           .in('status', ['accepted', 'sent', 'pending'])
           .order('created_at', { ascending: false })
