@@ -537,6 +537,8 @@ export function registerMobileRoutes(app: Express): void {
       // SECURITY: Explicitly select ONLY driver-safe columns - NEVER include total_price/base_price/customer pricing
       if (supabaseAdmin) {
         console.log("[Mobile Jobs] Querying Supabase for jobs (driver-safe columns only)...");
+        
+        // First get jobs assigned to this driver
         const { data: supabaseJobs, error: supabaseError } = await supabaseAdmin
           .from('jobs')
           .select(`
@@ -582,31 +584,60 @@ export function registerMobileRoutes(app: Express): void {
             updated_at
           `)
           .eq('driver_id', driver.id)
-          .not('driver_price', 'is', null)
           .order('created_at', { ascending: false });
         
         if (supabaseError) {
           console.log("[Mobile Jobs] Supabase query error:", supabaseError.message);
         } else if (supabaseJobs && supabaseJobs.length > 0) {
-          console.log(`[Mobile Jobs] Found ${supabaseJobs.length} jobs in Supabase (already filtered to driver_price != null)`);
+          console.log(`[Mobile Jobs] Found ${supabaseJobs.length} jobs in Supabase for driver ${driver.id}`);
           
-          let filteredJobs = supabaseJobs;
-          // NOTE: driver_price filter already applied in query (.not('driver_price', 'is', null))
+          // Get job_assignments to look up driver_price (more reliable than jobs.driver_price)
+          const jobIds = supabaseJobs.map(j => j.id);
+          const { data: assignments } = await supabaseAdmin
+            .from('job_assignments')
+            .select('job_id, driver_price, status')
+            .eq('driver_id', driver.id)
+            .in('job_id', jobIds);
+          
+          // Create a map of job_id -> assignment with driver_price
+          const assignmentMap = new Map<string, { driver_price: number | null, status: string }>();
+          if (assignments) {
+            for (const a of assignments) {
+              // Prefer accepted assignments, then sent, then pending
+              const existing = assignmentMap.get(a.job_id);
+              if (!existing || 
+                  (a.status === 'accepted' && existing.status !== 'accepted') ||
+                  (a.status === 'sent' && existing.status === 'pending')) {
+                assignmentMap.set(a.job_id, { driver_price: a.driver_price, status: a.status });
+              }
+            }
+          }
+          
+          // Enrich jobs with driver_price from assignments (fallback to job.driver_price)
+          let enrichedJobs = supabaseJobs.map(j => {
+            const assignment = assignmentMap.get(j.id);
+            const driverPrice = assignment?.driver_price ?? j.driver_price;
+            return { ...j, driver_price: driverPrice };
+          });
+          
+          // Filter out jobs without driver_price (no assignment found)
+          enrichedJobs = enrichedJobs.filter(j => j.driver_price != null);
+          console.log(`[Mobile Jobs] ${enrichedJobs.length} jobs have driver_price set`);
           
           // Apply status filters
           // "active" = jobs the driver has ACCEPTED and is working on
           // "pending" = job offers waiting for driver to accept/decline
           if (status === "active") {
-            filteredJobs = filteredJobs.filter(j => 
+            enrichedJobs = enrichedJobs.filter(j => 
               ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
             );
           } else if (status === "pending") {
-            filteredJobs = filteredJobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
+            enrichedJobs = enrichedJobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
           } else if (status === "completed") {
-            filteredJobs = filteredJobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
+            enrichedJobs = enrichedJobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
           }
           
-          mobileJobs = filteredJobs.map(mapSupabaseJobToMobileFormat);
+          mobileJobs = enrichedJobs.map(mapSupabaseJobToMobileFormat);
           
           return res.json({
             jobs: mobileJobs,
@@ -771,6 +802,25 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
+      // Look up driver_price from job_assignments as it's more reliable than jobs.driver_price
+      let assignmentDriverPrice: number | null = null;
+      if (supabaseAdmin) {
+        const { data: assignment } = await supabaseAdmin
+          .from('job_assignments')
+          .select('driver_price')
+          .eq('job_id', jobId)
+          .eq('driver_id', driver.id)
+          .in('status', ['accepted', 'sent', 'pending'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (assignment?.driver_price) {
+          assignmentDriverPrice = assignment.driver_price;
+          console.log(`[Job Details] Found driver_price ${assignmentDriverPrice} from job_assignments`);
+        }
+      }
+
       // Include driver's current location for map display
       const driverLocation = {
         latitude: driver.currentLatitude,
@@ -780,6 +830,8 @@ export function registerMobileRoutes(app: Express): void {
 
       // Build response from either source
       if (job) {
+        // Use assignment driver_price if job.driverPrice is null
+        const effectiveDriverPrice = job.driverPrice ?? assignmentDriverPrice;
         res.json({
           id: job.id,
           trackingNumber: job.trackingNumber,
@@ -799,7 +851,7 @@ export function registerMobileRoutes(app: Express): void {
           vehicleType: job.vehicleType,
           distance: job.distance,
           weight: job.weight,
-          driverPrice: job.driverPrice,
+          driverPrice: effectiveDriverPrice,
           scheduledPickupTime: job.scheduledPickupTime,
           isMultiDrop: job.isMultiDrop,
           isReturnTrip: job.isReturnTrip,
@@ -814,6 +866,8 @@ export function registerMobileRoutes(app: Express): void {
           driverLocation,
         });
       } else {
+        // Use assignment driver_price if supabaseJob.driver_price is null
+        const effectiveDriverPrice = supabaseJob.driver_price ?? assignmentDriverPrice;
         // Map from Supabase format (snake_case to camelCase)
         res.json({
           id: String(supabaseJob.id),
@@ -840,7 +894,7 @@ export function registerMobileRoutes(app: Express): void {
           distance: supabaseJob.distance_miles?.toString() || supabaseJob.distance || null,
           weight: supabaseJob.parcel_weight?.toString() || supabaseJob.weight || null,
           // CRITICAL: Use driver_price (admin-set), NEVER total_price
-          driverPrice: supabaseJob.driver_price?.toString() || null,
+          driverPrice: effectiveDriverPrice?.toString() || null,
           scheduledPickupTime: supabaseJob.scheduled_pickup_time,
           isMultiDrop: supabaseJob.is_multi_drop || false,
           isReturnTrip: supabaseJob.is_return_trip || false,
