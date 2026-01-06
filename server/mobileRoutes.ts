@@ -1543,19 +1543,29 @@ export function registerMobileRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       const driver = req.driver!;
       
+      console.log(`[Job Offers] Fetching job offers for driver ${driver.driverCode} (${driver.id})`);
+      
       // Get all pending/sent job assignments for this driver
       const assignments = await storage.getJobAssignments({ 
         driverId: driver.id,
         status: "sent" // Only show sent offers (pending means admin hasn't sent yet)
       });
+      console.log(`[Job Offers] Found ${assignments.length} sent assignments`);
       
       // Also get "pending" status assignments that are ready to be viewed
       const pendingAssignments = await storage.getJobAssignments({ 
         driverId: driver.id,
         status: "pending"
       });
+      console.log(`[Job Offers] Found ${pendingAssignments.length} pending assignments`);
       
       const allAssignments = [...assignments, ...pendingAssignments];
+      console.log(`[Job Offers] Total assignments: ${allAssignments.length}`);
+      
+      // Debug: Log driver prices from assignments
+      for (const a of allAssignments) {
+        console.log(`[Job Offers] Assignment ${a.id} for job ${a.jobId}: driverPrice=${a.driverPrice}, status=${a.status}`);
+      }
       
       // Enrich with job details and filter hidden jobs
       const enrichedOffers = await Promise.all(
