@@ -8,9 +8,9 @@ const LOGO_URL = 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.
 // Base URL for tracking links - uses current deployment or production
 const BASE_URL = process.env.APP_URL || 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev';
 
-// Mobile app store URLs (update these when apps are published)
+// Mobile app store URLs
 const GOOGLE_PLAY_URL = process.env.GOOGLE_PLAY_URL || 'https://play.google.com/store/apps/details?id=com.runcourier.app';
-const APP_STORE_URL = process.env.APP_STORE_URL || 'https://apps.apple.com/app/run-courier/id6739498614';
+const APP_STORE_URL = process.env.APP_STORE_URL || 'https://apps.apple.com/us/app/run-courier/id6756506175';
 
 // Official store badge image URLs (Google and Apple hosted)
 const GOOGLE_PLAY_BADGE_URL = 'https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png';
