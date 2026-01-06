@@ -63,6 +63,8 @@ import {
   Undo2,
   Trash2,
   RotateCcw,
+  Building2,
+  User,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -72,7 +74,7 @@ import { ShippingLabel } from '@/components/ShippingLabel';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
-import type { Job, Driver, JobStatus, JobAssignment } from '@shared/schema';
+import type { Job, Driver, JobStatus, JobAssignment, CustomerType } from '@shared/schema';
 import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
 
 // Type for drivers from Supabase
@@ -126,6 +128,7 @@ const getStatusBadge = (status: JobStatus) => {
 export default function AdminJobs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<string>('all');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [jobToAssign, setJobToAssign] = useState<Job | null>(null);
@@ -553,7 +556,8 @@ export default function AdminJobs() {
       job.pickupPostcode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.deliveryPostcode.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCustomerType = customerTypeFilter === 'all' || (job as any).customerType === customerTypeFilter;
+    return matchesSearch && matchesStatus && matchesCustomerType;
   }) || [];
 
   const getDriverName = (driverId: string | null) => {
@@ -911,6 +915,16 @@ export default function AdminJobs() {
                   data-testid="input-search-jobs"
                 />
               </div>
+              <Select value={customerTypeFilter} onValueChange={setCustomerTypeFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-customer-type-filter">
+                  <SelectValue placeholder="Customer type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
+                  <SelectItem value="individual">Individual</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
                   <Filter className="mr-2 h-4 w-4" />
@@ -963,6 +977,7 @@ export default function AdminJobs() {
                       />
                     </TableHead>
                     <TableHead>Tracking #</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Driver</TableHead>
@@ -987,6 +1002,19 @@ export default function AdminJobs() {
                         />
                       </TableCell>
                       <TableCell className="font-mono text-sm">{job.trackingNumber}</TableCell>
+                      <TableCell>
+                        {(job as any).customerType === 'business' ? (
+                          <Badge variant="outline" className="gap-1">
+                            <Building2 className="h-3 w-3" />
+                            Business
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="gap-1">
+                            <User className="h-3 w-3" />
+                            Individual
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="text-sm">
                           <div className="flex items-center gap-1">

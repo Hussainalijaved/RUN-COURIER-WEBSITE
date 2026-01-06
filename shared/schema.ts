@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export type UserRole = "admin" | "driver" | "customer" | "dispatcher" | "vendor";
 export type UserType = "individual" | "business";
+export type CustomerType = "individual" | "business";
 // CRITICAL: Job status values must match Supabase and mobile app
 // Flow: pending -> assigned/offered -> accepted -> arrived_pickup -> picked_up -> on_the_way -> delivered
 // Legacy: on_the_way_pickup, collected, on_the_way_delivery (kept for backward compatibility)
@@ -115,6 +116,7 @@ export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey(),
   trackingNumber: text("tracking_number").notNull().unique(),
   customerId: varchar("customer_id", { length: 36 }).notNull(),
+  customerType: text("customer_type").$type<CustomerType>().default("individual"),
   driverId: varchar("driver_id", { length: 36 }),
   dispatcherId: varchar("dispatcher_id", { length: 36 }),
   vendorId: varchar("vendor_id", { length: 36 }),

@@ -35,7 +35,7 @@ import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { calculateQuote, formatPrice, type QuoteBreakdown } from '@/lib/pricing';
 import { calculateDistanceFromPostcodes } from '@/lib/maps';
-import type { Driver, VehicleType } from '@shared/schema';
+import type { Driver, VehicleType, CustomerType } from '@shared/schema';
 import {
   Package,
   MapPin,
@@ -53,9 +53,12 @@ import {
   RefreshCw,
   Calendar,
   Clock,
+  Building2,
+  UserCircle,
 } from 'lucide-react';
 
 const createJobSchema = z.object({
+  customerType: z.enum(['individual', 'business']).default('individual'),
   pickupAddress: z.string().min(5, 'Pickup address is required'),
   pickupPostcode: z.string().min(3, 'Pickup postcode is required'),
   pickupInstructions: z.string().optional(),
@@ -66,6 +69,7 @@ const createJobSchema = z.object({
   recipientPhone: z.string().min(10, 'Valid phone number is required'),
   senderName: z.string().optional(),
   senderPhone: z.string().optional(),
+  companyName: z.string().optional(),
   weight: z.coerce.number().min(0.1, 'Weight must be greater than 0'),
   vehicleType: z.enum(['motorbike', 'car', 'small_van', 'medium_van']),
   isMultiDrop: z.boolean().default(false),
@@ -108,11 +112,13 @@ export default function AdminCreateJob() {
   const form = useForm<CreateJobInput>({
     resolver: zodResolver(createJobSchema),
     defaultValues: {
+      customerType: 'individual',
       pickupAddress: '',
       pickupPostcode: '',
       pickupInstructions: '',
       senderName: '',
       senderPhone: '',
+      companyName: '',
       deliveryAddress: '',
       deliveryPostcode: '',
       deliveryInstructions: '',
@@ -335,6 +341,78 @@ export default function AdminCreateJob() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Customer Type Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCircle className="h-5 w-5 text-primary" />
+                  Customer Type
+                </CardTitle>
+                <CardDescription>Select the type of customer for this job</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="customerType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex gap-4">
+                        <Button
+                          type="button"
+                          variant={field.value === 'individual' ? 'default' : 'outline'}
+                          className="flex-1 h-16"
+                          onClick={() => field.onChange('individual')}
+                          data-testid="button-customer-individual"
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <User className="h-5 w-5" />
+                            <span>Individual</span>
+                          </div>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === 'business' ? 'default' : 'outline'}
+                          className="flex-1 h-16"
+                          onClick={() => field.onChange('business')}
+                          data-testid="button-customer-business"
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <Building2 className="h-5 w-5" />
+                            <span>Business</span>
+                          </div>
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {form.watch('customerType') === 'business' && (
+                  <FormField
+                    control={form.control}
+                    name="companyName"
+                    render={({ field }) => (
+                      <FormItem className="mt-4">
+                        <FormLabel>Company Name</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              className="pl-10"
+                              placeholder="Enter company name"
+                              data-testid="input-company-name"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column - Pickup & Delivery Details */}
               <div className="lg:col-span-2 space-y-6">
