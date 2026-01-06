@@ -156,13 +156,16 @@ export function calculateQuote(
   let multiDropCharge = 0;
   let multiDropDistanceCharge = 0;
   let totalMultiDropDistance = 0;
+  let hiddenStopCharge = 0;
   
   if (options.isMultiDrop && options.multiDropDistances && options.multiDropDistances.length > 0) {
     totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
     multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
+    // Hidden charge: £3 per additional stop after the first (not displayed in breakdown)
+    hiddenStopCharge = options.multiDropDistances.length * 3;
   }
   
-  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge;
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge + hiddenStopCharge;
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
@@ -370,13 +373,16 @@ export async function calculateQuoteAsync(
   let multiDropCharge = 0;
   let multiDropDistanceCharge = 0;
   let totalMultiDropDistance = 0;
+  let hiddenStopCharge = 0;
   
   if (options.isMultiDrop && options.multiDropDistances && options.multiDropDistances.length > 0) {
     totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
     multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
+    // Hidden charge: £3 per additional stop after the first (not displayed in breakdown)
+    hiddenStopCharge = options.multiDropDistances.length * 3;
   }
   
-  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge;
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge + hiddenStopCharge;
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
