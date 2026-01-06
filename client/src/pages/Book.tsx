@@ -446,6 +446,13 @@ export default function Book() {
             });
           }
           
+          // Create scheduled time from selected pickup date/time for rush hour calculation
+          const pickupDateVal = form.getValues('pickupDate');
+          const pickupTimeVal = form.getValues('pickupTime');
+          const scheduledTime = pickupDateVal && pickupTimeVal 
+            ? new Date(`${pickupDateVal}T${pickupTimeVal}`) 
+            : new Date();
+          
           const calculatedQuote = calculateQuote(finalVehicleType, distanceResult.distance, weight, {
             pickupPostcode,
             deliveryPostcode,
@@ -455,6 +462,7 @@ export default function Book() {
             isReturnTrip,
             returnToSameLocation,
             returnDistance,
+            scheduledTime,
           });
           setQuote(calculatedQuote);
           toast({
