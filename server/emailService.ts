@@ -1248,3 +1248,210 @@ Run Courier - www.runcourier.co.uk`;
 
   return sendEmailNotification('info@runcourier.co.uk', `Payment Link Email Failed - ${data.trackingNumber}`, htmlContent, textContent);
 }
+
+export async function sendBusinessQuoteEmail(
+  customerEmail: string,
+  data: {
+    customerName?: string;
+    companyName?: string;
+    pickupPostcode: string;
+    pickupAddress: string;
+    drops: Array<{ postcode: string; address: string }>;
+    vehicleType: string;
+    weight: number;
+    quote: {
+      breakdown: {
+        baseCharge: number;
+        distanceCharge: number;
+        multiDropDistanceCharge: number;
+        weightSurcharge: number;
+        centralLondonCharge: number;
+        rushHourApplied: boolean;
+        totalPrice: number;
+      };
+      legs: Array<{ from: string; to: string; distance: number; duration: number }>;
+      totalDistance: number;
+      totalDuration: number;
+    };
+    notes?: string;
+  }
+): Promise<boolean> {
+  const vehicleNames: Record<string, string> = {
+    motorbike: 'Motorbike',
+    car: 'Car',
+    small_van: 'Small Van',
+    medium_van: 'Medium Van',
+  };
+
+  const legsHtml = data.quote.legs.map((leg, i) => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #666;">${i + 1}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${leg.from.split(',')[0]}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${leg.to.split(',')[0]}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333; text-align: right;">${leg.distance.toFixed(1)} miles</td>
+    </tr>
+  `).join('');
+
+  const content = `
+    <h2 style="color: #333; margin-top: 0;">Your Business Delivery Quote</h2>
+    ${data.customerName ? `<p style="color: #666; font-size: 16px;">Dear ${data.customerName},</p>` : ''}
+    <p style="color: #666; font-size: 16px;">
+      Thank you for your enquiry. Here is your personalised multi-drop delivery quote:
+    </p>
+    
+    ${data.companyName ? `<p style="color: #666; font-size: 14px;"><strong>Company:</strong> ${data.companyName}</p>` : ''}
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e0e0e0;">
+      <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Route Details</h3>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+        <thead>
+          <tr style="background-color: #f8f9fa;">
+            <th style="padding: 10px; text-align: left; color: #666; font-size: 12px;">STOP</th>
+            <th style="padding: 10px; text-align: left; color: #666; font-size: 12px;">FROM</th>
+            <th style="padding: 10px; text-align: left; color: #666; font-size: 12px;">TO</th>
+            <th style="padding: 10px; text-align: right; color: #666; font-size: 12px;">DISTANCE</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${legsHtml}
+        </tbody>
+      </table>
+      
+      <div style="background-color: #f8f9fa; padding: 15px; margin-top: 15px; border-radius: 5px;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="color: #666;">Total Distance:</td>
+            <td style="text-align: right; font-weight: bold; color: #333;">${data.quote.totalDistance.toFixed(1)} miles</td>
+          </tr>
+          <tr>
+            <td style="color: #666;">Estimated Duration:</td>
+            <td style="text-align: right; font-weight: bold; color: #333;">${data.quote.totalDuration} mins</td>
+          </tr>
+          <tr>
+            <td style="color: #666;">Vehicle Type:</td>
+            <td style="text-align: right; font-weight: bold; color: #333;">${vehicleNames[data.vehicleType] || data.vehicleType}</td>
+          </tr>
+          <tr>
+            <td style="color: #666;">Number of Drops:</td>
+            <td style="text-align: right; font-weight: bold; color: #333;">${data.drops.length}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    
+    <div style="background-color: #007BFF; color: white; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">
+      <p style="font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">TOTAL QUOTE</p>
+      <p style="font-size: 36px; font-weight: bold; margin: 0;">&pound;${data.quote.breakdown.totalPrice.toFixed(2)}</p>
+      ${data.quote.breakdown.rushHourApplied ? '<p style="font-size: 12px; margin: 10px 0 0 0; opacity: 0.8;">* Rush hour rates applied</p>' : ''}
+    </div>
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e0e0e0;">
+      <h3 style="color: #333; margin-top: 0;">Price Breakdown</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Base Charge</td>
+          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.baseCharge.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Distance Charge</td>
+          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.distanceCharge.toFixed(2)}</td>
+        </tr>
+        ${data.quote.breakdown.multiDropDistanceCharge > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Multi-Drop Distance</td>
+          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.multiDropDistanceCharge.toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ${data.quote.breakdown.weightSurcharge > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Weight Surcharge</td>
+          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.weightSurcharge.toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ${data.quote.breakdown.centralLondonCharge > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Central London Surcharge</td>
+          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.centralLondonCharge.toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        <tr style="border-top: 2px solid #007BFF;">
+          <td style="padding: 12px 0; color: #333; font-weight: bold; font-size: 18px;">Total</td>
+          <td style="padding: 12px 0; text-align: right; color: #007BFF; font-weight: bold; font-size: 18px;">&pound;${data.quote.breakdown.totalPrice.toFixed(2)}</td>
+        </tr>
+      </table>
+    </div>
+    
+    ${data.notes ? `
+    <div style="background-color: #fff3cd; border-radius: 8px; padding: 15px; margin: 20px 0;">
+      <h4 style="color: #856404; margin: 0 0 10px 0;">Additional Notes</h4>
+      <p style="color: #856404; margin: 0; white-space: pre-line;">${data.notes}</p>
+    </div>
+    ` : ''}
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+        Ready to book? Contact us to confirm your delivery:
+      </p>
+      <a href="tel:+442046346100" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block; margin: 5px;">
+        Call Now
+      </a>
+      <a href="mailto:info@runcourier.co.uk?subject=Business%20Quote%20-%20${data.companyName || 'Enquiry'}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block; margin: 5px;">
+        Email Us
+      </a>
+    </div>
+    
+    <p style="color: #999; font-size: 12px; text-align: center;">
+      This quote is valid for 7 days. Prices may vary based on actual pickup time and conditions.
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Business Delivery Quote');
+  
+  const legsText = data.quote.legs.map((leg, i) => 
+    `${i + 1}. ${leg.from.split(',')[0]} -> ${leg.to.split(',')[0]} (${leg.distance.toFixed(1)} miles)`
+  ).join('\n');
+  
+  const textContent = `Your Business Delivery Quote
+
+${data.customerName ? `Dear ${data.customerName},` : ''}
+
+Thank you for your enquiry. Here is your personalised multi-drop delivery quote:
+
+${data.companyName ? `Company: ${data.companyName}` : ''}
+
+ROUTE DETAILS
+${legsText}
+
+Total Distance: ${data.quote.totalDistance.toFixed(1)} miles
+Estimated Duration: ${data.quote.totalDuration} mins
+Vehicle Type: ${vehicleNames[data.vehicleType] || data.vehicleType}
+Number of Drops: ${data.drops.length}
+
+TOTAL QUOTE: £${data.quote.breakdown.totalPrice.toFixed(2)}
+
+PRICE BREAKDOWN
+- Base Charge: £${data.quote.breakdown.baseCharge.toFixed(2)}
+- Distance Charge: £${data.quote.breakdown.distanceCharge.toFixed(2)}
+${data.quote.breakdown.multiDropDistanceCharge > 0 ? `- Multi-Drop Distance: £${data.quote.breakdown.multiDropDistanceCharge.toFixed(2)}` : ''}
+${data.quote.breakdown.weightSurcharge > 0 ? `- Weight Surcharge: £${data.quote.breakdown.weightSurcharge.toFixed(2)}` : ''}
+${data.quote.breakdown.centralLondonCharge > 0 ? `- Central London Surcharge: £${data.quote.breakdown.centralLondonCharge.toFixed(2)}` : ''}
+- Total: £${data.quote.breakdown.totalPrice.toFixed(2)}
+
+${data.notes ? `NOTES: ${data.notes}` : ''}
+
+Ready to book? Contact us to confirm your delivery:
+- Phone: +44 20 4634 6100
+- Email: info@runcourier.co.uk
+
+This quote is valid for 7 days. Prices may vary based on actual pickup time and conditions.
+
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(
+    customerEmail, 
+    `Your Business Delivery Quote${data.companyName ? ` - ${data.companyName}` : ''}`, 
+    htmlContent, 
+    textContent
+  );
+}

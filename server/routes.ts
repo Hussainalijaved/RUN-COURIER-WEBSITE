@@ -22,7 +22,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending } from "./realtime";
@@ -4644,6 +4644,49 @@ export async function registerRoutes(
 
   // NOTE: Stripe webhook for payment-links has been moved to server/index.ts
   // to ensure it receives raw body for signature verification (before express.json middleware)
+
+  // ============= BUSINESS QUOTE =============
+  // Send business multi-drop quote email
+  app.post("/api/send-business-quote", asyncHandler(async (req, res) => {
+    const { customerEmail, customerName, companyName, pickupPostcode, pickupAddress, drops, vehicleType, weight, quote, notes } = req.body;
+
+    if (!customerEmail) {
+      return res.status(400).json({ error: "Customer email is required" });
+    }
+
+    if (!quote || !quote.breakdown) {
+      return res.status(400).json({ error: "Quote data is required" });
+    }
+
+    if (!drops || !Array.isArray(drops) || drops.length === 0) {
+      return res.status(400).json({ error: "At least one delivery point is required" });
+    }
+
+    try {
+      const emailSent = await sendBusinessQuoteEmail(customerEmail, {
+        customerName,
+        companyName,
+        pickupPostcode,
+        pickupAddress,
+        drops,
+        vehicleType,
+        weight,
+        quote,
+        notes,
+      });
+
+      if (emailSent) {
+        console.log(`[BusinessQuote] Quote email sent to ${customerEmail} for ${companyName || 'unnamed company'}`);
+        res.json({ success: true, message: "Quote sent successfully" });
+      } else {
+        console.error(`[BusinessQuote] Failed to send quote email to ${customerEmail}`);
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (error) {
+      console.error("[BusinessQuote] Error sending quote email:", error);
+      res.status(500).json({ error: "Failed to send quote email" });
+    }
+  }));
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("API Error:", err);

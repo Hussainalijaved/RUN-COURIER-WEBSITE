@@ -70,6 +70,7 @@ import AdminMap from "@/pages/admin/AdminMap";
 import AdminCreateJob from "@/pages/admin/AdminCreateJob";
 import AdminCustomers from "@/pages/admin/AdminCustomers";
 import AdminDriverPayments from "@/pages/admin/AdminDriverPayments";
+import AdminBusinessQuote from "@/pages/admin/AdminBusinessQuote";
 
 import CustomerDashboard from "@/pages/customer/CustomerDashboard";
 import CustomerOrders from "@/pages/customer/CustomerOrders";
@@ -209,6 +210,11 @@ function Router() {
       <Route path="/admin/analytics">
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/business-quote">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminBusinessQuote />
         </ProtectedRoute>
       </Route>
 

@@ -44,6 +44,7 @@ import {
   Key,
   Home,
   Wallet,
+  Calculator,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -64,6 +65,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/drivers', label: 'Drivers', icon: Users },
     { href: '/admin/applications', label: 'Applications', icon: FileText },
     { href: '/admin/customers', label: 'Customers', icon: Users },
+    { href: '/admin/business-quote', label: 'Business Quote', icon: Calculator },
     { href: '/admin/map', label: 'Live Map', icon: MapPin },
     { href: '/admin/documents', label: 'Documents', icon: FileText },
     { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
