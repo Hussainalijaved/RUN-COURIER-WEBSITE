@@ -211,7 +211,7 @@ export async function registerRoutes(
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Google Maps Places Autocomplete API endpoint
+  // Postcode autocomplete API endpoint using Google Maps Places API
   app.get("/api/maps/autocomplete", asyncHandler(async (req, res) => {
     const { input } = req.query;
     
@@ -226,15 +226,37 @@ export async function registerRoutes(
     }
 
     try {
+      // Use Google Maps Places API for autocomplete
       const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:gb&types=geocode&key=${apiKey}`;
       
       const response = await fetch(url);
       const data = await response.json();
       
-      if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
+      if (data.status === 'OK') {
         return res.json({ predictions: data.predictions || [] });
+      } else if (data.status === 'ZERO_RESULTS') {
+        return res.json({ predictions: [] });
       } else {
         console.error('Google Maps API error:', data.status, data.error_message);
+        
+        // Fallback to postcodes.io for UK postcode lookup
+        if (input.match(/^[A-Z]{1,2}\d/i)) {
+          try {
+            const postcodeResponse = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(input)}/autocomplete`);
+            const postcodeData = await postcodeResponse.json();
+            
+            if (postcodeData.status === 200 && postcodeData.result) {
+              const predictions = postcodeData.result.map((postcode: string) => ({
+                description: postcode,
+                place_id: postcode,
+              }));
+              return res.json({ predictions });
+            }
+          } catch (fallbackError) {
+            console.error('Postcodes.io fallback error:', fallbackError);
+          }
+        }
+        
         return res.json({ predictions: [] });
       }
     } catch (error) {
