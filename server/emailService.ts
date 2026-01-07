@@ -1285,16 +1285,24 @@ export async function sendBusinessQuoteEmail(
     medium_van: 'Medium Van',
   };
 
-  // Use postcodes instead of full addresses in the email
+  // Show both postcode and full address in the email
   const legsHtml = data.quote.legs.map((leg, i) => {
-    const fromPostcode = i === 0 ? data.pickupPostcode : data.drops[i - 1]?.postcode || leg.from.split(',')[0];
-    const toPostcode = data.drops[i]?.postcode || leg.to.split(',')[0];
+    const fromPostcode = i === 0 ? data.pickupPostcode : data.drops[i - 1]?.postcode || '';
+    const fromAddress = i === 0 ? data.pickupAddress : data.drops[i - 1]?.address || leg.from;
+    const toPostcode = data.drops[i]?.postcode || '';
+    const toAddress = data.drops[i]?.address || leg.to;
     return `
     <tr>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #666;">${i + 1}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${fromPostcode}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${toPostcode}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333; text-align: right;">${leg.distance.toFixed(1)} miles</td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; color: #666; vertical-align: top;">${i + 1}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; vertical-align: top;">
+        <div style="color: #333; font-weight: 600;">${fromPostcode}</div>
+        <div style="color: #666; font-size: 12px; margin-top: 4px;">${fromAddress}</div>
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; vertical-align: top;">
+        <div style="color: #333; font-weight: 600;">${toPostcode}</div>
+        <div style="color: #666; font-size: 12px; margin-top: 4px;">${toAddress}</div>
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; color: #333; text-align: right; vertical-align: top;">${leg.distance.toFixed(1)} miles</td>
     </tr>
   `;
   }).join('');
@@ -1388,12 +1396,14 @@ export async function sendBusinessQuoteEmail(
 
   const htmlContent = wrapEmailContent(content, 'Business Delivery Quote');
   
-  // Use postcodes instead of full addresses in plain text version
+  // Show both postcode and full address in plain text version
   const legsText = data.quote.legs.map((leg, i) => {
-    const fromPostcode = i === 0 ? data.pickupPostcode : data.drops[i - 1]?.postcode || leg.from.split(',')[0];
-    const toPostcode = data.drops[i]?.postcode || leg.to.split(',')[0];
-    return `${i + 1}. ${fromPostcode} -> ${toPostcode} (${leg.distance.toFixed(1)} miles)`;
-  }).join('\n');
+    const fromPostcode = i === 0 ? data.pickupPostcode : data.drops[i - 1]?.postcode || '';
+    const fromAddress = i === 0 ? data.pickupAddress : data.drops[i - 1]?.address || leg.from;
+    const toPostcode = data.drops[i]?.postcode || '';
+    const toAddress = data.drops[i]?.address || leg.to;
+    return `${i + 1}. FROM: ${fromPostcode}\n   ${fromAddress}\n   TO: ${toPostcode}\n   ${toAddress}\n   Distance: ${leg.distance.toFixed(1)} miles`;
+  }).join('\n\n');
   
   const textContent = `Your Business Delivery Quote
 

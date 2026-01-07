@@ -48,6 +48,7 @@ interface QuoteResult {
   }[];
   totalDistance: number;
   totalDuration: number;
+  routeMapUrl?: string;
 }
 
 export default function AdminBusinessQuote() {
@@ -171,11 +172,25 @@ export default function AdminBusinessQuote() {
         }
       );
 
+      // Generate route map URL
+      let routeMapUrl: string | undefined;
+      try {
+        const waypoints = [pickupPostcode, ...validDrops.map(d => d.postcode)].join('|');
+        const mapResponse = await fetch(`/api/maps/route-image?waypoints=${encodeURIComponent(waypoints)}&size=600x300`);
+        if (mapResponse.ok) {
+          const mapData = await mapResponse.json();
+          routeMapUrl = mapData.url;
+        }
+      } catch (mapError) {
+        console.error('Failed to generate route map:', mapError);
+      }
+
       setQuoteResult({
         breakdown,
         legs,
         totalDistance,
         totalDuration,
+        routeMapUrl,
       });
 
       toast({ title: 'Quote calculated successfully' });
@@ -452,6 +467,30 @@ export default function AdminBusinessQuote() {
           <div className="space-y-6">
             {quoteResult && (
               <>
+                {quoteResult.routeMapUrl && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <MapPin className="h-5 w-5" />
+                        Route Map
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-lg overflow-hidden border">
+                        <img 
+                          src={quoteResult.routeMapUrl} 
+                          alt="Delivery route map" 
+                          className="w-full h-auto"
+                          data-testid="img-route-map"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Green = Pickup • Blue = Intermediate Stops • Red = Final Destination
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -461,17 +500,26 @@ export default function AdminBusinessQuote() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      {quoteResult.legs.map((leg, index) => (
-                        <div key={index} className="flex justify-between items-center text-sm p-2 bg-muted rounded">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline">{index + 1}</Badge>
-                            <span className="truncate max-w-[200px]">
-                              {leg.from.split(',')[0]} → {leg.to.split(',')[0]}
-                            </span>
+                      {quoteResult.legs.map((leg, index) => {
+                        const fromPostcode = index === 0 ? pickupPostcode : drops[index - 1]?.postcode || '';
+                        const toPostcode = drops[index]?.postcode || '';
+                        return (
+                          <div key={index} className="p-3 bg-muted rounded space-y-1">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{index + 1}</Badge>
+                                <span className="font-medium">
+                                  {fromPostcode} → {toPostcode}
+                                </span>
+                              </div>
+                              <span className="font-medium">{leg.distance} miles</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground pl-8">
+                              {leg.from} → {leg.to}
+                            </div>
                           </div>
-                          <span className="font-medium">{leg.distance} miles</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <div className="border-t pt-4 space-y-2">

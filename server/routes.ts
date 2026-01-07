@@ -211,6 +211,47 @@ export async function registerRoutes(
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Google Maps Static Map URL generator for route visualization
+  app.get("/api/maps/route-image", asyncHandler(async (req, res) => {
+    const { waypoints, size } = req.query;
+    
+    if (!waypoints) {
+      return res.status(400).json({ error: 'Waypoints are required' });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Maps API not configured' });
+    }
+
+    try {
+      const waypointList = (waypoints as string).split('|');
+      if (waypointList.length < 2) {
+        return res.status(400).json({ error: 'At least 2 waypoints required' });
+      }
+
+      const mapSize = (size as string) || '600x400';
+      
+      // Build markers for each waypoint
+      const markers = waypointList.map((wp, i) => {
+        const label = i === 0 ? 'A' : i === waypointList.length - 1 ? 'B' : String.fromCharCode(65 + i);
+        const color = i === 0 ? 'green' : i === waypointList.length - 1 ? 'red' : 'blue';
+        return `markers=color:${color}|label:${label}|${encodeURIComponent(wp)}`;
+      }).join('&');
+
+      // Build path for route
+      const pathPoints = waypointList.map(wp => encodeURIComponent(wp)).join('|');
+      const path = `path=color:0x007BFF|weight:4|${pathPoints}`;
+
+      const url = `https://maps.googleapis.com/maps/api/staticmap?size=${mapSize}&${markers}&${path}&key=${apiKey}`;
+      
+      return res.json({ url });
+    } catch (error) {
+      console.error('Route image error:', error);
+      return res.status(500).json({ error: 'Failed to generate route image' });
+    }
+  }));
+
   // Google Maps Distance Matrix API endpoint
   app.get("/api/maps/distance", asyncHandler(async (req, res) => {
     const { origins, destinations } = req.query;
