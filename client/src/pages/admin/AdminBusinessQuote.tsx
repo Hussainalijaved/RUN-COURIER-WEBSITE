@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { geocodePostcode, calculateDistance } from '@/lib/maps';
 import { calculateQuote, formatPrice, isCentralLondon, type QuoteBreakdown } from '@/lib/pricing';
+import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import type { VehicleType } from '@shared/schema';
 
 interface DropPoint {
@@ -78,8 +79,8 @@ export default function AdminBusinessQuote() {
     }
   };
 
-  const updateDrop = (id: string, postcode: string) => {
-    setDrops(drops.map(d => d.id === id ? { ...d, postcode, address: '' } : d));
+  const updateDrop = (id: string, postcode: string, address?: string) => {
+    setDrops(drops.map(d => d.id === id ? { ...d, postcode, address: address || '' } : d));
   };
 
   const calculateQuoteHandler = async () => {
@@ -289,17 +290,22 @@ export default function AdminBusinessQuote() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="pickup-postcode">Pickup Postcode</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="pickup-postcode"
-                      placeholder="e.g., SW1A 1AA"
-                      value={pickupPostcode}
-                      onChange={(e) => setPickupPostcode(e.target.value.toUpperCase())}
-                      className="uppercase"
-                      data-testid="input-pickup-postcode"
-                    />
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <PostcodeAutocomplete
+                        value={pickupPostcode}
+                        onChange={(postcode, fullAddress) => {
+                          setPickupPostcode(postcode.toUpperCase());
+                          if (fullAddress) {
+                            setPickupAddress(fullAddress);
+                          }
+                        }}
+                        placeholder="Enter pickup postcode or address"
+                        data-testid="input-pickup-postcode"
+                      />
+                    </div>
                     {isCentralLondon(pickupPostcode) && (
-                      <Badge variant="secondary">Central London</Badge>
+                      <Badge variant="secondary" className="shrink-0 mt-2">Central London</Badge>
                     )}
                   </div>
                   {pickupAddress && (
@@ -312,21 +318,25 @@ export default function AdminBusinessQuote() {
                   {drops.map((drop, index) => (
                     <div key={drop.id} className="space-y-1">
                       <div className="flex gap-2 items-center">
-                        <Badge variant="outline" className="shrink-0">
+                        <Badge variant="outline" className="shrink-0 mt-2">
                           {index + 1}
                         </Badge>
-                        <Input
-                          placeholder={`Delivery ${index + 1} postcode`}
-                          value={drop.postcode}
-                          onChange={(e) => updateDrop(drop.id, e.target.value.toUpperCase())}
-                          className="uppercase"
-                          data-testid={`input-drop-postcode-${index}`}
-                        />
+                        <div className="flex-1">
+                          <PostcodeAutocomplete
+                            value={drop.postcode}
+                            onChange={(postcode, fullAddress) => {
+                              updateDrop(drop.id, postcode.toUpperCase(), fullAddress);
+                            }}
+                            placeholder={`Delivery ${index + 1} postcode or address`}
+                            data-testid={`input-drop-postcode-${index}`}
+                          />
+                        </div>
                         {drops.length > 1 && (
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => removeDrop(drop.id)}
+                            className="mt-1"
                             data-testid={`button-remove-drop-${index}`}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
