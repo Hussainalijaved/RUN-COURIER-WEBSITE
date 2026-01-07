@@ -137,6 +137,33 @@ export async function getPlacePredictions(
     const loaded = await ensureLoaded();
     if (!loaded) return [];
     
+    // Try the new Places API first (AutocompleteSuggestion)
+    try {
+      const { Place } = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
+      
+      // @ts-ignore - Using new AutocompleteSuggestion API
+      if (google.maps.places.AutocompleteSuggestion) {
+        // @ts-ignore
+        const request = {
+          input,
+          includedRegionCodes: ['gb'],
+        };
+        
+        // @ts-ignore
+        const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+        
+        if (suggestions && suggestions.length > 0) {
+          return suggestions.map((suggestion: any) => ({
+            description: suggestion.placePrediction?.text?.text || suggestion.placePrediction?.mainText?.text || input,
+            placeId: suggestion.placePrediction?.placeId || '',
+          })).filter((p: any) => p.description);
+        }
+      }
+    } catch (newApiError) {
+      console.log('New Places API not available, falling back to legacy');
+    }
+    
+    // Fallback to legacy AutocompleteService
     const service = new google.maps.places.AutocompleteService();
     
     return new Promise((resolve) => {
