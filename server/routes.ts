@@ -211,6 +211,38 @@ export async function registerRoutes(
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Google Maps Places Autocomplete API endpoint
+  app.get("/api/maps/autocomplete", asyncHandler(async (req, res) => {
+    const { input } = req.query;
+    
+    if (!input || typeof input !== 'string' || input.length < 2) {
+      return res.json({ predictions: [] });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error('GOOGLE_MAPS_API_KEY not configured');
+      return res.status(500).json({ error: 'Maps API not configured' });
+    }
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:gb&types=geocode&key=${apiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
+        return res.json({ predictions: data.predictions || [] });
+      } else {
+        console.error('Google Maps API error:', data.status, data.error_message);
+        return res.json({ predictions: [] });
+      }
+    } catch (error) {
+      console.error('Maps autocomplete error:', error);
+      return res.json({ predictions: [] });
+    }
+  }));
+
   app.get("/api/jobs", asyncHandler(async (req, res) => {
     const { status, customerId, driverId, vendorId, limit = 50 } = req.query;
     const jobs = await storage.getJobs({
