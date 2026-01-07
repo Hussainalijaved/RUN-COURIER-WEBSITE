@@ -1,4 +1,5 @@
 import type { VehicleType, PricingSettings, Vehicle } from "@shared/schema";
+import { congestionZonePostcodes } from "./congestionZonePostcodes";
 
 export interface PricingConfig {
   vehicles: {
@@ -79,6 +80,11 @@ export function isCentralLondon(postcode: string): boolean {
   return centralLondonPostcodes.some((cp) => prefix.startsWith(cp));
 }
 
+export function isCongestionZone(postcode: string): boolean {
+  const normalized = postcode.toUpperCase().replace(/\s/g, "");
+  return congestionZonePostcodes.has(normalized);
+}
+
 export function isRushHour(date: Date = new Date()): boolean {
   const hours = date.getHours();
   const minutes = date.getMinutes();
@@ -116,6 +122,7 @@ export interface QuoteBreakdown {
   multiDropDistanceCharge: number;
   weightSurcharge: number;
   centralLondonCharge: number;
+  congestionZoneCharge: number;
   multiDropCharge: number;
   returnTripCharge: number;
   rushHourApplied: boolean;
@@ -152,6 +159,10 @@ export function calculateQuote(
   const isCentralDelivery = isCentralLondon(options.deliveryPostcode);
   const centralLondonCharge = (isCentralPickup || isCentralDelivery) ? config.centralLondonSurcharge : 0;
   
+  const isCongestionPickup = isCongestionZone(options.pickupPostcode);
+  const isCongestionDelivery = isCongestionZone(options.deliveryPostcode);
+  const congestionZoneCharge = (isCongestionPickup || isCongestionDelivery) ? 18 : 0;
+  
   let multiDropCharge = 0;
   let multiDropDistanceCharge = 0;
   let totalMultiDropDistance = 0;
@@ -164,7 +175,7 @@ export function calculateQuote(
     hiddenStopCharge = options.multiDropDistances.length * 3;
   }
   
-  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge + hiddenStopCharge;
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
@@ -188,6 +199,7 @@ export function calculateQuote(
     multiDropDistanceCharge,
     weightSurcharge,
     centralLondonCharge,
+    congestionZoneCharge,
     multiDropCharge,
     returnTripCharge,
     rushHourApplied: rushHour,
@@ -369,6 +381,10 @@ export async function calculateQuoteAsync(
   const isCentralDelivery = isCentralLondon(options.deliveryPostcode);
   const centralLondonCharge = (isCentralPickup || isCentralDelivery) ? config.centralLondonSurcharge : 0;
   
+  const isCongestionPickup = isCongestionZone(options.pickupPostcode);
+  const isCongestionDelivery = isCongestionZone(options.deliveryPostcode);
+  const congestionZoneCharge = (isCongestionPickup || isCongestionDelivery) ? 18 : 0;
+  
   let multiDropCharge = 0;
   let multiDropDistanceCharge = 0;
   let totalMultiDropDistance = 0;
@@ -381,7 +397,7 @@ export async function calculateQuoteAsync(
     hiddenStopCharge = options.multiDropDistances.length * 3;
   }
   
-  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + multiDropCharge + hiddenStopCharge;
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
@@ -405,6 +421,7 @@ export async function calculateQuoteAsync(
     multiDropDistanceCharge,
     weightSurcharge,
     centralLondonCharge,
+    congestionZoneCharge,
     multiDropCharge,
     returnTripCharge,
     rushHourApplied: rushHour,
