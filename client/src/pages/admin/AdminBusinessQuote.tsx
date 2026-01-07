@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
@@ -71,6 +71,168 @@ export default function AdminBusinessQuote() {
   const [notes, setNotes] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [quoteSent, setQuoteSent] = useState(false);
+  const lastCalculatedRef = useRef<string>('');
+
+  // Auto-recalculate route when postcodes change (debounced)
+  useEffect(() => {
+    const validDrops = drops.filter(d => d.postcode.trim());
+    if (!pickupPostcode.trim() || validDrops.length === 0) {
+      return;
+    }
+
+    // Create a cache key to avoid duplicate calculations
+    const cacheKey = `${pickupPostcode}|${validDrops.map(d => d.postcode).sort().join('|')}|${vehicleType}|${weight}`;
+    if (cacheKey === lastCalculatedRef.current) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      // Re-check if conditions still valid after debounce
+      const currentValidDrops = drops.filter(d => d.postcode.trim());
+      if (!pickupPostcode.trim() || currentValidDrops.length === 0) {
+        return;
+      }
+
+      // Trigger the calculation
+      setIsCalculating(true);
+      setQuoteResult(null);
+
+      try {
+        // Get pickup address first
+        const pickupGeo = await geocodePostcode(pickupPostcode);
+        if (!pickupGeo) {
+          setIsCalculating(false);
+          return;
+        }
+        setPickupAddress(pickupGeo.formattedAddress);
+
+        // For single drop, use simple distance calculation
+        if (currentValidDrops.length === 1) {
+          const dropGeo = await geocodePostcode(currentValidDrops[0].postcode);
+          if (!dropGeo) {
+            setIsCalculating(false);
+            return;
+          }
+
+          const distResult = await calculateDistance(
+            { lat: pickupGeo.lat, lng: pickupGeo.lng },
+            { lat: dropGeo.lat, lng: dropGeo.lng }
+          );
+          if (!distResult) {
+            setIsCalculating(false);
+            return;
+          }
+
+          setDrops(prev => prev.map(d => 
+            d.id === currentValidDrops[0].id ? { ...d, address: dropGeo.formattedAddress } : d
+          ));
+
+          const breakdown = calculateQuote(
+            vehicleType,
+            distResult.distance,
+            parseFloat(weight) || 0,
+            {
+              pickupPostcode,
+              deliveryPostcode: currentValidDrops[0].postcode,
+              isMultiDrop: false,
+              multiDropCount: 0,
+              multiDropDistances: [],
+            }
+          );
+
+          let routeMapUrl: string | undefined;
+          try {
+            const mapResponse = await fetch(`/api/maps/route-image?waypoints=${encodeURIComponent(pickupPostcode + '|' + currentValidDrops[0].postcode)}&size=600x300`);
+            if (mapResponse.ok) {
+              const mapData = await mapResponse.json();
+              routeMapUrl = mapData.url;
+            }
+          } catch {
+            // Ignore map error
+          }
+
+          lastCalculatedRef.current = cacheKey;
+          setQuoteResult({
+            breakdown,
+            legs: [{
+              from: pickupGeo.formattedAddress,
+              to: dropGeo.formattedAddress,
+              distance: parseFloat(distResult.distance.toFixed(1)),
+              duration: distResult.duration,
+            }],
+            totalDistance: distResult.distance,
+            totalDuration: distResult.duration,
+            routeMapUrl,
+          });
+        } else {
+          // Multi-drop: use optimized route API
+          const dropPostcodes = currentValidDrops.map(d => d.postcode).join('|');
+          const routeResponse = await fetch(`/api/maps/optimized-route?origin=${encodeURIComponent(pickupPostcode)}&drops=${encodeURIComponent(dropPostcodes)}`);
+          
+          if (!routeResponse.ok) {
+            setIsCalculating(false);
+            return;
+          }
+
+          const routeData = await routeResponse.json();
+          const { legs, optimizedOrder, totalDistance, totalDuration, routeMapUrl } = routeData;
+
+          if (!legs || legs.length === 0 || !optimizedOrder || optimizedOrder.length !== currentValidDrops.length) {
+            setIsCalculating(false);
+            return;
+          }
+
+          // Reorder drops based on optimized route (nearest first, furthest last)
+          const reorderedDrops = optimizedOrder.map((idx: number) => currentValidDrops[idx]);
+          const updatedDrops = reorderedDrops.map((drop: DropPoint, i: number) => ({
+            ...drop,
+            address: legs[i]?.to || drop.address,
+          }));
+
+          // Update drops state with reordered drops (nearest first)
+          setDrops(prev => {
+            const emptyDrops = prev.filter(d => !d.postcode.trim());
+            return [...updatedDrops, ...emptyDrops];
+          });
+
+          const multiDropDistances = legs.slice(1).map((leg: { distance: number }) => leg.distance);
+          
+          const breakdown = calculateQuote(
+            vehicleType,
+            legs[0]?.distance || 0,
+            parseFloat(weight) || 0,
+            {
+              pickupPostcode,
+              deliveryPostcode: reorderedDrops[0]?.postcode || '',
+              isMultiDrop: true,
+              multiDropCount: reorderedDrops.length - 1,
+              multiDropDistances,
+            }
+          );
+
+          lastCalculatedRef.current = cacheKey;
+          setQuoteResult({
+            breakdown,
+            legs: legs.map((leg: { from: string; to: string; distance: number; duration: number }) => ({
+              from: leg.from,
+              to: leg.to,
+              distance: parseFloat(leg.distance.toFixed(1)),
+              duration: leg.duration,
+            })),
+            totalDistance,
+            totalDuration,
+            routeMapUrl,
+          });
+        }
+      } catch (error) {
+        console.error('Auto-calculate error:', error);
+      } finally {
+        setIsCalculating(false);
+      }
+    }, 800); // Debounce 800ms to wait for typing to finish
+
+    return () => clearTimeout(timer);
+  }, [pickupPostcode, drops, vehicleType, weight]);
 
   const addDrop = () => {
     setDrops([...drops, { id: String(Date.now()), postcode: '', address: '' }]);
