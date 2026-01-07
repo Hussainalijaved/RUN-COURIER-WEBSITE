@@ -52,7 +52,6 @@ export const defaultPricingConfig: PricingConfig = {
     },
   },
   weightSurcharges: [
-    { min: 4, max: 10, charge: 5 },
     { min: 10, max: 20, charge: 10 },
     { min: 20, max: 30, charge: 15 },
     { min: 30, max: 50, charge: 20 },
