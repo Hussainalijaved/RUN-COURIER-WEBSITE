@@ -1285,14 +1285,19 @@ export async function sendBusinessQuoteEmail(
     medium_van: 'Medium Van',
   };
 
-  const legsHtml = data.quote.legs.map((leg, i) => `
+  // Use postcodes instead of full addresses in the email
+  const legsHtml = data.quote.legs.map((leg, i) => {
+    const fromPostcode = i === 0 ? data.pickupPostcode : data.drops[i - 1]?.postcode || leg.from.split(',')[0];
+    const toPostcode = data.drops[i]?.postcode || leg.to.split(',')[0];
+    return `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #eee; color: #666;">${i + 1}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${leg.from.split(',')[0]}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${leg.to.split(',')[0]}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${fromPostcode}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;">${toPostcode}</td>
       <td style="padding: 10px; border-bottom: 1px solid #eee; color: #333; text-align: right;">${leg.distance.toFixed(1)} miles</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   const content = `
     <h2 style="color: #333; margin-top: 0;">Your Business Delivery Quote</h2>
@@ -1383,9 +1388,12 @@ export async function sendBusinessQuoteEmail(
 
   const htmlContent = wrapEmailContent(content, 'Business Delivery Quote');
   
-  const legsText = data.quote.legs.map((leg, i) => 
-    `${i + 1}. ${leg.from.split(',')[0]} -> ${leg.to.split(',')[0]} (${leg.distance.toFixed(1)} miles)`
-  ).join('\n');
+  // Use postcodes instead of full addresses in plain text version
+  const legsText = data.quote.legs.map((leg, i) => {
+    const fromPostcode = i === 0 ? data.pickupPostcode : data.drops[i - 1]?.postcode || leg.from.split(',')[0];
+    const toPostcode = data.drops[i]?.postcode || leg.to.split(',')[0];
+    return `${i + 1}. ${fromPostcode} -> ${toPostcode} (${leg.distance.toFixed(1)} miles)`;
+  }).join('\n');
   
   const textContent = `Your Business Delivery Quote
 
