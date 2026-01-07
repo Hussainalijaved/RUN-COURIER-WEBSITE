@@ -59,6 +59,8 @@ export default function AdminBusinessQuote() {
   ]);
   const [vehicleType, setVehicleType] = useState<VehicleType>('small_van');
   const [weight, setWeight] = useState('10');
+  const [pickupDate, setPickupDate] = useState('');
+  const [pickupTime, setPickupTime] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
   const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
   
@@ -216,6 +218,8 @@ export default function AdminBusinessQuote() {
           companyName,
           pickupPostcode,
           pickupAddress,
+          pickupDate,
+          pickupTime,
           drops: drops.filter(d => d.postcode.trim()).map(d => ({
             postcode: d.postcode,
             address: d.address,
@@ -247,6 +251,8 @@ export default function AdminBusinessQuote() {
     setPickupAddress('');
     setDrops([{ id: '1', postcode: '', address: '' }]);
     setWeight('10');
+    setPickupDate('');
+    setPickupTime('');
     setQuoteResult(null);
     setCustomerEmail('');
     setCustomerName('');
@@ -396,6 +402,29 @@ export default function AdminBusinessQuote() {
                     onChange={(e) => setWeight(e.target.value)}
                     data-testid="input-weight"
                   />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="pickup-date">Pickup Date</Label>
+                    <Input
+                      id="pickup-date"
+                      type="date"
+                      value={pickupDate}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      data-testid="input-pickup-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pickup-time">Pickup Time</Label>
+                    <Input
+                      id="pickup-time"
+                      type="time"
+                      value={pickupTime}
+                      onChange={(e) => setPickupTime(e.target.value)}
+                      data-testid="input-pickup-time"
+                    />
+                  </div>
                 </div>
 
                 <Button

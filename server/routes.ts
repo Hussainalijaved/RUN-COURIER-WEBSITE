@@ -4662,7 +4662,7 @@ export async function registerRoutes(
       return res.status(403).json({ error: "Admin access required" });
     }
 
-    const { customerEmail, customerName, companyName, pickupPostcode, pickupAddress, drops, vehicleType, weight, quote, notes } = req.body;
+    const { customerEmail, customerName, companyName, pickupPostcode, pickupAddress, pickupDate, pickupTime, drops, vehicleType, weight, quote, notes } = req.body;
 
     if (!customerEmail) {
       return res.status(400).json({ error: "Customer email is required" });
@@ -4682,6 +4682,8 @@ export async function registerRoutes(
         companyName,
         pickupPostcode,
         pickupAddress,
+        pickupDate,
+        pickupTime,
         drops,
         vehicleType,
         weight,

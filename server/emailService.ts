@@ -1256,6 +1256,8 @@ export async function sendBusinessQuoteEmail(
     companyName?: string;
     pickupPostcode: string;
     pickupAddress: string;
+    pickupDate?: string;
+    pickupTime?: string;
     drops: Array<{ postcode: string; address: string }>;
     vehicleType: string;
     weight: number;
@@ -1300,6 +1302,16 @@ export async function sendBusinessQuoteEmail(
     </p>
     
     ${data.companyName ? `<p style="color: #666; font-size: 14px;"><strong>Company:</strong> ${data.companyName}</p>` : ''}
+    
+    ${(data.pickupDate || data.pickupTime) ? `
+    <div style="background-color: #f0f7ff; border-radius: 8px; padding: 15px; margin: 20px 0; border-left: 4px solid #007BFF;">
+      <p style="margin: 0; color: #333; font-size: 14px;">
+        <strong>Requested Pickup:</strong> 
+        ${data.pickupDate ? new Date(data.pickupDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+        ${data.pickupTime ? ` at ${data.pickupTime}` : ''}
+      </p>
+    </div>
+    ` : ''}
     
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e0e0e0;">
       <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Route Details</h3>
