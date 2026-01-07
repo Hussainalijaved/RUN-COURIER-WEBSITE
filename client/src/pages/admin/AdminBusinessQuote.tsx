@@ -102,6 +102,7 @@ export default function AdminBusinessQuote() {
     setQuoteResult(null);
 
     try {
+      // Get pickup address first
       const pickupGeo = await geocodePostcode(pickupPostcode);
       if (!pickupGeo) {
         toast({ title: 'Invalid pickup postcode', variant: 'destructive' });
@@ -110,90 +111,156 @@ export default function AdminBusinessQuote() {
       }
       setPickupAddress(pickupGeo.formattedAddress);
 
-      const legs: QuoteResult['legs'] = [];
-      const dropAddresses: string[] = [];
-      const multiDropDistances: number[] = [];
-      let currentLocation = { lat: pickupGeo.lat, lng: pickupGeo.lng };
-      let currentAddress = pickupGeo.formattedAddress;
-      let totalDistance = 0;
-      let totalDuration = 0;
-
-      for (let i = 0; i < validDrops.length; i++) {
-        const dropGeo = await geocodePostcode(validDrops[i].postcode);
+      // For single drop, use simple distance calculation
+      if (validDrops.length === 1) {
+        const dropGeo = await geocodePostcode(validDrops[0].postcode);
         if (!dropGeo) {
-          toast({ title: `Invalid postcode: ${validDrops[i].postcode}`, variant: 'destructive' });
+          toast({ title: `Invalid postcode: ${validDrops[0].postcode}`, variant: 'destructive' });
           setIsCalculating(false);
           return;
         }
 
-        const distResult = await calculateDistance(currentLocation, { lat: dropGeo.lat, lng: dropGeo.lng });
+        const distResult = await calculateDistance(
+          { lat: pickupGeo.lat, lng: pickupGeo.lng },
+          { lat: dropGeo.lat, lng: dropGeo.lng }
+        );
         if (!distResult) {
           toast({ title: 'Could not calculate distance', variant: 'destructive' });
           setIsCalculating(false);
           return;
         }
 
-        legs.push({
-          from: currentAddress,
-          to: dropGeo.formattedAddress,
-          distance: distResult.distance,
-          duration: distResult.duration,
-        });
+        setDrops(prev => prev.map(d => 
+          d.id === validDrops[0].id ? { ...d, address: dropGeo.formattedAddress } : d
+        ));
 
-        dropAddresses.push(dropGeo.formattedAddress);
-        
-        if (i === 0) {
-          totalDistance += distResult.distance;
-          totalDuration += distResult.duration;
-        } else {
-          multiDropDistances.push(distResult.distance);
-          totalDistance += distResult.distance;
-          totalDuration += distResult.duration;
+        const breakdown = calculateQuote(
+          vehicleType,
+          distResult.distance,
+          parseFloat(weight) || 0,
+          {
+            pickupPostcode,
+            deliveryPostcode: validDrops[0].postcode,
+            isMultiDrop: false,
+            multiDropCount: 0,
+            multiDropDistances: [],
+          }
+        );
+
+        // Generate route map
+        let routeMapUrl: string | undefined;
+        try {
+          const mapResponse = await fetch(`/api/maps/route-image?waypoints=${encodeURIComponent(pickupPostcode + '|' + validDrops[0].postcode)}&size=600x300`);
+          if (mapResponse.ok) {
+            const mapData = await mapResponse.json();
+            routeMapUrl = mapData.url;
+          }
+        } catch (mapError) {
+          console.error('Failed to generate route map:', mapError);
         }
 
-        currentLocation = { lat: dropGeo.lat, lng: dropGeo.lng };
-        currentAddress = dropGeo.formattedAddress;
+        setQuoteResult({
+          breakdown,
+          legs: [{
+            from: pickupGeo.formattedAddress,
+            to: dropGeo.formattedAddress,
+            distance: distResult.distance,
+            duration: distResult.duration,
+          }],
+          totalDistance: distResult.distance,
+          totalDuration: distResult.duration,
+          routeMapUrl,
+        });
 
-        setDrops(prev => prev.map(d => 
-          d.id === validDrops[i].id ? { ...d, address: dropGeo.formattedAddress } : d
-        ));
+        toast({ title: 'Quote calculated successfully' });
+        setIsCalculating(false);
+        return;
       }
 
+      // For multi-drop, use Google Directions API with route optimization
+      // This ensures the same quote regardless of input order - system finds optimal route
+      const dropPostcodes = validDrops.map(d => d.postcode).join('|');
+      
+      const routeResponse = await fetch(
+        `/api/maps/optimized-route?origin=${encodeURIComponent(pickupPostcode)}&drops=${encodeURIComponent(dropPostcodes)}`
+      );
+
+      if (!routeResponse.ok) {
+        const errorData = await routeResponse.json();
+        toast({ title: errorData.error || 'Could not calculate optimized route', variant: 'destructive' });
+        setIsCalculating(false);
+        return;
+      }
+
+      const routeData = await routeResponse.json();
+      const { legs, optimizedOrder, totalDistance, totalDuration, routeMapUrl } = routeData;
+
+      // Validate response has legs
+      if (!legs || legs.length === 0) {
+        toast({ title: 'Could not calculate route - no valid legs returned', variant: 'destructive' });
+        setIsCalculating(false);
+        return;
+      }
+
+      // Validate optimizedOrder matches number of drops
+      if (!optimizedOrder || optimizedOrder.length !== validDrops.length) {
+        toast({ title: 'Route optimization failed - please check postcodes', variant: 'destructive' });
+        setIsCalculating(false);
+        return;
+      }
+
+      // Reorder drops based on optimized route
+      const reorderedDrops = optimizedOrder.map((idx: number) => validDrops[idx]);
+
+      // Update drops with addresses from the API response
+      const updatedDrops = reorderedDrops.map((drop: DropPoint, i: number) => ({
+        ...drop,
+        address: legs[i]?.to || drop.address,
+      }));
+
+      // Update state with reordered drops
+      setDrops(prev => {
+        const newDrops = [...prev];
+        updatedDrops.forEach((updatedDrop: DropPoint) => {
+          const idx = newDrops.findIndex(d => d.id === updatedDrop.id);
+          if (idx !== -1) {
+            newDrops[idx] = updatedDrop;
+          }
+        });
+        return newDrops;
+      });
+
+      // Calculate pricing based on optimized route
+      // First leg is pickup to first optimized drop, remaining are multi-drop distances
+      const multiDropDistances = legs.slice(1).map((leg: { distance: number }) => leg.distance);
+      
       const breakdown = calculateQuote(
         vehicleType,
         legs[0]?.distance || 0,
         parseFloat(weight) || 0,
         {
           pickupPostcode,
-          deliveryPostcode: validDrops[0]?.postcode || '',
-          isMultiDrop: validDrops.length > 1,
-          multiDropCount: validDrops.length - 1,
+          deliveryPostcode: reorderedDrops[0]?.postcode || '',
+          isMultiDrop: true,
+          multiDropCount: reorderedDrops.length - 1,
           multiDropDistances,
         }
       );
 
-      // Generate route map URL
-      let routeMapUrl: string | undefined;
-      try {
-        const waypoints = [pickupPostcode, ...validDrops.map(d => d.postcode)].join('|');
-        const mapResponse = await fetch(`/api/maps/route-image?waypoints=${encodeURIComponent(waypoints)}&size=600x300`);
-        if (mapResponse.ok) {
-          const mapData = await mapResponse.json();
-          routeMapUrl = mapData.url;
-        }
-      } catch (mapError) {
-        console.error('Failed to generate route map:', mapError);
-      }
-
       setQuoteResult({
         breakdown,
-        legs,
+        legs: legs.map((leg: { from: string; to: string; distance: number; duration: number }) => ({
+          from: leg.from,
+          to: leg.to,
+          distance: parseFloat(leg.distance.toFixed(1)),
+          duration: leg.duration,
+        })),
         totalDistance,
         totalDuration,
         routeMapUrl,
       });
 
-      toast({ title: 'Quote calculated successfully' });
+      toast({ title: 'Quote calculated with optimized route' });
     } catch (error) {
       console.error('Quote calculation error:', error);
       toast({ title: 'Error calculating quote', variant: 'destructive' });

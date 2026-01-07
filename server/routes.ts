@@ -211,6 +211,184 @@ export async function registerRoutes(
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Google Maps Optimized Route endpoint - finds optimal route through all drops
+  // Uses Distance Matrix API to get all distances, then implements nearest-neighbor TSP
+  app.get("/api/maps/optimized-route", asyncHandler(async (req, res) => {
+    const { origin, drops } = req.query;
+    
+    if (!origin || !drops) {
+      return res.status(400).json({ error: 'Origin and drops are required' });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Maps API not configured' });
+    }
+
+    try {
+      const dropList = (drops as string).split('|').filter(w => w.trim());
+      if (dropList.length === 0) {
+        return res.status(400).json({ error: 'At least one drop is required' });
+      }
+
+      // For single drop, no optimization needed
+      if (dropList.length === 1) {
+        const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin as string)}&destinations=${encodeURIComponent(dropList[0])}&key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.status !== 'OK' || !data.rows?.[0]?.elements?.[0]) {
+          return res.status(400).json({ error: 'Could not calculate distance' });
+        }
+
+        const element = data.rows[0].elements[0];
+        if (element.status !== 'OK') {
+          return res.status(400).json({ error: 'Invalid location' });
+        }
+
+        const legs = [{
+          from: origin + ', UK',
+          to: dropList[0] + ', UK',
+          distance: element.distance.value / 1609.34,
+          duration: Math.round(element.duration.value / 60),
+        }];
+
+        const markers = `markers=color:green|label:A|${encodeURIComponent(origin as string)}&markers=color:red|label:B|${encodeURIComponent(dropList[0])}`;
+        const path = `path=color:0x007BFF|weight:4|${encodeURIComponent(origin as string)}|${encodeURIComponent(dropList[0])}`;
+        const routeMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&${markers}&${path}&key=${apiKey}`;
+
+        return res.json({
+          legs,
+          optimizedOrder: [0],
+          totalDistance: legs[0].distance,
+          totalDuration: legs[0].duration,
+          routeMapUrl,
+        });
+      }
+
+      // For multiple drops, use Distance Matrix to get all pairwise distances
+      // Then solve TSP using nearest-neighbor heuristic
+      const allPoints = [origin as string, ...dropList];
+      
+      // Build distance matrix request (all points to all points)
+      const originsParam = allPoints.map(p => encodeURIComponent(p)).join('|');
+      const destinationsParam = allPoints.map(p => encodeURIComponent(p)).join('|');
+      
+      const matrixUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${originsParam}&destinations=${destinationsParam}&key=${apiKey}`;
+      const matrixResponse = await fetch(matrixUrl);
+      const matrixData = await matrixResponse.json();
+
+      if (matrixData.status !== 'OK') {
+        console.error('Distance Matrix error:', matrixData.status, matrixData.error_message);
+        return res.status(400).json({ error: 'Could not calculate distances' });
+      }
+
+      // Parse distance matrix into 2D array (in meters)
+      // Validate that all locations are reachable
+      const distanceMatrix: number[][] = [];
+      const durationMatrix: number[][] = [];
+      const invalidLocations: string[] = [];
+      
+      for (let i = 0; i < matrixData.rows.length; i++) {
+        distanceMatrix[i] = [];
+        durationMatrix[i] = [];
+        for (let j = 0; j < matrixData.rows[i].elements.length; j++) {
+          const element = matrixData.rows[i].elements[j];
+          if (element.status === 'OK') {
+            distanceMatrix[i][j] = element.distance.value;
+            durationMatrix[i][j] = element.duration.value;
+          } else {
+            // Track which location pair failed
+            if (i !== j) { // Don't count self-to-self as invalid
+              const fromLocation = allPoints[i];
+              const toLocation = allPoints[j];
+              invalidLocations.push(`${fromLocation} → ${toLocation}`);
+            }
+            distanceMatrix[i][j] = Infinity;
+            durationMatrix[i][j] = Infinity;
+          }
+        }
+      }
+
+      // Reject if any routes between points are invalid
+      if (invalidLocations.length > 0) {
+        console.error('Invalid route segments:', invalidLocations.slice(0, 5));
+        return res.status(400).json({ 
+          error: 'One or more postcodes are invalid or unreachable. Please check all postcodes.' 
+        });
+      }
+
+      // Nearest-neighbor TSP: start from origin (index 0), always go to nearest unvisited
+      const visited = new Set<number>([0]);
+      const route: number[] = [0]; // Start with origin
+      
+      while (visited.size < allPoints.length) {
+        const current = route[route.length - 1];
+        let nearestIdx = -1;
+        let nearestDist = Infinity;
+        
+        for (let i = 1; i < allPoints.length; i++) { // Skip origin (index 0)
+          if (!visited.has(i) && distanceMatrix[current][i] < nearestDist) {
+            nearestIdx = i;
+            nearestDist = distanceMatrix[current][i];
+          }
+        }
+        
+        if (nearestIdx === -1) break;
+        visited.add(nearestIdx);
+        route.push(nearestIdx);
+      }
+
+      // Validate that all points were visited (route is complete)
+      if (route.length !== allPoints.length) {
+        console.error('Incomplete route: visited', route.length, 'of', allPoints.length, 'points');
+        return res.status(400).json({ 
+          error: 'Could not find a complete route through all postcodes. Please check the postcodes.' 
+        });
+      }
+
+      // Build legs from the optimized route (skip origin at index 0)
+      const legs: { from: string; to: string; distance: number; duration: number }[] = [];
+      for (let i = 0; i < route.length - 1; i++) {
+        const fromIdx = route[i];
+        const toIdx = route[i + 1];
+        legs.push({
+          from: allPoints[fromIdx] + ', UK',
+          to: allPoints[toIdx] + ', UK',
+          distance: distanceMatrix[fromIdx][toIdx] / 1609.34, // meters to miles
+          duration: Math.round(durationMatrix[fromIdx][toIdx] / 60), // seconds to minutes
+        });
+      }
+
+      // optimizedOrder maps to the drop indices (subtract 1 because index 0 is origin)
+      const optimizedOrder = route.slice(1).map(idx => idx - 1);
+
+      const totalDistance = legs.reduce((sum, leg) => sum + leg.distance, 0);
+      const totalDuration = legs.reduce((sum, leg) => sum + leg.duration, 0);
+
+      // Build static map URL for the optimized route
+      const orderedPoints = route.map(idx => allPoints[idx]);
+      const markers = orderedPoints.map((wp, i) => {
+        const label = String.fromCharCode(65 + i);
+        const color = i === 0 ? 'green' : i === orderedPoints.length - 1 ? 'red' : 'blue';
+        return `markers=color:${color}|label:${label}|${encodeURIComponent(wp)}`;
+      }).join('&');
+      const pathPoints = orderedPoints.map(wp => encodeURIComponent(wp)).join('|');
+      const routeMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&${markers}&path=color:0x007BFF|weight:4|${pathPoints}&key=${apiKey}`;
+
+      return res.json({
+        legs,
+        optimizedOrder,
+        totalDistance,
+        totalDuration,
+        routeMapUrl,
+      });
+    } catch (error) {
+      console.error('Optimized route error:', error);
+      return res.status(500).json({ error: 'Failed to calculate optimized route' });
+    }
+  }));
+
   // Google Maps Static Map URL generator for route visualization
   app.get("/api/maps/route-image", asyncHandler(async (req, res) => {
     const { waypoints, size } = req.query;
