@@ -1,47 +1,7 @@
 /// <reference types="@types/google.maps" />
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
-
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-let isInitialized = false;
-let initPromise: Promise<void> | null = null;
-
-async function ensureLoaded(): Promise<boolean> {
-  if (isInitialized) return true;
-  
-  if (!apiKey) {
-    console.error('Google Maps API key is not configured');
-    return false;
-  }
-  
-  if (initPromise) {
-    await initPromise;
-    return isInitialized;
-  }
-  
-  initPromise = (async () => {
-    try {
-      setOptions({
-        key: apiKey,
-        v: 'weekly',
-      });
-      
-      await importLibrary('maps');
-      await importLibrary('places');
-      await importLibrary('geometry');
-      isInitialized = true;
-    } catch (error) {
-      console.error('Failed to load Google Maps:', error);
-      isInitialized = false;
-    }
-  })();
-  
-  await initPromise;
-  return isInitialized;
-}
 
 export async function initGoogleMaps(): Promise<void> {
-  await ensureLoaded();
+  // No longer needed - using server-side API
 }
 
 export async function geocodePostcode(postcode: string): Promise<{
@@ -50,32 +10,26 @@ export async function geocodePostcode(postcode: string): Promise<{
   formattedAddress: string;
 } | null> {
   try {
-    const loaded = await ensureLoaded();
-    if (!loaded) return null;
+    const response = await fetch(`/api/maps/geocode?address=${encodeURIComponent(postcode + ', UK')}`);
     
-    const geocoder = new google.maps.Geocoder();
+    if (!response.ok) {
+      console.error('Geocoding failed:', response.status);
+      return null;
+    }
     
-    return new Promise((resolve) => {
-      geocoder.geocode(
-        { address: `${postcode}, UK` },
-        (
-          results: google.maps.GeocoderResult[] | null,
-          status: google.maps.GeocoderStatus
-        ) => {
-          if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
-            const location = results[0].geometry.location;
-            resolve({
-              lat: location.lat(),
-              lng: location.lng(),
-              formattedAddress: results[0].formatted_address,
-            });
-          } else {
-            console.error('Geocoding failed:', status);
-            resolve(null);
-          }
-        }
-      );
-    });
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.results && data.results[0]) {
+      const location = data.results[0].geometry.location;
+      return {
+        lat: location.lat,
+        lng: location.lng,
+        formattedAddress: data.results[0].formatted_address,
+      };
+    } else {
+      console.error('Geocoding failed:', data.status);
+      return null;
+    }
   } catch (error) {
     console.error('Geocoding error:', error);
     return null;
@@ -87,41 +41,30 @@ export async function calculateDistance(
   destination: { lat: number; lng: number }
 ): Promise<{ distance: number; duration: number } | null> {
   try {
-    const loaded = await ensureLoaded();
-    if (!loaded) return null;
+    const origins = `${origin.lat},${origin.lng}`;
+    const destinations = `${destination.lat},${destination.lng}`;
     
-    const service = new google.maps.DistanceMatrixService();
+    const response = await fetch(`/api/maps/distance?origins=${encodeURIComponent(origins)}&destinations=${encodeURIComponent(destinations)}`);
     
-    return new Promise((resolve) => {
-      service.getDistanceMatrix(
-        {
-          origins: [new google.maps.LatLng(origin.lat, origin.lng)],
-          destinations: [new google.maps.LatLng(destination.lat, destination.lng)],
-          travelMode: google.maps.TravelMode.DRIVING,
-          unitSystem: google.maps.UnitSystem.IMPERIAL,
-        },
-        (
-          response: google.maps.DistanceMatrixResponse | null,
-          status: google.maps.DistanceMatrixStatus
-        ) => {
-          if (
-            status === google.maps.DistanceMatrixStatus.OK &&
-            response?.rows[0]?.elements[0]?.status === 'OK'
-          ) {
-            const element = response.rows[0].elements[0];
-            const distanceInMiles = element.distance.value / 1609.34;
-            const durationInMinutes = element.duration.value / 60;
-            resolve({
-              distance: Math.round(distanceInMiles * 10) / 10,
-              duration: Math.round(durationInMinutes),
-            });
-          } else {
-            console.error('Distance calculation failed:', status);
-            resolve(null);
-          }
-        }
-      );
-    });
+    if (!response.ok) {
+      console.error('Distance calculation failed:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.rows?.[0]?.elements?.[0]?.status === 'OK') {
+      const element = data.rows[0].elements[0];
+      const distanceInMiles = element.distance.value / 1609.34;
+      const durationInMinutes = element.duration.value / 60;
+      return {
+        distance: Math.round(distanceInMiles * 10) / 10,
+        duration: Math.round(durationInMinutes),
+      };
+    } else {
+      console.error('Distance calculation failed:', data.status);
+      return null;
+    }
   } catch (error) {
     console.error('Distance calculation error:', error);
     return null;
@@ -134,58 +77,22 @@ export async function getPlacePredictions(
   if (!input || input.length < 2) return [];
   
   try {
-    const loaded = await ensureLoaded();
-    if (!loaded) return [];
+    const response = await fetch(`/api/maps/autocomplete?input=${encodeURIComponent(input)}`);
     
-    // Use the new Places API (AutocompleteSuggestion) if available
-    if (google.maps.places.AutocompleteSuggestion) {
-      try {
-        const request = {
-          input,
-          includedRegionCodes: ['gb'],
-          includedPrimaryTypes: ['geocode', 'postal_code'],
-        };
-        
-        const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
-        
-        return suggestions
-          .filter((s: any) => s.placePrediction)
-          .map((s: any) => ({
-            description: s.placePrediction.text.text,
-            placeId: s.placePrediction.placeId,
-          }));
-      } catch (newApiError) {
-        console.log('New Places API error, falling back to legacy:', newApiError);
-      }
+    if (!response.ok) {
+      return [];
     }
     
-    // Fallback to legacy AutocompleteService
-    const service = new google.maps.places.AutocompleteService();
+    const data = await response.json();
     
-    return new Promise((resolve) => {
-      service.getPlacePredictions(
-        {
-          input,
-          componentRestrictions: { country: 'gb' },
-          types: ['geocode'],
-        },
-        (
-          predictions: google.maps.places.AutocompletePrediction[] | null,
-          status: google.maps.places.PlacesServiceStatus
-        ) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-            resolve(
-              predictions.map((p) => ({
-                description: p.description,
-                placeId: p.place_id,
-              }))
-            );
-          } else {
-            resolve([]);
-          }
-        }
-      );
-    });
+    if (data.predictions && data.predictions.length > 0) {
+      return data.predictions.map((p: any) => ({
+        description: p.description,
+        placeId: p.place_id,
+      }));
+    }
+    
+    return [];
   } catch (error) {
     console.error('Autocomplete error:', error);
     return [];

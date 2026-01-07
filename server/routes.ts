@@ -211,6 +211,70 @@ export async function registerRoutes(
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Google Maps Distance Matrix API endpoint
+  app.get("/api/maps/distance", asyncHandler(async (req, res) => {
+    const { origins, destinations } = req.query;
+    
+    if (!origins || !destinations) {
+      return res.status(400).json({ error: 'Origins and destinations are required' });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error('GOOGLE_MAPS_API_KEY not configured');
+      return res.status(500).json({ error: 'Maps API not configured' });
+    }
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origins as string)}&destinations=${encodeURIComponent(destinations as string)}&units=imperial&key=${apiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK') {
+        return res.json(data);
+      } else {
+        console.error('Google Maps Distance API error:', data.status, data.error_message);
+        return res.status(400).json({ error: data.status });
+      }
+    } catch (error) {
+      console.error('Distance API error:', error);
+      return res.status(500).json({ error: 'Failed to calculate distance' });
+    }
+  }));
+
+  // Google Maps Geocoding API endpoint
+  app.get("/api/maps/geocode", asyncHandler(async (req, res) => {
+    const { address } = req.query;
+    
+    if (!address) {
+      return res.status(400).json({ error: 'Address is required' });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error('GOOGLE_MAPS_API_KEY not configured');
+      return res.status(500).json({ error: 'Maps API not configured' });
+    }
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address as string)}&key=${apiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK') {
+        return res.json(data);
+      } else {
+        console.error('Google Maps Geocode API error:', data.status, data.error_message);
+        return res.status(400).json({ error: data.status });
+      }
+    } catch (error) {
+      console.error('Geocode API error:', error);
+      return res.status(500).json({ error: 'Failed to geocode address' });
+    }
+  }));
+
   // Postcode autocomplete API endpoint using Google Maps Places API only
   app.get("/api/maps/autocomplete", asyncHandler(async (req, res) => {
     const { input } = req.query;
