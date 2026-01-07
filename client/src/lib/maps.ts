@@ -222,45 +222,65 @@ export async function calculateRouteWithWaypoints(
       dropGeos.push({ ...geo, postcode });
     }
 
-    // Build route by calculating distance between each consecutive point
-    const legs: RouteLeg[] = [];
-    let totalDistance = 0;
-    let totalDuration = 0;
+    // Use Directions API to calculate the complete route
+    const directionsService = new google.maps.DirectionsService();
 
-    // All points in order: pickup -> drop1 -> drop2 -> ... -> dropN
-    const allPoints = [
-      { ...pickupGeo, postcode: pickupPostcode },
-      ...dropGeos,
-    ];
+    const origin = new google.maps.LatLng(pickupGeo.lat, pickupGeo.lng);
+    const destination = new google.maps.LatLng(
+      dropGeos[dropGeos.length - 1].lat,
+      dropGeos[dropGeos.length - 1].lng
+    );
 
-    for (let i = 0; i < allPoints.length - 1; i++) {
-      const from = allPoints[i];
-      const to = allPoints[i + 1];
+    // Create waypoints for intermediate stops (all drops except the last one)
+    const waypoints: google.maps.DirectionsWaypoint[] = dropGeos.slice(0, -1).map(geo => ({
+      location: new google.maps.LatLng(geo.lat, geo.lng),
+      stopover: true,
+    }));
 
-      const distResult = await calculateDistance(
-        { lat: from.lat, lng: from.lng },
-        { lat: to.lat, lng: to.lng }
+    return new Promise((resolve) => {
+      directionsService.route(
+        {
+          origin,
+          destination,
+          waypoints,
+          travelMode: google.maps.TravelMode.DRIVING,
+          unitSystem: google.maps.UnitSystem.IMPERIAL,
+          optimizeWaypoints: false, // Keep the order as specified
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result?.routes[0]?.legs) {
+            const routeLegs = result.routes[0].legs;
+            const legs: RouteLeg[] = [];
+            let totalDistance = 0;
+            let totalDuration = 0;
+
+            routeLegs.forEach((leg, index) => {
+              const distanceInMiles = (leg.distance?.value || 0) / 1609.34;
+              const durationInMinutes = (leg.duration?.value || 0) / 60;
+              const roundedDistance = Math.round(distanceInMiles * 10) / 10;
+              const roundedDuration = Math.round(durationInMinutes);
+
+              legs.push({
+                from: leg.start_address || '',
+                to: leg.end_address || '',
+                fromPostcode: index === 0 ? pickupPostcode : dropGeos[index - 1].postcode,
+                toPostcode: dropGeos[index].postcode,
+                distance: roundedDistance,
+                duration: roundedDuration,
+              });
+
+              totalDistance += roundedDistance;
+              totalDuration += roundedDuration;
+            });
+
+            resolve({ legs, totalDistance, totalDuration });
+          } else {
+            console.error('Directions request failed:', status);
+            resolve(null);
+          }
+        }
       );
-
-      if (!distResult) {
-        console.error('Could not calculate distance between points');
-        return null;
-      }
-
-      legs.push({
-        from: from.formattedAddress,
-        to: to.formattedAddress,
-        fromPostcode: from.postcode,
-        toPostcode: to.postcode,
-        distance: distResult.distance,
-        duration: distResult.duration,
-      });
-
-      totalDistance += distResult.distance;
-      totalDuration += distResult.duration;
-    }
-
-    return { legs, totalDistance, totalDuration };
+    });
   } catch (error) {
     console.error('Route calculation error:', error);
     return null;
