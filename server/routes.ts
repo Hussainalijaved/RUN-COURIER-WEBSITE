@@ -4646,8 +4646,22 @@ export async function registerRoutes(
   // to ensure it receives raw body for signature verification (before express.json middleware)
 
   // ============= BUSINESS QUOTE =============
-  // Send business multi-drop quote email
+  // Send business multi-drop quote email (admin only)
   app.post("/api/send-business-quote", asyncHandler(async (req, res) => {
+    // SECURITY: Require admin role to send business quotes
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const token = authHeader.slice(7);
+    const { verifyAccessToken } = await import("./supabaseAdmin");
+    const user = await verifyAccessToken(token);
+    
+    if (!user || (user.role !== 'admin' && user.role !== 'dispatcher')) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
     const { customerEmail, customerName, companyName, pickupPostcode, pickupAddress, drops, vehicleType, weight, quote, notes } = req.body;
 
     if (!customerEmail) {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -196,9 +197,18 @@ export default function AdminBusinessQuote() {
     setIsSending(true);
 
     try {
+      // Get auth token for authenticated request
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch('/api/send-business-quote', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           customerEmail,
           customerName,
@@ -217,7 +227,8 @@ export default function AdminBusinessQuote() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send quote');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to send quote');
       }
 
       setQuoteSent(true);
