@@ -218,17 +218,8 @@ export default function AdminBusinessQuote() {
         address: legs[i]?.to || drop.address,
       }));
 
-      // Update state with reordered drops
-      setDrops(prev => {
-        const newDrops = [...prev];
-        updatedDrops.forEach((updatedDrop: DropPoint) => {
-          const idx = newDrops.findIndex(d => d.id === updatedDrop.id);
-          if (idx !== -1) {
-            newDrops[idx] = updatedDrop;
-          }
-        });
-        return newDrops;
-      });
+      // Replace drops with reordered drops (nearest first, furthest last)
+      setDrops(updatedDrops);
 
       // Calculate pricing based on optimized route
       // First leg is pickup to first optimized drop, remaining are multi-drop distances
