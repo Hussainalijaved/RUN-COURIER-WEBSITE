@@ -1355,43 +1355,6 @@ export async function sendBusinessQuoteEmail(
     <div style="background-color: #007BFF; color: white; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">
       <p style="font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">TOTAL QUOTE</p>
       <p style="font-size: 36px; font-weight: bold; margin: 0;">&pound;${data.quote.breakdown.totalPrice.toFixed(2)}</p>
-      ${data.quote.breakdown.rushHourApplied ? '<p style="font-size: 12px; margin: 10px 0 0 0; opacity: 0.8;">* Rush hour rates applied</p>' : ''}
-    </div>
-    
-    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e0e0e0;">
-      <h3 style="color: #333; margin-top: 0;">Price Breakdown</h3>
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Base Charge</td>
-          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.baseCharge.toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Distance Charge</td>
-          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.distanceCharge.toFixed(2)}</td>
-        </tr>
-        ${data.quote.breakdown.multiDropDistanceCharge > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Multi-Drop Distance</td>
-          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.multiDropDistanceCharge.toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        ${data.quote.breakdown.weightSurcharge > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Weight Surcharge</td>
-          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.weightSurcharge.toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        ${data.quote.breakdown.centralLondonCharge > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Central London Surcharge</td>
-          <td style="padding: 8px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.centralLondonCharge.toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        <tr style="border-top: 2px solid #007BFF;">
-          <td style="padding: 12px 0; color: #333; font-weight: bold; font-size: 18px;">Total</td>
-          <td style="padding: 12px 0; text-align: right; color: #007BFF; font-weight: bold; font-size: 18px;">&pound;${data.quote.breakdown.totalPrice.toFixed(2)}</td>
-        </tr>
-      </table>
     </div>
     
     ${data.notes ? `
@@ -1441,14 +1404,6 @@ Vehicle Type: ${vehicleNames[data.vehicleType] || data.vehicleType}
 Number of Drops: ${data.drops.length}
 
 TOTAL QUOTE: £${data.quote.breakdown.totalPrice.toFixed(2)}
-
-PRICE BREAKDOWN
-- Base Charge: £${data.quote.breakdown.baseCharge.toFixed(2)}
-- Distance Charge: £${data.quote.breakdown.distanceCharge.toFixed(2)}
-${data.quote.breakdown.multiDropDistanceCharge > 0 ? `- Multi-Drop Distance: £${data.quote.breakdown.multiDropDistanceCharge.toFixed(2)}` : ''}
-${data.quote.breakdown.weightSurcharge > 0 ? `- Weight Surcharge: £${data.quote.breakdown.weightSurcharge.toFixed(2)}` : ''}
-${data.quote.breakdown.centralLondonCharge > 0 ? `- Central London Surcharge: £${data.quote.breakdown.centralLondonCharge.toFixed(2)}` : ''}
-- Total: £${data.quote.breakdown.totalPrice.toFixed(2)}
 
 ${data.notes ? `NOTES: ${data.notes}` : ''}
 
