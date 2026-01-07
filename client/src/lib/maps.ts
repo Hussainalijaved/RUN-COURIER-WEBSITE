@@ -137,33 +137,6 @@ export async function getPlacePredictions(
     const loaded = await ensureLoaded();
     if (!loaded) return [];
     
-    // Try the new Places API first (AutocompleteSuggestion)
-    try {
-      const { Place } = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
-      
-      // @ts-ignore - Using new AutocompleteSuggestion API
-      if (google.maps.places.AutocompleteSuggestion) {
-        // @ts-ignore
-        const request = {
-          input,
-          includedRegionCodes: ['gb'],
-        };
-        
-        // @ts-ignore
-        const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
-        
-        if (suggestions && suggestions.length > 0) {
-          return suggestions.map((suggestion: any) => ({
-            description: suggestion.placePrediction?.text?.text || suggestion.placePrediction?.mainText?.text || input,
-            placeId: suggestion.placePrediction?.placeId || '',
-          })).filter((p: any) => p.description);
-        }
-      }
-    } catch (newApiError) {
-      console.log('New Places API not available, falling back to legacy');
-    }
-    
-    // Fallback to legacy AutocompleteService
     const service = new google.maps.places.AutocompleteService();
     
     return new Promise((resolve) => {
@@ -213,85 +186,6 @@ export function calculateETA(durationMinutes: number): string {
   const now = new Date();
   now.setMinutes(now.getMinutes() + durationMinutes);
   return now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-
-export interface RouteLeg {
-  from: string;
-  to: string;
-  fromPostcode: string;
-  toPostcode: string;
-  distance: number;
-  duration: number;
-}
-
-export interface RouteResult {
-  legs: RouteLeg[];
-  totalDistance: number;
-  totalDuration: number;
-}
-
-export async function calculateRouteWithWaypoints(
-  pickupPostcode: string,
-  dropPostcodes: string[]
-): Promise<RouteResult | null> {
-  try {
-    const loaded = await ensureLoaded();
-    if (!loaded) return null;
-
-    // First geocode all postcodes
-    const pickupGeo = await geocodePostcode(pickupPostcode);
-    if (!pickupGeo) return null;
-
-    const dropGeos: Array<{ lat: number; lng: number; formattedAddress: string; postcode: string }> = [];
-    for (const postcode of dropPostcodes) {
-      const geo = await geocodePostcode(postcode);
-      if (!geo) return null;
-      dropGeos.push({ ...geo, postcode });
-    }
-
-    // Build route by calculating distance between each consecutive point using Distance Matrix
-    const legs: RouteLeg[] = [];
-    let totalDistance = 0;
-    let totalDuration = 0;
-
-    // All points in order: pickup -> drop1 -> drop2 -> ... -> dropN
-    const allPoints = [
-      { ...pickupGeo, postcode: pickupPostcode },
-      ...dropGeos,
-    ];
-
-    for (let i = 0; i < allPoints.length - 1; i++) {
-      const from = allPoints[i];
-      const to = allPoints[i + 1];
-
-      const distResult = await calculateDistance(
-        { lat: from.lat, lng: from.lng },
-        { lat: to.lat, lng: to.lng }
-      );
-
-      if (!distResult) {
-        console.error('Could not calculate distance between points');
-        return null;
-      }
-
-      legs.push({
-        from: from.formattedAddress,
-        to: to.formattedAddress,
-        fromPostcode: from.postcode,
-        toPostcode: to.postcode,
-        distance: distResult.distance,
-        duration: distResult.duration,
-      });
-
-      totalDistance += distResult.distance;
-      totalDuration += distResult.duration;
-    }
-
-    return { legs, totalDistance, totalDuration };
-  } catch (error) {
-    console.error('Route calculation error:', error);
-    return null;
-  }
 }
 
 export async function calculateDistanceFromPostcodes(

@@ -27,8 +27,8 @@ import {
   CheckCircle,
   Building,
 } from 'lucide-react';
-import { geocodePostcode, calculateRouteWithWaypoints } from '@/lib/maps';
-import { calculateQuote, formatPrice, isCongestionZone, type QuoteBreakdown } from '@/lib/pricing';
+import { geocodePostcode, calculateDistance } from '@/lib/maps';
+import { calculateQuote, formatPrice, isCentralLondon, type QuoteBreakdown } from '@/lib/pricing';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import type { VehicleType } from '@shared/schema';
 
@@ -101,54 +101,66 @@ export default function AdminBusinessQuote() {
     setQuoteResult(null);
 
     try {
-      // Step 1: Calculate the complete route first using Google Directions API
-      const dropPostcodes = validDrops.map(d => d.postcode);
-      const routeResult = await calculateRouteWithWaypoints(pickupPostcode, dropPostcodes);
-      
-      if (!routeResult) {
-        toast({ title: 'Could not calculate route. Please check the postcodes.', variant: 'destructive' });
+      const pickupGeo = await geocodePostcode(pickupPostcode);
+      if (!pickupGeo) {
+        toast({ title: 'Invalid pickup postcode', variant: 'destructive' });
         setIsCalculating(false);
         return;
       }
+      setPickupAddress(pickupGeo.formattedAddress);
 
-      // Get pickup address from geocoding
-      const pickupGeo = await geocodePostcode(pickupPostcode);
-      if (pickupGeo) {
-        setPickupAddress(pickupGeo.formattedAddress);
+      const legs: QuoteResult['legs'] = [];
+      const dropAddresses: string[] = [];
+      const multiDropDistances: number[] = [];
+      let currentLocation = { lat: pickupGeo.lat, lng: pickupGeo.lng };
+      let currentAddress = pickupGeo.formattedAddress;
+      let totalDistance = 0;
+      let totalDuration = 0;
+
+      for (let i = 0; i < validDrops.length; i++) {
+        const dropGeo = await geocodePostcode(validDrops[i].postcode);
+        if (!dropGeo) {
+          toast({ title: `Invalid postcode: ${validDrops[i].postcode}`, variant: 'destructive' });
+          setIsCalculating(false);
+          return;
+        }
+
+        const distResult = await calculateDistance(currentLocation, { lat: dropGeo.lat, lng: dropGeo.lng });
+        if (!distResult) {
+          toast({ title: 'Could not calculate distance', variant: 'destructive' });
+          setIsCalculating(false);
+          return;
+        }
+
+        legs.push({
+          from: currentAddress,
+          to: dropGeo.formattedAddress,
+          distance: distResult.distance,
+          duration: distResult.duration,
+        });
+
+        dropAddresses.push(dropGeo.formattedAddress);
+        
+        if (i === 0) {
+          totalDistance += distResult.distance;
+          totalDuration += distResult.duration;
+        } else {
+          multiDropDistances.push(distResult.distance);
+          totalDistance += distResult.distance;
+          totalDuration += distResult.duration;
+        }
+
+        currentLocation = { lat: dropGeo.lat, lng: dropGeo.lng };
+        currentAddress = dropGeo.formattedAddress;
+
+        setDrops(prev => prev.map(d => 
+          d.id === validDrops[i].id ? { ...d, address: dropGeo.formattedAddress } : d
+        ));
       }
 
-      // Update drops with addresses from route
-      const updatedDrops = [...drops];
-      routeResult.legs.forEach((leg, index) => {
-        const dropIndex = drops.findIndex(d => d.id === validDrops[index]?.id);
-        if (dropIndex >= 0) {
-          updatedDrops[dropIndex] = {
-            ...updatedDrops[dropIndex],
-            address: leg.to,
-          };
-        }
-      });
-      setDrops(updatedDrops);
-
-      // Step 2: Use the route distances for pricing
-      // First leg distance is the primary distance
-      const firstLegDistance = routeResult.legs[0]?.distance || 0;
-      
-      // Additional legs are multi-drop distances
-      const multiDropDistances = routeResult.legs.slice(1).map(leg => leg.distance);
-
-      // Convert legs to the format expected by QuoteResult
-      const legs: QuoteResult['legs'] = routeResult.legs.map(leg => ({
-        from: leg.from,
-        to: leg.to,
-        distance: leg.distance,
-        duration: leg.duration,
-      }));
-
-      // Step 3: Calculate price based on route distances
       const breakdown = calculateQuote(
         vehicleType,
-        firstLegDistance,
+        legs[0]?.distance || 0,
         parseFloat(weight) || 0,
         {
           pickupPostcode,
@@ -162,8 +174,8 @@ export default function AdminBusinessQuote() {
       setQuoteResult({
         breakdown,
         legs,
-        totalDistance: routeResult.totalDistance,
-        totalDuration: routeResult.totalDuration,
+        totalDistance,
+        totalDuration,
       });
 
       toast({ title: 'Quote calculated successfully' });
@@ -298,8 +310,8 @@ export default function AdminBusinessQuote() {
                         data-testid="input-pickup-postcode"
                       />
                     </div>
-                    {isCongestionZone(pickupPostcode) && (
-                      <Badge variant="secondary" className="shrink-0 mt-2">Congestion Zone</Badge>
+                    {isCentralLondon(pickupPostcode) && (
+                      <Badge variant="secondary" className="shrink-0 mt-2">Central London</Badge>
                     )}
                   </div>
                   {pickupAddress && (
