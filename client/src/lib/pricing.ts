@@ -13,7 +13,6 @@ export interface PricingConfig {
     };
   };
   weightSurcharges: { min: number; max: number | null; charge: number }[];
-  centralLondonSurcharge: number;
   multiDropCharge: number;
   returnTripMultiplier: number;
   waitingTimeFreeMinutes: number;
@@ -58,7 +57,6 @@ export const defaultPricingConfig: PricingConfig = {
     { min: 30, max: 50, charge: 20 },
     { min: 50, max: null, charge: 40 },
   ],
-  centralLondonSurcharge: 15,
   multiDropCharge: 3,
   returnTripMultiplier: 0.60,
   waitingTimeFreeMinutes: 10,
@@ -104,8 +102,9 @@ export function isRushHour(date: Date = new Date()): boolean {
 }
 
 export function getWeightSurcharge(weight: number): number {
+  // Weight up to and including 10kg is free
   for (const surcharge of defaultPricingConfig.weightSurcharges) {
-    if (weight >= surcharge.min && (surcharge.max === null || weight < surcharge.max)) {
+    if (weight > surcharge.min && (surcharge.max === null || weight <= surcharge.max)) {
       return surcharge.charge;
     }
   }
@@ -121,7 +120,6 @@ export interface QuoteBreakdown {
   distanceCharge: number;
   multiDropDistanceCharge: number;
   weightSurcharge: number;
-  centralLondonCharge: number;
   congestionZoneCharge: number;
   multiDropCharge: number;
   returnTripCharge: number;
@@ -155,10 +153,6 @@ export function calculateQuote(
   
   const weightSurcharge = getWeightSurcharge(weight);
   
-  const isCentralPickup = isCentralLondon(options.pickupPostcode);
-  const isCentralDelivery = isCentralLondon(options.deliveryPostcode);
-  const centralLondonCharge = (isCentralPickup || isCentralDelivery) ? config.centralLondonSurcharge : 0;
-  
   const isCongestionPickup = isCongestionZone(options.pickupPostcode);
   const isCongestionDelivery = isCongestionZone(options.deliveryPostcode);
   const congestionZoneCharge = (isCongestionPickup || isCongestionDelivery) ? 18 : 0;
@@ -175,7 +169,7 @@ export function calculateQuote(
     hiddenStopCharge = options.multiDropDistances.length * 3;
   }
   
-  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
@@ -198,7 +192,6 @@ export function calculateQuote(
     distanceCharge,
     multiDropDistanceCharge,
     weightSurcharge,
-    centralLondonCharge,
     congestionZoneCharge,
     multiDropCharge,
     returnTripCharge,
@@ -317,7 +310,6 @@ export async function fetchPricingConfig(): Promise<PricingConfig> {
     cachedPricingConfig = {
       vehicles: vehiclesMap,
       weightSurcharges: weightSurcharges.length > 0 ? weightSurcharges : defaultPricingConfig.weightSurcharges,
-      centralLondonSurcharge: parseFloat(pricingSettings.centralLondonSurcharge || '15'),
       multiDropCharge: parseFloat(pricingSettings.multiDropCharge || '5'),
       returnTripMultiplier: parseFloat(pricingSettings.returnTripMultiplier || '0.60'),
       waitingTimeFreeMinutes: pricingSettings.waitingTimeFreeMinutes || 10,
@@ -326,7 +318,7 @@ export async function fetchPricingConfig(): Promise<PricingConfig> {
     };
     cacheTimestamp = Date.now();
 
-    return cachedPricingConfig;
+    return cachedPricingConfig as PricingConfig;
   } catch (error) {
     console.warn('Error fetching pricing config:', error);
     return defaultPricingConfig;
@@ -377,10 +369,6 @@ export async function calculateQuoteAsync(
   // Get weight surcharge from fetched config
   const weightSurcharge = getWeightSurchargeWithConfig(weight, config);
   
-  const isCentralPickup = isCentralLondon(options.pickupPostcode);
-  const isCentralDelivery = isCentralLondon(options.deliveryPostcode);
-  const centralLondonCharge = (isCentralPickup || isCentralDelivery) ? config.centralLondonSurcharge : 0;
-  
   const isCongestionPickup = isCongestionZone(options.pickupPostcode);
   const isCongestionDelivery = isCongestionZone(options.deliveryPostcode);
   const congestionZoneCharge = (isCongestionPickup || isCongestionDelivery) ? 18 : 0;
@@ -397,7 +385,7 @@ export async function calculateQuoteAsync(
     hiddenStopCharge = options.multiDropDistances.length * 3;
   }
   
-  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + centralLondonCharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;
+  const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;
   
   let returnTripCharge = 0;
   if (options.isReturnTrip) {
@@ -420,7 +408,6 @@ export async function calculateQuoteAsync(
     distanceCharge,
     multiDropDistanceCharge,
     weightSurcharge,
-    centralLondonCharge,
     congestionZoneCharge,
     multiDropCharge,
     returnTripCharge,
@@ -449,9 +436,10 @@ function isRushHourWithConfig(date: Date, config: PricingConfig): boolean {
 }
 
 // Helper to get weight surcharge with a specific config
+// Weight up to and including 10kg is free
 function getWeightSurchargeWithConfig(weight: number, config: PricingConfig): number {
   for (const surcharge of config.weightSurcharges) {
-    if (weight >= surcharge.min && (surcharge.max === null || weight < surcharge.max)) {
+    if (weight > surcharge.min && (surcharge.max === null || weight <= surcharge.max)) {
       return surcharge.charge;
     }
   }

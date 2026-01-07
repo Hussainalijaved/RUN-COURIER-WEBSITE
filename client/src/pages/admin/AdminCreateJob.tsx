@@ -253,7 +253,7 @@ export default function AdminCreateJob() {
         basePrice: quote?.baseCharge.toString() || '0',
         distancePrice: quote?.distanceCharge.toString() || '0',
         weightSurcharge: quote?.weightSurcharge.toString() || '0',
-        centralLondonCharge: quote?.centralLondonCharge.toString() || '0',
+        centralLondonCharge: '0',
         returnTripCharge: quote?.returnTripCharge.toString() || '0',
         totalPrice: finalPrice.toString(),
         driverPrice: driverPrice !== null ? driverPrice.toString() : null,
@@ -893,10 +893,10 @@ export default function AdminCreateJob() {
                               <span data-testid="text-weight-surcharge">{formatPrice(quote.weightSurcharge)}</span>
                             </div>
                           )}
-                          {quote.centralLondonCharge > 0 && (
+                          {quote.congestionZoneCharge > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-muted-foreground">Central London</span>
-                              <span data-testid="text-london-charge">{formatPrice(quote.centralLondonCharge)}</span>
+                              <span className="text-muted-foreground">Congestion Zone</span>
+                              <span data-testid="text-congestion-charge">{formatPrice(quote.congestionZoneCharge)}</span>
                             </div>
                           )}
                           {quote.returnTripCharge > 0 && (

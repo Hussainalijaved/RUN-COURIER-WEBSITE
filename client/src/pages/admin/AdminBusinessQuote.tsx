@@ -495,10 +495,10 @@ export default function AdminBusinessQuote() {
                           <span>{formatPrice(quoteResult.breakdown.weightSurcharge)}</span>
                         </div>
                       )}
-                      {quoteResult.breakdown.centralLondonCharge > 0 && (
+                      {quoteResult.breakdown.congestionZoneCharge > 0 && (
                         <div className="flex justify-between text-sm">
-                          <span>Central London Surcharge</span>
-                          <span>{formatPrice(quoteResult.breakdown.centralLondonCharge)}</span>
+                          <span>Congestion Zone Charge</span>
+                          <span>{formatPrice(quoteResult.breakdown.congestionZoneCharge)}</span>
                         </div>
                       )}
                       {quoteResult.breakdown.rushHourApplied && (
