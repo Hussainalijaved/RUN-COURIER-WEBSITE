@@ -225,6 +225,9 @@ export default function AdminBusinessQuote() {
       // First leg is pickup to first optimized drop, remaining are multi-drop distances
       const multiDropDistances = legs.slice(1).map((leg: { distance: number }) => leg.distance);
       
+      // Get all drop postcodes for congestion zone check (£18 applied ONCE if any postcode is in zone)
+      const allDropPostcodes = reorderedDrops.map((drop: DropPoint) => drop.postcode);
+      
       const breakdown = calculateQuote(
         vehicleType,
         legs[0]?.distance || 0,
@@ -235,6 +238,7 @@ export default function AdminBusinessQuote() {
           isMultiDrop: true,
           multiDropCount: reorderedDrops.length - 1,
           multiDropDistances,
+          allDropPostcodes, // Pass all postcodes for single congestion charge
         }
       );
 

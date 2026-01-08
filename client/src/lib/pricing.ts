@@ -137,6 +137,7 @@ export function calculateQuote(
     isMultiDrop?: boolean;
     multiDropCount?: number;
     multiDropDistances?: number[];
+    allDropPostcodes?: string[]; // All drop postcodes for multi-drop congestion check
     isReturnTrip?: boolean;
     returnToSameLocation?: boolean;
     returnDistance?: number;
@@ -153,9 +154,20 @@ export function calculateQuote(
   
   const weightSurcharge = getWeightSurcharge(weight);
   
+  // For multi-drop routes, check ALL postcodes but only charge £18 once
   const isCongestionPickup = isCongestionZone(options.pickupPostcode);
-  const isCongestionDelivery = isCongestionZone(options.deliveryPostcode);
-  const congestionZoneCharge = (isCongestionPickup || isCongestionDelivery) ? 18 : 0;
+  let hasCongestionZone = isCongestionPickup;
+  
+  if (options.allDropPostcodes && options.allDropPostcodes.length > 0) {
+    // Check all drop postcodes for congestion zone
+    hasCongestionZone = hasCongestionZone || options.allDropPostcodes.some(pc => isCongestionZone(pc));
+  } else {
+    // Fallback: only check the single delivery postcode
+    hasCongestionZone = hasCongestionZone || isCongestionZone(options.deliveryPostcode);
+  }
+  
+  // Only apply £18 ONCE regardless of how many postcodes are in congestion zone
+  const congestionZoneCharge = hasCongestionZone ? 18 : 0;
   
   let multiDropCharge = 0;
   let multiDropDistanceCharge = 0;
