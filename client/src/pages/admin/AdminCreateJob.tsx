@@ -1245,20 +1245,23 @@ export default function AdminCreateJob() {
                         <Calculator className="h-5 w-5 text-primary" />
                         Quote Summary
                       </CardTitle>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRecalculate}
-                        disabled={isCalculating}
-                        data-testid="button-recalculate"
-                      >
-                        {isCalculating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                      </Button>
+                      {/* Only show refresh button when quote exists */}
+                      {quote && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRecalculate}
+                          disabled={isCalculating}
+                          data-testid="button-recalculate"
+                        >
+                          {isCalculating ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
