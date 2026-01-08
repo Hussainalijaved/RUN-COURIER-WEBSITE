@@ -1543,7 +1543,7 @@ export async function registerRoutes(
                   email: driver.email,
                   phone: driver.phone,
                   vehicle_type: driver.vehicleType,
-                  is_available: driver.isAvailable ?? false,
+                  online_status: driver.isAvailable ? 'online' : 'offline',
                   is_verified: driver.isVerified ?? false,
                   rating: driver.rating ?? "5.00",
                   total_jobs: driver.totalJobs ?? 0,
@@ -1614,7 +1614,7 @@ export async function registerRoutes(
           if (safeBody.email !== undefined) supabaseUpdateData.email = safeBody.email;
           if (safeBody.phone !== undefined) supabaseUpdateData.phone = safeBody.phone;
           if (safeBody.vehicleType !== undefined) supabaseUpdateData.vehicle_type = safeBody.vehicleType;
-          if (safeBody.isAvailable !== undefined) supabaseUpdateData.is_available = safeBody.isAvailable;
+          if (safeBody.isAvailable !== undefined) supabaseUpdateData.online_status = safeBody.isAvailable ? 'online' : 'offline';
           if (safeBody.isVerified !== undefined) supabaseUpdateData.is_verified = safeBody.isVerified;
           if (safeBody.address !== undefined) supabaseUpdateData.address = safeBody.address;
           if (safeBody.postcode !== undefined) supabaseUpdateData.postcode = safeBody.postcode;

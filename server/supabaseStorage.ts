@@ -76,7 +76,7 @@ function mapDbToDriver(dbDriver: any): Driver {
     vehicleMake: dbDriver.vehicle_make,
     vehicleModel: dbDriver.vehicle_model,
     vehicleColor: dbDriver.vehicle_color,
-    isAvailable: dbDriver.is_available,
+    isAvailable: dbDriver.online_status === 'online',
     isVerified: dbDriver.is_verified,
     currentLatitude: dbDriver.current_latitude,
     currentLongitude: dbDriver.current_longitude,
@@ -95,6 +95,7 @@ function mapDbToJob(dbJob: any): Job {
     id: dbJob.id,
     trackingNumber: dbJob.tracking_number,
     customerId: dbJob.customer_id,
+    customerType: dbJob.customer_type || null,
     driverId: dbJob.driver_id,
     dispatcherId: dbJob.dispatcher_id,
     vendorId: dbJob.vendor_id,
@@ -564,7 +565,7 @@ export class SupabaseStorage implements IStorage {
       query = query.neq('is_active', false);
     }
     if (filters?.isAvailable !== undefined) {
-      query = query.eq('is_available', filters.isAvailable);
+      query = query.eq('online_status', filters.isAvailable ? 'online' : 'offline');
     }
     if (filters?.isVerified !== undefined) {
       query = query.eq('is_verified', filters.isVerified);
@@ -584,7 +585,6 @@ export class SupabaseStorage implements IStorage {
     
     const dbDriver = {
       id,
-      user_id: insertDriver.userId,
       driver_id: insertDriver.driverCode,
       full_name: insertDriver.fullName || null,
       email: insertDriver.email || null,
@@ -603,7 +603,7 @@ export class SupabaseStorage implements IStorage {
       vehicle_make: insertDriver.vehicleMake || null,
       vehicle_model: insertDriver.vehicleModel || null,
       vehicle_color: insertDriver.vehicleColor || null,
-      is_available: insertDriver.isAvailable || false,
+      online_status: insertDriver.isAvailable ? 'online' : 'offline',
       is_verified: insertDriver.isVerified || false,
       current_latitude: insertDriver.currentLatitude || null,
       current_longitude: insertDriver.currentLongitude || null,
@@ -650,7 +650,7 @@ export class SupabaseStorage implements IStorage {
     if (data.vehicleMake !== undefined) dbData.vehicle_make = data.vehicleMake;
     if (data.vehicleModel !== undefined) dbData.vehicle_model = data.vehicleModel;
     if (data.vehicleColor !== undefined) dbData.vehicle_color = data.vehicleColor;
-    if (data.isAvailable !== undefined) dbData.is_available = data.isAvailable;
+    if (data.isAvailable !== undefined) dbData.online_status = data.isAvailable ? 'online' : 'offline';
     if (data.isVerified !== undefined) dbData.is_verified = data.isVerified;
     if (data.currentLatitude !== undefined) dbData.current_latitude = data.currentLatitude;
     if (data.currentLongitude !== undefined) dbData.current_longitude = data.currentLongitude;
