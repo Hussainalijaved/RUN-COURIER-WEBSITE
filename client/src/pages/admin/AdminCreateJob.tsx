@@ -1023,27 +1023,6 @@ export default function AdminCreateJob() {
                           </div>
                         )}
 
-                        {/* Calculate Multi-Drop Quote Button */}
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={calculateMultiDropQuote}
-                          disabled={isCalculating || drops.filter(d => d.postcode.trim()).length === 0}
-                          className="w-full"
-                          data-testid="button-calculate-multidrop"
-                        >
-                          {isCalculating ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Calculating Route...
-                            </>
-                          ) : (
-                            <>
-                              <Calculator className="h-4 w-4 mr-2" />
-                              Calculate Multi-Drop Quote
-                            </>
-                          )}
-                        </Button>
                       </div>
                     )}
                   </CardContent>
@@ -1283,6 +1262,26 @@ export default function AdminCreateJob() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Calculate Quote Button - shown when no quote */}
+                    {!quote && !isCalculating && (
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Fill in the pickup and delivery details, then click below to calculate the quote.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="default"
+                          onClick={handleRecalculate}
+                          disabled={isCalculating}
+                          className="w-full"
+                          data-testid="button-calculate-quote"
+                        >
+                          <Calculator className="h-4 w-4 mr-2" />
+                          Calculate Quote
+                        </Button>
+                      </div>
+                    )}
+                    
                     {isCalculating ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
