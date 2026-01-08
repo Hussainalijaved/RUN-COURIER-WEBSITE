@@ -10,7 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { initGoogleMaps, getMapCenter, geocodePostcode } from '@/lib/maps';
+import { MapFallback } from '@/components/ui/map-fallback';
+import { getMapCenter, geocodePostcode } from '@/lib/maps';
+import { useGoogleMaps } from '@/hooks/useGoogleMaps';
 import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useDriverLocations } from '@/hooks/useDriverLocations';
@@ -120,42 +122,39 @@ export default function AdminMap() {
     return 'offline';
   };
 
-  const initMap = useCallback(async () => {
-    if (mapInstanceRef.current || !mapRef.current) return;
+  const { status: mapsStatus, error: mapsError, isReady: mapsReady, retry: retryMaps } = useGoogleMaps();
 
-    try {
-      await initGoogleMaps();
-      
-      if (typeof google === 'undefined' || !google.maps) {
-        setMapError('Google Maps failed to load. Please check your API key configuration.');
-        return;
-      }
+  const initMap = useCallback(() => {
+    if (mapInstanceRef.current || !mapRef.current || !mapsReady) return;
 
-      const center = getMapCenter();
-      const newMap = new google.maps.Map(mapRef.current, {
-        center,
-        zoom: 12,
-        styles: [
-          { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
-        ],
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true,
-      });
-      
-      mapInstanceRef.current = newMap;
-      setMapLoaded(true);
-      setMapError(null);
-    } catch (error) {
-      console.error('Error loading map:', error);
-      setMapError('Failed to initialize Google Maps. Please try refreshing the page.');
+    if (typeof google === 'undefined' || !google.maps) {
+      setMapError('Google Maps failed to load.');
+      return;
     }
-  }, []);
+
+    const center = getMapCenter();
+    const newMap = new google.maps.Map(mapRef.current, {
+      center,
+      zoom: 12,
+      styles: [
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+        { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
+      ],
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: true,
+    });
+    
+    mapInstanceRef.current = newMap;
+    setMapLoaded(true);
+    setMapError(null);
+  }, [mapsReady]);
 
   useEffect(() => {
-    initMap();
-  }, [initMap]);
+    if (mapsReady) {
+      initMap();
+    }
+  }, [mapsReady, initMap]);
 
   useEffect(() => {
     const loadJobLocations = async () => {
@@ -582,29 +581,18 @@ export default function AdminMap() {
             </div>
           </CardHeader>
           <CardContent className="p-0 h-full relative">
-            {mapError ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/50 p-8">
-                <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-                <p className="text-center text-destructive font-medium mb-2">Map Error</p>
-                <p className="text-center text-muted-foreground text-sm max-w-md">{mapError}</p>
-                <Button 
-                  variant="outline" 
-                  className="mt-4" 
-                  onClick={() => {
-                    setMapError(null);
-                    initMap();
-                  }}
-                >
-                  Try Again
-                </Button>
-              </div>
-            ) : !mapLoaded ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-muted-foreground">Loading map...</p>
-                </div>
-              </div>
+            {(mapsStatus === 'error' || mapsStatus === 'unconfigured' || mapError) ? (
+              <MapFallback 
+                status={mapError ? 'error' : mapsStatus} 
+                error={mapError || mapsError} 
+                onRetry={() => {
+                  setMapError(null);
+                  retryMaps();
+                }}
+                className="absolute inset-0"
+              />
+            ) : mapsStatus === 'loading' || !mapLoaded ? (
+              <MapFallback status="loading" className="absolute inset-0" />
             ) : null}
             <div ref={mapRef} className="w-full h-full min-h-[400px]" data-testid="map-container" />
           </CardContent>

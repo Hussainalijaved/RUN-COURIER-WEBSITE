@@ -5,38 +5,36 @@ let loadAttempts = 0;
 const MAX_LOAD_ATTEMPTS = 3;
 
 export async function initGoogleMaps(): Promise<void> {
-  // If already loaded, return immediately
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    throw new Error('Google Maps can only be loaded in browser environment');
+  }
+
   if (typeof google !== 'undefined' && google.maps) {
     return;
   }
   
-  // If already loading, wait for it
   if (googleMapsPromise) {
     return googleMapsPromise;
   }
   
-  // Load Google Maps script
   googleMapsPromise = new Promise((resolve, reject) => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     
     if (!apiKey) {
       console.error('VITE_GOOGLE_MAPS_API_KEY is not configured');
-      googleMapsPromise = null; // Reset to allow retry
+      googleMapsPromise = null;
       reject(new Error('Google Maps API key not configured'));
       return;
     }
     
-    // Check if script already exists
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]') as HTMLScriptElement | null;
     if (existingScript) {
-      // Wait for existing script to load
       if (typeof google !== 'undefined' && google.maps) {
         resolve();
         return;
       }
       existingScript.addEventListener('load', () => resolve());
       existingScript.addEventListener('error', () => {
-        // Remove failed script and reset for retry
         existingScript.remove();
         googleMapsPromise = null;
         reject(new Error('Failed to load Google Maps'));
@@ -51,21 +49,18 @@ export async function initGoogleMaps(): Promise<void> {
     script.defer = true;
     
     script.onload = () => {
-      console.log('Google Maps loaded successfully');
-      loadAttempts = 0; // Reset on success
+      loadAttempts = 0;
       resolve();
     };
     
     script.onerror = () => {
-      console.error('Failed to load Google Maps script (attempt ' + loadAttempts + '/' + MAX_LOAD_ATTEMPTS + ')');
-      // Remove failed script and reset promise to allow retry
       script.remove();
       googleMapsPromise = null;
       
       if (loadAttempts < MAX_LOAD_ATTEMPTS) {
         reject(new Error('Failed to load Google Maps. Retry available.'));
       } else {
-        reject(new Error('Failed to load Google Maps after ' + MAX_LOAD_ATTEMPTS + ' attempts. Please refresh the page.'));
+        reject(new Error('Failed to load Google Maps after ' + MAX_LOAD_ATTEMPTS + ' attempts.'));
       }
     };
     
@@ -75,8 +70,9 @@ export async function initGoogleMaps(): Promise<void> {
   return googleMapsPromise;
 }
 
-// Helper to reset map loader for manual retry
 export function resetGoogleMapsLoader(): void {
+  if (typeof document === 'undefined') return;
+  
   googleMapsPromise = null;
   loadAttempts = 0;
   const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
