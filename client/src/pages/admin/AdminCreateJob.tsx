@@ -448,7 +448,7 @@ export default function AdminCreateJob() {
         scheduledPickupTime,
         scheduledDeliveryTime,
         isScheduled: !!scheduledPickupTime,
-        isMultiDrop: isMultiDropMode && validDrops.length > 1,
+        isMultiDrop: isMultiDropMode && validDrops.length >= 1,
         multiDropStops: multiDropStops.length > 0 ? multiDropStops : undefined,
       };
 
@@ -517,13 +517,26 @@ export default function AdminCreateJob() {
       return;
     }
     
-    // Validate multi-drop mode has valid drops
+    // Validate multi-drop mode has valid drops with required fields
     if (isMultiDropMode) {
       const validDrops = drops.filter(d => d.postcode.trim());
       if (validDrops.length === 0) {
         toast({
           title: 'Drops Required',
           description: 'Please add at least one delivery drop with a valid postcode.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Check each drop has required fields
+      const incompleteDrops = validDrops.filter(d => 
+        !d.address.trim() || !d.recipientName.trim() || !d.recipientPhone.trim()
+      );
+      if (incompleteDrops.length > 0) {
+        toast({
+          title: 'Incomplete Drop Details',
+          description: 'Please fill in address, recipient name and phone for all drops.',
           variant: 'destructive',
         });
         return;
