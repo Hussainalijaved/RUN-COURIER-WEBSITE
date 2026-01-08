@@ -55,18 +55,30 @@ import {
   Clock,
   Building2,
   UserCircle,
+  Plus,
+  Trash2,
+  ArrowRight,
 } from 'lucide-react';
+
+interface DropPoint {
+  id: string;
+  postcode: string;
+  address: string;
+  recipientName: string;
+  recipientPhone: string;
+  instructions: string;
+}
 
 const createJobSchema = z.object({
   customerType: z.enum(['individual', 'business']).default('individual'),
   pickupAddress: z.string().min(5, 'Pickup address is required'),
   pickupPostcode: z.string().min(3, 'Pickup postcode is required'),
   pickupInstructions: z.string().optional(),
-  deliveryAddress: z.string().min(5, 'Delivery address is required'),
-  deliveryPostcode: z.string().min(3, 'Delivery postcode is required'),
+  deliveryAddress: z.string().default(''),
+  deliveryPostcode: z.string().default(''),
   deliveryInstructions: z.string().optional(),
-  recipientName: z.string().min(2, 'Recipient name is required'),
-  recipientPhone: z.string().min(10, 'Valid phone number is required'),
+  recipientName: z.string().default(''),
+  recipientPhone: z.string().default(''),
   senderName: z.string().optional(),
   senderPhone: z.string().optional(),
   companyName: z.string().optional(),
@@ -79,6 +91,39 @@ const createJobSchema = z.object({
   pickupTime: z.string().min(1, 'Pickup time is required'),
   deliveryDate: z.string().optional(),
   deliveryTime: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // In single-drop mode, validate delivery fields individually
+  if (!data.isMultiDrop) {
+    if (data.deliveryAddress.length < 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Delivery address is required (min 5 characters)',
+        path: ['deliveryAddress'],
+      });
+    }
+    if (data.deliveryPostcode.length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Delivery postcode is required',
+        path: ['deliveryPostcode'],
+      });
+    }
+    if (data.recipientName.length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Recipient name is required',
+        path: ['recipientName'],
+      });
+    }
+    if (data.recipientPhone.length < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Valid phone number is required',
+        path: ['recipientPhone'],
+      });
+    }
+  }
+  // In multi-drop mode, delivery fields are optional (handled by drops array)
 });
 
 const getTodayDate = () => {
@@ -108,6 +153,30 @@ export default function AdminCreateJob() {
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [driverPrice, setDriverPrice] = useState<number | null>(null);
   const [isEditingDriverPrice, setIsEditingDriverPrice] = useState(false);
+  
+  // Multi-drop state
+  const [drops, setDrops] = useState<DropPoint[]>([]);
+  const [isMultiDropMode, setIsMultiDropMode] = useState(false);
+  const [routeLegs, setRouteLegs] = useState<{ from: string; to: string; distance: number }[]>([]);
+  
+  const addDrop = () => {
+    setDrops(prev => [...prev, { 
+      id: String(Date.now()), 
+      postcode: '', 
+      address: '', 
+      recipientName: '', 
+      recipientPhone: '', 
+      instructions: '' 
+    }]);
+  };
+
+  const removeDrop = (id: string) => {
+    setDrops(prev => prev.filter(d => d.id !== id));
+  };
+
+  const updateDrop = (id: string, field: keyof DropPoint, value: string) => {
+    setDrops(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d));
+  };
 
   const form = useForm<CreateJobInput>({
     resolver: zodResolver(createJobSchema),
@@ -194,7 +263,93 @@ export default function AdminCreateJob() {
 
   const lastCalculatedRef = useRef<string>('');
 
+  // Calculate multi-drop quote using optimized route API
+  const calculateMultiDropQuote = async () => {
+    if (!pickupPostcode || pickupPostcode.length < 3) {
+      toast({ title: 'Please enter a pickup postcode', variant: 'destructive' });
+      return;
+    }
+    
+    const validDrops = drops.filter(d => d.postcode.trim().length >= 3);
+    if (validDrops.length === 0) {
+      toast({ title: 'Please add at least one delivery drop', variant: 'destructive' });
+      return;
+    }
+
+    setIsCalculating(true);
+    setQuote(null);
+    setRouteLegs([]);
+
+    try {
+      const dropPostcodes = validDrops.map(d => d.postcode).join('|');
+      const routeResponse = await fetch(
+        `/api/maps/optimized-route?origin=${encodeURIComponent(pickupPostcode)}&drops=${encodeURIComponent(dropPostcodes)}`
+      );
+      
+      if (!routeResponse.ok) {
+        throw new Error('Failed to calculate optimized route');
+      }
+      
+      const routeData = await routeResponse.json();
+      
+      // Extract distance legs and total distance from optimized route response
+      // API returns { legs: [{from, to, distance, duration}], totalDistance, totalDuration, optimizedOrder }
+      const legs: { from: string; to: string; distance: number }[] = [];
+      let totalDistance = 0;
+      
+      if (routeData.legs && routeData.legs.length > 0) {
+        for (const leg of routeData.legs) {
+          legs.push({
+            from: leg.from || '',
+            to: leg.to || '',
+            distance: leg.distance || 0,
+          });
+          totalDistance += leg.distance || 0;
+        }
+      }
+      
+      // Use total from API if available
+      if (routeData.totalDistance) {
+        totalDistance = routeData.totalDistance;
+      }
+      
+      setDistance(totalDistance);
+      setRouteLegs(legs);
+      
+      // Get all postcodes for congestion check (pickup + all drops)
+      const allDropPostcodes = validDrops.map(d => d.postcode);
+      
+      // Calculate quote with multi-drop pricing
+      const quoteResult = calculateQuote(vehicleType as VehicleType, totalDistance, weight || 1, {
+        pickupPostcode,
+        deliveryPostcode: validDrops[validDrops.length - 1].postcode,
+        allDropPostcodes,
+        isMultiDrop: true,
+        multiDropCount: validDrops.length,
+        multiDropDistances: legs.map(l => l.distance),
+        isReturnTrip: isReturnTrip || false,
+        returnToSameLocation: isReturnTrip || false,
+      });
+      
+      setQuote(quoteResult);
+      setPriceOverride(null);
+      setIsEditingPrice(false);
+      
+      toast({ title: 'Multi-drop quote calculated successfully' });
+    } catch (error) {
+      console.error('Error calculating multi-drop quote:', error);
+      toast({ title: 'Failed to calculate multi-drop quote', variant: 'destructive' });
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
   useEffect(() => {
+    // Skip auto-calculation in multi-drop mode - user must click calculate button
+    if (isMultiDropMode) {
+      return;
+    }
+    
     const calculateQuoteFromFields = async () => {
       const cacheKey = `${pickupPostcode}-${deliveryPostcode}-${weight}-${vehicleType}-${isReturnTrip}`;
       
@@ -232,7 +387,7 @@ export default function AdminCreateJob() {
 
     const timer = setTimeout(calculateQuoteFromFields, 500);
     return () => clearTimeout(timer);
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, isMultiDropMode]);
 
   const createJobMutation = useMutation({
     mutationFn: async (data: CreateJobInput) => {
@@ -245,16 +400,46 @@ export default function AdminCreateJob() {
         ? new Date(`${data.deliveryDate}T${data.deliveryTime}`).toISOString()
         : null;
       
+      // Build multi-drop stops array if in multi-drop mode
+      const validDrops = isMultiDropMode ? drops.filter(d => d.postcode.trim()) : [];
+      const multiDropStops = validDrops.map((drop, index) => ({
+        stopOrder: index + 1,
+        postcode: drop.postcode,
+        address: drop.address,
+        recipientName: drop.recipientName,
+        recipientPhone: drop.recipientPhone,
+        instructions: drop.instructions,
+      }));
+
+      // For multi-drop, use the last drop as the delivery address
+      const deliveryAddress = isMultiDropMode && validDrops.length > 0 
+        ? validDrops[validDrops.length - 1].address || data.deliveryAddress
+        : data.deliveryAddress;
+      const deliveryPostcodeValue = isMultiDropMode && validDrops.length > 0
+        ? validDrops[validDrops.length - 1].postcode
+        : data.deliveryPostcode;
+      const recipientNameValue = isMultiDropMode && validDrops.length > 0
+        ? validDrops[validDrops.length - 1].recipientName || data.recipientName
+        : data.recipientName;
+      const recipientPhoneValue = isMultiDropMode && validDrops.length > 0
+        ? validDrops[validDrops.length - 1].recipientPhone || data.recipientPhone
+        : data.recipientPhone;
+      
       const jobData = {
         ...data,
         customerId: 'admin-created',
         pickupContactName: data.senderName || null,
         pickupContactPhone: data.senderPhone || null,
+        deliveryAddress,
+        deliveryPostcode: deliveryPostcodeValue,
+        recipientName: recipientNameValue,
+        recipientPhone: recipientPhoneValue,
         distance: distance.toString(),
         basePrice: quote?.baseCharge.toString() || '0',
         distancePrice: quote?.distanceCharge.toString() || '0',
         weightSurcharge: quote?.weightSurcharge.toString() || '0',
-        centralLondonCharge: '0',
+        multiDropCharge: quote?.multiDropCharge?.toString() || '0',
+        centralLondonCharge: quote?.congestionZoneCharge?.toString() || '0',
         returnTripCharge: quote?.returnTripCharge.toString() || '0',
         totalPrice: finalPrice.toString(),
         driverPrice: driverPrice !== null ? driverPrice.toString() : null,
@@ -263,6 +448,8 @@ export default function AdminCreateJob() {
         scheduledPickupTime,
         scheduledDeliveryTime,
         isScheduled: !!scheduledPickupTime,
+        isMultiDrop: isMultiDropMode && validDrops.length > 1,
+        multiDropStops: multiDropStops.length > 0 ? multiDropStops : undefined,
       };
 
       const res = await apiRequest('POST', '/api/jobs', jobData);
@@ -286,6 +473,12 @@ export default function AdminCreateJob() {
   });
 
   const handleRecalculate = async () => {
+    // In multi-drop mode, use the multi-drop calculation
+    if (isMultiDropMode) {
+      await calculateMultiDropQuote();
+      return;
+    }
+    
     const values = form.getValues();
     if (values.pickupPostcode && values.deliveryPostcode) {
       setIsCalculating(true);
@@ -323,6 +516,20 @@ export default function AdminCreateJob() {
       });
       return;
     }
+    
+    // Validate multi-drop mode has valid drops
+    if (isMultiDropMode) {
+      const validDrops = drops.filter(d => d.postcode.trim());
+      if (validDrops.length === 0) {
+        toast({
+          title: 'Drops Required',
+          description: 'Please add at least one delivery drop with a valid postcode.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+    
     createJobMutation.mutate(data);
   };
 
@@ -534,105 +741,279 @@ export default function AdminCreateJob() {
                 {/* Delivery Details */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5 text-red-500" />
-                      Delivery Details
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <MapPin className="h-5 w-5 text-red-500" />
+                        Delivery Details
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="multi-drop-toggle" className="text-sm font-medium">
+                          Multi-drop
+                        </Label>
+                        <Switch
+                          id="multi-drop-toggle"
+                          checked={isMultiDropMode}
+                          onCheckedChange={(checked) => {
+                            setIsMultiDropMode(checked);
+                            form.setValue('isMultiDrop', checked);
+                            setQuote(null);
+                            setRouteLegs([]);
+                            if (checked && drops.length === 0) {
+                              addDrop();
+                            }
+                          }}
+                          data-testid="switch-multi-drop"
+                        />
+                      </div>
+                    </div>
+                    {isMultiDropMode && (
+                      <CardDescription>
+                        Add multiple delivery stops. The route will be automatically optimized.
+                      </CardDescription>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="deliveryPostcode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Delivery Postcode *</FormLabel>
-                          <FormControl>
-                            <PostcodeAutocomplete
-                              value={field.value}
-                              onChange={(postcode, address) => {
-                                field.onChange(postcode);
-                                if (address) {
-                                  form.setValue('deliveryAddress', address);
-                                }
-                              }}
-                              placeholder="Enter delivery postcode"
-                              data-testid="input-delivery-postcode"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="deliveryAddress"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Delivery Address *</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Full delivery address"
-                              data-testid="input-delivery-address"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="recipientName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Recipient Name *</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
+                    {/* Single Drop Mode */}
+                    {!isMultiDropMode && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="deliveryPostcode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Delivery Postcode *</FormLabel>
+                              <FormControl>
+                                <PostcodeAutocomplete
+                                  value={field.value}
+                                  onChange={(postcode, address) => {
+                                    field.onChange(postcode);
+                                    if (address) {
+                                      form.setValue('deliveryAddress', address);
+                                    }
+                                  }}
+                                  placeholder="Enter delivery postcode"
+                                  data-testid="input-delivery-postcode"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="deliveryAddress"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Delivery Address *</FormLabel>
+                              <FormControl>
+                                <Textarea
                                   {...field}
-                                  className="pl-10"
-                                  placeholder="John Smith"
-                                  data-testid="input-recipient-name"
+                                  placeholder="Full delivery address"
+                                  data-testid="input-delivery-address"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="recipientName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Recipient Name *</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                      {...field}
+                                      className="pl-10"
+                                      placeholder="John Smith"
+                                      data-testid="input-recipient-name"
+                                    />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="recipientPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Recipient Phone *</FormLabel>
+                                <FormControl>
+                                  <PhoneInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} data-testid="input-recipient-phone" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name="deliveryInstructions"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Delivery Instructions</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="e.g., Leave with reception, call before arrival"
+                                  data-testid="input-delivery-instructions"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
+
+                    {/* Multi-Drop Mode */}
+                    {isMultiDropMode && (
+                      <div className="space-y-4">
+                        {drops.map((drop, index) => (
+                          <div 
+                            key={drop.id} 
+                            className="p-4 border rounded-lg space-y-3 bg-muted/30"
+                            data-testid={`drop-point-${index}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="h-6 w-6 rounded-full p-0 flex items-center justify-center">
+                                  {index + 1}
+                                </Badge>
+                                <span className="font-medium text-sm">Drop {index + 1}</span>
+                              </div>
+                              {drops.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeDrop(drop.id)}
+                                  data-testid={`button-remove-drop-${index}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label className="text-sm">Postcode *</Label>
+                                <PostcodeAutocomplete
+                                  value={drop.postcode}
+                                  onChange={(postcode, address) => {
+                                    updateDrop(drop.id, 'postcode', postcode);
+                                    if (address) {
+                                      updateDrop(drop.id, 'address', address);
+                                    }
+                                  }}
+                                  placeholder="Enter postcode"
+                                  data-testid={`input-drop-postcode-${index}`}
                                 />
                               </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
+                              <div className="space-y-2">
+                                <Label className="text-sm">Address</Label>
+                                <Input
+                                  value={drop.address}
+                                  onChange={(e) => updateDrop(drop.id, 'address', e.target.value)}
+                                  placeholder="Full address"
+                                  data-testid={`input-drop-address-${index}`}
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label className="text-sm">Recipient Name</Label>
+                                <Input
+                                  value={drop.recipientName}
+                                  onChange={(e) => updateDrop(drop.id, 'recipientName', e.target.value)}
+                                  placeholder="Recipient name"
+                                  data-testid={`input-drop-recipient-${index}`}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm">Recipient Phone</Label>
+                                <Input
+                                  value={drop.recipientPhone}
+                                  onChange={(e) => updateDrop(drop.id, 'recipientPhone', e.target.value)}
+                                  placeholder="07123456789"
+                                  data-testid={`input-drop-phone-${index}`}
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label className="text-sm">Instructions</Label>
+                              <Input
+                                value={drop.instructions}
+                                onChange={(e) => updateDrop(drop.id, 'instructions', e.target.value)}
+                                placeholder="Delivery instructions"
+                                data-testid={`input-drop-instructions-${index}`}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addDrop}
+                          className="w-full"
+                          data-testid="button-add-drop"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Another Drop
+                        </Button>
+
+                        {/* Route Preview */}
+                        {routeLegs.length > 0 && (
+                          <div className="mt-4 p-3 bg-muted rounded-lg">
+                            <Label className="text-sm font-medium mb-2 block">Optimized Route</Label>
+                            <div className="space-y-2">
+                              {routeLegs.map((leg, index) => (
+                                <div key={index} className="flex items-center gap-2 text-sm">
+                                  <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                                    {index + 1}
+                                  </Badge>
+                                  <span className="text-muted-foreground truncate max-w-[120px]">{leg.from}</span>
+                                  <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                  <span className="truncate max-w-[120px]">{leg.to}</span>
+                                  <span className="text-muted-foreground ml-auto">({leg.distance.toFixed(1)} mi)</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="recipientPhone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Recipient Phone *</FormLabel>
-                            <FormControl>
-                              <PhoneInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} data-testid="input-recipient-phone" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <FormField
-                      control={form.control}
-                      name="deliveryInstructions"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Delivery Instructions</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="e.g., Leave with reception, call before arrival"
-                              data-testid="input-delivery-instructions"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+
+                        {/* Calculate Multi-Drop Quote Button */}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={calculateMultiDropQuote}
+                          disabled={isCalculating || drops.filter(d => d.postcode.trim()).length === 0}
+                          className="w-full"
+                          data-testid="button-calculate-multidrop"
+                        >
+                          {isCalculating ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Calculating Route...
+                            </>
+                          ) : (
+                            <>
+                              <Calculator className="h-4 w-4 mr-2" />
+                              Calculate Multi-Drop Quote
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
