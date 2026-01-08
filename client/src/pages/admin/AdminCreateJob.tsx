@@ -264,6 +264,9 @@ export default function AdminCreateJob() {
   const lastCalculatedRef = useRef<string>('');
 
   // Calculate multi-drop quote using optimized route API
+  // Maximum 9 drops due to Google Maps Distance Matrix API limits (10 points × 10 points = 100 elements max)
+  const MAX_DROPS = 9;
+  
   const calculateMultiDropQuote = async () => {
     if (!pickupPostcode || pickupPostcode.length < 3) {
       toast({ title: 'Please enter a pickup postcode', variant: 'destructive' });
@@ -273,6 +276,15 @@ export default function AdminCreateJob() {
     const validDrops = drops.filter(d => d.postcode.trim().length >= 3);
     if (validDrops.length === 0) {
       toast({ title: 'Please add at least one delivery drop', variant: 'destructive' });
+      return;
+    }
+    
+    if (validDrops.length > MAX_DROPS) {
+      toast({ 
+        title: `Maximum ${MAX_DROPS} drops allowed`, 
+        description: 'Please reduce the number of delivery drops.',
+        variant: 'destructive' 
+      });
       return;
     }
 
@@ -287,7 +299,8 @@ export default function AdminCreateJob() {
       );
       
       if (!routeResponse.ok) {
-        throw new Error('Failed to calculate optimized route');
+        const errorData = await routeResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to calculate optimized route');
       }
       
       const routeData = await routeResponse.json();
@@ -338,7 +351,12 @@ export default function AdminCreateJob() {
       toast({ title: 'Multi-drop quote calculated successfully' });
     } catch (error) {
       console.error('Error calculating multi-drop quote:', error);
-      toast({ title: 'Failed to calculate multi-drop quote', variant: 'destructive' });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to calculate multi-drop quote';
+      toast({ 
+        title: 'Quote Calculation Failed', 
+        description: errorMessage,
+        variant: 'destructive' 
+      });
     } finally {
       setIsCalculating(false);
     }
@@ -978,10 +996,11 @@ export default function AdminCreateJob() {
                           variant="outline"
                           onClick={addDrop}
                           className="w-full"
+                          disabled={drops.length >= MAX_DROPS}
                           data-testid="button-add-drop"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Another Drop
+                          {drops.length >= MAX_DROPS ? `Maximum ${MAX_DROPS} Drops Reached` : 'Add Another Drop'}
                         </Button>
 
                         {/* Route Preview */}
