@@ -1,0 +1,93 @@
+REPLIT FIX-ALL PROMPT (PASTE AS-IS)
+
+You are a senior full-stack engineer auditing and fixing a production logistics platform (web + mobile) using Supabase, Stripe, Maps, and push notifications.
+
+Your task is to fix ALL of the following issues end-to-end, without breaking existing functionality:
+
+1️⃣ MAP NOT SHOWING
+
+Debug why the map is not rendering on the website.
+
+Verify Google Maps / Mapbox integration.
+
+Ensure API keys are correctly loaded from environment variables (VITE_ prefixed if needed).
+
+Fix domain/API restrictions issues.
+
+Ensure the map renders correctly in production builds (not just dev).
+
+2️⃣ DRIVER ID LOGIC (CRITICAL)
+
+Restore the original driver ID generation logic.
+
+Driver IDs must follow this format ONLY:
+RC + 2 numbers + 1 letter (example: RC11A)
+
+The RC prefix must NEVER change.
+
+Ensure IDs are generated once and remain immutable.
+
+Fix both backend logic and any frontend assumptions.
+
+3️⃣ POD (PROOF OF DELIVERY) – MOBILE BUG
+
+Fix the POD image upload error:
+Cannot read property 'Base64' of undefined
+
+Ensure the image picker always returns a valid base64 or file object before upload.
+
+Correct the upload flow to Supabase Storage.
+
+Validate bucket permissions and storage policies.
+
+Ensure mobile app can upload POD images reliably.
+
+4️⃣ PUSH NOTIFICATION SOUND (MOBILE)
+
+Ensure push notifications use sound: "default" and high priority.
+
+Verify notifications trigger sound when a driver is assigned a job.
+
+Fix payload structure if needed for iOS.
+
+5️⃣ ENV + DEPLOYMENT SANITY CHECK
+
+Verify all required environment variables are documented and used correctly:
+
+VITE_SUPABASE_URL
+
+VITE_SUPABASE_ANON_KEY
+
+Maps API keys
+
+Stripe / Apple Pay domains
+
+Ensure the project builds cleanly with these env vars.
+
+6️⃣ FINAL VALIDATION
+
+Test the following flows:
+
+Admin login
+
+Driver login
+
+Job assignment
+
+Map rendering
+
+Driver notification (with sound)
+
+POD image upload
+
+Job completion
+
+Output:
+
+Apply code fixes directly.
+
+Clearly comment critical fixes.
+
+Do NOT introduce breaking changes.
+
+Assume this is a live production system.

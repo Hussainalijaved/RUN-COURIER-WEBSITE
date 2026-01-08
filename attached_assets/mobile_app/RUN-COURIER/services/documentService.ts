@@ -240,7 +240,21 @@ export async function uploadDocument(
       }
     } else {
       // Native platform - use expo-file-system
-      const FileSystem = require('expo-file-system');
+      // Import safely to prevent "Cannot read property 'Base64' of undefined"
+      let FileSystem: any;
+      try {
+        FileSystem = require('expo-file-system');
+      } catch (importError) {
+        console.error('[DOC UPLOAD] Failed to import expo-file-system:', importError);
+        return { success: false, error: 'File system not available. Please restart the app.' };
+      }
+      
+      // Validate FileSystem is properly loaded
+      if (!FileSystem || !FileSystem.EncodingType || !FileSystem.EncodingType.Base64) {
+        console.error('[DOC UPLOAD] expo-file-system not properly loaded');
+        return { success: false, error: 'File system module not available. Please restart the app.' };
+      }
+      
       const base64 = await FileSystem.readAsStringAsync(fileUri, { 
         encoding: FileSystem.EncodingType.Base64 
       });

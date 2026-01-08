@@ -19,7 +19,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { Driver, Job } from '@shared/schema';
 
 interface JobLocation {
-  jobId: number;
+  jobId: string;
   pickupLat: number;
   pickupLng: number;
   deliveryLat: number;
@@ -32,15 +32,15 @@ export default function AdminMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const driverMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
-  const jobMarkersRef = useRef<Map<number, { pickup: google.maps.Marker; delivery: google.maps.Marker; polyline: google.maps.Polyline }>>(new Map());
+  const jobMarkersRef = useRef<Map<string, { pickup: google.maps.Marker; delivery: google.maps.Marker; polyline: google.maps.Polyline }>>(new Map());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [jobLocations, setJobLocations] = useState<Map<number, JobLocation>>(new Map());
+  const [jobLocations, setJobLocations] = useState<Map<string, JobLocation>>(new Map());
   const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [assigningJobId, setAssigningJobId] = useState<number | null>(null);
+  const [assigningJobId, setAssigningJobId] = useState<string | null>(null);
   const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
   const [driverPriceForAssign, setDriverPriceForAssign] = useState<string>('');
   const { toast } = useToast();
@@ -67,7 +67,7 @@ export default function AdminMap() {
   });
 
   const assignJobMutation = useMutation({
-    mutationFn: async ({ jobId, driverId, driverPrice }: { jobId: number; driverId: string; driverPrice: string }) => {
+    mutationFn: async ({ jobId, driverId, driverPrice }: { jobId: string; driverId: string; driverPrice: string }) => {
       return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId, driverPrice });
     },
     onSuccess: () => {
@@ -298,7 +298,7 @@ export default function AdminMap() {
     const map = mapInstanceRef.current;
     if (!map || !mapLoaded) return;
 
-    const currentJobIds = new Set<number>();
+    const currentJobIds = new Set<string>();
     const allDisplayJobs = [...pendingJobs, ...activeJobs];
 
     allDisplayJobs.forEach((job) => {
@@ -509,7 +509,7 @@ export default function AdminMap() {
         return <Badge className="bg-blue-500 text-white text-xs">Assigned</Badge>;
       case 'picked_up':
         return <Badge className="bg-purple-500 text-white text-xs">Picked Up</Badge>;
-      case 'in_transit':
+      case 'on_the_way':
         return <Badge className="bg-indigo-500 text-white text-xs">In Transit</Badge>;
       default:
         return <Badge variant="secondary" className="text-xs">{job.status}</Badge>;

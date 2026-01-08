@@ -1,7 +1,88 @@
 /// <reference types="@types/google.maps" />
 
+let googleMapsPromise: Promise<void> | null = null;
+let loadAttempts = 0;
+const MAX_LOAD_ATTEMPTS = 3;
+
 export async function initGoogleMaps(): Promise<void> {
-  // No longer needed - using server-side API
+  // If already loaded, return immediately
+  if (typeof google !== 'undefined' && google.maps) {
+    return;
+  }
+  
+  // If already loading, wait for it
+  if (googleMapsPromise) {
+    return googleMapsPromise;
+  }
+  
+  // Load Google Maps script
+  googleMapsPromise = new Promise((resolve, reject) => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    
+    if (!apiKey) {
+      console.error('VITE_GOOGLE_MAPS_API_KEY is not configured');
+      googleMapsPromise = null; // Reset to allow retry
+      reject(new Error('Google Maps API key not configured'));
+      return;
+    }
+    
+    // Check if script already exists
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]') as HTMLScriptElement | null;
+    if (existingScript) {
+      // Wait for existing script to load
+      if (typeof google !== 'undefined' && google.maps) {
+        resolve();
+        return;
+      }
+      existingScript.addEventListener('load', () => resolve());
+      existingScript.addEventListener('error', () => {
+        // Remove failed script and reset for retry
+        existingScript.remove();
+        googleMapsPromise = null;
+        reject(new Error('Failed to load Google Maps'));
+      });
+      return;
+    }
+    
+    loadAttempts++;
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+    script.async = true;
+    script.defer = true;
+    
+    script.onload = () => {
+      console.log('Google Maps loaded successfully');
+      loadAttempts = 0; // Reset on success
+      resolve();
+    };
+    
+    script.onerror = () => {
+      console.error('Failed to load Google Maps script (attempt ' + loadAttempts + '/' + MAX_LOAD_ATTEMPTS + ')');
+      // Remove failed script and reset promise to allow retry
+      script.remove();
+      googleMapsPromise = null;
+      
+      if (loadAttempts < MAX_LOAD_ATTEMPTS) {
+        reject(new Error('Failed to load Google Maps. Retry available.'));
+      } else {
+        reject(new Error('Failed to load Google Maps after ' + MAX_LOAD_ATTEMPTS + ' attempts. Please refresh the page.'));
+      }
+    };
+    
+    document.head.appendChild(script);
+  });
+  
+  return googleMapsPromise;
+}
+
+// Helper to reset map loader for manual retry
+export function resetGoogleMapsLoader(): void {
+  googleMapsPromise = null;
+  loadAttempts = 0;
+  const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+  if (existingScript) {
+    existingScript.remove();
+  }
 }
 
 export async function geocodePostcode(postcode: string): Promise<{

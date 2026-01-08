@@ -757,7 +757,20 @@ export function ActiveJobScreen({ navigation }: any) {
       }
       
       // Use expo-file-system with pure JS base64 decoder - Hermes compatible
-      const FileSystem = require('expo-file-system');
+      // Import safely to prevent "Cannot read property 'Base64' of undefined"
+      let FileSystem: any;
+      try {
+        FileSystem = require('expo-file-system');
+      } catch (importError) {
+        console.error('[POD UPLOAD] Failed to import expo-file-system:', importError);
+        return { success: false, error: 'File system not available' };
+      }
+      
+      // Validate FileSystem is properly loaded
+      if (!FileSystem || !FileSystem.EncodingType || !FileSystem.EncodingType.Base64) {
+        console.error('[POD UPLOAD] expo-file-system not properly loaded');
+        return { success: false, error: 'File system module not available. Please restart the app.' };
+      }
       
       // Check if file exists first
       const fileInfo = await FileSystem.getInfoAsync(uri);
