@@ -212,6 +212,7 @@ export default function AdminCreateJob() {
             const quoteResult = calculateQuote(vehicleType as VehicleType, distResult.distance, weight || 1, {
               pickupPostcode,
               deliveryPostcode,
+              allDropPostcodes: [deliveryPostcode], // Single delivery for congestion check
               isReturnTrip: isReturnTrip || false,
               returnToSameLocation: isReturnTrip || false,
             });
@@ -296,6 +297,7 @@ export default function AdminCreateJob() {
           const quoteResult = calculateQuote(values.vehicleType as VehicleType, distResult.distance, values.weight || 1, {
             pickupPostcode: values.pickupPostcode,
             deliveryPostcode: values.deliveryPostcode,
+            allDropPostcodes: [values.deliveryPostcode], // Single delivery for congestion check
             isReturnTrip: values.isReturnTrip || false,
             returnToSameLocation: values.isReturnTrip || false,
           });

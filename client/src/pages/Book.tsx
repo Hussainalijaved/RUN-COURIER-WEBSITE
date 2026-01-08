@@ -453,12 +453,16 @@ export default function Book() {
             ? new Date(`${pickupDateVal}T${pickupTimeVal}`) 
             : new Date();
           
+          // Collect all drop postcodes for congestion zone check (£18 applied ONCE if any is in zone)
+          const allDropPostcodes = [deliveryPostcode, ...multiDropStops.filter(s => s.length >= 3)];
+          
           const calculatedQuote = calculateQuote(finalVehicleType, distanceResult.distance, weight, {
             pickupPostcode,
             deliveryPostcode,
             isMultiDrop,
             multiDropCount: multiDropStops.filter(s => s.length >= 3).length,
             multiDropDistances,
+            allDropPostcodes,
             isReturnTrip,
             returnToSameLocation,
             returnDistance,
@@ -1489,14 +1493,14 @@ export default function Book() {
                           weightSurcharge: quote.weightSurcharge || 0,
                           multiDropCharge: quote.multiDropCharge || 0,
                           returnTripCharge: quote.returnTripCharge || 0,
-                          centralLondonCharge: quote.centralLondonCharge || 0,
+                          centralLondonCharge: quote.congestionZoneCharge || 0,
                           waitingTimeCharge: 0,
                           totalPrice: finalPrice,
                           distance,
                           estimatedTime,
                           isMultiDrop,
                           isReturnTrip,
-                          isCentralLondon: quote.centralLondonCharge > 0,
+                          isCentralLondon: quote.congestionZoneCharge > 0,
                           isRushHour: quote.rushHourApplied || false,
                           multiDropStops: multiDropStops.join(','),
                           customerId: user?.id || undefined,

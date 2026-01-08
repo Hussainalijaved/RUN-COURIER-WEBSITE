@@ -141,6 +141,7 @@ export default function AdminBusinessQuote() {
           {
             pickupPostcode,
             deliveryPostcode: validDrops[0].postcode,
+            allDropPostcodes: [validDrops[0].postcode], // Single drop for congestion check
             isMultiDrop: false,
             multiDropCount: 0,
             multiDropDistances: [],
