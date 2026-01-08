@@ -264,8 +264,7 @@ export default function AdminCreateJob() {
   const lastCalculatedRef = useRef<string>('');
 
   // Calculate multi-drop quote using optimized route API
-  // Maximum 9 drops due to Google Maps Distance Matrix API limits (10 points × 10 points = 100 elements max)
-  const MAX_DROPS = 9;
+  // Supports unlimited drops via chunked Distance Matrix API requests
   
   const calculateMultiDropQuote = async () => {
     if (!pickupPostcode || pickupPostcode.length < 3) {
@@ -276,15 +275,6 @@ export default function AdminCreateJob() {
     const validDrops = drops.filter(d => d.postcode.trim().length >= 3);
     if (validDrops.length === 0) {
       toast({ title: 'Please add at least one delivery drop', variant: 'destructive' });
-      return;
-    }
-    
-    if (validDrops.length > MAX_DROPS) {
-      toast({ 
-        title: `Maximum ${MAX_DROPS} drops allowed`, 
-        description: 'Please reduce the number of delivery drops.',
-        variant: 'destructive' 
-      });
       return;
     }
 
@@ -996,11 +986,10 @@ export default function AdminCreateJob() {
                           variant="outline"
                           onClick={addDrop}
                           className="w-full"
-                          disabled={drops.length >= MAX_DROPS}
                           data-testid="button-add-drop"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          {drops.length >= MAX_DROPS ? `Maximum ${MAX_DROPS} Drops Reached` : 'Add Another Drop'}
+                          Add Another Drop
                         </Button>
 
                         {/* Route Preview */}

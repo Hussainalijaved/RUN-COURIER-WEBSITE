@@ -269,45 +269,69 @@ export async function registerRoutes(
       // For multiple drops, use Distance Matrix to get all pairwise distances
       // Then solve TSP using nearest-neighbor heuristic
       const allPoints = [origin as string, ...dropList];
+      const n = allPoints.length;
       
-      // Build distance matrix request (all points to all points)
-      const originsParam = allPoints.map(p => encodeURIComponent(p)).join('|');
-      const destinationsParam = allPoints.map(p => encodeURIComponent(p)).join('|');
-      
-      const matrixUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${originsParam}&destinations=${destinationsParam}&key=${apiKey}`;
-      const matrixResponse = await fetch(matrixUrl);
-      const matrixData = await matrixResponse.json();
-
-      if (matrixData.status !== 'OK') {
-        console.error('Distance Matrix error:', matrixData.status, matrixData.error_message);
-        return res.status(400).json({ error: 'Could not calculate distances' });
-      }
-
-      // Parse distance matrix into 2D array (in meters)
-      // Validate that all locations are reachable
-      const distanceMatrix: number[][] = [];
-      const durationMatrix: number[][] = [];
+      // Initialize distance and duration matrices
+      const distanceMatrix: number[][] = Array.from({ length: n }, () => Array(n).fill(Infinity));
+      const durationMatrix: number[][] = Array.from({ length: n }, () => Array(n).fill(Infinity));
       const invalidLocations: string[] = [];
       
-      for (let i = 0; i < matrixData.rows.length; i++) {
-        distanceMatrix[i] = [];
-        durationMatrix[i] = [];
-        for (let j = 0; j < matrixData.rows[i].elements.length; j++) {
-          const element = matrixData.rows[i].elements[j];
-          if (element.status === 'OK') {
-            distanceMatrix[i][j] = element.distance.value;
-            durationMatrix[i][j] = element.duration.value;
-          } else {
-            // Track which location pair failed
-            if (i !== j) { // Don't count self-to-self as invalid
-              const fromLocation = allPoints[i];
-              const toLocation = allPoints[j];
-              invalidLocations.push(`${fromLocation} → ${toLocation}`);
+      // Batch Distance Matrix requests to stay within 100-element limit (10x10 max per request)
+      const BATCH_SIZE = 10;
+      
+      // Helper function to fetch a batch of the distance matrix
+      const fetchMatrixBatch = async (originIndices: number[], destIndices: number[]) => {
+        const batchOrigins = originIndices.map(i => encodeURIComponent(allPoints[i])).join('|');
+        const batchDests = destIndices.map(j => encodeURIComponent(allPoints[j])).join('|');
+        
+        const batchUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${batchOrigins}&destinations=${batchDests}&key=${apiKey}`;
+        const response = await fetch(batchUrl);
+        const data = await response.json();
+        
+        if (data.status !== 'OK') {
+          console.error('Distance Matrix batch error:', data.status, data.error_message);
+          throw new Error(`Distance Matrix API error: ${data.error_message || data.status}`);
+        }
+        
+        // Parse results into our matrices
+        for (let oi = 0; oi < originIndices.length; oi++) {
+          const globalOriginIdx = originIndices[oi];
+          for (let di = 0; di < destIndices.length; di++) {
+            const globalDestIdx = destIndices[di];
+            const element = data.rows[oi]?.elements[di];
+            
+            if (element?.status === 'OK') {
+              distanceMatrix[globalOriginIdx][globalDestIdx] = element.distance.value;
+              durationMatrix[globalOriginIdx][globalDestIdx] = element.duration.value;
+            } else if (globalOriginIdx !== globalDestIdx) {
+              invalidLocations.push(`${allPoints[globalOriginIdx]} → ${allPoints[globalDestIdx]}`);
             }
-            distanceMatrix[i][j] = Infinity;
-            durationMatrix[i][j] = Infinity;
           }
         }
+      }
+      
+      // Build list of batch requests needed
+      const originBatches: number[][] = [];
+      const destBatches: number[][] = [];
+      
+      for (let i = 0; i < n; i += BATCH_SIZE) {
+        originBatches.push(Array.from({ length: Math.min(BATCH_SIZE, n - i) }, (_, k) => i + k));
+      }
+      for (let j = 0; j < n; j += BATCH_SIZE) {
+        destBatches.push(Array.from({ length: Math.min(BATCH_SIZE, n - j) }, (_, k) => j + k));
+      }
+      
+      // Execute all batch requests (sequentially to avoid rate limiting)
+      for (const originBatch of originBatches) {
+        for (const destBatch of destBatches) {
+          await fetchMatrixBatch(originBatch, destBatch);
+        }
+      }
+      
+      // Set self-distances to 0
+      for (let i = 0; i < n; i++) {
+        distanceMatrix[i][i] = 0;
+        durationMatrix[i][i] = 0;
       }
 
       // Reject if any routes between points are invalid
