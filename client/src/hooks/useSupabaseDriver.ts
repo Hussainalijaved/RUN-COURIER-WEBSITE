@@ -299,9 +299,10 @@ export function useUpdateDriverAvailability() {
 
   return useMutation({
     mutationFn: async ({ driverId, isAvailable }: { driverId: string; isAvailable: boolean }) => {
+      // Supabase uses online_status column with 'online'/'offline' string values
       const { data, error } = await supabase
         .from('drivers')
-        .update({ is_available: isAvailable })
+        .update({ online_status: isAvailable ? 'online' : 'offline' })
         .eq('id', driverId)
         .select()
         .single();
