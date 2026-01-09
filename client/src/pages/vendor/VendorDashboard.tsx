@@ -100,10 +100,7 @@ export default function VendorDashboard() {
 
   const createKeyMutation = useMutation({
     mutationFn: async (name: string) => {
-      return apiRequest('/api/vendor/api-keys', {
-        method: 'POST',
-        body: JSON.stringify({ name, userId: user?.id }),
-      });
+      return apiRequest('POST', '/api/vendor/api-keys', { name, userId: user?.id });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vendor/api-keys'] });
@@ -118,9 +115,7 @@ export default function VendorDashboard() {
 
   const deleteKeyMutation = useMutation({
     mutationFn: async (keyId: string) => {
-      return apiRequest(`/api/vendor/api-keys/${keyId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/vendor/api-keys/${keyId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vendor/api-keys'] });
@@ -258,7 +253,7 @@ export default function VendorDashboard() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <code className="text-sm bg-muted px-2 py-1 rounded">
-                                {showKeys[apiKey.id] ? apiKey.key : maskKey(apiKey.key)}
+                                {showKeys[apiKey.id] ? apiKey.apiKey : maskKey(apiKey.apiKey)}
                               </code>
                               <Button
                                 variant="ghost"
@@ -286,7 +281,7 @@ export default function VendorDashboard() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => copyToClipboard(apiKey.key)}
+                                onClick={() => copyToClipboard(apiKey.apiKey)}
                                 data-testid={`button-copy-${apiKey.id}`}
                               >
                                 <Copy className="h-4 w-4" />

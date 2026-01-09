@@ -55,10 +55,7 @@ export default function DispatcherDashboard() {
 
   const assignMutation = useMutation({
     mutationFn: async ({ jobId, driverId }: { jobId: string; driverId: string }) => {
-      return apiRequest(`/api/jobs/${jobId}/assign`, {
-        method: 'PATCH',
-        body: JSON.stringify({ driverId }),
-      });
+      return apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
@@ -169,7 +166,7 @@ export default function DispatcherDashboard() {
                       <div className="flex gap-2 mt-2 flex-wrap">
                         <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
                         <Badge variant="outline">{job.weight}kg</Badge>
-                        {job.isUrgent && <Badge className="bg-red-500 text-white">Urgent</Badge>}
+                        {(job as any).isUrgent && <Badge className="bg-red-500 text-white">Urgent</Badge>}
                       </div>
                     </div>
                   ))}

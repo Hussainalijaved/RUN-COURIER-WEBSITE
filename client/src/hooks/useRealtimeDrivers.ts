@@ -29,7 +29,7 @@ export function useRealtimeDrivers() {
   useEffect(() => {
     if (!user) return;
 
-    const userRole = user.user_metadata?.role;
+    const userRole = (user as any).user_metadata?.role;
     if (userRole !== 'admin' && userRole !== 'dispatcher') return;
 
     const channel = supabase

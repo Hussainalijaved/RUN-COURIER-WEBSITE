@@ -13,6 +13,7 @@ export interface PricingConfig {
     };
   };
   weightSurcharges: { min: number; max: number | null; charge: number }[];
+  centralLondonSurcharge: number;
   multiDropCharge: number;
   returnTripMultiplier: number;
   waitingTimeFreeMinutes: number;
@@ -57,6 +58,7 @@ export const defaultPricingConfig: PricingConfig = {
     { min: 30, max: 50, charge: 20 },
     { min: 50, max: null, charge: 40 },
   ],
+  centralLondonSurcharge: 15,
   multiDropCharge: 3,
   returnTripMultiplier: 0.60,
   waitingTimeFreeMinutes: 10,
@@ -322,6 +324,7 @@ export async function fetchPricingConfig(): Promise<PricingConfig> {
     cachedPricingConfig = {
       vehicles: vehiclesMap,
       weightSurcharges: weightSurcharges.length > 0 ? weightSurcharges : defaultPricingConfig.weightSurcharges,
+      centralLondonSurcharge: parseFloat(pricingSettings.centralLondonSurcharge || '15'),
       multiDropCharge: parseFloat(pricingSettings.multiDropCharge || '5'),
       returnTripMultiplier: parseFloat(pricingSettings.returnTripMultiplier || '0.60'),
       waitingTimeFreeMinutes: pricingSettings.waitingTimeFreeMinutes || 10,

@@ -621,6 +621,7 @@ export class MemStorage implements IStorage {
     const job: Job = {
       id,
       trackingNumber: insertJob.trackingNumber,
+      customerType: (insertJob.customerType || 'individual') as 'individual' | 'business',
       customerId: insertJob.customerId,
       driverId: insertJob.driverId || null,
       dispatcherId: insertJob.dispatcherId || null,

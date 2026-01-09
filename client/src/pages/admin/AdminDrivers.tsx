@@ -79,7 +79,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
 import { useRealtimeDrivers } from '@/hooks/useRealtimeDrivers';
-import type { Driver, User, Document, DocumentStatus } from '@shared/schema';
+import type { Driver, User, Document, DocumentStatus, VehicleType } from '@shared/schema';
 
 interface SupabaseDriver {
   id: string;
@@ -88,6 +88,9 @@ interface SupabaseDriver {
   phone: string | null;
   role: string;
   driverCode: string | null;
+  vehicleType?: string;
+  isAvailable?: boolean;
+  isVerified?: boolean;
   createdAt: string;
 }
 
