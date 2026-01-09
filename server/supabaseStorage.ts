@@ -788,6 +788,7 @@ export class SupabaseStorage implements IStorage {
     const dbJob = {
       tracking_number: insertJob.trackingNumber,
       customer_id: isValidUUID(insertJob.customerId) ? insertJob.customerId : null,
+      customer_type: insertJob.customerType || 'individual',
       driver_id: insertJob.driverId || null,
       dispatcher_id: insertJob.dispatcherId || null,
       vendor_id: insertJob.vendorId || null,
