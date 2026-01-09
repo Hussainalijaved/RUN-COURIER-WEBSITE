@@ -227,6 +227,8 @@ export default function AdminCreateJob() {
   const weight = form.watch('weight');
   const vehicleType = form.watch('vehicleType');
   const isReturnTrip = form.watch('isReturnTrip');
+  const pickupDate = form.watch('pickupDate');
+  const pickupTime = form.watch('pickupTime');
 
   const lastCalculatedRef = useRef<string>('');
 
@@ -289,6 +291,12 @@ export default function AdminCreateJob() {
       // Get all postcodes for congestion check (pickup + all drops)
       const allDropPostcodes = validDrops.map(d => d.postcode);
       
+      // Use scheduled pickup time for rush hour calculation if available
+      let scheduledTime: Date | undefined;
+      if (pickupDate && pickupTime) {
+        scheduledTime = new Date(`${pickupDate}T${pickupTime}`);
+      }
+      
       // Calculate quote with multi-drop pricing
       const quoteResult = calculateQuote(vehicleType as VehicleType, totalDistance, weight || 1, {
         pickupPostcode,
@@ -299,6 +307,7 @@ export default function AdminCreateJob() {
         multiDropDistances: legs.map(l => l.distance),
         isReturnTrip: isReturnTrip || false,
         returnToSameLocation: isReturnTrip || false,
+        scheduledTime,
       });
       
       setQuote(quoteResult);
@@ -326,7 +335,7 @@ export default function AdminCreateJob() {
     }
     
     const calculateQuoteFromFields = async () => {
-      const cacheKey = `${pickupPostcode}-${deliveryPostcode}-${weight}-${vehicleType}-${isReturnTrip}`;
+      const cacheKey = `${pickupPostcode}-${deliveryPostcode}-${weight}-${vehicleType}-${isReturnTrip}-${pickupDate}-${pickupTime}`;
       
       if (cacheKey === lastCalculatedRef.current) {
         return;
@@ -339,12 +348,19 @@ export default function AdminCreateJob() {
           if (distResult) {
             setDistance(distResult.distance);
             
+            // Use scheduled pickup time for rush hour calculation if available
+            let scheduledTime: Date | undefined;
+            if (pickupDate && pickupTime) {
+              scheduledTime = new Date(`${pickupDate}T${pickupTime}`);
+            }
+            
             const quoteResult = calculateQuote(vehicleType as VehicleType, distResult.distance, weight || 1, {
               pickupPostcode,
               deliveryPostcode,
               allDropPostcodes: [deliveryPostcode], // Single delivery for congestion check
               isReturnTrip: isReturnTrip || false,
               returnToSameLocation: isReturnTrip || false,
+              scheduledTime,
             });
             
             setQuote(quoteResult);
@@ -362,7 +378,7 @@ export default function AdminCreateJob() {
 
     const timer = setTimeout(calculateQuoteFromFields, 500);
     return () => clearTimeout(timer);
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, isMultiDropMode]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, isMultiDropMode, pickupDate, pickupTime]);
 
   const createJobMutation = useMutation({
     mutationFn: async (data: CreateJobInput) => {
@@ -462,12 +478,19 @@ export default function AdminCreateJob() {
         if (distResult) {
           setDistance(distResult.distance);
           
+          // Use scheduled pickup time for rush hour calculation if available
+          let scheduledTime: Date | undefined;
+          if (values.pickupDate && values.pickupTime) {
+            scheduledTime = new Date(`${values.pickupDate}T${values.pickupTime}`);
+          }
+          
           const quoteResult = calculateQuote(values.vehicleType as VehicleType, distResult.distance, values.weight || 1, {
             pickupPostcode: values.pickupPostcode,
             deliveryPostcode: values.deliveryPostcode,
             allDropPostcodes: [values.deliveryPostcode], // Single delivery for congestion check
             isReturnTrip: values.isReturnTrip || false,
             returnToSameLocation: values.isReturnTrip || false,
+            scheduledTime,
           });
           
           setQuote(quoteResult);
@@ -1222,7 +1245,9 @@ export default function AdminCreateJob() {
                             <span data-testid="text-base-charge">{formatPrice(quote.baseCharge)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Distance Charge</span>
+                            <span className="text-muted-foreground">
+                              Distance Charge ({distance.toFixed(1)} mi × £{quote.rushHourApplied ? '1.50' : (vehicleType === 'motorbike' ? '1.30' : vehicleType === 'car' ? '1.20' : vehicleType === 'small_van' ? '1.30' : '1.40')}/mi)
+                            </span>
                             <span data-testid="text-distance-charge">{formatPrice(quote.distanceCharge)}</span>
                           </div>
                           {quote.weightSurcharge > 0 && (
