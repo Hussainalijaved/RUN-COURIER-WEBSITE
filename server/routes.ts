@@ -3655,6 +3655,65 @@ export async function registerRoutes(
     res.json(invoice);
   }));
 
+  app.post("/api/invoices", asyncHandler(async (req, res) => {
+    const { insertInvoiceSchema } = await import("@shared/schema");
+    const { z } = await import("zod");
+    
+    const createInvoiceSchema = z.object({
+      customerId: z.string().min(1, "Customer ID is required"),
+      customerName: z.string().min(1, "Customer name is required"),
+      customerEmail: z.string().email("Valid email required"),
+      companyName: z.string().nullable().optional(),
+      businessAddress: z.string().nullable().optional(),
+      vatNumber: z.string().nullable().optional(),
+      subtotal: z.number().min(0, "Subtotal must be non-negative"),
+      vat: z.number().min(0).optional().default(0),
+      total: z.number().min(0, "Total must be non-negative"),
+      dueDate: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid due date"),
+      periodStart: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid period start date"),
+      periodEnd: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid period end date"),
+      jobIds: z.array(z.string()).optional().default([]),
+      notes: z.string().nullable().optional(),
+    });
+    
+    const parseResult = createInvoiceSchema.safeParse(req.body);
+    
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Validation failed", details: parseResult.error.flatten() });
+    }
+    
+    const data = parseResult.data;
+    
+    // Generate invoice number
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const existingInvoices = await storage.getInvoices({});
+    const invoiceCount = existingInvoices.length + 1;
+    const invoiceNumber = `INV-${year}${month}-${String(invoiceCount).padStart(4, '0')}`;
+    
+    const invoice = await storage.createInvoice({
+      invoiceNumber,
+      customerId: data.customerId,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      companyName: data.companyName || null,
+      businessAddress: data.businessAddress || null,
+      vatNumber: data.vatNumber || null,
+      subtotal: String(data.subtotal),
+      vat: String(data.vat),
+      total: String(data.total),
+      status: 'pending',
+      dueDate: new Date(data.dueDate),
+      periodStart: new Date(data.periodStart),
+      periodEnd: new Date(data.periodEnd),
+      jobIds: data.jobIds,
+      notes: data.notes || null,
+    });
+    
+    res.status(201).json(invoice);
+  }));
+
   // Contact form endpoint
   app.post("/api/contact", asyncHandler(async (req, res) => {
     const { name, email, phone, subject, message } = req.body;

@@ -71,6 +71,7 @@ import AdminCreateJob from "@/pages/admin/AdminCreateJob";
 import AdminCustomers from "@/pages/admin/AdminCustomers";
 import AdminDriverPayments from "@/pages/admin/AdminDriverPayments";
 import AdminBusinessQuote from "@/pages/admin/AdminBusinessQuote";
+import AdminInvoices from "@/pages/admin/AdminInvoices";
 
 import CustomerDashboard from "@/pages/customer/CustomerDashboard";
 import CustomerOrders from "@/pages/customer/CustomerOrders";
@@ -215,6 +216,11 @@ function Router() {
       <Route path="/admin/business-quote">
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminBusinessQuote />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/invoices">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminInvoices />
         </ProtectedRoute>
       </Route>
 
