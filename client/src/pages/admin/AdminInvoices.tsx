@@ -118,15 +118,18 @@ export default function AdminInvoices() {
     queryKey: ['/api/invoices'],
   });
 
-  const { data: customers } = useQuery<UserType[]>({
-    queryKey: ['/api/users', { role: 'customer' }],
+  const { data: customers, isLoading: customersLoading } = useQuery<UserType[]>({
+    queryKey: ['/api/users'],
   });
+
+  // Filter to customers only (exclude admins and drivers)
+  const billableCustomers = customers?.filter(c => c.role === 'customer') || [];
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
   });
 
-  const selectedCustomer = customers?.find(c => c.id === watchedCustomerId);
+  const selectedCustomer = billableCustomers.find(c => c.id === watchedCustomerId);
 
   const customerJobs = jobs?.filter(job => 
     job.customerId === watchedCustomerId && 
@@ -374,20 +377,29 @@ export default function AdminInvoices() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Customer</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-customer">
-                            <SelectValue placeholder="Select a customer" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {customers?.filter(c => c.role === 'customer').map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id}>
-                              {customer.companyName || customer.fullName} ({customer.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {customersLoading ? (
+                        <Skeleton className="h-10 w-full" />
+                      ) : billableCustomers.length === 0 ? (
+                        <div className="p-3 border rounded-md bg-yellow-50 text-yellow-800 text-sm">
+                          <AlertCircle className="h-4 w-4 inline mr-2" />
+                          No customers found. Customers need to register and place orders first.
+                        </div>
+                      ) : (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-customer">
+                              <SelectValue placeholder="Select a customer" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {billableCustomers.map((customer) => (
+                              <SelectItem key={customer.id} value={customer.id}>
+                                {customer.companyName || customer.fullName} ({customer.email})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
