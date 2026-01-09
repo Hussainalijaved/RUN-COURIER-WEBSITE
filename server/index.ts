@@ -126,8 +126,13 @@ async function initStripe() {
         .then(() => {
           console.log('Stripe data synced');
         })
-        .catch((err: Error) => {
-          console.error('Error syncing Stripe data:', err);
+        .catch((err: any) => {
+          // Handle common non-critical Stripe sync errors gracefully
+          if (err?.code === 'resource_missing' || err?.message?.includes('No such customer')) {
+            console.warn('[Stripe Sync] Skipped missing resource - this is normal if customers were deleted from Stripe');
+          } else {
+            console.warn('[Stripe Sync] Non-critical sync issue:', err?.message || err);
+          }
         });
     });
   } catch (error) {

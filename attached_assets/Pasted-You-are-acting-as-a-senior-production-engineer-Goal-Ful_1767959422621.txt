@@ -1,0 +1,56 @@
+You are acting as a senior production engineer.
+
+Goal:
+Fully stabilize this project so it builds, publishes, and runs reliably in Replit production with no blocking errors or misleading warnings.
+
+Tasks:
+
+1. Production Safety Audit
+- Scan the entire codebase for any code that can crash a production build.
+- Remove or guard any access to window, document, navigator, google, or browser-only APIs so they never execute during build or SSR.
+- Ensure all such logic runs only after client mount.
+
+2. Environment Variable Hardening
+- Add a single startup validation that checks for:
+  - VITE_SUPABASE_URL
+  - VITE_SUPABASE_ANON_KEY
+  - VITE_GOOGLE_MAPS_API_KEY
+- If any are missing:
+  - Log a clear warning
+  - Disable dependent features
+  - Do NOT crash the app or build.
+
+3. Google Maps Stabilization
+- Refactor Maps usage to:
+  - Load dynamically on the client only
+  - Never execute during build
+  - Gracefully fallback if Maps fails to load
+- Prevent Maps from blocking deployment or runtime.
+
+4. Supabase Consistency
+- Verify Supabase client initialization is production-safe.
+- Ensure no schema or RLS policies are modified.
+- Confirm prod database usage only.
+
+5. Replit Deployment Compatibility
+- Confirm Vite build output is `dist`.
+- Ensure Replit publishing detects a successful build.
+- Remove any development-only database assumptions that can trigger false deployment errors.
+
+6. Logging & Error Clarity
+- Replace vague errors with clear console logs.
+- Silence non-critical dev database warnings where possible.
+- Ensure production logs reflect only real failures.
+
+7. Final Verification
+- Run a production build.
+- Confirm zero build-time crashes.
+- Confirm app loads without blocking errors.
+
+Rules:
+- Do not introduce new features.
+- Do not modify DNS, SSL, or external services.
+- Do not touch mobile code.
+- Make only changes required for stability and successful publishing.
+
+Return only when the app is production-stable and publish-ready.
