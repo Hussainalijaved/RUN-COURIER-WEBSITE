@@ -97,7 +97,7 @@ async function initStripe() {
   const databaseUrl = getConnectionString();
 
   if (!databaseUrl) {
-    console.warn('Database not configured - Stripe integration will be disabled');
+    console.warn('Database not configured - Stripe sync caching will be disabled');
     return;
   }
 
@@ -135,8 +135,18 @@ async function initStripe() {
           }
         });
     });
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
+  } catch (error: any) {
+    // Handle database connection errors gracefully (e.g., Neon endpoint paused)
+    const errorMessage = error?.message || String(error);
+    if (errorMessage.includes('endpoint has been disabled') || 
+        errorMessage.includes('XX000') ||
+        errorMessage.includes('connection') ||
+        errorMessage.includes('ECONNREFUSED')) {
+      console.warn('[Stripe] Database unavailable - Stripe sync caching disabled. Payments will still work via direct API calls.');
+    } else {
+      console.error('Failed to initialize Stripe sync:', errorMessage);
+    }
+    // App continues to run - direct Stripe API calls will still work
   }
 }
 
