@@ -298,7 +298,9 @@ export default function AdminCreateJob() {
       }
       
       // Calculate quote with multi-drop pricing
-      const quoteResult = calculateQuote(vehicleType as VehicleType, totalDistance, weight || 1, {
+      // For multi-drop: pass 0 as base distance since ALL distance is in multiDropDistances
+      // This prevents double-counting the distance
+      const quoteResult = calculateQuote(vehicleType as VehicleType, 0, weight || 1, {
         pickupPostcode,
         deliveryPostcode: validDrops[validDrops.length - 1].postcode,
         allDropPostcodes,
