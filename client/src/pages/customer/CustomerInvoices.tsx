@@ -33,6 +33,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import type { Invoice, Job, InvoiceStatus } from '@shared/schema';
+import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 
 const getStatusBadge = (status: InvoiceStatus) => {
   switch (status) {
@@ -104,6 +105,8 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
           <style>
             body { font-family: Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
             .header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #007BFF; }
+            .company-header { display: flex; align-items: flex-start; gap: 15px; }
+            .company-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; }
             .company-name { font-size: 28px; font-weight: bold; color: #007BFF; margin-bottom: 5px; }
             .company-details { font-size: 11px; color: #666; line-height: 1.6; }
             .invoice-title { font-size: 32px; font-weight: bold; color: #333; text-align: right; }
@@ -173,15 +176,24 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
 
       <div ref={printRef} className="p-6 bg-white text-black">
         <div className="flex justify-between items-start mb-6 pb-4 border-b-4 border-primary">
-          <div>
-            <h1 className="text-2xl font-bold text-primary">{COMPANY_DETAILS.tradingName}</h1>
-            <div className="text-xs text-gray-600 mt-2 leading-relaxed">
-              <p>{COMPANY_DETAILS.name}</p>
-              <p>{COMPANY_DETAILS.address}</p>
-              <p>{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
-              <p>{COMPANY_DETAILS.country}</p>
-              <p className="mt-2">Tel: {COMPANY_DETAILS.phone}</p>
-              <p>Email: {COMPANY_DETAILS.email}</p>
+          <div className="flex items-start gap-4 company-header">
+            <img 
+              src={logoImage} 
+              alt="Run Courier Logo" 
+              className="h-16 w-16 object-contain rounded company-logo"
+              style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '8px' }}
+              data-testid="invoice-logo"
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-primary">{COMPANY_DETAILS.tradingName}</h1>
+              <div className="text-xs text-gray-600 mt-2 leading-relaxed">
+                <p>{COMPANY_DETAILS.name}</p>
+                <p>{COMPANY_DETAILS.address}</p>
+                <p>{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
+                <p>{COMPANY_DETAILS.country}</p>
+                <p className="mt-2">Tel: {COMPANY_DETAILS.phone}</p>
+                <p>Email: {COMPANY_DETAILS.email}</p>
+              </div>
             </div>
           </div>
           <div className="text-right">
