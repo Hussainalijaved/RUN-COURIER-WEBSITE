@@ -76,7 +76,6 @@ const COMPANY_DETAILS = {
   postcode: 'WC2H 9JQ',
   country: 'United Kingdom',
   companyNumber: '12345678',
-  vatNumber: 'GB 123 4567 89',
   phone: '+44 20 7123 4567',
   email: 'accounts@runcourier.co.uk',
   website: 'www.runcourier.co.uk',
@@ -101,14 +100,14 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
       <!DOCTYPE html>
       <html>
         <head>
-          <title>VAT Invoice ${invoice.invoiceNumber}</title>
+          <title>Invoice ${invoice.invoiceNumber}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
             .header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #007BFF; }
             .company-name { font-size: 28px; font-weight: bold; color: #007BFF; margin-bottom: 5px; }
             .company-details { font-size: 11px; color: #666; line-height: 1.6; }
             .invoice-title { font-size: 32px; font-weight: bold; color: #333; text-align: right; }
-            .vat-invoice-label { font-size: 14px; color: #007BFF; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+            .invoice-label { font-size: 14px; color: #007BFF; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
             .invoice-number { font-size: 16px; margin-top: 10px; }
             .addresses { display: flex; justify-content: space-between; margin: 30px 0; }
             .address-block { width: 45%; }
@@ -126,7 +125,6 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             .totals { margin-left: auto; width: 280px; }
             .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; }
             .totals-row.subtotal { border-bottom: 1px solid #ddd; }
-            .totals-row.vat { color: #666; }
             .totals-row.total { border-top: 2px solid #333; font-size: 16px; font-weight: bold; margin-top: 10px; padding-top: 15px; }
             .totals-row.total span:last-child { color: #007BFF; }
             .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; }
@@ -159,7 +157,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
     <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="flex items-center justify-between">
-          <span>VAT Invoice {invoice.invoiceNumber}</span>
+          <span>Invoice {invoice.invoiceNumber}</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleDownloadPDF} data-testid="button-download-pdf">
               <Download className="h-4 w-4 mr-2" />
@@ -187,7 +185,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">VAT Invoice</p>
+            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Invoice</p>
             <h2 className="text-2xl font-bold text-gray-800">{invoice.invoiceNumber}</h2>
             <div className={`mt-3 inline-block px-3 py-1 rounded text-xs font-bold ${
               invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
@@ -206,14 +204,12 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             <p className="text-sm text-gray-600">{COMPANY_DETAILS.address}</p>
             <p className="text-sm text-gray-600">{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
             <p className="text-sm text-gray-600 mt-2">Company No: {COMPANY_DETAILS.companyNumber}</p>
-            <p className="text-sm text-gray-600 font-semibold">VAT No: {COMPANY_DETAILS.vatNumber}</p>
           </div>
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 pb-1 border-b">Bill To</h3>
             <p className="font-semibold text-sm">{invoice.companyName || invoice.customerName}</p>
             <p className="text-sm text-gray-600">{invoice.customerEmail}</p>
             {invoice.businessAddress && <p className="text-sm text-gray-600">{invoice.businessAddress}</p>}
-            {invoice.vatNumber && <p className="text-sm text-gray-600 font-semibold mt-2">VAT No: {invoice.vatNumber}</p>}
           </div>
         </div>
 
@@ -244,7 +240,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Tracking #</th>
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Date</th>
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Description</th>
-              <th className="text-right py-3 px-4 text-xs font-semibold uppercase">Amount (Ex VAT)</th>
+              <th className="text-right py-3 px-4 text-xs font-semibold uppercase">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -269,16 +265,8 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
 
         <div className="flex justify-end">
           <div className="w-72">
-            <div className="flex justify-between py-2 text-sm border-b">
-              <span className="text-gray-600">Subtotal (Ex VAT)</span>
-              <span className="font-medium">{formatPrice(invoice.subtotal)}</span>
-            </div>
-            <div className="flex justify-between py-2 text-sm text-gray-600">
-              <span>VAT @ 20%</span>
-              <span>{formatPrice(invoice.vat || 0)}</span>
-            </div>
-            <div className="flex justify-between py-3 border-t-2 border-gray-800 mt-2">
-              <span className="font-bold text-lg">Total Due (Inc VAT)</span>
+            <div className="flex justify-between py-3 border-t-2 border-gray-800">
+              <span className="font-bold text-lg">Total Due</span>
               <span className="font-bold text-lg text-primary">{formatPrice(invoice.total)}</span>
             </div>
           </div>
@@ -312,7 +300,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
         </div>
 
         <div className="mt-6 text-center text-xs text-gray-400 leading-relaxed">
-          <p>{COMPANY_DETAILS.name} | Registered in England & Wales | Company No: {COMPANY_DETAILS.companyNumber} | VAT No: {COMPANY_DETAILS.vatNumber}</p>
+          <p>{COMPANY_DETAILS.name} | Registered in England & Wales | Company No: {COMPANY_DETAILS.companyNumber}</p>
           <p>Registered Office: {COMPANY_DETAILS.address}, {COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
           <p className="mt-2">Thank you for your business</p>
         </div>

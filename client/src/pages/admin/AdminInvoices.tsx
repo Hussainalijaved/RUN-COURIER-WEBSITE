@@ -176,10 +176,8 @@ export default function AdminInvoices() {
 
   const calculateTotals = () => {
     const selectedJobs = customerJobs.filter(job => selectedJobIds.includes(job.id));
-    const subtotal = selectedJobs.reduce((sum, job) => sum + parseFloat(job.totalPrice), 0);
-    const vat = subtotal * 0.20;
-    const total = subtotal + vat;
-    return { subtotal, vat, total };
+    const total = selectedJobs.reduce((sum, job) => sum + parseFloat(job.totalPrice), 0);
+    return { subtotal: total, vat: 0, total };
   };
 
   const onSubmit = (formData: CreateInvoiceFormData) => {
@@ -537,15 +535,7 @@ export default function AdminInvoices() {
                 <Card>
                   <CardContent className="pt-4">
                     <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span>{formatPrice(subtotal)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">VAT (20%)</span>
-                        <span>{formatPrice(vat)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                      <div className="flex justify-between font-bold text-lg">
                         <span>Total</span>
                         <span>{formatPrice(total)}</span>
                       </div>
