@@ -56,11 +56,16 @@ import { z } from 'zod';
 import type { Invoice, User as UserType, InvoiceStatus, Job } from '@shared/schema';
 
 const createInvoiceFormSchema = z.object({
-  customerId: z.string().min(1, "Please select a customer"),
+  customerId: z.string().min(1, "Please select a customer or Admin Jobs"),
   periodStart: z.string().min(1, "Period start date is required"),
   periodEnd: z.string().min(1, "Period end date is required"),
   dueDate: z.string().min(1, "Due date is required"),
   notes: z.string().optional(),
+  // Fields for admin jobs (manual customer entry)
+  manualCustomerName: z.string().optional(),
+  manualCustomerEmail: z.string().optional(),
+  manualCompanyName: z.string().optional(),
+  manualBusinessAddress: z.string().optional(),
 });
 
 type CreateInvoiceFormData = z.infer<typeof createInvoiceFormSchema>;
@@ -109,6 +114,10 @@ export default function AdminInvoices() {
       periodEnd: '',
       dueDate: '',
       notes: '',
+      manualCustomerName: '',
+      manualCustomerEmail: '',
+      manualCompanyName: '',
+      manualBusinessAddress: '',
     },
   });
 
@@ -130,12 +139,18 @@ export default function AdminInvoices() {
   });
 
   const selectedCustomer = billableCustomers.find(c => c.id === watchedCustomerId);
+  const isAdminJobs = watchedCustomerId === 'admin-jobs';
 
-  const customerJobs = jobs?.filter(job => 
-    job.customerId === watchedCustomerId && 
-    job.status === 'delivered' &&
-    job.paymentStatus !== 'paid'
-  ) || [];
+  // Filter jobs based on selection - either customer jobs or admin-created jobs (no customer)
+  const customerJobs = jobs?.filter(job => {
+    const isDeliveredUnpaid = job.status === 'delivered' && job.paymentStatus !== 'paid';
+    if (isAdminJobs) {
+      // Show jobs created by admin (no customer ID)
+      return !job.customerId && isDeliveredUnpaid;
+    }
+    // Show jobs for the selected customer
+    return job.customerId === watchedCustomerId && isDeliveredUnpaid;
+  }) || [];
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -181,10 +196,6 @@ export default function AdminInvoices() {
   };
 
   const onSubmit = (formData: CreateInvoiceFormData) => {
-    if (!selectedCustomer) {
-      toast({ title: 'Please select a customer', variant: 'destructive' });
-      return;
-    }
     if (selectedJobIds.length === 0) {
       toast({ title: 'Please select at least one job', variant: 'destructive' });
       return;
@@ -192,22 +203,53 @@ export default function AdminInvoices() {
 
     const { subtotal, vat, total } = calculateTotals();
 
-    createInvoiceMutation.mutate({
-      customerId: selectedCustomer.id,
-      customerName: selectedCustomer.fullName,
-      customerEmail: selectedCustomer.email,
-      companyName: selectedCustomer.companyName || null,
-      businessAddress: selectedCustomer.businessAddress || null,
-      vatNumber: selectedCustomer.vatNumber || null,
-      subtotal,
-      vat,
-      total,
-      dueDate: formData.dueDate,
-      periodStart: formData.periodStart,
-      periodEnd: formData.periodEnd,
-      jobIds: selectedJobIds,
-      notes: formData.notes || null,
-    });
+    if (isAdminJobs) {
+      // For admin jobs, use manually entered customer details
+      if (!formData.manualCustomerName || !formData.manualCustomerEmail) {
+        toast({ title: 'Please enter customer name and email', variant: 'destructive' });
+        return;
+      }
+
+      createInvoiceMutation.mutate({
+        customerId: 'admin-jobs',
+        customerName: formData.manualCustomerName,
+        customerEmail: formData.manualCustomerEmail,
+        companyName: formData.manualCompanyName || null,
+        businessAddress: formData.manualBusinessAddress || null,
+        vatNumber: null,
+        subtotal,
+        vat,
+        total,
+        dueDate: formData.dueDate,
+        periodStart: formData.periodStart,
+        periodEnd: formData.periodEnd,
+        jobIds: selectedJobIds,
+        notes: formData.notes || null,
+      });
+    } else {
+      // For regular customers
+      if (!selectedCustomer) {
+        toast({ title: 'Please select a customer', variant: 'destructive' });
+        return;
+      }
+
+      createInvoiceMutation.mutate({
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.fullName,
+        customerEmail: selectedCustomer.email,
+        companyName: selectedCustomer.companyName || null,
+        businessAddress: selectedCustomer.businessAddress || null,
+        vatNumber: null,
+        subtotal,
+        vat,
+        total,
+        dueDate: formData.dueDate,
+        periodStart: formData.periodStart,
+        periodEnd: formData.periodEnd,
+        jobIds: selectedJobIds,
+        notes: formData.notes || null,
+      });
+    }
   };
 
   const toggleJobSelection = (jobId: string) => {
@@ -390,6 +432,9 @@ export default function AdminInvoices() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                            <SelectItem value="admin-jobs">
+                              Admin Jobs (No Customer Linked)
+                            </SelectItem>
                             {billableCustomers.map((customer) => (
                               <SelectItem key={customer.id} value={customer.id}>
                                 {customer.companyName || customer.fullName} ({customer.email})
@@ -421,12 +466,68 @@ export default function AdminInvoices() {
                             <p className="font-medium">{selectedCustomer.companyName}</p>
                           </div>
                         )}
-                        {selectedCustomer.vatNumber && (
-                          <div>
-                            <p className="text-muted-foreground">VAT Number</p>
-                            <p className="font-medium">{selectedCustomer.vatNumber}</p>
-                          </div>
-                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {isAdminJobs && (
+                  <Card>
+                    <CardContent className="pt-4 space-y-4">
+                      <p className="text-sm text-muted-foreground">Enter customer details for this invoice:</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="manualCustomerName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Customer Name *</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Customer name" data-testid="input-manual-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="manualCustomerEmail"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email *</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="email" placeholder="customer@email.com" data-testid="input-manual-email" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="manualCompanyName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Company Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Company name (optional)" data-testid="input-manual-company" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="manualBusinessAddress"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Business Address</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Business address (optional)" data-testid="input-manual-address" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
                     </CardContent>
                   </Card>
@@ -510,7 +611,11 @@ export default function AdminInvoices() {
 
                 {watchedCustomerId && customerJobs.length === 0 && (
                   <div className="text-center py-6 border rounded-md">
-                    <p className="text-muted-foreground">No unpaid delivered jobs for this customer</p>
+                    <p className="text-muted-foreground">
+                      {isAdminJobs 
+                        ? 'No unpaid delivered admin jobs found' 
+                        : 'No unpaid delivered jobs for this customer'}
+                    </p>
                   </div>
                 )}
 
