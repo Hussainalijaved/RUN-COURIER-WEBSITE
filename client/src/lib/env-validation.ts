@@ -1,3 +1,5 @@
+import { isBrowser } from './browser';
+
 type EnvValidationResult = {
   isValid: boolean;
   missingVars: string[];
@@ -13,9 +15,15 @@ const OPTIONAL_ENV_VARS = [
   'VITE_GOOGLE_MAPS_API_KEY',
 ] as const;
 
+let validationRun = false;
+
 export function validateEnvironment(): EnvValidationResult {
   const missingVars: string[] = [];
   const warnings: string[] = [];
+
+  if (!isBrowser) {
+    return { isValid: true, missingVars: [], warnings: [] };
+  }
 
   for (const envVar of REQUIRED_ENV_VARS) {
     const value = import.meta.env[envVar];
@@ -39,23 +47,24 @@ export function validateEnvironment(): EnvValidationResult {
 }
 
 export function logEnvironmentStatus(): void {
-  if (typeof window === 'undefined') {
+  if (!isBrowser || validationRun) {
     return;
   }
+  validationRun = true;
 
   const result = validateEnvironment();
 
   if (!result.isValid) {
-    console.error(
-      `%c[CRITICAL] Missing required environment variables:\n${result.missingVars.map(v => `  - ${v}`).join('\n')}\n\nThe application may not function correctly. Please configure these variables in your environment.`,
-      'color: #ff4444; font-weight: bold; font-size: 14px;'
+    console.warn(
+      `%c[WARNING] Missing environment variables:\n${result.missingVars.map(v => `  - ${v}`).join('\n')}\n\nSome features may be limited.`,
+      'color: #ffaa00; font-weight: bold;'
     );
   }
 
   if (result.warnings.length > 0) {
     console.warn(
-      `%c[WARNING] Environment warnings:\n${result.warnings.map(w => `  - ${w}`).join('\n')}`,
-      'color: #ffaa00; font-weight: bold;'
+      `%c[INFO] Environment notes:\n${result.warnings.map(w => `  - ${w}`).join('\n')}`,
+      'color: #6699cc;'
     );
   }
 

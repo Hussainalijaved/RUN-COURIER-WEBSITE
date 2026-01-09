@@ -71,8 +71,8 @@ interface DropPoint {
 
 const createJobSchema = z.object({
   customerType: z.enum(['individual', 'business']).default('individual'),
-  pickupAddress: z.string().min(5, 'Pickup address is required'),
-  pickupPostcode: z.string().min(3, 'Pickup postcode is required'),
+  pickupAddress: z.string().optional().default(''),
+  pickupPostcode: z.string().optional().default(''),
   pickupInstructions: z.string().optional(),
   deliveryAddress: z.string().default(''),
   deliveryPostcode: z.string().default(''),
@@ -82,48 +82,15 @@ const createJobSchema = z.object({
   senderName: z.string().optional(),
   senderPhone: z.string().optional(),
   companyName: z.string().optional(),
-  weight: z.coerce.number().min(0.1, 'Weight must be greater than 0'),
+  weight: z.coerce.number().optional().default(1),
   vehicleType: z.enum(['motorbike', 'car', 'small_van', 'medium_van']),
   isMultiDrop: z.boolean().default(false),
   isReturnTrip: z.boolean().default(false),
   driverId: z.string().optional(),
-  pickupDate: z.string().min(1, 'Pickup date is required'),
-  pickupTime: z.string().min(1, 'Pickup time is required'),
+  pickupDate: z.string().optional().default(''),
+  pickupTime: z.string().optional().default(''),
   deliveryDate: z.string().optional(),
   deliveryTime: z.string().optional(),
-}).superRefine((data, ctx) => {
-  // In single-drop mode, validate delivery fields individually
-  if (!data.isMultiDrop) {
-    if (data.deliveryAddress.length < 5) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Delivery address is required (min 5 characters)',
-        path: ['deliveryAddress'],
-      });
-    }
-    if (data.deliveryPostcode.length < 3) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Delivery postcode is required',
-        path: ['deliveryPostcode'],
-      });
-    }
-    if (data.recipientName.length < 2) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Recipient name is required',
-        path: ['recipientName'],
-      });
-    }
-    if (data.recipientPhone.length < 10) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Valid phone number is required',
-        path: ['recipientPhone'],
-      });
-    }
-  }
-  // In multi-drop mode, delivery fields are optional (handled by drops array)
 });
 
 const getTodayDate = () => {
@@ -516,41 +483,6 @@ export default function AdminCreateJob() {
   };
 
   const onSubmit = (data: CreateJobInput) => {
-    if (!quote && priceOverride === null) {
-      toast({
-        title: 'Quote Required',
-        description: 'Please calculate a quote before creating the job.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Validate multi-drop mode has valid drops with required fields
-    if (isMultiDropMode) {
-      const validDrops = drops.filter(d => d.postcode.trim());
-      if (validDrops.length === 0) {
-        toast({
-          title: 'Drops Required',
-          description: 'Please add at least one delivery drop with a valid postcode.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      // Check each drop has required fields
-      const incompleteDrops = validDrops.filter(d => 
-        !d.address.trim() || !d.recipientName.trim() || !d.recipientPhone.trim()
-      );
-      if (incompleteDrops.length > 0) {
-        toast({
-          title: 'Incomplete Drop Details',
-          description: 'Please fill in address, recipient name and phone for all drops.',
-          variant: 'destructive',
-        });
-        return;
-      }
-    }
-    
     createJobMutation.mutate(data);
   };
 

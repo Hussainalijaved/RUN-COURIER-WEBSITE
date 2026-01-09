@@ -855,25 +855,36 @@ export async function registerRoutes(
     }
     
     // Preprocess data to handle type coercion
+    // ADMIN FLEXIBILITY: Provide defaults for missing required fields
+    const weight = req.body.weight ?? 1;
+    const pickupAddress = req.body.pickupAddress || 'TBC';
+    const pickupPostcode = req.body.pickupPostcode || 'TBC';
+    const deliveryAddress = req.body.deliveryAddress || 'TBC';
+    const deliveryPostcode = req.body.deliveryPostcode || 'TBC';
+    const basePrice = req.body.basePrice ?? '0';
+    const distancePrice = req.body.distancePrice ?? '0';
+    const totalPrice = req.body.totalPrice ?? '0';
+    
     const preprocessedBody = {
       ...req.body,
       trackingNumber,
-      driverId: resolvedDriverId, // Use the resolved user_id
-      // Convert weight to string if it's a number (schema expects decimal as string)
-      weight: typeof req.body.weight === 'number' ? String(req.body.weight) : req.body.weight,
-      // Convert date strings to Date objects
+      driverId: resolvedDriverId,
+      pickupAddress,
+      pickupPostcode,
+      deliveryAddress,
+      deliveryPostcode,
+      weight: typeof weight === 'number' ? String(weight) : weight,
       scheduledPickupTime: req.body.scheduledPickupTime ? new Date(req.body.scheduledPickupTime) : undefined,
       scheduledDeliveryTime: req.body.scheduledDeliveryTime ? new Date(req.body.scheduledDeliveryTime) : undefined,
-      // Convert numeric fields to strings for decimal columns
-      distance: typeof req.body.distance === 'number' ? String(req.body.distance) : req.body.distance,
-      basePrice: typeof req.body.basePrice === 'number' ? String(req.body.basePrice) : req.body.basePrice,
-      distancePrice: typeof req.body.distancePrice === 'number' ? String(req.body.distancePrice) : req.body.distancePrice,
-      weightSurcharge: typeof req.body.weightSurcharge === 'number' ? String(req.body.weightSurcharge) : req.body.weightSurcharge,
-      multiDropCharge: typeof req.body.multiDropCharge === 'number' ? String(req.body.multiDropCharge) : req.body.multiDropCharge,
-      returnTripCharge: typeof req.body.returnTripCharge === 'number' ? String(req.body.returnTripCharge) : req.body.returnTripCharge,
-      centralLondonCharge: typeof req.body.centralLondonCharge === 'number' ? String(req.body.centralLondonCharge) : req.body.centralLondonCharge,
-      waitingTimeCharge: typeof req.body.waitingTimeCharge === 'number' ? String(req.body.waitingTimeCharge) : req.body.waitingTimeCharge,
-      totalPrice: typeof req.body.totalPrice === 'number' ? String(req.body.totalPrice) : req.body.totalPrice,
+      distance: typeof req.body.distance === 'number' ? String(req.body.distance) : (req.body.distance || '0'),
+      basePrice: typeof basePrice === 'number' ? String(basePrice) : basePrice,
+      distancePrice: typeof distancePrice === 'number' ? String(distancePrice) : distancePrice,
+      weightSurcharge: typeof req.body.weightSurcharge === 'number' ? String(req.body.weightSurcharge) : (req.body.weightSurcharge || '0'),
+      multiDropCharge: typeof req.body.multiDropCharge === 'number' ? String(req.body.multiDropCharge) : (req.body.multiDropCharge || '0'),
+      returnTripCharge: typeof req.body.returnTripCharge === 'number' ? String(req.body.returnTripCharge) : (req.body.returnTripCharge || '0'),
+      centralLondonCharge: typeof req.body.centralLondonCharge === 'number' ? String(req.body.centralLondonCharge) : (req.body.centralLondonCharge || '0'),
+      waitingTimeCharge: typeof req.body.waitingTimeCharge === 'number' ? String(req.body.waitingTimeCharge) : (req.body.waitingTimeCharge || '0'),
+      totalPrice: typeof totalPrice === 'number' ? String(totalPrice) : totalPrice,
     };
     
     const data = insertJobSchema.parse(preprocessedBody);
