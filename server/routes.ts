@@ -1015,8 +1015,15 @@ export async function registerRoutes(
       });
       console.log(`[Jobs] New job ${job.id} created and assigned to driver ${job.driverId}`);
     }
-    // Send admin notification
-    await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send job notification:', err));
+    // Send admin notification - include multiDropStops from request for email details
+    const jobWithStops = {
+      ...job,
+      multiDropStops: req.body.multiDropStops || null,
+      returnToSameLocation: req.body.returnToSameLocation ?? true,
+      returnAddress: req.body.returnAddress || null,
+      returnPostcode: req.body.returnPostcode || null,
+    };
+    await sendNewJobNotification(job.id, jobWithStops).catch(err => console.error('Failed to send job notification:', err));
     // Send customer confirmation if email available
     const customerEmail = req.body.customerEmail || (job as any).customerEmail;
     if (customerEmail) {

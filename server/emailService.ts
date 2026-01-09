@@ -345,6 +345,44 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
       </table>
 
       <!-- Delivery Details -->
+      ${jobDetails.isMultiDrop && jobDetails.multiDropStops && jobDetails.multiDropStops.length > 0 ? `
+      <h3 style="color: #28a745; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #28a745; padding-bottom: 8px;">MULTI-DROP DELIVERY (${jobDetails.multiDropStops.length} STOPS)</h3>
+      ${jobDetails.multiDropStops.map((stop: any, index: number) => `
+      <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #28a745;">
+        <h4 style="color: #28a745; margin: 0 0 10px; font-size: 14px;">Stop ${index + 1}</h4>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 5px 0; color: #666; width: 120px; vertical-align: top;"><strong>Postcode:</strong></td>
+            <td style="padding: 5px 0; color: #333;">${stop.postcode || 'N/A'}</td>
+          </tr>
+          ${stop.address ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Address:</strong></td>
+            <td style="padding: 5px 0; color: #333;">${stop.address}</td>
+          </tr>
+          ` : ''}
+          ${stop.recipientName ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Recipient:</strong></td>
+            <td style="padding: 5px 0; color: #333;">${stop.recipientName}</td>
+          </tr>
+          ` : ''}
+          ${stop.recipientPhone ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Phone:</strong></td>
+            <td style="padding: 5px 0; color: #333;"><a href="tel:${stop.recipientPhone}" style="color: #007BFF;">${stop.recipientPhone}</a></td>
+          </tr>
+          ` : ''}
+          ${stop.instructions ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+            <td style="padding: 5px 0; color: #333; font-style: italic;">${stop.instructions}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+      `).join('')}
+      ` : `
       <h3 style="color: #28a745; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #28a745; padding-bottom: 8px;">DELIVERY DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
@@ -382,6 +420,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
         </tr>
         ` : ''}
       </table>
+      `}
 
       <!-- Delivery Options -->
       <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">DELIVERY OPTIONS</h3>
@@ -409,6 +448,22 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
           <td style="padding: 8px 0; color: #666;"><strong>Return Trip:</strong></td>
           <td style="padding: 8px 0; color: #333;">Yes</td>
         </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Return To:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.returnToSameLocation ? 'Same as Pickup' : (jobDetails.returnAddress || jobDetails.returnPostcode || 'Not specified')}</td>
+        </tr>
+        ${!jobDetails.returnToSameLocation && jobDetails.returnPostcode ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Return Postcode:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.returnPostcode}</td>
+        </tr>
+        ` : ''}
+        ${!jobDetails.returnToSameLocation && jobDetails.returnAddress ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Return Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.returnAddress}</td>
+        </tr>
+        ` : ''}
         ` : ''}
         ${jobDetails.isCentralLondon ? `
         <tr>
