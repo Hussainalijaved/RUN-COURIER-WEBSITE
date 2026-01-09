@@ -68,6 +68,24 @@ interface InvoiceWithJobs {
   jobs: Job[];
 }
 
+const COMPANY_DETAILS = {
+  name: 'Run Courier Ltd',
+  tradingName: 'RUN COURIER',
+  address: '71-75 Shelton Street',
+  city: 'London',
+  postcode: 'WC2H 9JQ',
+  country: 'United Kingdom',
+  companyNumber: '12345678',
+  vatNumber: 'GB 123 4567 89',
+  phone: '+44 20 7123 4567',
+  email: 'accounts@runcourier.co.uk',
+  website: 'www.runcourier.co.uk',
+  bankName: 'Barclays Business',
+  accountName: 'Run Courier Ltd',
+  sortCode: '20-00-00',
+  accountNumber: '12345678',
+};
+
 function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs; onClose: () => void }) {
   const printRef = useRef<HTMLDivElement>(null);
   const { invoice, jobs } = invoiceData;
@@ -83,27 +101,42 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Invoice ${invoice.invoiceNumber}</title>
+          <title>VAT Invoice ${invoice.invoiceNumber}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-            .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
-            .logo { font-size: 24px; font-weight: bold; color: #007BFF; }
-            .invoice-title { font-size: 32px; color: #666; }
-            .info-section { margin-bottom: 30px; }
-            .info-row { display: flex; justify-content: space-between; margin-bottom: 20px; }
-            .info-block { width: 48%; }
-            .info-block h3 { font-size: 12px; color: #666; margin-bottom: 8px; text-transform: uppercase; }
-            .info-block p { margin: 4px 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 30px; }
-            th { background: #f5f5f5; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #ddd; }
-            td { padding: 12px; border-bottom: 1px solid #eee; }
-            .totals { margin-top: 30px; text-align: right; }
-            .total-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-            .total-label { width: 150px; text-align: right; padding-right: 20px; }
-            .total-value { width: 100px; text-align: right; }
-            .grand-total { font-size: 20px; font-weight: bold; color: #007BFF; border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; }
-            .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-            .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+            body { font-family: Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
+            .header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #007BFF; }
+            .company-name { font-size: 28px; font-weight: bold; color: #007BFF; margin-bottom: 5px; }
+            .company-details { font-size: 11px; color: #666; line-height: 1.6; }
+            .invoice-title { font-size: 32px; font-weight: bold; color: #333; text-align: right; }
+            .vat-invoice-label { font-size: 14px; color: #007BFF; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+            .invoice-number { font-size: 16px; margin-top: 10px; }
+            .addresses { display: flex; justify-content: space-between; margin: 30px 0; }
+            .address-block { width: 45%; }
+            .address-block h3 { font-size: 11px; color: #666; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+            .address-block p { margin: 4px 0; font-size: 13px; }
+            .invoice-meta { background: #f8f9fa; padding: 15px; margin: 20px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+            .meta-item { text-align: center; }
+            .meta-item label { font-size: 10px; color: #666; text-transform: uppercase; display: block; margin-bottom: 5px; }
+            .meta-item span { font-size: 13px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th { background: #007BFF; color: white; padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; }
+            th:last-child { text-align: right; }
+            td { padding: 12px; border-bottom: 1px solid #eee; font-size: 12px; }
+            td:last-child { text-align: right; }
+            .totals { margin-left: auto; width: 280px; }
+            .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; }
+            .totals-row.subtotal { border-bottom: 1px solid #ddd; }
+            .totals-row.vat { color: #666; }
+            .totals-row.total { border-top: 2px solid #333; font-size: 16px; font-weight: bold; margin-top: 10px; padding-top: 15px; }
+            .totals-row.total span:last-child { color: #007BFF; }
+            .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; }
+            .payment-info { background: #f8f9fa; padding: 20px; margin-top: 20px; }
+            .payment-info h4 { margin: 0 0 15px 0; font-size: 13px; text-transform: uppercase; color: #333; }
+            .payment-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px; }
+            .payment-grid div { display: flex; justify-content: space-between; }
+            .payment-grid label { color: #666; }
+            .legal-footer { margin-top: 30px; font-size: 10px; color: #999; text-align: center; line-height: 1.8; }
+            .status { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
             .status-paid { background: #d4edda; color: #155724; }
             .status-pending { background: #fff3cd; color: #856404; }
             .status-overdue { background: #f8d7da; color: #721c24; }
@@ -126,7 +159,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
     <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="flex items-center justify-between">
-          <span>Invoice {invoice.invoiceNumber}</span>
+          <span>VAT Invoice {invoice.invoiceNumber}</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleDownloadPDF} data-testid="button-download-pdf">
               <Download className="h-4 w-4 mr-2" />
@@ -140,16 +173,23 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
         </DialogTitle>
       </DialogHeader>
 
-      <div ref={printRef} className="p-6 bg-white">
-        <div className="flex justify-between items-start mb-8">
+      <div ref={printRef} className="p-6 bg-white text-black">
+        <div className="flex justify-between items-start mb-6 pb-4 border-b-4 border-primary">
           <div>
-            <h1 className="text-2xl font-bold text-primary">RUN COURIER™</h1>
-            <p className="text-muted-foreground">Professional Courier Services</p>
+            <h1 className="text-2xl font-bold text-primary">{COMPANY_DETAILS.tradingName}</h1>
+            <div className="text-xs text-gray-600 mt-2 leading-relaxed">
+              <p>{COMPANY_DETAILS.name}</p>
+              <p>{COMPANY_DETAILS.address}</p>
+              <p>{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
+              <p>{COMPANY_DETAILS.country}</p>
+              <p className="mt-2">Tel: {COMPANY_DETAILS.phone}</p>
+              <p>Email: {COMPANY_DETAILS.email}</p>
+            </div>
           </div>
           <div className="text-right">
-            <h2 className="text-3xl font-light text-muted-foreground">INVOICE</h2>
-            <p className="text-lg font-semibold">{invoice.invoiceNumber}</p>
-            <div className={`mt-2 inline-block px-3 py-1 rounded-full text-xs font-bold ${
+            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">VAT Invoice</p>
+            <h2 className="text-2xl font-bold text-gray-800">{invoice.invoiceNumber}</h2>
+            <div className={`mt-3 inline-block px-3 py-1 rounded text-xs font-bold ${
               invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
               invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
               'bg-yellow-100 text-yellow-800'
@@ -159,54 +199,67 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-2 gap-8 mb-6">
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Bill To</h3>
-            <p className="font-semibold">{invoice.companyName || invoice.customerName}</p>
-            <p className="text-muted-foreground">{invoice.customerEmail}</p>
-            {invoice.businessAddress && <p className="text-muted-foreground">{invoice.businessAddress}</p>}
-            {invoice.vatNumber && <p className="text-muted-foreground">VAT: {invoice.vatNumber}</p>}
+            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 pb-1 border-b">From</h3>
+            <p className="font-semibold text-sm">{COMPANY_DETAILS.name}</p>
+            <p className="text-sm text-gray-600">{COMPANY_DETAILS.address}</p>
+            <p className="text-sm text-gray-600">{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
+            <p className="text-sm text-gray-600 mt-2">Company No: {COMPANY_DETAILS.companyNumber}</p>
+            <p className="text-sm text-gray-600 font-semibold">VAT No: {COMPANY_DETAILS.vatNumber}</p>
           </div>
-          <div className="text-right">
-            <div className="mb-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Invoice Date</h3>
-              <p>{formatDate(invoice.createdAt)}</p>
-            </div>
-            <div className="mb-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Due Date</h3>
-              <p className={invoice.status === 'overdue' ? 'text-red-600 font-semibold' : ''}>
-                {formatDate(invoice.dueDate)}
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Billing Period</h3>
-              <p>{formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}</p>
-            </div>
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 pb-1 border-b">Bill To</h3>
+            <p className="font-semibold text-sm">{invoice.companyName || invoice.customerName}</p>
+            <p className="text-sm text-gray-600">{invoice.customerEmail}</p>
+            {invoice.businessAddress && <p className="text-sm text-gray-600">{invoice.businessAddress}</p>}
+            {invoice.vatNumber && <p className="text-sm text-gray-600 font-semibold mt-2">VAT No: {invoice.vatNumber}</p>}
           </div>
         </div>
 
-        <table className="w-full mb-8">
+        <div className="bg-gray-50 p-4 mb-6 grid grid-cols-4 gap-4 text-center">
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Invoice Date</p>
+            <p className="font-semibold text-sm">{formatDate(invoice.createdAt)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Due Date</p>
+            <p className={`font-semibold text-sm ${invoice.status === 'overdue' ? 'text-red-600' : ''}`}>
+              {formatDate(invoice.dueDate)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Period Start</p>
+            <p className="font-semibold text-sm">{formatDate(invoice.periodStart)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Period End</p>
+            <p className="font-semibold text-sm">{formatDate(invoice.periodEnd)}</p>
+          </div>
+        </div>
+
+        <table className="w-full mb-6">
           <thead>
-            <tr className="border-b-2">
-              <th className="text-left py-3 text-xs font-semibold text-muted-foreground uppercase">Tracking #</th>
-              <th className="text-left py-3 text-xs font-semibold text-muted-foreground uppercase">Date</th>
-              <th className="text-left py-3 text-xs font-semibold text-muted-foreground uppercase">Route</th>
-              <th className="text-right py-3 text-xs font-semibold text-muted-foreground uppercase">Amount</th>
+            <tr className="bg-primary text-white">
+              <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Tracking #</th>
+              <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Date</th>
+              <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Description</th>
+              <th className="text-right py-3 px-4 text-xs font-semibold uppercase">Amount (Ex VAT)</th>
             </tr>
           </thead>
           <tbody>
             {jobs.length > 0 ? jobs.map((job) => (
               <tr key={job.id} className="border-b">
-                <td className="py-3 font-mono text-sm">{job.trackingNumber}</td>
-                <td className="py-3 text-muted-foreground">{formatDate(job.createdAt)}</td>
-                <td className="py-3 text-muted-foreground text-sm">
-                  {job.pickupPostcode} → {job.deliveryPostcode}
+                <td className="py-3 px-4 font-mono text-xs">{job.trackingNumber}</td>
+                <td className="py-3 px-4 text-gray-600 text-xs">{formatDate(job.createdAt)}</td>
+                <td className="py-3 px-4 text-gray-600 text-xs">
+                  Courier Service: {job.pickupPostcode} → {job.deliveryPostcode}
                 </td>
-                <td className="py-3 text-right font-medium">{formatPrice(job.totalPrice)}</td>
+                <td className="py-3 px-4 text-right font-medium text-sm">{formatPrice(job.totalPrice)}</td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                <td colSpan={4} className="py-8 text-center text-gray-500">
                   No deliveries found for this invoice period
                 </td>
               </tr>
@@ -215,28 +268,53 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
         </table>
 
         <div className="flex justify-end">
-          <div className="w-64">
-            <div className="flex justify-between py-2">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>{formatPrice(invoice.subtotal)}</span>
+          <div className="w-72">
+            <div className="flex justify-between py-2 text-sm border-b">
+              <span className="text-gray-600">Subtotal (Ex VAT)</span>
+              <span className="font-medium">{formatPrice(invoice.subtotal)}</span>
             </div>
-            <div className="flex justify-between py-2">
-              <span className="text-muted-foreground">VAT (20%)</span>
+            <div className="flex justify-between py-2 text-sm text-gray-600">
+              <span>VAT @ 20%</span>
               <span>{formatPrice(invoice.vat || 0)}</span>
             </div>
-            <div className="flex justify-between py-3 border-t-2 border-black mt-2">
-              <span className="font-bold text-lg">Total Due</span>
+            <div className="flex justify-between py-3 border-t-2 border-gray-800 mt-2">
+              <span className="font-bold text-lg">Total Due (Inc VAT)</span>
               <span className="font-bold text-lg text-primary">{formatPrice(invoice.total)}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 pt-6 border-t text-sm text-muted-foreground">
-          <p className="font-semibold mb-2">Payment Information</p>
-          <p>Bank: Barclays Business</p>
-          <p>Account Name: Run Courier Ltd</p>
-          <p>Sort Code: 20-00-00 | Account Number: 12345678</p>
-          <p className="mt-4">Please include invoice number {invoice.invoiceNumber} as payment reference.</p>
+        <div className="mt-8 pt-6 border-t-2">
+          <div className="bg-gray-50 p-4">
+            <h4 className="font-semibold text-sm uppercase text-gray-800 mb-3">Payment Details</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Bank:</span>
+                <span className="font-medium">{COMPANY_DETAILS.bankName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Account Name:</span>
+                <span className="font-medium">{COMPANY_DETAILS.accountName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Sort Code:</span>
+                <span className="font-medium">{COMPANY_DETAILS.sortCode}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Account Number:</span>
+                <span className="font-medium">{COMPANY_DETAILS.accountNumber}</span>
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-gray-600">
+              Please use invoice number <span className="font-bold">{invoice.invoiceNumber}</span> as your payment reference.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 text-center text-xs text-gray-400 leading-relaxed">
+          <p>{COMPANY_DETAILS.name} | Registered in England & Wales | Company No: {COMPANY_DETAILS.companyNumber} | VAT No: {COMPANY_DETAILS.vatNumber}</p>
+          <p>Registered Office: {COMPANY_DETAILS.address}, {COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
+          <p className="mt-2">Thank you for your business</p>
         </div>
       </div>
     </DialogContent>
