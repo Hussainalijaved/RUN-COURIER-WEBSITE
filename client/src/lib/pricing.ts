@@ -125,6 +125,8 @@ export interface QuoteBreakdown {
   congestionZoneCharge: number;
   multiDropCharge: number;
   returnTripCharge: number;
+  waitingTimeCharge: number;
+  waitingTimeMinutes: number;
   rushHourApplied: boolean;
   totalPrice: number;
 }
@@ -144,6 +146,7 @@ export function calculateQuote(
     returnToSameLocation?: boolean;
     returnDistance?: number;
     scheduledTime?: Date;
+    waitingTimeMinutes?: number;
   }
 ): QuoteBreakdown {
   const config = defaultPricingConfig;
@@ -194,8 +197,16 @@ export function calculateQuote(
     }
   }
   
+  // Calculate waiting time charge (first 10 minutes free, then £0.50/min)
+  const waitingTimeMinutes = options.waitingTimeMinutes || 0;
+  let waitingTimeCharge = 0;
+  if (waitingTimeMinutes > config.waitingTimeFreeMinutes) {
+    const chargeableMinutes = waitingTimeMinutes - config.waitingTimeFreeMinutes;
+    waitingTimeCharge = chargeableMinutes * config.waitingTimePerMinute;
+  }
+  
   const totalDistance = distance + totalMultiDropDistance;
-  const totalPrice = subtotalBeforeReturn + returnTripCharge;
+  const totalPrice = subtotalBeforeReturn + returnTripCharge + waitingTimeCharge;
   
   return {
     vehicleType,
@@ -209,6 +220,8 @@ export function calculateQuote(
     congestionZoneCharge,
     multiDropCharge,
     returnTripCharge,
+    waitingTimeCharge,
+    waitingTimeMinutes,
     rushHourApplied: rushHour,
     totalPrice: Math.round(totalPrice * 100) / 100,
   };
@@ -367,6 +380,7 @@ export async function calculateQuoteAsync(
     returnToSameLocation?: boolean;
     returnDistance?: number;
     scheduledTime?: Date;
+    waitingTimeMinutes?: number;
   }
 ): Promise<QuoteBreakdown> {
   const config = await fetchPricingConfig();
@@ -411,8 +425,16 @@ export async function calculateQuoteAsync(
     }
   }
   
+  // Calculate waiting time charge (first 10 minutes free, then £0.50/min)
+  const waitingTimeMinutes = options.waitingTimeMinutes || 0;
+  let waitingTimeCharge = 0;
+  if (waitingTimeMinutes > config.waitingTimeFreeMinutes) {
+    const chargeableMinutes = waitingTimeMinutes - config.waitingTimeFreeMinutes;
+    waitingTimeCharge = chargeableMinutes * config.waitingTimePerMinute;
+  }
+  
   const totalDistance = distance + totalMultiDropDistance;
-  const totalPrice = subtotalBeforeReturn + returnTripCharge;
+  const totalPrice = subtotalBeforeReturn + returnTripCharge + waitingTimeCharge;
   
   return {
     vehicleType,
@@ -426,6 +448,8 @@ export async function calculateQuoteAsync(
     congestionZoneCharge,
     multiDropCharge,
     returnTripCharge,
+    waitingTimeCharge,
+    waitingTimeMinutes,
     rushHourApplied: rushHour,
     totalPrice: Math.round(totalPrice * 100) / 100,
   };
