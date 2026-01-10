@@ -125,66 +125,122 @@ export function useDriverJobs(driverId: string | undefined) {
     queryFn: async () => {
       if (!driverId) return [];
       
-      // CRITICAL: Only fetch driver-safe columns - NEVER use select('*')
-      // Filter out jobs hidden by admin (driver_hidden = true)
-      const { data, error } = await supabase
+      // STEP 1: Get job_assignments for this driver (only sent/accepted - not expired/rejected/cancelled)
+      const { data: assignments } = await supabase
+        .from('job_assignments')
+        .select('job_id, driver_price, status')
+        .eq('driver_id', driverId)
+        .in('status', ['sent', 'accepted', 'pending']);
+      
+      // Create map of job_id -> driver_price from assignments
+      const assignmentPriceMap = new Map<string, number | null>();
+      const assignmentJobIds: string[] = [];
+      for (const a of assignments || []) {
+        assignmentJobIds.push(a.job_id);
+        // Prefer accepted assignments, then sent, then pending
+        const existing = assignmentPriceMap.get(String(a.job_id));
+        if (existing === undefined || a.status === 'accepted') {
+          assignmentPriceMap.set(String(a.job_id), a.driver_price);
+        }
+      }
+      console.log(`[useDriverJobs] Found ${assignmentJobIds.length} job assignments for driver ${driverId}`);
+      
+      // STEP 2: Fetch jobs where driver_id is set directly
+      const { data: directJobs, error: directError } = await supabase
         .from('jobs')
         .select(DRIVER_SAFE_JOB_COLUMNS)
         .eq('driver_id', driverId)
         .or('driver_hidden.is.null,driver_hidden.eq.false')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (directError) {
+        console.error('[useDriverJobs] Error fetching direct jobs:', directError);
+      }
+      
+      let allJobs = directJobs || [];
+      console.log(`[useDriverJobs] Found ${allJobs.length} directly assigned jobs`);
+      
+      // STEP 3: Fetch jobs from assignments (not already in directJobs)
+      if (assignmentJobIds.length > 0) {
+        const existingIds = new Set(allJobs.map(j => String(j.id)));
+        const missingJobIds = assignmentJobIds.filter(id => !existingIds.has(String(id)));
+        
+        if (missingJobIds.length > 0) {
+          const { data: assignedJobs, error: assignedError } = await supabase
+            .from('jobs')
+            .select(DRIVER_SAFE_JOB_COLUMNS)
+            .in('id', missingJobIds)
+            .or('driver_hidden.is.null,driver_hidden.eq.false')
+            .order('created_at', { ascending: false });
+          
+          if (assignedError) {
+            console.error('[useDriverJobs] Error fetching assigned jobs:', assignedError);
+          } else if (assignedJobs) {
+            allJobs = [...allJobs, ...assignedJobs];
+            console.log(`[useDriverJobs] Added ${assignedJobs.length} jobs from assignments, total: ${allJobs.length}`);
+          }
+        }
+      }
+      
+      const data = allJobs;
+      const error = directError;
 
       // SECURITY: Return DriverJob type - never cast to Job which includes customer pricing fields
-      return (data || []).map(job => ({
-        id: job.id,
-        trackingNumber: job.tracking_number,
-        customerId: job.customer_id,
-        driverId: job.driver_id,
-        dispatcherId: job.dispatcher_id,
-        vendorId: job.vendor_id,
-        status: job.status,
-        vehicleType: job.vehicle_type,
-        pickupAddress: job.pickup_address,
-        pickupPostcode: job.pickup_postcode,
-        pickupLatitude: job.pickup_latitude,
-        pickupLongitude: job.pickup_longitude,
-        pickupInstructions: job.pickup_instructions,
-        pickupContactName: job.pickup_contact_name,
-        pickupContactPhone: job.pickup_contact_phone,
-        deliveryAddress: job.delivery_address,
-        deliveryPostcode: job.delivery_postcode,
-        deliveryLatitude: job.delivery_latitude,
-        deliveryLongitude: job.delivery_longitude,
-        deliveryInstructions: job.delivery_instructions,
-        recipientName: job.recipient_name,
-        recipientPhone: job.recipient_phone,
-        senderName: job.sender_name,
-        senderPhone: job.sender_phone,
-        parcelDescription: job.parcel_description,
-        parcelWeight: job.parcel_weight,
-        parcelDimensions: job.parcel_dimensions,
-        weight: job.weight,
-        distance: job.distance,
-        distanceMiles: job.distance_miles,
-        isMultiDrop: job.is_multi_drop,
-        isReturnTrip: job.is_return_trip,
-        isUrgent: job.is_urgent,
-        isFragile: job.is_fragile,
-        requiresSignature: job.requires_signature,
-        // CRITICAL: Use driver_price ONLY - never expose customer pricing
-        driverPrice: job.driver_price,
-        scheduledPickupTime: job.scheduled_pickup_time,
-        estimatedDeliveryTime: job.estimated_delivery_time,
-        actualPickupTime: job.actual_pickup_time,
-        actualDeliveryTime: job.actual_delivery_time,
-        podSignatureUrl: job.pod_signature_url,
-        podPhotoUrl: job.pod_photo_url,
-        podNotes: job.pod_notes,
-        createdAt: job.created_at,
-        updatedAt: job.updated_at,
-      })) as DriverJob[];
+      // IMPORTANT: Use driver_price from assignments when available (more reliable than jobs.driver_price)
+      return (data || []).map(job => {
+        // Get driver_price from assignment if available, fallback to job.driver_price
+        const assignmentPrice = assignmentPriceMap.get(String(job.id));
+        const driverPrice = assignmentPrice !== undefined ? assignmentPrice : job.driver_price;
+        
+        return {
+          id: job.id,
+          trackingNumber: job.tracking_number,
+          customerId: job.customer_id,
+          driverId: job.driver_id,
+          dispatcherId: job.dispatcher_id,
+          vendorId: job.vendor_id,
+          status: job.status,
+          vehicleType: job.vehicle_type,
+          pickupAddress: job.pickup_address,
+          pickupPostcode: job.pickup_postcode,
+          pickupLatitude: job.pickup_latitude,
+          pickupLongitude: job.pickup_longitude,
+          pickupInstructions: job.pickup_instructions,
+          pickupContactName: job.pickup_contact_name,
+          pickupContactPhone: job.pickup_contact_phone,
+          deliveryAddress: job.delivery_address,
+          deliveryPostcode: job.delivery_postcode,
+          deliveryLatitude: job.delivery_latitude,
+          deliveryLongitude: job.delivery_longitude,
+          deliveryInstructions: job.delivery_instructions,
+          recipientName: job.recipient_name,
+          recipientPhone: job.recipient_phone,
+          senderName: job.sender_name,
+          senderPhone: job.sender_phone,
+          parcelDescription: job.parcel_description,
+          parcelWeight: job.parcel_weight,
+          parcelDimensions: job.parcel_dimensions,
+          weight: job.weight,
+          distance: job.distance,
+          distanceMiles: job.distance_miles,
+          isMultiDrop: job.is_multi_drop,
+          isReturnTrip: job.is_return_trip,
+          isUrgent: job.is_urgent,
+          isFragile: job.is_fragile,
+          requiresSignature: job.requires_signature,
+          // CRITICAL: Use driver_price from assignment or job - never expose customer pricing
+          driverPrice: driverPrice,
+          scheduledPickupTime: job.scheduled_pickup_time,
+          estimatedDeliveryTime: job.estimated_delivery_time,
+          actualPickupTime: job.actual_pickup_time,
+          actualDeliveryTime: job.actual_delivery_time,
+          podSignatureUrl: job.pod_signature_url,
+          podPhotoUrl: job.pod_photo_url,
+          podNotes: job.pod_notes,
+          createdAt: job.created_at,
+          updatedAt: job.updated_at,
+        };
+      }) as DriverJob[];
     },
     enabled: !!driverId,
   });

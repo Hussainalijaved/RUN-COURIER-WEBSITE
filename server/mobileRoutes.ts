@@ -711,12 +711,12 @@ export function registerMobileRoutes(app: Express): void {
             enrichedJobs = enrichedJobs.filter(j => 
               ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
             );
-            // For active/pending jobs, require driver_price (driver needs to know earnings)
+            // For active jobs, require driver_price (driver needs to know earnings)
             enrichedJobs = enrichedJobs.filter(j => j.driver_price != null);
           } else if (status === "pending") {
             enrichedJobs = enrichedJobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
-            // For active/pending jobs, require driver_price (driver needs to know earnings)
-            enrichedJobs = enrichedJobs.filter(j => j.driver_price != null);
+            // For pending jobs, show offers even without driver_price (pricing may be pending)
+            // Driver can still see and respond to offers
           } else if (status === "completed") {
             // For history/completed jobs, show ALL jobs regardless of driver_price
             // This ensures drivers can see their full job history
@@ -762,12 +762,11 @@ export function registerMobileRoutes(app: Express): void {
         jobs = jobs.filter(j => 
           ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
         );
-        // For active/pending jobs, require driver_price
+        // For active jobs, require driver_price
         jobs = jobs.filter(j => j.driverPrice != null);
       } else if (status === "pending") {
         jobs = jobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
-        // For active/pending jobs, require driver_price
-        jobs = jobs.filter(j => j.driverPrice != null);
+        // For pending jobs, show offers even without driver_price (pricing may be pending)
       } else if (status === "completed") {
         // For history/completed jobs, show ALL jobs regardless of driver_price
         jobs = jobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
