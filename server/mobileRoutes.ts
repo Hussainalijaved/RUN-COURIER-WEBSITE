@@ -632,22 +632,33 @@ export function registerMobileRoutes(app: Express): void {
             return { ...j, driver_price: driverPrice };
           });
           
-          // Filter out jobs without driver_price (no assignment found)
-          enrichedJobs = enrichedJobs.filter(j => j.driver_price != null);
-          console.log(`[Mobile Jobs] ${enrichedJobs.length} jobs have driver_price set`);
-          
-          // Apply status filters
+          // Apply status filters first
           // "active" = jobs the driver has ACCEPTED and is working on
           // "pending" = job offers waiting for driver to accept/decline
+          // "completed" = job history (delivered, cancelled, failed)
           if (status === "active") {
             enrichedJobs = enrichedJobs.filter(j => 
               ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
             );
+            // For active/pending jobs, require driver_price (driver needs to know earnings)
+            enrichedJobs = enrichedJobs.filter(j => j.driver_price != null);
           } else if (status === "pending") {
             enrichedJobs = enrichedJobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
+            // For active/pending jobs, require driver_price (driver needs to know earnings)
+            enrichedJobs = enrichedJobs.filter(j => j.driver_price != null);
           } else if (status === "completed") {
+            // For history/completed jobs, show ALL jobs regardless of driver_price
+            // This ensures drivers can see their full job history
             enrichedJobs = enrichedJobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
+          } else {
+            // No filter specified - show all jobs but filter by driver_price for non-completed
+            const completedStatuses = ["delivered", "cancelled", "failed"];
+            enrichedJobs = enrichedJobs.filter(j => 
+              completedStatuses.includes(j.status) || j.driver_price != null
+            );
           }
+          
+          console.log(`[Mobile Jobs] ${enrichedJobs.length} jobs after filtering`);
           
           mobileJobs = enrichedJobs.map(mapSupabaseJobToMobileFormat);
           
@@ -671,20 +682,28 @@ export function registerMobileRoutes(app: Express): void {
       
       // Filter out hidden jobs (unless viewing completed/history)
       jobs = jobs.filter(j => (j as any).driverHidden !== true);
-      
-      // CRITICAL: Only show jobs with admin-assigned price
-      jobs = jobs.filter(j => j.driverPrice != null);
 
+      // Apply status filters
       // "active" = jobs the driver has ACCEPTED and is working on
       // "pending" = job offers waiting for driver to accept/decline
+      // "completed" = job history (delivered, cancelled, failed)
       if (status === "active") {
         jobs = jobs.filter(j => 
           ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
         );
+        // For active/pending jobs, require driver_price
+        jobs = jobs.filter(j => j.driverPrice != null);
       } else if (status === "pending") {
         jobs = jobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
+        // For active/pending jobs, require driver_price
+        jobs = jobs.filter(j => j.driverPrice != null);
       } else if (status === "completed") {
-        jobs = jobs.filter(j => ["delivered", "cancelled"].includes(j.status));
+        // For history/completed jobs, show ALL jobs regardless of driver_price
+        jobs = jobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
+      } else {
+        // No filter - show all but require driver_price for non-completed
+        const completedStatuses = ["delivered", "cancelled", "failed"];
+        jobs = jobs.filter(j => completedStatuses.includes(j.status) || j.driverPrice != null);
       }
 
       mobileJobs = jobs.map(job => ({
