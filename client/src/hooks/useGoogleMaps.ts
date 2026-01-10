@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { isGoogleMapsConfigured } from '@/lib/env-validation';
 import { isBrowser, isGoogleMapsLoaded } from '@/lib/browser';
 
@@ -14,10 +14,23 @@ interface UseGoogleMapsResult {
 let googleMapsPromise: Promise<void> | null = null;
 let loadAttempts = 0;
 const MAX_LOAD_ATTEMPTS = 3;
+let authFailureDetected = false;
+let authFailureCallbacks: ((error: string) => void)[] = [];
+
+// Google Maps calls this global function when there's an authentication error
+if (typeof window !== 'undefined') {
+  (window as any).gm_authFailure = () => {
+    authFailureDetected = true;
+    const errorMsg = 'Google Maps API key is blocked for this domain. Please add this domain to your API key settings in Google Cloud Console.';
+    console.error('[Google Maps] Auth failure detected:', errorMsg);
+    authFailureCallbacks.forEach(cb => cb(errorMsg));
+  };
+}
 
 function resetLoader(): void {
   googleMapsPromise = null;
   loadAttempts = 0;
+  authFailureDetected = false;
   if (isBrowser) {
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existingScript) {
@@ -90,9 +103,24 @@ async function loadGoogleMaps(): Promise<void> {
 export function useGoogleMaps(): UseGoogleMapsResult {
   const [status, setStatus] = useState<GoogleMapsStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  const handleAuthFailure = useCallback((errorMsg: string) => {
+    if (mountedRef.current) {
+      setStatus('error');
+      setError(errorMsg);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     if (!isBrowser) {
+      return;
+    }
+
+    // Check if auth failure was already detected
+    if (authFailureDetected) {
+      setStatus('error');
+      setError('Google Maps API key is blocked for this domain. Please add this domain to your API key settings in Google Cloud Console.');
       return;
     }
 
@@ -112,7 +140,13 @@ export function useGoogleMaps(): UseGoogleMapsResult {
 
     try {
       await loadGoogleMaps();
-      setStatus('ready');
+      // Check again after loading in case auth failure was triggered
+      if (authFailureDetected) {
+        setStatus('error');
+        setError('Google Maps API key is blocked for this domain. Please add this domain to your API key settings in Google Cloud Console.');
+      } else {
+        setStatus('ready');
+      }
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to load Google Maps');
@@ -125,13 +159,26 @@ export function useGoogleMaps(): UseGoogleMapsResult {
   }, [load]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
+    // Register for auth failure callbacks
+    authFailureCallbacks.push(handleAuthFailure);
+    
     load();
-  }, [load]);
+    
+    return () => {
+      mountedRef.current = false;
+      const index = authFailureCallbacks.indexOf(handleAuthFailure);
+      if (index > -1) {
+        authFailureCallbacks.splice(index, 1);
+      }
+    };
+  }, [load, handleAuthFailure]);
 
   return {
     status,
     error,
-    isReady: status === 'ready',
+    isReady: status === 'ready' && !authFailureDetected,
     retry,
   };
 }
