@@ -538,8 +538,24 @@ export function registerMobileRoutes(app: Express): void {
       if (supabaseAdmin) {
         console.log("[Mobile Jobs] Querying Supabase for jobs (driver-safe columns only)...");
         
-        // First get jobs assigned to this driver
-        const { data: supabaseJobs, error: supabaseError } = await supabaseAdmin
+        // STEP 1: Get ALL job_assignments for this driver first (includes pending/sent offers)
+        const { data: allAssignments, error: assignmentsError } = await supabaseAdmin
+          .from('job_assignments')
+          .select('job_id, driver_price, status')
+          .eq('driver_id', driver.id);
+        
+        if (assignmentsError) {
+          console.log(`[Mobile Jobs] Error fetching assignments:`, assignmentsError.message);
+        }
+        
+        const assignmentJobIds = (allAssignments || []).map(a => String(a.job_id));
+        console.log(`[Mobile Jobs] Found ${allAssignments?.length || 0} job assignments for driver ${driver.id}`);
+        
+        // STEP 2: Get jobs where driver_id is set OR job has an assignment for this driver
+        let supabaseJobs: any[] = [];
+        
+        // Query jobs directly assigned to driver
+        const { data: directJobs, error: directError } = await supabaseAdmin
           .from('jobs')
           .select(`
             id,
@@ -586,26 +602,81 @@ export function registerMobileRoutes(app: Express): void {
           .eq('driver_id', driver.id)
           .order('created_at', { ascending: false });
         
-        if (supabaseError) {
-          console.log("[Mobile Jobs] Supabase query error:", supabaseError.message);
-        } else if (supabaseJobs && supabaseJobs.length > 0) {
-          console.log(`[Mobile Jobs] Found ${supabaseJobs.length} jobs in Supabase for driver ${driver.id}`);
+        if (directError) {
+          console.log("[Mobile Jobs] Supabase direct jobs query error:", directError.message);
+        } else if (directJobs) {
+          supabaseJobs = [...directJobs];
+          console.log(`[Mobile Jobs] Found ${directJobs.length} directly assigned jobs`);
+        }
+        
+        // Also fetch jobs from assignments (for pending/sent offers not yet accepted)
+        if (assignmentJobIds.length > 0) {
+          const { data: assignedJobs, error: assignedError } = await supabaseAdmin
+            .from('jobs')
+            .select(`
+              id,
+              tracking_number,
+              status,
+              driver_price,
+              vehicle_type,
+              priority,
+              pickup_address,
+              pickup_postcode,
+              pickup_latitude,
+              pickup_longitude,
+              pickup_instructions,
+              pickup_contact_name,
+              pickup_contact_phone,
+              delivery_address,
+              delivery_postcode,
+              delivery_latitude,
+              delivery_longitude,
+              delivery_instructions,
+              recipient_name,
+              recipient_phone,
+              sender_name,
+              sender_phone,
+              parcel_description,
+              parcel_weight,
+              parcel_dimensions,
+              distance_miles,
+              scheduled_pickup_time,
+              estimated_delivery_time,
+              actual_pickup_time,
+              actual_delivery_time,
+              pod_signature_url,
+              pod_photo_url,
+              pod_notes,
+              is_multi_drop,
+              is_return_trip,
+              is_urgent,
+              is_fragile,
+              requires_signature,
+              created_at,
+              updated_at
+            `)
+            .in('id', assignmentJobIds.map(id => parseInt(id) || id));
           
-          // Get job_assignments to look up driver_price (more reliable than jobs.driver_price)
-          // IMPORTANT: job_assignments.job_id is TEXT, jobs.id may be INTEGER - convert to strings for comparison
-          const jobIds = supabaseJobs.map(j => String(j.id));
-          console.log(`[Mobile Jobs] Looking up assignments for ${jobIds.length} job IDs:`, jobIds.slice(0, 5));
-          
-          const { data: assignments, error: assignmentsError } = await supabaseAdmin
-            .from('job_assignments')
-            .select('job_id, driver_price, status')
-            .eq('driver_id', driver.id)
-            .in('job_id', jobIds);
-          
-          if (assignmentsError) {
-            console.log(`[Mobile Jobs] Error fetching assignments:`, assignmentsError.message);
+          if (assignedError) {
+            console.log("[Mobile Jobs] Supabase assigned jobs query error:", assignedError.message);
+          } else if (assignedJobs) {
+            // Merge, avoiding duplicates
+            const existingIds = new Set(supabaseJobs.map(j => String(j.id)));
+            for (const job of assignedJobs) {
+              if (!existingIds.has(String(job.id))) {
+                supabaseJobs.push(job);
+              }
+            }
+            console.log(`[Mobile Jobs] Added ${assignedJobs.length} jobs from assignments, total: ${supabaseJobs.length}`);
           }
-          console.log(`[Mobile Jobs] Found ${assignments?.length || 0} matching assignments`);
+        }
+        
+        if (supabaseJobs.length > 0) {
+          console.log(`[Mobile Jobs] Total ${supabaseJobs.length} jobs found for driver ${driver.id}`);
+          
+          // Create assignment map for driver_price lookup
+          const assignments = allAssignments || [];
+          console.log(`[Mobile Jobs] Found ${assignments.length} matching assignments`);
           
           // Create a map of job_id -> assignment with driver_price
           const assignmentMap = new Map<string, { driver_price: number | null, status: string }>();

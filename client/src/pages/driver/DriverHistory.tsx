@@ -37,7 +37,10 @@ export default function DriverHistory() {
   const { data: driver } = useDriver();
   const { data: myJobs, isLoading } = useDriverJobs(driver?.id);
 
-  const completedJobs = myJobs?.filter((j) => j.status === 'delivered') || [];
+  // Include all completed job statuses: delivered, cancelled, failed
+  const completedJobs = myJobs?.filter((j) => 
+    ['delivered', 'cancelled', 'failed'].includes(j.status)
+  ) || [];
   
   const filteredJobs = completedJobs.filter((job) => 
     job.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
