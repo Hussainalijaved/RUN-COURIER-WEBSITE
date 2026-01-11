@@ -3793,20 +3793,81 @@ export async function registerRoutes(
   }));
 
   // Invoice routes for Pay Later customers
+  // Using invoice_payment_tokens as source of truth since invoices table has schema issues
   app.get("/api/invoices", asyncHandler(async (req, res) => {
-    const { customerId, status } = req.query;
-    const invoices = await storage.getInvoices({
-      customerId: customerId as string,
-      status: status as any,
-    });
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.json([]);
+    }
+    
+    const { status } = req.query;
+    let query = supabaseAdmin
+      .from('invoice_payment_tokens')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error || !data) {
+      console.error('[Invoices] Error fetching invoices:', error);
+      return res.json([]);
+    }
+    
+    // Transform invoice_payment_tokens to invoice format for frontend compatibility
+    const invoices = data.map((token: any) => ({
+      id: token.token,
+      invoiceNumber: token.invoice_number,
+      customerName: token.customer_name,
+      customerEmail: token.customer_email,
+      total: token.amount,
+      status: token.status,
+      dueDate: token.due_date,
+      periodStart: token.period_start,
+      periodEnd: token.period_end,
+      notes: token.notes,
+      createdAt: token.created_at,
+      paymentToken: token.token,
+    }));
+    
     res.json(invoices);
   }));
 
   app.get("/api/invoices/:id", asyncHandler(async (req, res) => {
-    const invoice = await storage.getInvoice(req.params.id);
-    if (!invoice) {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
       return res.status(404).json({ error: "Invoice not found" });
     }
+    
+    // Try to find by token (id is actually the token)
+    const { data, error } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .select('*')
+      .eq('token', req.params.id)
+      .single();
+    
+    if (error || !data) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    
+    const invoice = {
+      id: data.token,
+      invoiceNumber: data.invoice_number,
+      customerName: data.customer_name,
+      customerEmail: data.customer_email,
+      total: data.amount,
+      status: data.status,
+      dueDate: data.due_date,
+      periodStart: data.period_start,
+      periodEnd: data.period_end,
+      notes: data.notes,
+      createdAt: data.created_at,
+      paymentToken: data.token,
+    };
+    
     res.json(invoice);
   }));
 
@@ -3819,14 +3880,40 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/invoices/:id", asyncHandler(async (req, res) => {
-    const invoice = await storage.updateInvoice(req.params.id, req.body);
-    // Send admin notification if invoice was created
-    if (invoice && req.body.status) {
-      await sendPaymentNotification(invoice.invoiceNumber, invoice.total, new Date(invoice.dueDate).toLocaleDateString()).catch(err => console.error('Failed to send payment notification:', err));
-    }
-    if (!invoice) {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
       return res.status(404).json({ error: "Invoice not found" });
     }
+    
+    const updateData: any = {};
+    if (req.body.status) updateData.status = req.body.status;
+    
+    const { data, error } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .update(updateData)
+      .eq('token', req.params.id)
+      .select()
+      .single();
+    
+    if (error || !data) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    
+    const invoice = {
+      id: data.token,
+      invoiceNumber: data.invoice_number,
+      customerName: data.customer_name,
+      customerEmail: data.customer_email,
+      total: data.amount,
+      status: data.status,
+      dueDate: data.due_date,
+      periodStart: data.period_start,
+      periodEnd: data.period_end,
+      notes: data.notes,
+      createdAt: data.created_at,
+      paymentToken: data.token,
+    };
+    
     res.json(invoice);
   }));
 
