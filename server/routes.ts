@@ -3825,19 +3825,20 @@ export async function registerRoutes(
       customer_id: null,
       customer_name: token.customer_name,
       customer_email: token.customer_email,
-      company_name: null,
-      business_address: null,
-      subtotal: String(token.amount),
-      vat: '0',
+      company_name: token.company_name || null,
+      business_address: token.business_address || null,
+      vat_number: token.vat_number || null,
+      subtotal: String(token.subtotal || token.amount),
+      vat: String(token.vat || 0),
       total: String(token.amount),
       status: token.status,
       due_date: token.due_date,
       period_start: token.period_start,
       period_end: token.period_end,
-      job_ids: null,
+      job_ids: token.job_ids || null,
       notes: token.notes,
       payment_token: token.token,
-      job_details: null,
+      job_details: token.job_details || null,
       created_at: token.created_at,
     }));
     
@@ -3867,19 +3868,20 @@ export async function registerRoutes(
       customer_id: null,
       customer_name: data.customer_name,
       customer_email: data.customer_email,
-      company_name: null,
-      business_address: null,
-      subtotal: String(data.amount),
-      vat: '0',
+      company_name: data.company_name || null,
+      business_address: data.business_address || null,
+      vat_number: data.vat_number || null,
+      subtotal: String(data.subtotal || data.amount),
+      vat: String(data.vat || 0),
       total: String(data.amount),
       status: data.status,
       due_date: data.due_date,
       period_start: data.period_start,
       period_end: data.period_end,
-      job_ids: null,
+      job_ids: data.job_ids || null,
       notes: data.notes,
       payment_token: data.token,
-      job_details: null,
+      job_details: data.job_details || null,
       created_at: data.created_at,
     };
     
@@ -4016,6 +4018,13 @@ export async function registerRoutes(
     periodStart: string;
     periodEnd: string;
     notes: string | null;
+    companyName?: string | null;
+    businessAddress?: string | null;
+    vatNumber?: string | null;
+    subtotal?: number;
+    vat?: number;
+    jobDetails?: any[];
+    jobIds?: string[];
   }): Promise<boolean> {
     if (!supabaseAdmin) return false;
     const { error } = await supabaseAdmin
@@ -4031,7 +4040,17 @@ export async function registerRoutes(
         period_end: tokenData.periodEnd,
         notes: tokenData.notes,
         status: 'pending',
+        company_name: tokenData.companyName || null,
+        business_address: tokenData.businessAddress || null,
+        vat_number: tokenData.vatNumber || null,
+        subtotal: tokenData.subtotal || tokenData.amount,
+        vat: tokenData.vat || 0,
+        job_details: tokenData.jobDetails ? JSON.stringify(tokenData.jobDetails) : null,
+        job_ids: tokenData.jobIds || null,
       });
+    if (error) {
+      console.error('[Invoice] Error creating payment token:', error);
+    }
     return !error;
   }
   
@@ -4140,6 +4159,13 @@ export async function registerRoutes(
       periodStart: formatDate(data.periodStart),
       periodEnd: formatDate(data.periodEnd),
       notes: fullNotes.trim() || null,
+      companyName: data.companyName,
+      businessAddress: data.businessAddress,
+      vatNumber: data.vatNumber,
+      subtotal: data.subtotal,
+      vat: data.vat,
+      jobDetails: jobDetails,
+      jobIds: data.jobIds,
     });
     
     if (!tokenCreated) {

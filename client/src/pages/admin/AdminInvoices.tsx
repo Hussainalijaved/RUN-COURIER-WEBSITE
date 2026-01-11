@@ -377,11 +377,10 @@ export default function AdminInvoices() {
       case 'paid':
         return <Badge variant="default" className="bg-green-500"><CheckCircle2 className="h-3 w-3 mr-1" />Paid</Badge>;
       case 'pending':
-        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'expired':
       case 'overdue':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Overdue</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Unpaid</Badge>;
     }
   };
 
