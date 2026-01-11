@@ -1098,7 +1098,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
   const content = `
     <div style="text-align: center; margin-bottom: 30px;">
       <h1 style="color: #007BFF; margin: 0; font-size: 32px;">INVOICE</h1>
-      <p style="color: #666; margin: 10px 0 0 0; font-size: 14px;">Run Courier Ltd</p>
+      <p style="color: #666; margin: 10px 0 0 0; font-size: 14px;">RUN COURIER</p>
     </div>
     
     ${customerInfoHtml}

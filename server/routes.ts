@@ -4130,7 +4130,7 @@ export async function registerRoutes(
     if (storedToken) {
       const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
       const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
-      paymentUrl = `${protocol}://${baseUrl}/pay/${storedToken}`;
+      paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${storedToken}`;
     }
     
     // Parse job details from stored JSON (use snake_case from database)
