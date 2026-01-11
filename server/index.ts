@@ -45,6 +45,9 @@ export async function triggerStripeSync() {
   try {
     const { getStripeSync } = await import('./stripeClient');
     const stripeSync = await getStripeSync();
+    if (!stripeSync) {
+      return { status: 'disabled', message: 'Stripe not configured' };
+    }
     await stripeSync.syncBackfill();
     return { status: 'completed' };
   } catch (error: any) {
@@ -129,21 +132,36 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
-      const { runMigrations } = await import('stripe-replit-sync');
       const { getStripeSync } = await import('./stripeClient');
+      const stripeSync = await getStripeSync();
+      
+      if (!stripeSync) {
+        console.log("[BACKGROUND] Stripe sync disabled - not configured");
+        return;
+      }
       
       const databaseUrl = process.env.DATABASE_URL || 
         (process.env.PGHOST ? `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || '5432'}/${process.env.PGDATABASE}` : null);
       
       if (databaseUrl) {
-        await runMigrations({ databaseUrl });
-        const stripeSync = await getStripeSync();
-        const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-        await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`, {
-          enabled_events: ['*'],
-          description: 'Run Courier payment webhook',
-        });
-        console.log("[BACKGROUND] Stripe initialized");
+        try {
+          const { runMigrations } = await import('stripe-replit-sync');
+          await runMigrations({ databaseUrl });
+        } catch (migrationError: any) {
+          console.warn("[BACKGROUND] Stripe migration warning:", migrationError?.message);
+        }
+        
+        try {
+          const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost'}`;
+          await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`, {
+            enabled_events: ['*'],
+            description: 'Run Courier payment webhook',
+          });
+          console.log("[BACKGROUND] Stripe initialized");
+        } catch (webhookError: any) {
+          console.warn("[BACKGROUND] Stripe webhook warning:", webhookError?.message);
+        }
+        
         stripeSync.syncBackfill().catch((e: any) => {
           console.warn("[BACKGROUND] Stripe sync warning:", e?.message);
         });
