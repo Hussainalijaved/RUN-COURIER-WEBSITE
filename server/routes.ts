@@ -4008,11 +4008,11 @@ export async function registerRoutes(
     const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
     const paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${paymentToken}`;
     
-    // Save invoice to Supabase for future reference
+    // Save invoice to Supabase for future reference (use app_invoices to avoid conflict with Stripe)
     const invoiceId = uuidv4();
     if (supabaseAdmin) {
       const { error: saveError } = await supabaseAdmin
-        .from('invoices')
+        .from('app_invoices')
         .insert({
           id: invoiceId,
           invoice_number: invoiceNumber,
