@@ -4004,7 +4004,9 @@ export async function registerRoutes(
     }
     
     // Generate payment URL
-    const paymentUrl = `${BASE_URL}/invoice-pay/${paymentToken}`;
+    const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+    const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+    const paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${paymentToken}`;
     
     // Save invoice to Supabase for future reference
     const invoiceId = uuidv4();
