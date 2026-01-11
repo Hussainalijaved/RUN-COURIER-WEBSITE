@@ -4107,6 +4107,88 @@ export async function registerRoutes(
     }
   }));
 
+  // Resend invoice email to customer
+  app.post("/api/invoices/:id/resend", asyncHandler(async (req, res) => {
+    const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
+    
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    
+    const formatDate = (date: Date | string) => {
+      return new Date(date).toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
+    };
+    
+    // Build payment URL if token exists (use snake_case from database)
+    let paymentUrl = '';
+    const storedToken = (invoice as any).payment_token || (invoice as any).paymentToken;
+    if (storedToken) {
+      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+      paymentUrl = `${protocol}://${baseUrl}/pay/${storedToken}`;
+    }
+    
+    // Parse job details from stored JSON (use snake_case from database)
+    const storedJobDetails = (invoice as any).job_details || (invoice as any).jobDetails;
+    const jobDetails = storedJobDetails 
+      ? (typeof storedJobDetails === 'string' 
+          ? JSON.parse(storedJobDetails) 
+          : storedJobDetails)
+      : [];
+    
+    // Convert total to number for the function
+    const totalAmount = typeof invoice.total === 'string' 
+      ? parseFloat(invoice.total) 
+      : invoice.total;
+    
+    const success = await sendInvoiceToCustomerWithPaymentLink(
+      invoice.customerEmail,
+      invoice.customerName,
+      invoice.invoiceNumber,
+      totalAmount,
+      formatDate(invoice.dueDate),
+      formatDate(invoice.periodStart),
+      formatDate(invoice.periodEnd),
+      invoice.notes,
+      paymentUrl,
+      (invoice as any).companyName,
+      (invoice as any).businessAddress,
+      jobDetails
+    );
+    
+    if (success) {
+      res.json({ 
+        success: true, 
+        message: `Invoice resent to ${invoice.customerEmail}`,
+        customerEmail: invoice.customerEmail 
+      });
+    } else {
+      res.status(500).json({ error: "Failed to resend invoice email" });
+    }
+  }));
+
+  // Update invoice status
+  app.patch("/api/invoices/:id/status", asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    
+    if (!status || !['pending', 'paid', 'overdue', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status value" });
+    }
+    
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    
+    const updated = await storage.updateInvoice(req.params.id, { status });
+    res.json(updated);
+  }));
+
   // Test invoice email endpoint (for testing email delivery without database)
   app.post("/api/test-invoice-email", asyncHandler(async (req, res) => {
     const { email, customerName, invoiceNumber, amount, dueDate, periodStart, periodEnd, notes } = req.body;

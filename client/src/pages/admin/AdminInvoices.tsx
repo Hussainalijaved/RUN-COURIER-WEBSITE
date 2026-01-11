@@ -43,7 +43,24 @@ import {
   FileText,
   Loader2,
   Send,
+  Eye,
+  Mail,
+  Printer,
+  MoreHorizontal,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  RefreshCw,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { queryClient } from '@/lib/queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -94,10 +111,34 @@ interface SentInvoice {
   sentAt: Date;
 }
 
+interface SavedInvoice {
+  id: string;
+  invoice_number: string;
+  customer_id: string | null;
+  customer_name: string;
+  customer_email: string;
+  company_name: string | null;
+  business_address: string | null;
+  subtotal: string;
+  vat: string;
+  total: string;
+  status: string;
+  due_date: string;
+  period_start: string;
+  period_end: string;
+  job_ids: string[] | null;
+  notes: string | null;
+  payment_token: string | null;
+  job_details: string | null;
+  created_at: string;
+}
+
 export default function AdminInvoices() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [sentInvoices, setSentInvoices] = useState<SentInvoice[]>([]);
+  const [viewInvoice, setViewInvoice] = useState<SavedInvoice | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<CreateInvoiceFormData>({
@@ -129,6 +170,11 @@ export default function AdminInvoices() {
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
+  });
+
+  // Fetch saved invoices from database
+  const { data: savedInvoices, isLoading: invoicesLoading, refetch: refetchInvoices } = useQuery<SavedInvoice[]>({
+    queryKey: ['/api/invoices'],
   });
 
   const selectedCustomer = billableCustomers.find(c => c.id === watchedCustomerId);
@@ -167,6 +213,7 @@ export default function AdminInvoices() {
       });
       setCreateDialogOpen(false);
       resetForm();
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
     },
     onError: (error: any) => {
       toast({ 
@@ -176,6 +223,165 @@ export default function AdminInvoices() {
       });
     },
   });
+
+  // Resend invoice mutation
+  const resendInvoiceMutation = useMutation({
+    mutationFn: async (invoice: SavedInvoice) => {
+      const response = await apiRequest('POST', `/api/invoices/${invoice.id}/resend`);
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      toast({ 
+        title: 'Invoice resent successfully', 
+        description: `Invoice sent to ${result.customerEmail}`
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to resend invoice', 
+        description: error?.message || 'Please try again',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  // Mark invoice as paid mutation
+  const markPaidMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const response = await apiRequest('PATCH', `/api/invoices/${invoiceId}/status`, { status: 'paid' });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Invoice marked as paid' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to update invoice', 
+        description: error?.message || 'Please try again',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  // Print invoice function
+  const printInvoice = (invoice: SavedInvoice) => {
+    const jobDetails = invoice.job_details ? JSON.parse(invoice.job_details) : [];
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Please allow popups to print', variant: 'destructive' });
+      return;
+    }
+    
+    const jobsTable = jobDetails.length > 0 ? `
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+        <thead>
+          <tr style="background: #f8f9fa;">
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Tracking</th>
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Pickup</th>
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Delivery</th>
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Date</th>
+            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${jobDetails.map((job: any) => `
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.trackingNumber || 'N/A'}</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 200px;">${job.pickupAddress || 'N/A'}</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 200px;">${job.deliveryAddress || job.recipientName || 'N/A'}</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.scheduledDate || 'N/A'}</td>
+              <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">£${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` : '';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${invoice.invoice_number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
+          .company { font-size: 24px; font-weight: bold; color: #007BFF; }
+          .invoice-title { font-size: 28px; color: #333; text-align: right; }
+          .invoice-number { color: #666; text-align: right; }
+          .details { display: flex; justify-content: space-between; margin-bottom: 30px; }
+          .bill-to, .invoice-info { width: 45%; }
+          .label { color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; }
+          .value { font-size: 14px; margin-bottom: 15px; }
+          .total-section { background: #f8f9fa; padding: 20px; margin-top: 30px; text-align: right; }
+          .total { font-size: 24px; font-weight: bold; color: #007BFF; }
+          .bank-details { margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 8px; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 12px; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company">RUN COURIER</div>
+          <div>
+            <div class="invoice-title">INVOICE</div>
+            <div class="invoice-number">${invoice.invoice_number}</div>
+          </div>
+        </div>
+        <div class="details">
+          <div class="bill-to">
+            <div class="label">Bill To</div>
+            <div class="value" style="font-weight: bold;">${invoice.customer_name}</div>
+            ${invoice.company_name ? `<div class="value">${invoice.company_name}</div>` : ''}
+            ${invoice.business_address ? `<div class="value">${invoice.business_address}</div>` : ''}
+            <div class="value">${invoice.customer_email}</div>
+          </div>
+          <div class="invoice-info">
+            <div class="label">Invoice Date</div>
+            <div class="value">${formatDate(invoice.created_at)}</div>
+            <div class="label">Due Date</div>
+            <div class="value" style="color: #d9534f; font-weight: bold;">${formatDate(invoice.due_date)}</div>
+            <div class="label">Period</div>
+            <div class="value">${formatDate(invoice.period_start)} - ${formatDate(invoice.period_end)}</div>
+          </div>
+        </div>
+        ${jobsTable}
+        ${invoice.notes ? `<div style="background: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 8px;"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
+        <div class="total-section">
+          <div style="margin-bottom: 5px;">Subtotal: ${formatPrice(invoice.subtotal)}</div>
+          <div style="margin-bottom: 10px;">VAT: ${formatPrice(invoice.vat)}</div>
+          <div class="total">Total: ${formatPrice(invoice.total)}</div>
+        </div>
+        <div class="bank-details">
+          <strong>Bank Transfer Details</strong><br>
+          Account Name: RUN COURIER<br>
+          Sort Code: 30-99-50<br>
+          Account Number: 36113363<br>
+          Reference: ${invoice.invoice_number}
+        </div>
+        <div class="footer">
+          RUN COURIER | info@runcourier.co.uk | runcourier.co.uk
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <Badge variant="default" className="bg-green-500"><CheckCircle2 className="h-3 w-3 mr-1" />Paid</Badge>;
+      case 'pending':
+        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'overdue':
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Overdue</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   const resetForm = () => {
     form.reset();
@@ -358,6 +564,223 @@ export default function AdminInvoices() {
             )}
           </CardContent>
         </Card>
+
+        {/* Saved Invoices from Database */}
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Saved Invoices
+                </CardTitle>
+                <CardDescription>
+                  All invoices stored in the database with full history
+                </CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => refetchInvoices()} data-testid="button-refresh-invoices">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {invoicesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : !savedInvoices || savedInvoices.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No invoices found</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Create an invoice to get started
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {savedInvoices.map((invoice) => (
+                      <TableRow key={invoice.id} data-testid={`row-saved-invoice-${invoice.id}`}>
+                        <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
+                        <TableCell className="font-medium">{invoice.customer_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{invoice.customer_email}</TableCell>
+                        <TableCell className="text-right font-medium">{formatPrice(invoice.total)}</TableCell>
+                        <TableCell className="text-muted-foreground">{formatDate(invoice.due_date)}</TableCell>
+                        <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-invoice-actions-${invoice.id}`}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                onClick={() => { setViewInvoice(invoice); setViewDialogOpen(true); }}
+                                data-testid={`menu-view-invoice-${invoice.id}`}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => resendInvoiceMutation.mutate(invoice)}
+                                disabled={resendInvoiceMutation.isPending}
+                                data-testid={`menu-resend-invoice-${invoice.id}`}
+                              >
+                                <Mail className="h-4 w-4 mr-2" />
+                                Resend Email
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => printInvoice(invoice)}
+                                data-testid={`menu-print-invoice-${invoice.id}`}
+                              >
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print Invoice
+                              </DropdownMenuItem>
+                              {invoice.status !== 'paid' && (
+                                <DropdownMenuItem 
+                                  onClick={() => markPaidMutation.mutate(invoice.id)}
+                                  disabled={markPaidMutation.isPending}
+                                  data-testid={`menu-mark-paid-${invoice.id}`}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                                  Mark as Paid
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* View Invoice Dialog */}
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Invoice Details</DialogTitle>
+              <DialogDescription>
+                {viewInvoice?.invoice_number}
+              </DialogDescription>
+            </DialogHeader>
+            {viewInvoice && (
+              <div className="space-y-6 py-4">
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Bill To</h4>
+                    <p className="font-medium">{viewInvoice.customer_name}</p>
+                    {viewInvoice.company_name && <p className="text-sm">{viewInvoice.company_name}</p>}
+                    {viewInvoice.business_address && <p className="text-sm text-muted-foreground">{viewInvoice.business_address}</p>}
+                    <p className="text-sm text-muted-foreground">{viewInvoice.customer_email}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="mb-2">
+                      <span className="text-sm text-muted-foreground">Status: </span>
+                      {getStatusBadge(viewInvoice.status)}
+                    </div>
+                    <p className="text-sm"><span className="text-muted-foreground">Created:</span> {formatDate(viewInvoice.created_at)}</p>
+                    <p className="text-sm"><span className="text-muted-foreground">Due:</span> {formatDate(viewInvoice.due_date)}</p>
+                    <p className="text-sm"><span className="text-muted-foreground">Period:</span> {formatDate(viewInvoice.period_start)} - {formatDate(viewInvoice.period_end)}</p>
+                  </div>
+                </div>
+
+                {viewInvoice.job_details && JSON.parse(viewInvoice.job_details).length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Jobs Included</h4>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tracking</TableHead>
+                            <TableHead>Pickup</TableHead>
+                            <TableHead>Delivery</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-mono text-sm">{job.trackingNumber || 'N/A'}</TableCell>
+                              <TableCell className="text-sm max-w-[200px] break-words">{job.pickupAddress || 'N/A'}</TableCell>
+                              <TableCell className="text-sm max-w-[200px] break-words">{job.deliveryAddress || job.recipientName || 'N/A'}</TableCell>
+                              <TableCell className="text-right font-medium">{formatPrice(job.price)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {viewInvoice.notes && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Notes</h4>
+                    <p className="text-sm p-3 bg-muted rounded-md">{viewInvoice.notes}</p>
+                  </div>
+                )}
+
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatPrice(viewInvoice.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-muted-foreground">VAT</span>
+                    <span>{formatPrice(viewInvoice.vat)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total</span>
+                    <span>{formatPrice(viewInvoice.total)}</span>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">Bank Transfer Details</h4>
+                  <div className="text-sm space-y-1">
+                    <p><span className="text-muted-foreground">Account Name:</span> RUN COURIER</p>
+                    <p><span className="text-muted-foreground">Sort Code:</span> 30-99-50</p>
+                    <p><span className="text-muted-foreground">Account Number:</span> 36113363</p>
+                    <p><span className="text-muted-foreground">Reference:</span> {viewInvoice.invoice_number}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => viewInvoice && printInvoice(viewInvoice)}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+              <Button variant="outline" onClick={() => viewInvoice && resendInvoiceMutation.mutate(viewInvoice)} disabled={resendInvoiceMutation.isPending}>
+                <Mail className="h-4 w-4 mr-2" />
+                Resend
+              </Button>
+              {viewInvoice?.status !== 'paid' && (
+                <Button onClick={() => viewInvoice && markPaidMutation.mutate(viewInvoice.id)} disabled={markPaidMutation.isPending}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Mark Paid
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={createDialogOpen} onOpenChange={(open) => {
           setCreateDialogOpen(open);

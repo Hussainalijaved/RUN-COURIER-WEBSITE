@@ -987,7 +987,7 @@ export async function sendInvoiceToCustomer(
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Account Name:</strong></td>
-          <td style="padding: 5px 0; color: #333;">ROMANIA LTD-RUN COURIER</td>
+          <td style="padding: 5px 0; color: #333;">RUN COURIER</td>
         </tr>
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Sort Code:</strong></td>
@@ -1011,7 +1011,7 @@ export async function sendInvoiceToCustomer(
   `;
 
   const htmlContent = wrapEmailContent(content, 'Invoice');
-  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}PAYMENT METHODS\n\nOption 1: Bank Transfer\nAccount Name: ROMANIA LTD-RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nOption 2: Pay by Card (Stripe)\nPay securely online at: https://runcourier.co.uk/pay\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}PAYMENT METHODS\n\nOption 1: Bank Transfer\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nOption 2: Pay by Card (Stripe)\nPay securely online at: https://runcourier.co.uk/pay\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
@@ -1146,7 +1146,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Account Name:</strong></td>
-          <td style="padding: 5px 0; color: #333;">ROMANIA LTD-RUN COURIER</td>
+          <td style="padding: 5px 0; color: #333;">RUN COURIER</td>
         </tr>
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Sort Code:</strong></td>
@@ -1174,7 +1174,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       `- ${job.trackingNumber}: ${job.pickupAddress.substring(0, 30)}... to ${job.deliveryAddress ? job.deliveryAddress.substring(0, 30) + '...' : job.recipientName || 'N/A'} (${job.scheduledDate}) - £${job.price.toFixed(2)}`
     ).join('\n')}\n` : '';
   
-  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\n${notes ? `Notes: ${notes}\n\n` : ''}PAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: ROMANIA LTD-RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\n${notes ? `Notes: ${notes}\n\n` : ''}PAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
