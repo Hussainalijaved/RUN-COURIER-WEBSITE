@@ -4010,11 +4010,20 @@ export async function registerRoutes(
     
     // Save invoice to Supabase for future reference
     const invoiceId = uuidv4();
+    // System UUID for manual/admin invoices (constant placeholder that satisfies NOT NULL constraint)
+    const SYSTEM_CUSTOMER_ID = '00000000-0000-0000-0000-000000000000';
+    
     if (supabaseAdmin) {
+      // Determine customer_id - use system placeholder for manual invoices
+      const customerId = (data.customerId === 'manual-invoice' || data.customerId === 'admin-jobs' || !data.customerId) 
+        ? SYSTEM_CUSTOMER_ID 
+        : data.customerId;
+      
       // Build insert object - only include columns that exist in the invoices table
       const invoiceRecord: any = {
         id: invoiceId,
         invoice_number: invoiceNumber,
+        customer_id: customerId,
         customer_name: data.customerName,
         customer_email: data.customerEmail,
         company_name: data.companyName || null,
@@ -4031,19 +4040,13 @@ export async function registerRoutes(
         notes: fullNotes.trim() || null,
       };
       
-      // Only add customer_id if it's a valid UUID (not manual-invoice or admin-jobs)
-      const customerId = data.customerId === 'manual-invoice' || data.customerId === 'admin-jobs' ? null : data.customerId;
-      if (customerId) {
-        invoiceRecord.customer_id = customerId;
-      }
-      
       const { error: saveError } = await supabaseAdmin
         .from('invoices')
         .insert(invoiceRecord);
       
       if (saveError) {
         console.error('[Invoice] Failed to save invoice to database:', saveError);
-        console.error('[Invoice] Insert data was:', JSON.stringify(invoiceRecord, null, 2));
+        console.error('[Invoice] Error details:', JSON.stringify(saveError, null, 2));
       } else {
         console.log(`[Invoice] Saved invoice ${invoiceNumber} to database with id ${invoiceId}`);
       }
