@@ -3818,19 +3818,27 @@ export async function registerRoutes(
     }
     
     // Transform invoice_payment_tokens to invoice format for frontend compatibility
+    // Frontend expects snake_case field names
     const invoices = data.map((token: any) => ({
       id: token.token,
-      invoiceNumber: token.invoice_number,
-      customerName: token.customer_name,
-      customerEmail: token.customer_email,
-      total: token.amount,
+      invoice_number: token.invoice_number,
+      customer_id: null,
+      customer_name: token.customer_name,
+      customer_email: token.customer_email,
+      company_name: null,
+      business_address: null,
+      subtotal: String(token.amount),
+      vat: '0',
+      total: String(token.amount),
       status: token.status,
-      dueDate: token.due_date,
-      periodStart: token.period_start,
-      periodEnd: token.period_end,
+      due_date: token.due_date,
+      period_start: token.period_start,
+      period_end: token.period_end,
+      job_ids: null,
       notes: token.notes,
-      createdAt: token.created_at,
-      paymentToken: token.token,
+      payment_token: token.token,
+      job_details: null,
+      created_at: token.created_at,
     }));
     
     res.json(invoices);
@@ -3855,17 +3863,24 @@ export async function registerRoutes(
     
     const invoice = {
       id: data.token,
-      invoiceNumber: data.invoice_number,
-      customerName: data.customer_name,
-      customerEmail: data.customer_email,
-      total: data.amount,
+      invoice_number: data.invoice_number,
+      customer_id: null,
+      customer_name: data.customer_name,
+      customer_email: data.customer_email,
+      company_name: null,
+      business_address: null,
+      subtotal: String(data.amount),
+      vat: '0',
+      total: String(data.amount),
       status: data.status,
-      dueDate: data.due_date,
-      periodStart: data.period_start,
-      periodEnd: data.period_end,
+      due_date: data.due_date,
+      period_start: data.period_start,
+      period_end: data.period_end,
+      job_ids: null,
       notes: data.notes,
-      createdAt: data.created_at,
-      paymentToken: data.token,
+      payment_token: data.token,
+      job_details: null,
+      created_at: data.created_at,
     };
     
     res.json(invoice);
@@ -3901,17 +3916,24 @@ export async function registerRoutes(
     
     const invoice = {
       id: data.token,
-      invoiceNumber: data.invoice_number,
-      customerName: data.customer_name,
-      customerEmail: data.customer_email,
-      total: data.amount,
+      invoice_number: data.invoice_number,
+      customer_id: null,
+      customer_name: data.customer_name,
+      customer_email: data.customer_email,
+      company_name: null,
+      business_address: null,
+      subtotal: String(data.amount),
+      vat: '0',
+      total: String(data.amount),
       status: data.status,
-      dueDate: data.due_date,
-      periodStart: data.period_start,
-      periodEnd: data.period_end,
+      due_date: data.due_date,
+      period_start: data.period_start,
+      period_end: data.period_end,
+      job_ids: null,
       notes: data.notes,
-      createdAt: data.created_at,
-      paymentToken: data.token,
+      payment_token: data.token,
+      job_details: null,
+      created_at: data.created_at,
     };
     
     res.json(invoice);
