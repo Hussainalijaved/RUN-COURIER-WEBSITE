@@ -104,6 +104,7 @@ const formatDate = (date: Date | string | null) => {
 };
 
 interface SentInvoice {
+  id: string;
   invoiceNumber: string;
   customerEmail: string;
   customerName: string;
@@ -200,6 +201,7 @@ export default function AdminInvoices() {
     },
     onSuccess: (result: any, variables: any) => {
       const sentInvoice: SentInvoice = {
+        id: result.id,
         invoiceNumber: result.invoiceNumber,
         customerEmail: result.customerEmail,
         customerName: variables.customerName,
@@ -541,23 +543,97 @@ export default function AdminInvoices() {
                       <TableHead>Email</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead>Sent At</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sentInvoices.map((invoice, index) => (
-                      <TableRow key={index} data-testid={`row-sent-invoice-${index}`}>
-                        <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
-                        <TableCell className="font-medium">{invoice.customerName}</TableCell>
-                        <TableCell className="text-muted-foreground">{invoice.customerEmail}</TableCell>
-                        <TableCell className="text-right font-medium">{formatPrice(invoice.total)}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(invoice.sentAt).toLocaleTimeString('en-GB', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {sentInvoices.map((invoice, index) => {
+                      const fullInvoice = savedInvoices?.find(s => s.id === invoice.id);
+                      return (
+                        <TableRow key={index} data-testid={`row-sent-invoice-${index}`}>
+                          <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
+                          <TableCell className="font-medium">{invoice.customerName}</TableCell>
+                          <TableCell className="text-muted-foreground">{invoice.customerEmail}</TableCell>
+                          <TableCell className="text-right font-medium">{formatPrice(invoice.total)}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(invoice.sentAt).toLocaleTimeString('en-GB', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" data-testid={`button-recent-invoice-actions-${index}`}>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={() => { 
+                                    if (fullInvoice) {
+                                      setViewInvoice(fullInvoice); 
+                                      setViewDialogOpen(true); 
+                                    } else {
+                                      refetchInvoices().then(() => {
+                                        const refreshed = savedInvoices?.find(s => s.id === invoice.id);
+                                        if (refreshed) {
+                                          setViewInvoice(refreshed);
+                                          setViewDialogOpen(true);
+                                        }
+                                      });
+                                    }
+                                  }}
+                                  data-testid={`menu-view-recent-${index}`}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    if (fullInvoice) {
+                                      resendInvoiceMutation.mutate(fullInvoice);
+                                    } else {
+                                      toast({ title: 'Loading invoice...', description: 'Please try again in a moment' });
+                                      refetchInvoices();
+                                    }
+                                  }}
+                                  disabled={resendInvoiceMutation.isPending}
+                                  data-testid={`menu-resend-recent-${index}`}
+                                >
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  Resend Email
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    if (fullInvoice) {
+                                      printInvoice(fullInvoice);
+                                    } else {
+                                      toast({ title: 'Loading invoice...', description: 'Please try again in a moment' });
+                                      refetchInvoices();
+                                    }
+                                  }}
+                                  data-testid={`menu-print-recent-${index}`}
+                                >
+                                  <Printer className="h-4 w-4 mr-2" />
+                                  Print Invoice
+                                </DropdownMenuItem>
+                                {fullInvoice && fullInvoice.status !== 'paid' && (
+                                  <DropdownMenuItem 
+                                    onClick={() => markPaidMutation.mutate(invoice.id)}
+                                    disabled={markPaidMutation.isPending}
+                                    data-testid={`menu-mark-paid-recent-${index}`}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Mark as Paid
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
