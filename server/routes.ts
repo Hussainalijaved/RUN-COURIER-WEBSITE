@@ -4021,16 +4021,14 @@ export async function registerRoutes(
         ? SYSTEM_CUSTOMER_ID 
         : data.customerId;
       
-      // Build insert object - only include columns that exist in the invoices table
+      // Build insert object - ONLY core columns that definitely exist in the database
+      // The Supabase table may be older and missing: business_address, company_name, vat_number
       const invoiceRecord: any = {
         id: invoiceId,
         invoice_number: invoiceNumber,
         customer_id: customerId,
         customer_name: data.customerName,
         customer_email: data.customerEmail,
-        company_name: data.companyName || null,
-        business_address: data.businessAddress || null,
-        vat_number: data.vatNumber || null,
         subtotal: data.subtotal.toString(),
         vat: data.vat.toString(),
         total: data.total.toString(),
