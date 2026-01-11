@@ -3894,6 +3894,43 @@ export async function registerRoutes(
     res.json(result);
   }));
 
+  // Update invoice status (Mark as Paid)
+  app.patch("/api/invoices/:id/status", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Database not available" });
+    }
+    
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: "Status is required" });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .update({ status })
+      .eq('token', req.params.id)
+      .select()
+      .single();
+    
+    if (error || !data) {
+      console.error('[Invoices] Error updating status:', error);
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    
+    const invoice = {
+      id: data.token,
+      invoice_number: data.invoice_number,
+      customer_name: data.customer_name,
+      customer_email: data.customer_email,
+      total: String(data.amount),
+      status: data.status,
+      due_date: data.due_date,
+    };
+    
+    res.json(invoice);
+  }));
+
   app.patch("/api/invoices/:id", asyncHandler(async (req, res) => {
     const { supabaseAdmin } = await import('./supabaseAdmin');
     if (!supabaseAdmin) {
