@@ -214,7 +214,7 @@ export default function AdminInvoices() {
   };
 
   const calculateTotals = () => {
-    const selectedJobs = customerJobs.filter(job => selectedJobIds.includes(job.id));
+    const selectedJobs = customerJobs.filter(job => selectedJobIds.includes(String(job.id)));
     const total = selectedJobs.reduce((sum, job) => {
       const price = job.totalPrice ? parseFloat(job.totalPrice) : 0;
       return sum + (isNaN(price) ? 0 : price);
@@ -312,11 +312,12 @@ export default function AdminInvoices() {
     }
   };
 
-  const toggleJobSelection = (jobId: string) => {
+  const toggleJobSelection = (jobId: string | number) => {
+    const id = String(jobId);
     setSelectedJobIds(prev => 
-      prev.includes(jobId) 
-        ? prev.filter(id => id !== jobId)
-        : [...prev, jobId]
+      prev.includes(id) 
+        ? prev.filter(prevId => prevId !== id)
+        : [...prev, id]
     );
   };
 
@@ -689,34 +690,64 @@ export default function AdminInvoices() {
 
                 {watchedCustomerId && !isManualInvoice && customerJobs.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Select Jobs to Include</Label>
-                    <div className="border rounded-md max-h-48 overflow-y-auto">
-                      {customerJobs.map((job) => (
-                        <div
-                          key={job.id}
-                          className={`flex items-center justify-between p-3 border-b last:border-b-0 cursor-pointer hover-elevate ${
-                            selectedJobIds.includes(job.id) ? 'bg-primary/10' : ''
-                          }`}
-                          onClick={() => toggleJobSelection(job.id)}
-                          data-testid={`job-select-${job.id}`}
+                    <div className="flex items-center justify-between">
+                      <Label>Select Jobs to Include ({selectedJobIds.length} of {customerJobs.length} selected)</Label>
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedJobIds(customerJobs.map(j => String(j.id)))}
+                          data-testid="button-select-all-jobs"
                         >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedJobIds.includes(job.id)}
-                              onChange={() => toggleJobSelection(job.id)}
-                              className="h-4 w-4"
-                            />
-                            <div>
-                              <p className="font-mono text-sm">{job.trackingNumber}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {job.pickupPostcode} → {job.deliveryPostcode}
-                              </p>
+                          Select All
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedJobIds([])}
+                          data-testid="button-deselect-all-jobs"
+                        >
+                          Deselect All
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="border rounded-md max-h-64 overflow-y-auto">
+                      {customerJobs.map((job) => {
+                        const jobIdStr = String(job.id);
+                        const isSelected = selectedJobIds.includes(jobIdStr);
+                        return (
+                          <div
+                            key={job.id}
+                            className={`flex items-center justify-between p-3 border-b last:border-b-0 cursor-pointer hover-elevate ${
+                              isSelected ? 'bg-primary/10' : ''
+                            }`}
+                            onClick={() => toggleJobSelection(job.id)}
+                            data-testid={`job-select-${job.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleJobSelection(job.id)}
+                                className="h-4 w-4"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div>
+                                <p className="font-mono text-sm">{job.trackingNumber}</p>
+                                <p className="text-xs text-muted-foreground truncate max-w-[300px]">
+                                  {job.pickupAddress || `${job.pickupPostcode} → ${job.deliveryPostcode}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(job.createdAt)} - {job.status}
+                                </p>
+                              </div>
                             </div>
+                            <span className="font-medium">{formatPrice(job.totalPrice)}</span>
                           </div>
-                          <span className="font-medium">{formatPrice(job.totalPrice)}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
