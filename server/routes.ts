@@ -4011,34 +4011,41 @@ export async function registerRoutes(
     // Save invoice to Supabase for future reference
     const invoiceId = uuidv4();
     if (supabaseAdmin) {
+      // Build insert object - only include columns that exist in the invoices table
+      const invoiceRecord: any = {
+        id: invoiceId,
+        invoice_number: invoiceNumber,
+        customer_name: data.customerName,
+        customer_email: data.customerEmail,
+        company_name: data.companyName || null,
+        business_address: data.businessAddress || null,
+        vat_number: data.vatNumber || null,
+        subtotal: data.subtotal.toString(),
+        vat: data.vat.toString(),
+        total: data.total.toString(),
+        status: 'pending',
+        due_date: new Date(data.dueDate).toISOString(),
+        period_start: new Date(data.periodStart).toISOString(),
+        period_end: new Date(data.periodEnd).toISOString(),
+        job_ids: data.jobIds,
+        notes: fullNotes.trim() || null,
+      };
+      
+      // Only add customer_id if it's a valid UUID (not manual-invoice or admin-jobs)
+      const customerId = data.customerId === 'manual-invoice' || data.customerId === 'admin-jobs' ? null : data.customerId;
+      if (customerId) {
+        invoiceRecord.customer_id = customerId;
+      }
+      
       const { error: saveError } = await supabaseAdmin
         .from('invoices')
-        .insert({
-          id: invoiceId,
-          invoice_number: invoiceNumber,
-          customer_id: data.customerId === 'manual-invoice' || data.customerId === 'admin-jobs' ? null : data.customerId,
-          customer_name: data.customerName,
-          customer_email: data.customerEmail,
-          company_name: data.companyName || null,
-          business_address: data.businessAddress || null,
-          vat_number: data.vatNumber || null,
-          subtotal: data.subtotal.toString(),
-          vat: data.vat.toString(),
-          total: data.total.toString(),
-          status: 'pending',
-          due_date: new Date(data.dueDate).toISOString(),
-          period_start: new Date(data.periodStart).toISOString(),
-          period_end: new Date(data.periodEnd).toISOString(),
-          job_ids: data.jobIds,
-          notes: fullNotes.trim() || null,
-          payment_token: paymentToken,
-          job_details: jobDetails.length > 0 ? JSON.stringify(jobDetails) : null,
-        });
+        .insert(invoiceRecord);
       
       if (saveError) {
         console.error('[Invoice] Failed to save invoice to database:', saveError);
+        console.error('[Invoice] Insert data was:', JSON.stringify(invoiceRecord, null, 2));
       } else {
-        console.log(`[Invoice] Saved invoice ${invoiceNumber} to database`);
+        console.log(`[Invoice] Saved invoice ${invoiceNumber} to database with id ${invoiceId}`);
       }
     }
     
