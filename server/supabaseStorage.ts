@@ -1449,12 +1449,13 @@ export class SupabaseStorage implements IStorage {
   async getInvoiceWithJobs(id: string): Promise<{ invoice: Invoice; jobs: Job[] } | undefined> {
     const invoice = await this.getInvoice(id);
     if (!invoice) return undefined;
-    const jobs: Job[] = [];
-    if (invoice.jobIds && Array.isArray(invoice.jobIds)) {
-      for (const jobId of invoice.jobIds) {
-        const job = await this.getJob(jobId);
-        if (job) jobs.push(job);
-      }
+    
+    // Fetch all jobs in parallel for better performance
+    let jobs: Job[] = [];
+    if (invoice.jobIds && Array.isArray(invoice.jobIds) && invoice.jobIds.length > 0) {
+      const jobPromises = invoice.jobIds.map(jobId => this.getJob(jobId));
+      const results = await Promise.all(jobPromises);
+      jobs = results.filter((job): job is Job => job !== undefined);
     }
     return { invoice, jobs };
   }
