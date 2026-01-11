@@ -1382,22 +1382,21 @@ export class SupabaseStorage implements IStorage {
 
   async getInvoice(id: string): Promise<Invoice | undefined> {
     const supabase = this.checkSupabase();
-    // Use 'app_invoices' table to avoid conflict with Stripe's 'invoices' table
-    const { data, error } = await supabase.from('app_invoices').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('invoices').select('*').eq('id', id).single();
     if (error || !data) return undefined;
     return mapDbToInvoice(data);
   }
 
   async getInvoiceByNumber(invoiceNumber: string): Promise<Invoice | undefined> {
     const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('app_invoices').select('*').eq('invoice_number', invoiceNumber).single();
+    const { data, error } = await supabase.from('invoices').select('*').eq('invoice_number', invoiceNumber).single();
     if (error || !data) return undefined;
     return mapDbToInvoice(data);
   }
 
   async getInvoices(filters?: { customerId?: string; status?: InvoiceStatus }): Promise<Invoice[]> {
     const supabase = this.checkSupabase();
-    let query = supabase.from('app_invoices').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('invoices').select('*').order('created_at', { ascending: false });
     if (filters?.customerId) query = query.eq('customer_id', filters.customerId);
     if (filters?.status) query = query.eq('status', filters.status);
     const { data, error } = await query;
@@ -1428,8 +1427,7 @@ export class SupabaseStorage implements IStorage {
       job_ids: invoice.jobIds || null,
       notes: invoice.notes || null,
     };
-    // Use 'app_invoices' table to avoid conflict with Stripe's 'invoices' table
-    const { data, error } = await supabase.from('app_invoices').insert(dbInvoice).select().single();
+    const { data, error } = await supabase.from('invoices').insert(dbInvoice).select().single();
     if (error) {
       console.error('Invoice creation error:', error);
       throw error;
@@ -1443,7 +1441,7 @@ export class SupabaseStorage implements IStorage {
     if (data.status !== undefined) dbData.status = data.status;
     if (data.paidAt !== undefined) dbData.paid_at = data.paidAt;
     if (data.notes !== undefined) dbData.notes = data.notes;
-    const { data: updated, error } = await supabase.from('app_invoices').update(dbData).eq('id', id).select().single();
+    const { data: updated, error } = await supabase.from('invoices').update(dbData).eq('id', id).select().single();
     if (error || !updated) return undefined;
     return mapDbToInvoice(updated);
   }
