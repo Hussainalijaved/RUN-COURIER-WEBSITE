@@ -189,25 +189,31 @@ export default function InvoicePayment() {
   useEffect(() => {
     const loadInvoice = async () => {
       try {
-        const response = await fetch(`/api/invoice-pay/${token}`);
-        if (!response.ok) {
-          const data = await response.json();
+        // Run both API calls in parallel for faster loading
+        const [invoiceResponse, intentResponse] = await Promise.all([
+          fetch(`/api/invoice-pay/${token}`),
+          fetch(`/api/invoice-pay/${token}/create-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          })
+        ]);
+
+        if (!invoiceResponse.ok) {
+          const data = await invoiceResponse.json();
           throw new Error(data.error || 'Failed to load invoice');
         }
-        const data = await response.json();
-        setInvoiceData(data);
-
-        const intentResponse = await fetch(`/api/invoice-pay/${token}/create-payment-intent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
         
         if (!intentResponse.ok) {
           const intentData = await intentResponse.json();
           throw new Error(intentData.error || 'Failed to initialize payment');
         }
+
+        const [invoiceData, intentData] = await Promise.all([
+          invoiceResponse.json(),
+          intentResponse.json()
+        ]);
         
-        const intentData = await intentResponse.json();
+        setInvoiceData(invoiceData);
         setClientSecret(intentData.clientSecret);
         setPaymentIntentId(intentData.paymentIntentId);
       } catch (err: any) {
