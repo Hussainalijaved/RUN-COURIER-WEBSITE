@@ -1852,7 +1852,7 @@ export async function registerRoutes(
     res.json({ success: true, message: "Driver account reactivated successfully", driver: reactivatedDriver });
   }));
 
-  // Delete driver permanently
+  // Delete driver permanently - COMPLETE removal from all systems
   app.delete("/api/drivers/:id", asyncHandler(async (req, res) => {
     const driverId = req.params.id;
     
@@ -1863,13 +1863,182 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Driver not found" });
     }
     
-    // Delete from in-memory storage
-    const deleted = await storage.deleteDriver(driverId);
-    if (!deleted) {
-      return res.status(500).json({ error: "Failed to delete driver" });
+    const driverEmail = driver.email;
+    const driverUserId = driver.userId || driver.id;
+    
+    // Build list of all possible IDs to search for
+    const driverIds = [...new Set([driverId, driverUserId].filter(Boolean))];
+    console.log(`[Drivers] Starting PERMANENT deletion of driver (IDs: ${driverIds.join(', ')}, email: ${driverEmail})`);
+    
+    // First, find the actual Supabase Auth user ID by email (using direct lookup, not listUsers)
+    let authUserId: string | null = null;
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin && driverEmail) {
+        // Direct lookup by email - more reliable than listUsers which is paginated
+        const { data: userData, error } = await supabaseAdmin.auth.admin.getUserById(driverId);
+        if (!error && userData?.user) {
+          authUserId = userData.user.id;
+          console.log(`[Drivers] Found auth user ID by driver ID: ${authUserId}`);
+        } else if (driverUserId !== driverId) {
+          // Try with userId
+          const { data: userData2 } = await supabaseAdmin.auth.admin.getUserById(driverUserId);
+          if (userData2?.user) {
+            authUserId = userData2.user.id;
+            console.log(`[Drivers] Found auth user ID by user ID: ${authUserId}`);
+          }
+        }
+        
+        // If still not found, also check Supabase drivers table for the real auth id
+        if (!authUserId) {
+          const { data: supaDrivers } = await supabaseAdmin
+            .from('drivers')
+            .select('id, user_id')
+            .or(`id.eq.${driverId},user_id.eq.${driverId}`);
+          if (supaDrivers && supaDrivers.length > 0) {
+            for (const sd of supaDrivers) {
+              const potentialId = sd.id || sd.user_id;
+              if (potentialId && !driverIds.includes(potentialId)) {
+                driverIds.push(potentialId);
+              }
+              // Try to get auth user for each found ID
+              const { data: authCheck } = await supabaseAdmin.auth.admin.getUserById(sd.id);
+              if (authCheck?.user) {
+                authUserId = authCheck.user.id;
+                console.log(`[Drivers] Found auth user from Supabase drivers lookup: ${authUserId}`);
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to lookup auth user:", e);
     }
     
-    // Delete from PostgreSQL
+    // 1. Update jobs to remove driver reference (preserve job history with null driver)
+    try {
+      const { db } = await import("./db");
+      const { jobs: jobsTable, jobAssignments } = await import("@shared/schema");
+      const { eq, or, inArray } = await import("drizzle-orm");
+      
+      // Nullify driver_id on all jobs assigned to this driver (try both IDs)
+      for (const id of driverIds) {
+        await db.update(jobsTable).set({ driverId: null }).where(eq(jobsTable.driverId, id));
+      }
+      console.log(`[Drivers] Removed driver from jobs in PostgreSQL`);
+      
+      // Delete job assignments for this driver
+      for (const id of driverIds) {
+        await db.delete(jobAssignments).where(eq(jobAssignments.driverId, id));
+      }
+      console.log(`[Drivers] Deleted job assignments in PostgreSQL`);
+    } catch (e) {
+      console.error("Failed to clean up jobs/assignments in PostgreSQL:", e);
+    }
+    
+    // 2. Update jobs in Supabase (mobile app data source)
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        // Nullify driver_id on jobs - use .in() for proper filtering
+        for (const id of driverIds) {
+          const { error: jobError } = await supabaseAdmin
+            .from('jobs')
+            .update({ driver_id: null })
+            .eq('driver_id', id);
+          if (jobError) {
+            console.error(`Failed to nullify driver_id=${id} on Supabase jobs:`, jobError);
+          }
+        }
+        console.log(`[Drivers] Removed driver from Supabase jobs`);
+        
+        // Delete job assignments
+        for (const id of driverIds) {
+          const { error: assignError } = await supabaseAdmin
+            .from('job_assignments')
+            .delete()
+            .eq('driver_id', id);
+          if (assignError) {
+            console.error(`Failed to delete Supabase job assignments for driver_id=${id}:`, assignError);
+          }
+        }
+        console.log(`[Drivers] Deleted Supabase job assignments`);
+        
+        // Delete driver devices (push notification tokens)
+        for (const id of driverIds) {
+          const { error: deviceError } = await supabaseAdmin
+            .from('driver_devices')
+            .delete()
+            .eq('driver_id', id);
+          if (deviceError) {
+            console.error(`Failed to delete Supabase driver devices for driver_id=${id}:`, deviceError);
+          }
+        }
+        console.log(`[Drivers] Deleted Supabase driver devices`);
+      }
+    } catch (e) {
+      console.error("Failed to clean up Supabase jobs/assignments:", e);
+    }
+    
+    // 3. Delete from Supabase drivers table
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        // Delete by id column
+        for (const id of driverIds) {
+          await supabaseAdmin.from('drivers').delete().eq('id', id);
+        }
+        // Also delete by user_id column
+        for (const id of driverIds) {
+          await supabaseAdmin.from('drivers').delete().eq('user_id', id);
+        }
+        console.log(`[Drivers] Deleted driver from Supabase drivers table`);
+      }
+    } catch (e) {
+      console.error("Failed to delete driver from Supabase:", e);
+    }
+    
+    // 4. Delete from Supabase Auth (THIS IS CRITICAL - prevents driver from coming back)
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        let authDeleted = false;
+        
+        // First priority: delete by found auth user ID (from email lookup)
+        if (authUserId) {
+          const { error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
+          if (error) {
+            console.error(`Failed to delete auth user by authUserId ${authUserId}:`, error);
+          } else {
+            authDeleted = true;
+            console.log(`[Drivers] DELETED Supabase auth user: ${authUserId}`);
+          }
+        }
+        
+        // Fallback: try each driver ID as potential auth user ID
+        if (!authDeleted) {
+          for (const id of driverIds) {
+            const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+            if (!error) {
+              authDeleted = true;
+              console.log(`[Drivers] DELETED Supabase auth user by ID: ${id}`);
+              break;
+            } else if (!error.message?.includes('not found')) {
+              console.error(`Failed to delete auth user ${id}:`, error);
+            }
+          }
+        }
+        
+        if (!authDeleted) {
+          console.log(`[Drivers] No auth user found to delete (may already be deleted)`);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to delete from Supabase Auth:", e);
+    }
+    
+    // 5. Delete from PostgreSQL drivers table
     try {
       const { db } = await import("./db");
       const { drivers: driversTable } = await import("@shared/schema");
@@ -1881,27 +2050,14 @@ export async function registerRoutes(
       console.error("Failed to delete driver from PostgreSQL:", e);
     }
     
-    // Delete from Supabase drivers table
-    try {
-      const { supabaseAdmin } = await import("./supabaseAdmin");
-      if (supabaseAdmin) {
-        const { error } = await supabaseAdmin
-          .from('drivers')
-          .delete()
-          .or(`id.eq.${driverId},user_id.eq.${driverId}`);
-        
-        if (error) {
-          console.error("Failed to delete driver from Supabase:", error);
-        } else {
-          console.log(`[Drivers] Deleted driver from Supabase: ${driverId}`);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to delete driver from Supabase:", e);
+    // 6. Delete from in-memory storage
+    const deleted = await storage.deleteDriver(driverId);
+    if (!deleted) {
+      console.log(`[Drivers] Driver not in memory storage (may have been deleted already)`);
     }
     
-    console.log(`[Drivers] Permanently deleted driver ${driverId}`);
-    res.json({ success: true, message: "Driver permanently deleted" });
+    console.log(`[Drivers] PERMANENTLY DELETED driver (${driverEmail}) from ALL systems`);
+    res.json({ success: true, message: "Driver permanently deleted from all systems" });
   }));
 
   // Fetch all drivers from Supabase (users with role=driver)

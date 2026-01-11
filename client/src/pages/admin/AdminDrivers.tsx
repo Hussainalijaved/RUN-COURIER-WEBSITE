@@ -1589,9 +1589,17 @@ export default function AdminDrivers() {
                     <p className="text-sm text-muted-foreground">{getDriverInfo(driverToDelete).email}</p>
                   </div>
                 </div>
-                <p className="text-sm text-red-600 mt-3 font-medium">
-                  Warning: This will permanently remove the driver from the system. All data associated with this driver will be lost.
-                </p>
+                <div className="mt-3 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-sm text-red-600 dark:text-red-400 font-semibold">
+                    PERMANENT DELETION WARNING
+                  </p>
+                  <ul className="text-sm text-red-600 dark:text-red-400 mt-2 space-y-1 list-disc pl-4">
+                    <li>Driver will be removed from ALL systems</li>
+                    <li>Login account will be deleted permanently</li>
+                    <li>Driver will NOT be able to sign in again</li>
+                    <li>This action CANNOT be undone</li>
+                  </ul>
+                </div>
               </div>
             )}
             <DialogFooter className="gap-2">
