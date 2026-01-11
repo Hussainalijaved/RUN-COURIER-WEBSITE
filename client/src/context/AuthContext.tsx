@@ -45,12 +45,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const initAuth = async () => {
+      // Add timeout to prevent infinite loading if Supabase is slow/unreachable
+      const authTimeout = setTimeout(() => {
+        if (mounted && loading) {
+          console.warn('[Auth] Session check timed out after 5s, continuing without auth');
+          setLoading(false);
+        }
+      }, 5000);
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        clearTimeout(authTimeout);
         if (mounted && session?.user) {
           setUser(extractUserFromSession(session));
         }
       } catch (error) {
+        clearTimeout(authTimeout);
         console.error('Auth init error:', error);
       } finally {
         if (mounted) {
@@ -61,23 +71,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    try {
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted) return;
 
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setLoading(false);
-        } else if (session?.user) {
-          setUser(extractUserFromSession(session));
-          setLoading(false);
+          if (event === 'SIGNED_OUT') {
+            setUser(null);
+            setLoading(false);
+          } else if (session?.user) {
+            setUser(extractUserFromSession(session));
+            setLoading(false);
+          }
         }
-      }
-    );
+      );
+      subscription = data.subscription;
+    } catch (error) {
+      console.error('[Auth] Failed to setup auth listener:', error);
+    }
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 

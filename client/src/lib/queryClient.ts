@@ -8,15 +8,22 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// Get Supabase access token for authenticated API requests
+// Get Supabase access token for authenticated API requests with timeout
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      return { "Authorization": `Bearer ${session.access_token}` };
+    // Add 3 second timeout to prevent hanging
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 3000);
+    });
+    
+    const sessionPromise = supabase.auth.getSession();
+    const result = await Promise.race([sessionPromise, timeoutPromise]);
+    
+    if (result && 'data' in result && result.data.session?.access_token) {
+      return { "Authorization": `Bearer ${result.data.session.access_token}` };
     }
   } catch (error) {
-    console.warn("[Auth] Failed to get session for API request");
+    console.warn("[Auth] Failed to get session for API request:", error);
   }
   return {};
 }
