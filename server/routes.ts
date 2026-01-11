@@ -3997,7 +3997,10 @@ export async function registerRoutes(
     });
     
     if (!tokenCreated) {
-      console.error('[Invoice] Failed to create payment token in database');
+      console.error('[Invoice] CRITICAL: Failed to create payment token in database. This likely means the invoice_payment_tokens table does not exist in Supabase. Please run the migration from supabase/migrations/011_invoice_payment_tokens.sql in your Supabase SQL Editor.');
+      return res.status(500).json({ 
+        error: "Failed to create invoice payment link. The invoice_payment_tokens table may not exist in Supabase. Please contact administrator to run the database migration." 
+      });
     }
     
     // Generate payment URL
