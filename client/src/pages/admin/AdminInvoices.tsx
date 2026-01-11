@@ -307,93 +307,63 @@ export default function AdminInvoices() {
       <head>
         <title>Invoice ${invoice.invoice_number}</title>
         <style>
-          @page {
-            size: A4;
-            margin: 20mm;
-          }
-          * {
-            box-sizing: border-box;
-          }
-          html, body {
-            width: 210mm;
-            min-height: 297mm;
-            margin: 0 auto;
-            padding: 20mm;
-            font-family: Arial, sans-serif;
-            color: #333;
-            background: white;
-          }
-          .page-content {
-            width: 100%;
-            max-width: 170mm;
-            margin: 0 auto;
-          }
-          .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+          body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
           .company { font-size: 24px; font-weight: bold; color: #007BFF; }
           .invoice-title { font-size: 28px; color: #333; text-align: right; }
           .invoice-number { color: #666; text-align: right; }
-          .details { display: flex; justify-content: space-between; margin-bottom: 25px; }
+          .details { display: flex; justify-content: space-between; margin-bottom: 30px; }
           .bill-to, .invoice-info { width: 45%; }
-          .label { color: #666; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
-          .value { font-size: 13px; margin-bottom: 12px; }
-          .total-section { background: #f8f9fa; padding: 15px; margin-top: 20px; text-align: right; }
-          .total { font-size: 20px; font-weight: bold; color: #007BFF; }
-          .bank-details { margin-top: 20px; padding: 15px; background: #e8f4fd; border-radius: 8px; font-size: 13px; }
-          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 11px; }
-          table { font-size: 12px; }
-          @media print {
-            html, body { width: 210mm; min-height: 297mm; margin: 0; padding: 15mm; }
-            .page-content { max-width: 100%; }
-          }
-          @media screen {
-            body { background: #f0f0f0; }
-            .page-content { background: white; padding: 20mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-          }
+          .label { color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; }
+          .value { font-size: 14px; margin-bottom: 15px; }
+          .total-section { background: #f8f9fa; padding: 20px; margin-top: 30px; text-align: right; }
+          .total { font-size: 24px; font-weight: bold; color: #007BFF; }
+          .bank-details { margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 8px; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 12px; }
+          @media print { body { margin: 0; } }
         </style>
       </head>
       <body>
-        <div class="page-content">
-          <div class="header">
-            <div class="company">RUN COURIER</div>
-            <div>
-              <div class="invoice-title">INVOICE</div>
-              <div class="invoice-number">${invoice.invoice_number}</div>
-            </div>
+        <div class="header">
+          <div class="company">RUN COURIER</div>
+          <div>
+            <div class="invoice-title">INVOICE</div>
+            <div class="invoice-number">${invoice.invoice_number}</div>
           </div>
-          <div class="details">
-            <div class="bill-to">
-              <div class="label">Bill To</div>
-              <div class="value" style="font-weight: bold;">${invoice.customer_name}</div>
-              ${invoice.company_name ? `<div class="value">${invoice.company_name}</div>` : ''}
-              ${invoice.business_address ? `<div class="value">${invoice.business_address}</div>` : ''}
-              <div class="value">${invoice.customer_email}</div>
-            </div>
-            <div class="invoice-info">
-              <div class="label">Invoice Date</div>
-              <div class="value">${formatDate(invoice.created_at)}</div>
-              <div class="label">Due Date</div>
-              <div class="value" style="color: #d9534f; font-weight: bold;">${formatDate(invoice.due_date)}</div>
-              <div class="label">Period</div>
-              <div class="value">${formatDate(invoice.period_start)} - ${formatDate(invoice.period_end)}</div>
-            </div>
+        </div>
+        <div class="details">
+          <div class="bill-to">
+            <div class="label">Bill To</div>
+            <div class="value" style="font-weight: bold;">${invoice.customer_name}</div>
+            ${invoice.company_name ? `<div class="value">${invoice.company_name}</div>` : ''}
+            ${invoice.business_address ? `<div class="value">${invoice.business_address}</div>` : ''}
+            <div class="value">${invoice.customer_email}</div>
           </div>
-          ${jobsTable}
-          ${invoice.notes ? `<div style="background: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 8px;"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
-          <div class="total-section">
-            <div style="margin-bottom: 5px;">Subtotal: ${formatPrice(invoice.subtotal)}</div>
-            <div style="margin-bottom: 10px;">VAT: ${formatPrice(invoice.vat)}</div>
-            <div class="total">Total: ${formatPrice(invoice.total)}</div>
+          <div class="invoice-info">
+            <div class="label">Invoice Date</div>
+            <div class="value">${formatDate(invoice.created_at)}</div>
+            <div class="label">Due Date</div>
+            <div class="value" style="color: #d9534f; font-weight: bold;">${formatDate(invoice.due_date)}</div>
+            <div class="label">Period</div>
+            <div class="value">${formatDate(invoice.period_start)} - ${formatDate(invoice.period_end)}</div>
           </div>
-          <div class="bank-details">
-            <strong>Bank Transfer Details</strong><br>
-            Account Name: RUN COURIER<br>
-            Sort Code: 30-99-50<br>
-            Account Number: 36113363<br>
-            Reference: ${invoice.invoice_number}
-          </div>
-          <div class="footer">
-            RUN COURIER | info@runcourier.co.uk | runcourier.co.uk
-          </div>
+        </div>
+        ${jobsTable}
+        ${invoice.notes ? `<div style="background: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 8px;"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
+        <div class="total-section">
+          <div style="margin-bottom: 5px;">Subtotal: ${formatPrice(invoice.subtotal)}</div>
+          <div style="margin-bottom: 10px;">VAT: ${formatPrice(invoice.vat)}</div>
+          <div class="total">Total: ${formatPrice(invoice.total)}</div>
+        </div>
+        <div class="bank-details">
+          <strong>Bank Transfer Details</strong><br>
+          Account Name: RUN COURIER<br>
+          Sort Code: 30-99-50<br>
+          Account Number: 36113363<br>
+          Reference: ${invoice.invoice_number}
+        </div>
+        <div class="footer">
+          RUN COURIER | info@runcourier.co.uk | runcourier.co.uk
         </div>
       </body>
       </html>

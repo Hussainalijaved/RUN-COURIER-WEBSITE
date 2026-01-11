@@ -1302,7 +1302,7 @@ export class MemStorage implements IStorage {
       id,
       ...invoice,
       invoiceNumber: invoice.invoiceNumber,
-      customerId: invoice.customerId || null,
+      customerId: invoice.customerId,
       customerName: invoice.customerName,
       customerEmail: invoice.customerEmail,
       companyName: invoice.companyName || null,
@@ -1318,8 +1318,6 @@ export class MemStorage implements IStorage {
       periodEnd: invoice.periodEnd,
       jobIds: invoice.jobIds || null,
       notes: invoice.notes || null,
-      paymentToken: invoice.paymentToken || null,
-      jobDetails: invoice.jobDetails || null,
       createdAt: new Date(),
     };
     this.invoices.set(id, newInvoice);
