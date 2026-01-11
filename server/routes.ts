@@ -4013,6 +4013,8 @@ export async function registerRoutes(
     // System UUID for manual/admin invoices (constant placeholder that satisfies NOT NULL constraint)
     const SYSTEM_CUSTOMER_ID = '00000000-0000-0000-0000-000000000000';
     
+    console.log(`[Invoice] Attempting to save invoice ${invoiceNumber} to database. supabaseAdmin available: ${!!supabaseAdmin}`);
+    
     if (supabaseAdmin) {
       // Determine customer_id - use system placeholder for manual invoices
       const customerId = (data.customerId === 'manual-invoice' || data.customerId === 'admin-jobs' || !data.customerId) 
