@@ -982,32 +982,36 @@ export async function sendInvoiceToCustomer(
     ` : ''}
     <div style="background-color: #e8f4fd; border-radius: 8px; padding: 20px; margin: 20px 0;">
       <h3 style="color: #333; margin-top: 0;">Payment Methods</h3>
-      <p style="color: #666; margin-bottom: 10px;">Please pay via bank transfer to:</p>
-      <table style="width: 100%; border-collapse: collapse;">
+      
+      <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Option 1: Bank Transfer</p>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Account Name:</strong></td>
-          <td style="padding: 5px 0; color: #333;">Run Courier Ltd</td>
+          <td style="padding: 5px 0; color: #333;">ROMANIA LTD-RUN COURIER</td>
         </tr>
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Sort Code:</strong></td>
-          <td style="padding: 5px 0; color: #333;">04-00-04</td>
+          <td style="padding: 5px 0; color: #333;">30-99-50</td>
         </tr>
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Account Number:</strong></td>
-          <td style="padding: 5px 0; color: #333;">23396820</td>
+          <td style="padding: 5px 0; color: #333;">36113363</td>
         </tr>
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Reference:</strong></td>
           <td style="padding: 5px 0; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
       </table>
+      
+      <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Option 2: Pay by Card (Stripe)</p>
+      <p style="color: #666; margin: 0;">Pay securely online via Stripe at <a href="https://runcourier.co.uk/pay" style="color: #0066cc; text-decoration: underline;">runcourier.co.uk/pay</a></p>
     </div>
     <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at info@runcourier.co.uk</p>
     <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Invoice');
-  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}Payment Details:\nAccount Name: Run Courier Ltd\nSort Code: 04-00-04\nAccount Number: 23396820\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}PAYMENT METHODS\n\nOption 1: Bank Transfer\nAccount Name: ROMANIA LTD-RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nOption 2: Pay by Card (Stripe)\nPay securely online at: https://runcourier.co.uk/pay\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
