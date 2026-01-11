@@ -1016,6 +1016,16 @@ export async function sendInvoiceToCustomer(
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
 
+export interface InvoiceJobDetail {
+  trackingNumber: string;
+  pickupAddress: string;
+  deliveryAddress: string | null;
+  recipientName: string | null;
+  scheduledDate: string;
+  vehicleType: string;
+  price: number;
+}
+
 export async function sendInvoiceToCustomerWithPaymentLink(
   customerEmail: string,
   customerName: string,
@@ -1025,12 +1035,73 @@ export async function sendInvoiceToCustomerWithPaymentLink(
   periodStart: string,
   periodEnd: string,
   notes: string | null,
-  paymentUrl: string
+  paymentUrl: string,
+  companyName?: string | null,
+  businessAddress?: string | null,
+  jobDetails?: InvoiceJobDetail[]
 ): Promise<boolean> {
+  const formatVehicleType = (type: string) => {
+    const types: Record<string, string> = {
+      'motorbike': 'Motorbike',
+      'car': 'Car',
+      'small_van': 'Small Van',
+      'medium_van': 'Medium Van',
+    };
+    return types[type] || type;
+  };
+
+  const jobsTableHtml = jobDetails && jobDetails.length > 0 ? `
+    <div style="margin: 20px 0;">
+      <h3 style="color: #333; margin-bottom: 15px; font-size: 16px;">Delivery Details</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <thead>
+          <tr style="background-color: #f8f9fa;">
+            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Tracking</th>
+            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Pickup</th>
+            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Delivery</th>
+            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Date</th>
+            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Vehicle</th>
+            <th style="padding: 10px 8px; text-align: right; border-bottom: 2px solid #dee2e6; color: #495057;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${jobDetails.map((job, index) => `
+            <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+              <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6; color: #333; font-weight: bold;">${job.trackingNumber}</td>
+              <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6; color: #666; max-width: 150px;">${job.pickupAddress.substring(0, 40)}${job.pickupAddress.length > 40 ? '...' : ''}</td>
+              <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6; color: #666; max-width: 150px;">${job.deliveryAddress ? (job.deliveryAddress.substring(0, 40) + (job.deliveryAddress.length > 40 ? '...' : '')) : (job.recipientName || 'N/A')}</td>
+              <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6; color: #666;">${job.scheduledDate}</td>
+              <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6; color: #666;">${formatVehicleType(job.vehicleType)}</td>
+              <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6; color: #333; text-align: right; font-weight: bold;">£${job.price.toFixed(2)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="background-color: #e9ecef;">
+            <td colspan="5" style="padding: 12px 8px; text-align: right; font-weight: bold; color: #333; border-top: 2px solid #dee2e6;">Total Amount Due:</td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: bold; color: #007BFF; font-size: 16px; border-top: 2px solid #dee2e6;">£${amount.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  ` : '';
+
+  const customerInfoHtml = companyName || businessAddress ? `
+    <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+      <p style="margin: 0 0 5px 0; color: #333;"><strong>Bill To:</strong></p>
+      <p style="margin: 0; color: #666;">${customerName}</p>
+      ${companyName ? `<p style="margin: 5px 0 0 0; color: #666;">${companyName}</p>` : ''}
+      ${businessAddress ? `<p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">${businessAddress}</p>` : ''}
+    </div>
+  ` : '';
+
   const content = `
-    <h2 style="color: #333; margin-top: 0;">Invoice from Run Courier</h2>
-    <p style="color: #666; font-size: 16px;">Dear ${customerName},</p>
-    <p style="color: #666; font-size: 16px;">Please find below details of your invoice:</p>
+    <div style="text-align: center; margin-bottom: 30px;">
+      <h1 style="color: #007BFF; margin: 0; font-size: 32px;">INVOICE</h1>
+      <p style="color: #666; margin: 10px 0 0 0; font-size: 14px;">Run Courier Ltd</p>
+    </div>
+    
+    ${customerInfoHtml}
     
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e1e5eb;">
       <table style="width: 100%; border-collapse: collapse;">
@@ -1039,19 +1110,25 @@ export async function sendInvoiceToCustomerWithPaymentLink(
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Amount Due:</strong></td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-size: 20px; font-weight: bold;">£${typeof amount === 'number' ? amount.toFixed(2) : amount}</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Invoice Date:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
         </tr>
         <tr>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Period:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${periodStart} - ${periodEnd}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Due Date:</strong></td>
-          <td style="padding: 10px 0; color: #e74c3c; font-weight: bold;">${dueDate}</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Due Date:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #e74c3c; font-weight: bold;">${dueDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #666;"><strong>Amount Due:</strong></td>
+          <td style="padding: 10px 0; color: #007BFF; font-size: 24px; font-weight: bold;">£${typeof amount === 'number' ? amount.toFixed(2) : amount}</td>
         </tr>
       </table>
     </div>
+    
+    ${jobsTableHtml}
     
     ${notes ? `<div style="background-color: #fff3cd; border-radius: 8px; padding: 15px; margin-bottom: 20px; border-left: 4px solid #ffc107;"><p style="color: #856404; margin: 0;"><strong>Notes:</strong> ${notes}</p></div>` : ''}
     
@@ -1091,7 +1168,13 @@ export async function sendInvoiceToCustomerWithPaymentLink(
   `;
 
   const htmlContent = wrapEmailContent(content, 'Invoice');
-  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}PAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: ROMANIA LTD-RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  
+  const jobsTextList = jobDetails && jobDetails.length > 0 ? 
+    `\nDELIVERY DETAILS:\n${jobDetails.map(job => 
+      `- ${job.trackingNumber}: ${job.pickupAddress.substring(0, 30)}... to ${job.deliveryAddress ? job.deliveryAddress.substring(0, 30) + '...' : job.recipientName || 'N/A'} (${job.scheduledDate}) - £${job.price.toFixed(2)}`
+    ).join('\n')}\n` : '';
+  
+  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\n${notes ? `Notes: ${notes}\n\n` : ''}PAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: ROMANIA LTD-RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }

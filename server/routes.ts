@@ -3902,10 +3902,12 @@ export async function registerRoutes(
     return !error;
   }
 
-  // Create and send invoice directly via email (no database storage)
+  // Create and send invoice via email with job details and save to database
   app.post("/api/invoices", asyncHandler(async (req, res) => {
     const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
     const { z } = await import("zod");
+    const crypto = await import("crypto");
+    const uuidv4 = () => crypto.randomUUID();
     
     const createInvoiceSchema = z.object({
       customerId: z.string().min(1, "Customer ID is required"),
@@ -3947,14 +3949,38 @@ export async function registerRoutes(
       });
     };
     
-    // Build notes with job details if provided
+    const formatShortDate = (date: Date | string | null) => {
+      if (!date) return '';
+      return new Date(date).toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+    };
+    
+    // Fetch job details if job IDs provided
+    let jobDetails: any[] = [];
+    if (data.jobIds && data.jobIds.length > 0 && supabaseAdmin) {
+      const { data: jobs, error } = await supabaseAdmin
+        .from('jobs')
+        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price')
+        .in('id', data.jobIds.map(id => parseInt(id)));
+      
+      if (!error && jobs) {
+        jobDetails = jobs.map(job => ({
+          trackingNumber: job.tracking_number || `JOB-${job.id}`,
+          pickupAddress: job.pickup_address || 'N/A',
+          deliveryAddress: job.delivery_address,
+          recipientName: job.recipient_name,
+          scheduledDate: formatShortDate(job.scheduled_pickup_time),
+          vehicleType: job.vehicle_type || 'car',
+          price: parseFloat(job.total_price) || 0,
+        }));
+      }
+    }
+    
+    // Build notes
     let fullNotes = data.notes || '';
-    if (data.companyName) {
-      fullNotes = `Company: ${data.companyName}\n${fullNotes}`;
-    }
-    if (data.businessAddress) {
-      fullNotes = `${fullNotes}\nAddress: ${data.businessAddress}`;
-    }
     
     // Create payment token for Stripe payment link
     const paymentToken = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -3977,7 +4003,41 @@ export async function registerRoutes(
     // Generate payment URL
     const paymentUrl = `${BASE_URL}/invoice-pay/${paymentToken}`;
     
-    // Send invoice directly via email with payment link
+    // Save invoice to Supabase for future reference
+    const invoiceId = uuidv4();
+    if (supabaseAdmin) {
+      const { error: saveError } = await supabaseAdmin
+        .from('invoices')
+        .insert({
+          id: invoiceId,
+          invoice_number: invoiceNumber,
+          customer_id: data.customerId === 'manual-invoice' || data.customerId === 'admin-jobs' ? null : data.customerId,
+          customer_name: data.customerName,
+          customer_email: data.customerEmail,
+          company_name: data.companyName || null,
+          business_address: data.businessAddress || null,
+          vat_number: data.vatNumber || null,
+          subtotal: data.subtotal.toString(),
+          vat: data.vat.toString(),
+          total: data.total.toString(),
+          status: 'pending',
+          due_date: new Date(data.dueDate).toISOString(),
+          period_start: new Date(data.periodStart).toISOString(),
+          period_end: new Date(data.periodEnd).toISOString(),
+          job_ids: data.jobIds,
+          notes: fullNotes.trim() || null,
+          payment_token: paymentToken,
+          job_details: jobDetails.length > 0 ? JSON.stringify(jobDetails) : null,
+        });
+      
+      if (saveError) {
+        console.error('[Invoice] Failed to save invoice to database:', saveError);
+      } else {
+        console.log(`[Invoice] Saved invoice ${invoiceNumber} to database`);
+      }
+    }
+    
+    // Send invoice directly via email with payment link and job details
     const success = await sendInvoiceToCustomerWithPaymentLink(
       data.customerEmail,
       data.customerName,
@@ -3987,17 +4047,22 @@ export async function registerRoutes(
       formatDate(data.periodStart),
       formatDate(data.periodEnd),
       fullNotes.trim() || null,
-      paymentUrl
+      paymentUrl,
+      data.companyName,
+      data.businessAddress,
+      jobDetails
     );
     
     if (success) {
       res.status(201).json({ 
-        success: true, 
+        success: true,
+        id: invoiceId,
         invoiceNumber,
         message: `Invoice ${invoiceNumber} sent to ${data.customerEmail}`,
         customerEmail: data.customerEmail,
         total: data.total,
-        paymentUrl
+        paymentUrl,
+        jobCount: jobDetails.length,
       });
     } else {
       res.status(500).json({ error: "Failed to send invoice email" });

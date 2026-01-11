@@ -239,7 +239,7 @@ export type JobAssignmentStatus = "pending" | "sent" | "accepted" | "rejected" |
 export const invoices = pgTable("invoices", {
   id: varchar("id", { length: 36 }).primaryKey(),
   invoiceNumber: text("invoice_number").notNull().unique(),
-  customerId: varchar("customer_id", { length: 36 }).notNull(),
+  customerId: varchar("customer_id", { length: 36 }),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   companyName: text("company_name"),
@@ -255,6 +255,8 @@ export const invoices = pgTable("invoices", {
   periodEnd: timestamp("period_end").notNull(),
   jobIds: text("job_ids").array(),
   notes: text("notes"),
+  paymentToken: text("payment_token"),
+  jobDetails: text("job_details"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
