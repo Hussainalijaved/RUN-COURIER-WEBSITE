@@ -3830,8 +3830,9 @@ export async function registerRoutes(
     res.json(invoice);
   }));
 
+  // Create and send invoice directly via email (no database storage)
   app.post("/api/invoices", asyncHandler(async (req, res) => {
-    const { insertInvoiceSchema } = await import("@shared/schema");
+    const { sendInvoiceToCustomer } = await import("./emailService");
     const { z } = await import("zod");
     
     const createInvoiceSchema = z.object({
@@ -3863,30 +3864,49 @@ export async function registerRoutes(
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const existingInvoices = await storage.getInvoices({});
-    const invoiceCount = existingInvoices.length + 1;
-    const invoiceNumber = `INV-${year}${month}-${String(invoiceCount).padStart(4, '0')}`;
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const invoiceNumber = `INV-${year}${month}-${randomSuffix}`;
     
-    const invoice = await storage.createInvoice({
+    const formatDate = (dateStr: string) => {
+      return new Date(dateStr).toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
+    };
+    
+    // Build notes with job details if provided
+    let fullNotes = data.notes || '';
+    if (data.companyName) {
+      fullNotes = `Company: ${data.companyName}\n${fullNotes}`;
+    }
+    if (data.businessAddress) {
+      fullNotes = `${fullNotes}\nAddress: ${data.businessAddress}`;
+    }
+    
+    // Send invoice directly via email
+    const success = await sendInvoiceToCustomer(
+      data.customerEmail,
+      data.customerName,
       invoiceNumber,
-      customerId: data.customerId,
-      customerName: data.customerName,
-      customerEmail: data.customerEmail,
-      companyName: data.companyName || null,
-      businessAddress: data.businessAddress || null,
-      vatNumber: data.vatNumber || null,
-      subtotal: String(data.subtotal),
-      vat: String(data.vat),
-      total: String(data.total),
-      status: 'pending',
-      dueDate: new Date(data.dueDate),
-      periodStart: new Date(data.periodStart),
-      periodEnd: new Date(data.periodEnd),
-      jobIds: data.jobIds,
-      notes: data.notes || null,
-    });
+      data.total,
+      formatDate(data.dueDate),
+      formatDate(data.periodStart),
+      formatDate(data.periodEnd),
+      fullNotes.trim() || null
+    );
     
-    res.status(201).json(invoice);
+    if (success) {
+      res.status(201).json({ 
+        success: true, 
+        invoiceNumber,
+        message: `Invoice ${invoiceNumber} sent to ${data.customerEmail}`,
+        customerEmail: data.customerEmail,
+        total: data.total
+      });
+    } else {
+      res.status(500).json({ error: "Failed to send invoice email" });
+    }
   }));
 
   // Send invoice to customer email
