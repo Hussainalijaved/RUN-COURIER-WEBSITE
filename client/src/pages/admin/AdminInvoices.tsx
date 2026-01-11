@@ -143,13 +143,15 @@ export default function AdminInvoices() {
 
   // Filter jobs based on selection - either customer jobs or admin-created jobs (no customer)
   const customerJobs = jobs?.filter(job => {
-    const isDeliveredUnpaid = job.status === 'delivered' && job.paymentStatus !== 'paid';
+    const isUnpaid = job.paymentStatus !== 'paid';
+    const isDelivered = job.status === 'delivered';
+    
     if (isAdminJobs) {
-      // Show jobs created by admin (no customer ID)
-      return !job.customerId && isDeliveredUnpaid;
+      // Show jobs created by admin (no customer ID) - include all unpaid jobs regardless of status
+      return !job.customerId && isUnpaid;
     }
-    // Show jobs for the selected customer
-    return job.customerId === watchedCustomerId && isDeliveredUnpaid;
+    // Show jobs for the selected customer (must be delivered and unpaid)
+    return job.customerId === watchedCustomerId && isDelivered && isUnpaid;
   }) || [];
 
   const createInvoiceMutation = useMutation({
@@ -191,7 +193,10 @@ export default function AdminInvoices() {
 
   const calculateTotals = () => {
     const selectedJobs = customerJobs.filter(job => selectedJobIds.includes(job.id));
-    const total = selectedJobs.reduce((sum, job) => sum + parseFloat(job.totalPrice), 0);
+    const total = selectedJobs.reduce((sum, job) => {
+      const price = job.totalPrice ? parseFloat(job.totalPrice) : 0;
+      return sum + (isNaN(price) ? 0 : price);
+    }, 0);
     return { subtotal: total, vat: 0, total };
   };
 
@@ -419,27 +424,26 @@ export default function AdminInvoices() {
                       <FormLabel>Customer</FormLabel>
                       {customersLoading ? (
                         <Skeleton className="h-10 w-full" />
-                      ) : billableCustomers.length === 0 ? (
-                        <div className="p-3 border rounded-md bg-yellow-50 text-yellow-800 text-sm">
-                          <AlertCircle className="h-4 w-4 inline mr-2" />
-                          No customers found. Customers need to register and place orders first.
-                        </div>
                       ) : (
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-customer">
-                              <SelectValue placeholder="Select a customer" />
+                              <SelectValue placeholder="Select a customer or Admin Jobs" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="admin-jobs">
                               Admin Jobs (No Customer Linked)
                             </SelectItem>
-                            {billableCustomers.map((customer) => (
-                              <SelectItem key={customer.id} value={customer.id}>
-                                {customer.companyName || customer.fullName} ({customer.email})
-                              </SelectItem>
-                            ))}
+                            {billableCustomers.length > 0 && (
+                              <>
+                                {billableCustomers.map((customer) => (
+                                  <SelectItem key={customer.id} value={customer.id}>
+                                    {customer.companyName || customer.fullName} ({customer.email})
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                       )}
