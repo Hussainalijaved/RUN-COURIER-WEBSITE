@@ -46,6 +46,7 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Send,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -191,6 +192,19 @@ export default function AdminInvoices() {
     },
     onError: () => {
       toast({ title: 'Failed to update invoice', variant: 'destructive' });
+    },
+  });
+
+  const sendInvoiceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('POST', `/api/invoices/${id}/send`);
+    },
+    onSuccess: (_, id) => {
+      const invoice = invoices?.find(inv => inv.id === id);
+      toast({ title: 'Invoice sent', description: `Invoice sent to ${invoice?.customerEmail}` });
+    },
+    onError: () => {
+      toast({ title: 'Failed to send invoice', variant: 'destructive' });
     },
   });
 
@@ -413,6 +427,20 @@ export default function AdminInvoices() {
                         <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => sendInvoiceMutation.mutate(invoice.id)}
+                              disabled={sendInvoiceMutation.isPending}
+                              title="Send invoice to customer"
+                              data-testid={`button-send-${invoice.id}`}
+                            >
+                              {sendInvoiceMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
+                            </Button>
                             <Select
                               value={invoice.status}
                               onValueChange={(value) => 

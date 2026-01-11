@@ -1407,14 +1407,22 @@ export class SupabaseStorage implements IStorage {
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
     const supabase = this.checkSupabase();
     const id = randomUUID();
+    // Note: company_name and business_address are included in notes since these columns may not exist in Supabase
+    let enrichedNotes = invoice.notes || '';
+    if (invoice.companyName) {
+      enrichedNotes = `Company: ${invoice.companyName}\n${enrichedNotes}`;
+    }
+    if (invoice.businessAddress) {
+      enrichedNotes = `${enrichedNotes}\nBusiness Address: ${invoice.businessAddress}`;
+    }
+    enrichedNotes = enrichedNotes.trim() || null;
+    
     const dbInvoice = {
       id,
       invoice_number: invoice.invoiceNumber,
       customer_id: invoice.customerId,
       customer_name: invoice.customerName,
       customer_email: invoice.customerEmail,
-      company_name: invoice.companyName || null,
-      business_address: invoice.businessAddress || null,
       vat_number: invoice.vatNumber || null,
       subtotal: invoice.subtotal,
       vat: invoice.vat || "0",
@@ -1424,7 +1432,7 @@ export class SupabaseStorage implements IStorage {
       period_start: invoice.periodStart,
       period_end: invoice.periodEnd,
       job_ids: invoice.jobIds || null,
-      notes: invoice.notes || null,
+      notes: enrichedNotes,
     };
     const { data, error } = await supabase.from('invoices').insert(dbInvoice).select().single();
     if (error) throw error;

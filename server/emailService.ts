@@ -939,6 +939,79 @@ export async function sendPaymentNotification(
   return sendAdminNotification('New Invoice Generated', htmlContent, textContent);
 }
 
+// Send invoice to customer email
+export async function sendInvoiceToCustomer(
+  customerEmail: string,
+  customerName: string,
+  invoiceNumber: string,
+  amount: string,
+  dueDate: string,
+  periodStart: string,
+  periodEnd: string,
+  notes?: string | null
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #333; margin-top: 0;">Invoice from Run Courier</h2>
+    <p style="color: #666; font-size: 16px;">Dear ${customerName},</p>
+    <p style="color: #666; font-size: 16px;">Please find below details of your invoice:</p>
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 140px;"><strong>Invoice Number:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">${invoiceNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Amount Due:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold; font-size: 18px;">£${amount}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Period:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${periodStart} - ${periodEnd}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #666;"><strong>Due Date:</strong></td>
+          <td style="padding: 10px 0; color: #d9534f; font-weight: bold;">${dueDate}</td>
+        </tr>
+      </table>
+    </div>
+    ${notes ? `
+    <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin: 20px 0;">
+      <p style="color: #666; margin: 0;"><strong>Notes:</strong></p>
+      <p style="color: #666; margin: 10px 0 0 0; white-space: pre-wrap;">${notes}</p>
+    </div>
+    ` : ''}
+    <div style="background-color: #e8f4fd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0;">Payment Methods</h3>
+      <p style="color: #666; margin-bottom: 10px;">Please pay via bank transfer to:</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 5px 0; color: #666;"><strong>Account Name:</strong></td>
+          <td style="padding: 5px 0; color: #333;">Run Courier Ltd</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0; color: #666;"><strong>Sort Code:</strong></td>
+          <td style="padding: 5px 0; color: #333;">04-00-04</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0; color: #666;"><strong>Account Number:</strong></td>
+          <td style="padding: 5px 0; color: #333;">23396820</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0; color: #666;"><strong>Reference:</strong></td>
+          <td style="padding: 5px 0; color: #333; font-weight: bold;">${invoiceNumber}</td>
+        </tr>
+      </table>
+    </div>
+    <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at info@runcourier.co.uk</p>
+    <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Invoice');
+  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}Payment Details:\nAccount Name: Run Courier Ltd\nSort Code: 04-00-04\nAccount Number: 23396820\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+
+  return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
+}
+
 export async function sendPasswordResetEmail(
   email: string,
   resetLink: string

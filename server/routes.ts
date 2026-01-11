@@ -3889,6 +3889,68 @@ export async function registerRoutes(
     res.status(201).json(invoice);
   }));
 
+  // Send invoice to customer email
+  app.post("/api/invoices/:id/send", asyncHandler(async (req, res) => {
+    const { sendInvoiceToCustomer } = await import("./emailService");
+    
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    
+    const formatDate = (date: Date) => {
+      return new Date(date).toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
+    };
+    
+    const success = await sendInvoiceToCustomer(
+      invoice.customerEmail,
+      invoice.customerName,
+      invoice.invoiceNumber,
+      invoice.total,
+      formatDate(invoice.dueDate),
+      formatDate(invoice.periodStart),
+      formatDate(invoice.periodEnd),
+      invoice.notes
+    );
+    
+    if (success) {
+      res.json({ success: true, message: `Invoice sent to ${invoice.customerEmail}` });
+    } else {
+      res.status(500).json({ error: "Failed to send invoice email" });
+    }
+  }));
+
+  // Test invoice email endpoint (for testing email delivery without database)
+  app.post("/api/test-invoice-email", asyncHandler(async (req, res) => {
+    const { email, customerName, invoiceNumber, amount, dueDate, periodStart, periodEnd, notes } = req.body;
+    
+    if (!email || !customerName) {
+      return res.status(400).json({ error: "Email and customer name are required" });
+    }
+    
+    const { sendInvoiceToCustomer } = await import("./emailService");
+    const success = await sendInvoiceToCustomer(
+      email,
+      customerName,
+      invoiceNumber || `INV-TEST-${Date.now()}`,
+      parseFloat(amount) || 50.00,
+      dueDate || "25 January 2026",
+      periodStart || "1 January 2026",
+      periodEnd || "11 January 2026",
+      notes || "Test invoice"
+    );
+    
+    if (success) {
+      res.json({ success: true, message: `Test invoice sent to ${email}` });
+    } else {
+      res.status(500).json({ error: "Failed to send test invoice email" });
+    }
+  }));
+
   // Contact form endpoint
   app.post("/api/contact", asyncHandler(async (req, res) => {
     const { name, email, phone, subject, message } = req.body;
