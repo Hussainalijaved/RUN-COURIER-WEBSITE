@@ -1382,21 +1382,22 @@ export class SupabaseStorage implements IStorage {
 
   async getInvoice(id: string): Promise<Invoice | undefined> {
     const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('invoices').select('*').eq('id', id).single();
+    // Use 'app_invoices' table to avoid conflict with Stripe's 'invoices' table
+    const { data, error } = await supabase.from('app_invoices').select('*').eq('id', id).single();
     if (error || !data) return undefined;
     return mapDbToInvoice(data);
   }
 
   async getInvoiceByNumber(invoiceNumber: string): Promise<Invoice | undefined> {
     const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('invoices').select('*').eq('invoice_number', invoiceNumber).single();
+    const { data, error } = await supabase.from('app_invoices').select('*').eq('invoice_number', invoiceNumber).single();
     if (error || !data) return undefined;
     return mapDbToInvoice(data);
   }
 
   async getInvoices(filters?: { customerId?: string; status?: InvoiceStatus }): Promise<Invoice[]> {
     const supabase = this.checkSupabase();
-    let query = supabase.from('invoices').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('app_invoices').select('*').order('created_at', { ascending: false });
     if (filters?.customerId) query = query.eq('customer_id', filters.customerId);
     if (filters?.status) query = query.eq('status', filters.status);
     const { data, error } = await query;
@@ -1407,15 +1408,6 @@ export class SupabaseStorage implements IStorage {
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
     const supabase = this.checkSupabase();
     const id = randomUUID();
-    // Note: company_name and business_address are included in notes since these columns may not exist in Supabase
-    let enrichedNotes = invoice.notes || '';
-    if (invoice.companyName) {
-      enrichedNotes = `Company: ${invoice.companyName}\n${enrichedNotes}`;
-    }
-    if (invoice.businessAddress) {
-      enrichedNotes = `${enrichedNotes}\nBusiness Address: ${invoice.businessAddress}`;
-    }
-    enrichedNotes = enrichedNotes.trim() || null;
     
     const dbInvoice = {
       id,
@@ -1423,6 +1415,8 @@ export class SupabaseStorage implements IStorage {
       customer_id: invoice.customerId,
       customer_name: invoice.customerName,
       customer_email: invoice.customerEmail,
+      company_name: invoice.companyName || null,
+      business_address: invoice.businessAddress || null,
       vat_number: invoice.vatNumber || null,
       subtotal: invoice.subtotal,
       vat: invoice.vat || "0",
@@ -1432,10 +1426,14 @@ export class SupabaseStorage implements IStorage {
       period_start: invoice.periodStart,
       period_end: invoice.periodEnd,
       job_ids: invoice.jobIds || null,
-      notes: enrichedNotes,
+      notes: invoice.notes || null,
     };
-    const { data, error } = await supabase.from('invoices').insert(dbInvoice).select().single();
-    if (error) throw error;
+    // Use 'app_invoices' table to avoid conflict with Stripe's 'invoices' table
+    const { data, error } = await supabase.from('app_invoices').insert(dbInvoice).select().single();
+    if (error) {
+      console.error('Invoice creation error:', error);
+      throw error;
+    }
     return mapDbToInvoice(data);
   }
 
@@ -1445,7 +1443,7 @@ export class SupabaseStorage implements IStorage {
     if (data.status !== undefined) dbData.status = data.status;
     if (data.paidAt !== undefined) dbData.paid_at = data.paidAt;
     if (data.notes !== undefined) dbData.notes = data.notes;
-    const { data: updated, error } = await supabase.from('invoices').update(dbData).eq('id', id).select().single();
+    const { data: updated, error } = await supabase.from('app_invoices').update(dbData).eq('id', id).select().single();
     if (error || !updated) return undefined;
     return mapDbToInvoice(updated);
   }
