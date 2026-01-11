@@ -554,7 +554,7 @@ export function registerMobileRoutes(app: Express): void {
         // STEP 2: Get jobs where driver_id is set OR job has an assignment for this driver
         let supabaseJobs: any[] = [];
         
-        // Query jobs directly assigned to driver
+        // Query jobs directly assigned to driver (exclude hidden jobs)
         const { data: directJobs, error: directError } = await supabaseAdmin
           .from('jobs')
           .select(`
@@ -596,10 +596,12 @@ export function registerMobileRoutes(app: Express): void {
             is_urgent,
             is_fragile,
             requires_signature,
+            driver_hidden,
             created_at,
             updated_at
           `)
           .eq('driver_id', driver.id)
+          .or('driver_hidden.is.null,driver_hidden.eq.false')
           .order('created_at', { ascending: false });
         
         if (directError) {
@@ -609,7 +611,7 @@ export function registerMobileRoutes(app: Express): void {
           console.log(`[Mobile Jobs] Found ${directJobs.length} directly assigned jobs`);
         }
         
-        // Also fetch jobs from assignments (for pending/sent offers not yet accepted)
+        // Also fetch jobs from assignments (for pending/sent offers not yet accepted, exclude hidden)
         if (assignmentJobIds.length > 0) {
           const { data: assignedJobs, error: assignedError } = await supabaseAdmin
             .from('jobs')
@@ -652,10 +654,12 @@ export function registerMobileRoutes(app: Express): void {
               is_urgent,
               is_fragile,
               requires_signature,
+              driver_hidden,
               created_at,
               updated_at
             `)
-            .in('id', assignmentJobIds.map(id => parseInt(id) || id));
+            .in('id', assignmentJobIds.map(id => parseInt(id) || id))
+            .or('driver_hidden.is.null,driver_hidden.eq.false');
           
           if (assignedError) {
             console.log("[Mobile Jobs] Supabase assigned jobs query error:", assignedError.message);
