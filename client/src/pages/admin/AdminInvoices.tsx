@@ -56,16 +56,19 @@ import { z } from 'zod';
 import type { Invoice, User as UserType, InvoiceStatus, Job } from '@shared/schema';
 
 const createInvoiceFormSchema = z.object({
-  customerId: z.string().min(1, "Please select a customer or Admin Jobs"),
+  customerId: z.string().min(1, "Please select a customer or Manual Invoice"),
   periodStart: z.string().min(1, "Period start date is required"),
   periodEnd: z.string().min(1, "Period end date is required"),
   dueDate: z.string().min(1, "Due date is required"),
   notes: z.string().optional(),
-  // Fields for admin jobs (manual customer entry)
+  // Fields for manual invoice (customer entry)
   manualCustomerName: z.string().optional(),
   manualCustomerEmail: z.string().optional(),
   manualCompanyName: z.string().optional(),
   manualBusinessAddress: z.string().optional(),
+  // Manual amount for invoices without jobs
+  manualAmount: z.string().optional(),
+  manualDescription: z.string().optional(),
 });
 
 type CreateInvoiceFormData = z.infer<typeof createInvoiceFormSchema>;
@@ -85,8 +88,10 @@ const getStatusBadge = (status: InvoiceStatus) => {
   }
 };
 
-const formatPrice = (price: string | number) => {
+const formatPrice = (price: string | number | null | undefined) => {
+  if (price === null || price === undefined) return '£0.00';
   const num = typeof price === 'string' ? parseFloat(price) : price;
+  if (isNaN(num)) return '£0.00';
   return `£${num.toFixed(2)}`;
 };
 
@@ -118,10 +123,13 @@ export default function AdminInvoices() {
       manualCustomerEmail: '',
       manualCompanyName: '',
       manualBusinessAddress: '',
+      manualAmount: '',
+      manualDescription: '',
     },
   });
 
   const watchedCustomerId = form.watch('customerId');
+  const isManualInvoice = watchedCustomerId === 'manual-invoice';
 
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
     queryKey: ['/api/invoices'],
@@ -201,6 +209,39 @@ export default function AdminInvoices() {
   };
 
   const onSubmit = (formData: CreateInvoiceFormData) => {
+    // For manual invoices, use the manual amount
+    if (isManualInvoice) {
+      if (!formData.manualCustomerName || !formData.manualCustomerEmail) {
+        toast({ title: 'Please enter customer name and email', variant: 'destructive' });
+        return;
+      }
+      
+      const manualTotal = formData.manualAmount ? parseFloat(formData.manualAmount) : 0;
+      if (manualTotal <= 0) {
+        toast({ title: 'Please enter a valid amount', variant: 'destructive' });
+        return;
+      }
+
+      createInvoiceMutation.mutate({
+        customerId: 'manual-invoice',
+        customerName: formData.manualCustomerName,
+        customerEmail: formData.manualCustomerEmail,
+        companyName: formData.manualCompanyName || null,
+        businessAddress: formData.manualBusinessAddress || null,
+        vatNumber: null,
+        subtotal: manualTotal,
+        vat: 0,
+        total: manualTotal,
+        dueDate: formData.dueDate,
+        periodStart: formData.periodStart,
+        periodEnd: formData.periodEnd,
+        jobIds: [],
+        notes: formData.manualDescription ? `${formData.manualDescription}\n\n${formData.notes || ''}`.trim() : formData.notes || null,
+      });
+      return;
+    }
+
+    // For job-based invoices
     if (selectedJobIds.length === 0) {
       toast({ title: 'Please select at least one job', variant: 'destructive' });
       return;
@@ -432,8 +473,11 @@ export default function AdminInvoices() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                            <SelectItem value="manual-invoice">
+                              Manual Invoice (Enter All Details)
+                            </SelectItem>
                             <SelectItem value="admin-jobs">
-                              Admin Jobs (No Customer Linked)
+                              Admin Jobs (Link to Existing Jobs)
                             </SelectItem>
                             {billableCustomers.length > 0 && (
                               <>
@@ -475,7 +519,7 @@ export default function AdminInvoices() {
                   </Card>
                 )}
 
-                {isAdminJobs && (
+                {(isAdminJobs || isManualInvoice) && (
                   <Card>
                     <CardContent className="pt-4 space-y-4">
                       <p className="text-sm text-muted-foreground">Enter customer details for this invoice:</p>
@@ -537,6 +581,42 @@ export default function AdminInvoices() {
                   </Card>
                 )}
 
+                {isManualInvoice && (
+                  <Card>
+                    <CardContent className="pt-4 space-y-4">
+                      <p className="text-sm text-muted-foreground">Enter invoice amount and description:</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="manualAmount"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Total Amount (£) *</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="number" step="0.01" min="0" placeholder="0.00" data-testid="input-manual-amount" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="manualDescription"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Description / Line Items</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} placeholder="Enter invoice description or line items..." rows={3} data-testid="input-manual-description" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="grid grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -579,7 +659,7 @@ export default function AdminInvoices() {
                   />
                 </div>
 
-                {watchedCustomerId && customerJobs.length > 0 && (
+                {watchedCustomerId && !isManualInvoice && customerJobs.length > 0 && (
                   <div className="space-y-2">
                     <Label>Select Jobs to Include</Label>
                     <div className="border rounded-md max-h-48 overflow-y-auto">
@@ -613,11 +693,11 @@ export default function AdminInvoices() {
                   </div>
                 )}
 
-                {watchedCustomerId && customerJobs.length === 0 && (
+                {watchedCustomerId && !isManualInvoice && customerJobs.length === 0 && (
                   <div className="text-center py-6 border rounded-md">
                     <p className="text-muted-foreground">
                       {isAdminJobs 
-                        ? 'No unpaid delivered admin jobs found' 
+                        ? 'No unpaid admin jobs found' 
                         : 'No unpaid delivered jobs for this customer'}
                     </p>
                   </div>
@@ -641,16 +721,18 @@ export default function AdminInvoices() {
                   )}
                 />
 
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between font-bold text-lg">
-                        <span>Total</span>
-                        <span>{formatPrice(total)}</span>
+                {!isManualInvoice && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between font-bold text-lg">
+                          <span>Total</span>
+                          <span>{formatPrice(total)}</span>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -658,7 +740,7 @@ export default function AdminInvoices() {
                   </Button>
                   <Button 
                     type="submit"
-                    disabled={createInvoiceMutation.isPending || !watchedCustomerId || selectedJobIds.length === 0}
+                    disabled={createInvoiceMutation.isPending || !watchedCustomerId || (!isManualInvoice && selectedJobIds.length === 0)}
                     data-testid="button-submit-invoice"
                   >
                     {createInvoiceMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
