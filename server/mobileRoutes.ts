@@ -678,6 +678,11 @@ export function registerMobileRoutes(app: Express): void {
         if (supabaseJobs.length > 0) {
           console.log(`[Mobile Jobs] Total ${supabaseJobs.length} jobs found for driver ${driver.id}`);
           
+          // CRITICAL: Filter out hidden jobs (admin can hide jobs from driver view)
+          const beforeHiddenFilter = supabaseJobs.length;
+          supabaseJobs = supabaseJobs.filter(j => j.driver_hidden !== true);
+          console.log(`[Mobile Jobs] Filtered ${beforeHiddenFilter - supabaseJobs.length} hidden jobs, ${supabaseJobs.length} remaining`);
+          
           // Create assignment map for driver_price lookup
           const assignments = allAssignments || [];
           console.log(`[Mobile Jobs] Found ${assignments.length} matching assignments`);
