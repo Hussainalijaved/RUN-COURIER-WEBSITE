@@ -2360,6 +2360,17 @@ export async function registerRoutes(
     }
   }));
 
+  // Admin endpoint to manually trigger Stripe sync (not auto-run on startup)
+  app.post("/api/admin/sync-stripe", asyncHandler(async (req, res) => {
+    try {
+      const { triggerStripeSync } = await import('./index');
+      const result = await triggerStripeSync();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Stripe sync failed' });
+    }
+  }));
+
   app.post("/api/users/:id/deactivate", asyncHandler(async (req, res) => {
     const userId = req.params.id;
     

@@ -93,22 +93,26 @@ function getConnectionString(): string | null {
   return null;
 }
 
-async function initStripe() {
+// Stripe initialization - runs fully in background, never blocks server startup
+let stripeInitialized = false;
+let stripeSyncInProgress = false;
+
+async function initStripeInBackground() {
   const databaseUrl = getConnectionString();
 
   if (!databaseUrl) {
-    console.warn('Database not configured - Stripe sync caching will be disabled');
+    console.warn('[Stripe] Database not configured - Stripe sync caching disabled');
     return;
   }
 
   try {
-    console.log('Initializing Stripe schema...');
+    console.log('[Stripe] Initializing schema in background...');
     await runMigrations({ databaseUrl });
-    console.log('Stripe schema ready');
+    console.log('[Stripe] Schema ready');
 
     const stripeSync = await getStripeSync();
 
-    console.log('Setting up managed webhook...');
+    console.log('[Stripe] Setting up managed webhook...');
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
     const { webhook } = await stripeSync.findOrCreateManagedWebhook(
       `${webhookBaseUrl}/api/stripe/webhook`,
@@ -117,41 +121,62 @@ async function initStripe() {
         description: 'Run Courier payment webhook',
       }
     );
-    console.log(`Webhook configured: ${webhook.url}`);
+    console.log(`[Stripe] Webhook configured: ${webhook.url}`);
+    stripeInitialized = true;
 
-    // Run Stripe sync in background after server starts (non-blocking)
-    setImmediate(() => {
-      console.log('Syncing Stripe data in background...');
-      stripeSync.syncBackfill()
-        .then(() => {
-          console.log('Stripe data synced');
-        })
-        .catch((err: any) => {
-          // Handle common non-critical Stripe sync errors gracefully
-          if (err?.code === 'resource_missing' || err?.message?.includes('No such customer')) {
-            console.warn('[Stripe Sync] Skipped missing resource - this is normal if customers were deleted from Stripe');
-          } else {
-            console.warn('[Stripe Sync] Non-critical sync issue:', err?.message || err);
-          }
-        });
-    });
+    // Sync data in background - completely non-blocking
+    console.log('[Stripe] Starting background data sync...');
+    stripeSyncInProgress = true;
+    stripeSync.syncBackfill()
+      .then(() => {
+        console.log('[Stripe] Background sync complete');
+        stripeSyncInProgress = false;
+      })
+      .catch((err: any) => {
+        stripeSyncInProgress = false;
+        if (err?.code === 'resource_missing' || err?.message?.includes('No such customer')) {
+          console.warn('[Stripe Sync] Skipped missing resource - normal if customers were deleted');
+        } else {
+          console.warn('[Stripe Sync] Non-critical sync issue:', err?.message || err);
+        }
+      });
   } catch (error: any) {
-    // Handle database connection errors gracefully (e.g., Neon endpoint paused)
     const errorMessage = error?.message || String(error);
     if (errorMessage.includes('endpoint has been disabled') || 
         errorMessage.includes('XX000') ||
         errorMessage.includes('connection') ||
         errorMessage.includes('ECONNREFUSED')) {
-      console.warn('[Stripe] Database unavailable - Stripe sync caching disabled. Payments will still work via direct API calls.');
+      console.warn('[Stripe] Database unavailable - sync caching disabled. Payments still work via direct API.');
     } else {
-      console.error('Failed to initialize Stripe sync:', errorMessage);
+      console.error('[Stripe] Init error:', errorMessage);
     }
-    // App continues to run - direct Stripe API calls will still work
   }
 }
 
-// Initialize Stripe but don't wait for it
-initStripe().catch(console.error);
+// Export for manual trigger via admin endpoint
+export async function triggerStripeSync() {
+  if (stripeSyncInProgress) {
+    return { status: 'already_running' };
+  }
+  
+  try {
+    const stripeSync = await getStripeSync();
+    stripeSyncInProgress = true;
+    await stripeSync.syncBackfill();
+    stripeSyncInProgress = false;
+    return { status: 'completed' };
+  } catch (error: any) {
+    stripeSyncInProgress = false;
+    return { status: 'error', message: error?.message };
+  }
+}
+
+// DO NOT await - fire and forget so server starts immediately
+setTimeout(() => {
+  initStripeInBackground().catch(err => {
+    console.warn('[Stripe] Background init failed:', err?.message || err);
+  });
+}, 100); // Small delay to ensure server is fully up first
 
 // Main Stripe webhook (managed by stripe-replit-sync)
 app.post(
@@ -302,13 +327,19 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Run startup migrations to add new columns
-  await runStartupMigrations();
+  // Run startup migrations in background - don't block server start
+  runStartupMigrations().catch(err => {
+    console.warn('[Migrations] Background migration failed:', err?.message || err);
+  });
   
   await registerRoutes(httpServer, app);
 
   setupRealtimeServer(httpServer);
-  await hydrateLocationCache();
+  
+  // Hydrate cache in background - don't block server start
+  hydrateLocationCache().catch(err => {
+    console.warn('[Realtime] Failed to hydrate location cache:', err?.message || err);
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
