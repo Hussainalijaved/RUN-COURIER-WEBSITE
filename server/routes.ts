@@ -1390,6 +1390,25 @@ export async function registerRoutes(
     // Also update in-memory storage
     await storage.updateJob(jobId, updateData);
     
+    // CRITICAL: Also update Supabase (source of truth for mobile app)
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (supabaseAdmin) {
+      const { error: supabaseError } = await supabaseAdmin
+        .from('jobs')
+        .update({
+          driver_hidden: hidden,
+          driver_hidden_at: hidden ? new Date().toISOString() : null,
+          driver_hidden_by: hidden ? (adminId || null) : null,
+        })
+        .eq('id', jobId);
+      
+      if (supabaseError) {
+        console.error(`[Jobs] Supabase update failed for job ${jobId}:`, supabaseError.message);
+      } else {
+        console.log(`[Jobs] Supabase updated: job ${jobId} driver_hidden=${hidden}`);
+      }
+    }
+    
     console.log(`[Jobs] Job ${jobId} visibility for driver: ${hidden ? 'hidden' : 'visible'} by admin ${adminId || 'unknown'}`);
     
     const updatedJob = await storage.getJob(jobId);
