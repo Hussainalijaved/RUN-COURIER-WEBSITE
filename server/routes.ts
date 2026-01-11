@@ -1867,7 +1867,7 @@ export async function registerRoutes(
     const driverUserId = driver.userId || driver.id;
     
     // Build list of all possible IDs to search for
-    const driverIds = [...new Set([driverId, driverUserId].filter(Boolean))];
+    const driverIds = Array.from(new Set([driverId, driverUserId].filter(Boolean)));
     console.log(`[Drivers] Starting PERMANENT deletion of driver (IDs: ${driverIds.join(', ')}, email: ${driverEmail})`);
     
     // First, find the actual Supabase Auth user ID by email (using direct lookup, not listUsers)
