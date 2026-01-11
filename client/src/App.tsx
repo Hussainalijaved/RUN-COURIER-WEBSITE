@@ -48,6 +48,7 @@ import Quote from "@/pages/Quote";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import PaymentLink, { PaymentLinkSuccess } from "@/pages/PaymentLink";
+import InvoicePayment from "@/pages/InvoicePayment";
 import Support from "@/pages/Support";
 
 import {
@@ -153,6 +154,8 @@ function Router() {
       
       <Route path="/pay/:token" component={PaymentLink} />
       <Route path="/pay/:token/success" component={PaymentLinkSuccess} />
+      
+      <Route path="/invoice-pay/:token" component={InvoicePayment} />
       
       <Route path="/services/same-day" component={SameDayService} />
       <Route path="/services/medical" component={MedicalService} />

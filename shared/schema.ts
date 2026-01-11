@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -497,3 +497,26 @@ export type DriverDevice = typeof driverDevices.$inferSelect;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type BookingQuoteInput = z.infer<typeof bookingQuoteSchema>;
+
+// Invoice payment tokens for secure email payment links
+export type InvoicePaymentTokenStatus = "pending" | "paid" | "expired";
+
+export const invoicePaymentTokens = pgTable("invoice_payment_tokens", {
+  id: serial("id").primaryKey(),
+  token: varchar("token", { length: 100 }).notNull().unique(),
+  invoiceNumber: varchar("invoice_number", { length: 50 }).notNull(),
+  customerName: varchar("customer_name", { length: 255 }).notNull(),
+  customerEmail: varchar("customer_email", { length: 255 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  dueDate: varchar("due_date", { length: 100 }).notNull(),
+  periodStart: varchar("period_start", { length: 100 }).notNull(),
+  periodEnd: varchar("period_end", { length: 100 }).notNull(),
+  notes: text("notes"),
+  paymentIntentId: varchar("payment_intent_id", { length: 255 }),
+  clientSecret: text("client_secret"),
+  status: text("status").$type<InvoicePaymentTokenStatus>().notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type InvoicePaymentToken = typeof invoicePaymentTokens.$inferSelect;

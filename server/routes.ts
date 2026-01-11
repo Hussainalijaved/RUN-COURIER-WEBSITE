@@ -3830,9 +3830,81 @@ export async function registerRoutes(
     res.json(invoice);
   }));
 
+  // Helper functions for invoice payment tokens (using Supabase for persistence)
+  const { supabaseAdmin } = await import('./supabaseAdmin');
+  
+  interface InvoicePaymentToken {
+    token: string;
+    invoice_number: string;
+    customer_name: string;
+    customer_email: string;
+    amount: number;
+    due_date: string;
+    period_start: string;
+    period_end: string;
+    notes: string | null;
+    payment_intent_id: string | null;
+    client_secret: string | null;
+    status: 'pending' | 'paid' | 'expired';
+    created_at: string;
+  }
+  
+  async function getInvoicePaymentToken(token: string): Promise<InvoicePaymentToken | null> {
+    if (!supabaseAdmin) return null;
+    const { data, error } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .select('*')
+      .eq('token', token)
+      .single();
+    if (error || !data) return null;
+    return data as InvoicePaymentToken;
+  }
+  
+  async function createInvoicePaymentToken(tokenData: {
+    token: string;
+    invoiceNumber: string;
+    customerName: string;
+    customerEmail: string;
+    amount: number;
+    dueDate: string;
+    periodStart: string;
+    periodEnd: string;
+    notes: string | null;
+  }): Promise<boolean> {
+    if (!supabaseAdmin) return false;
+    const { error } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .insert({
+        token: tokenData.token,
+        invoice_number: tokenData.invoiceNumber,
+        customer_name: tokenData.customerName,
+        customer_email: tokenData.customerEmail,
+        amount: tokenData.amount,
+        due_date: tokenData.dueDate,
+        period_start: tokenData.periodStart,
+        period_end: tokenData.periodEnd,
+        notes: tokenData.notes,
+        status: 'pending',
+      });
+    return !error;
+  }
+  
+  async function updateInvoicePaymentToken(token: string, updates: Partial<{
+    payment_intent_id: string;
+    client_secret: string;
+    status: 'pending' | 'paid' | 'expired';
+  }>): Promise<boolean> {
+    if (!supabaseAdmin) return false;
+    const { error } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .update(updates)
+      .eq('token', token);
+    return !error;
+  }
+
   // Create and send invoice directly via email (no database storage)
   app.post("/api/invoices", asyncHandler(async (req, res) => {
-    const { sendInvoiceToCustomer } = await import("./emailService");
+    const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
     const { z } = await import("zod");
     
     const createInvoiceSchema = z.object({
@@ -3884,8 +3956,29 @@ export async function registerRoutes(
       fullNotes = `${fullNotes}\nAddress: ${data.businessAddress}`;
     }
     
-    // Send invoice directly via email
-    const success = await sendInvoiceToCustomer(
+    // Create payment token for Stripe payment link
+    const paymentToken = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    const tokenCreated = await createInvoicePaymentToken({
+      token: paymentToken,
+      invoiceNumber,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      amount: data.total,
+      dueDate: formatDate(data.dueDate),
+      periodStart: formatDate(data.periodStart),
+      periodEnd: formatDate(data.periodEnd),
+      notes: fullNotes.trim() || null,
+    });
+    
+    if (!tokenCreated) {
+      console.error('[Invoice] Failed to create payment token in database');
+    }
+    
+    // Generate payment URL
+    const paymentUrl = `${BASE_URL}/invoice-pay/${paymentToken}`;
+    
+    // Send invoice directly via email with payment link
+    const success = await sendInvoiceToCustomerWithPaymentLink(
       data.customerEmail,
       data.customerName,
       invoiceNumber,
@@ -3893,7 +3986,8 @@ export async function registerRoutes(
       formatDate(data.dueDate),
       formatDate(data.periodStart),
       formatDate(data.periodEnd),
-      fullNotes.trim() || null
+      fullNotes.trim() || null,
+      paymentUrl
     );
     
     if (success) {
@@ -3902,7 +3996,8 @@ export async function registerRoutes(
         invoiceNumber,
         message: `Invoice ${invoiceNumber} sent to ${data.customerEmail}`,
         customerEmail: data.customerEmail,
-        total: data.total
+        total: data.total,
+        paymentUrl
       });
     } else {
       res.status(500).json({ error: "Failed to send invoice email" });
@@ -3953,11 +4048,12 @@ export async function registerRoutes(
     }
     
     const { sendInvoiceToCustomer } = await import("./emailService");
+    const testAmount = parseFloat(amount) || 50.00;
     const success = await sendInvoiceToCustomer(
       email,
       customerName,
       invoiceNumber || `INV-TEST-${Date.now()}`,
-      parseFloat(amount) || 50.00,
+      testAmount.toFixed(2),
       dueDate || "25 January 2026",
       periodStart || "1 January 2026",
       periodEnd || "11 January 2026",
@@ -3969,6 +4065,166 @@ export async function registerRoutes(
     } else {
       res.status(500).json({ error: "Failed to send test invoice email" });
     }
+  }));
+
+  // ============= INVOICE PAYMENT WITH EMBEDDED STRIPE =============
+
+  // Public endpoint: Get invoice payment details by token
+  app.get("/api/invoice-pay/:token", asyncHandler(async (req, res) => {
+    const token = req.params.token;
+    const invoiceData = await getInvoicePaymentToken(token);
+    
+    if (!invoiceData) {
+      return res.status(404).json({ error: "Invoice payment link not found or expired" });
+    }
+    
+    if (invoiceData.status === 'paid') {
+      return res.status(410).json({ error: "This invoice has already been paid" });
+    }
+    
+    // Check if expired (7 days)
+    const expiryTime = new Date(invoiceData.created_at);
+    expiryTime.setDate(expiryTime.getDate() + 7);
+    if (new Date() > expiryTime) {
+      await updateInvoicePaymentToken(token, { status: 'expired' });
+      return res.status(410).json({ error: "This payment link has expired" });
+    }
+    
+    res.json({
+      invoiceNumber: invoiceData.invoice_number,
+      customerName: invoiceData.customer_name,
+      amount: invoiceData.amount,
+      dueDate: invoiceData.due_date,
+      periodStart: invoiceData.period_start,
+      periodEnd: invoiceData.period_end,
+      notes: invoiceData.notes,
+    });
+  }));
+
+  // Public endpoint: Create PaymentIntent for invoice
+  app.post("/api/invoice-pay/:token/create-payment-intent", asyncHandler(async (req, res) => {
+    const token = req.params.token;
+    const invoiceData = await getInvoicePaymentToken(token);
+    
+    if (!invoiceData) {
+      return res.status(404).json({ error: "Invoice payment link not found" });
+    }
+    
+    if (invoiceData.status === 'paid') {
+      return res.status(410).json({ error: "This invoice has already been paid" });
+    }
+    
+    // Check if expired
+    const expiryTime = new Date(invoiceData.created_at);
+    expiryTime.setDate(expiryTime.getDate() + 7);
+    if (new Date() > expiryTime) {
+      await updateInvoicePaymentToken(token, { status: 'expired' });
+      return res.status(410).json({ error: "This payment link has expired" });
+    }
+    
+    // Return existing PaymentIntent if already created
+    if (invoiceData.payment_intent_id && invoiceData.client_secret) {
+      return res.json({
+        clientSecret: invoiceData.client_secret,
+        paymentIntentId: invoiceData.payment_intent_id,
+      });
+    }
+    
+    const stripe = await getUncachableStripeClient();
+    
+    // Create or find Stripe customer
+    let stripeCustomerId: string | undefined;
+    const existingCustomers = await stripe.customers.list({ 
+      email: invoiceData.customer_email, 
+      limit: 1 
+    });
+    
+    if (existingCustomers.data.length > 0) {
+      stripeCustomerId = existingCustomers.data[0].id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: invoiceData.customer_email,
+        name: invoiceData.customer_name,
+      });
+      stripeCustomerId = customer.id;
+    }
+    
+    // Create PaymentIntent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(invoiceData.amount * 100),
+      currency: 'gbp',
+      customer: stripeCustomerId,
+      metadata: {
+        type: 'invoice_payment',
+        invoiceNumber: invoiceData.invoice_number,
+        customerEmail: invoiceData.customer_email,
+        customerName: invoiceData.customer_name,
+        paymentToken: token,
+      },
+      description: `Invoice ${invoiceData.invoice_number} - Run Courier`,
+      receipt_email: invoiceData.customer_email,
+    });
+    
+    // Store PaymentIntent details in database
+    await updateInvoicePaymentToken(token, {
+      payment_intent_id: paymentIntent.id,
+      client_secret: paymentIntent.client_secret!,
+    });
+    
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    });
+  }));
+
+  // Public endpoint: Confirm invoice payment
+  app.post("/api/invoice-pay/:token/confirm", asyncHandler(async (req, res) => {
+    const token = req.params.token;
+    const { paymentIntentId } = req.body;
+    const invoiceData = await getInvoicePaymentToken(token);
+    
+    if (!invoiceData) {
+      return res.status(404).json({ error: "Invoice payment link not found" });
+    }
+    
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: "Payment intent ID required" });
+    }
+    
+    const stripe = await getUncachableStripeClient();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ 
+        error: "Payment not completed", 
+        status: paymentIntent.status 
+      });
+    }
+    
+    // Mark as paid in database
+    await updateInvoicePaymentToken(token, { status: 'paid' });
+    
+    // Send payment confirmation email
+    try {
+      const { sendPaymentReceivedConfirmation } = await import("./emailService");
+      await sendPaymentReceivedConfirmation(
+        invoiceData.customer_email,
+        invoiceData.customer_name,
+        invoiceData.invoice_number,
+        invoiceData.amount,
+        paymentIntentId
+      );
+    } catch (err) {
+      console.error("[InvoicePayment] Failed to send confirmation email:", err);
+    }
+    
+    console.log(`[InvoicePayment] Invoice ${invoiceData.invoice_number} paid via Stripe: ${paymentIntentId}`);
+    
+    res.json({ 
+      success: true, 
+      message: "Payment successful",
+      invoiceNumber: invoiceData.invoice_number,
+    });
   }));
 
   // Contact form endpoint
