@@ -1,0 +1,95 @@
+You are a senior production engineer working on the Run Courier codebase hosted on Replit.
+
+CRITICAL RULES (DO NOT VIOLATE):
+
+❌ DO NOT change, refactor, rename, or delete ANY existing pricing logic, pricing formulas, settings, rates, surcharges, or conditions.
+
+❌ DO NOT modify database schemas, Supabase tables, Stripe logic, admin pricing overrides, or driver payment logic.
+
+❌ DO NOT change existing UI text, business rules, or workflows.
+
+❌ DO NOT remove or rewrite existing Google Maps initialization code.
+
+✅ ONLY ADD new code where necessary.
+
+If any existing code is unclear, leave it untouched.
+
+OBJECTIVE
+
+Add a Google Maps multi-postcode route feature that allows up to 20 UK postcodes and visually displays the optimized driving route on the existing Google Map.
+
+This feature is for route visualization and distance/time calculation ONLY.
+
+All pricing must continue to use the current system exactly as it is.
+
+FUNCTIONAL REQUIREMENTS
+
+Accept 2–20 UK postcodes (one per line or existing input fields).
+
+Use Google Maps Directions API with optimizeWaypoints: true.
+
+Draw the route on the map using DirectionsRenderer.
+
+Calculate and expose:
+
+total distance (meters → miles)
+
+total duration (seconds → minutes)
+
+Return distance and time as variables only so existing pricing logic can already consume them if needed.
+
+Do NOT calculate price, change price, or override admin pricing.
+
+Do NOT display pricing breakdowns to drivers or customers.
+
+Generate a Google Maps navigation link for drivers (Google Maps app compatible).
+
+TECHNICAL CONSTRAINTS
+
+Use existing Google Maps JS API already configured.
+
+Use existing API key (do not replace or hard-code new keys).
+
+Keep everything compatible with Replit + Hostinger deployment.
+
+All new code must be modular and isolated (new functions only).
+
+IMPLEMENTATION DETAILS
+
+If a route already exists on the map, clear it before rendering a new one.
+
+Validate postcode count (min 2, max 20).
+
+Handle API errors gracefully without crashing the app.
+
+Do not block the UI if routing fails.
+
+Do not auto-dispatch or auto-assign drivers.
+
+DELIVERABLES
+
+Add a new function (e.g. calculateMultiStopRoute) that:
+
+accepts an array of postcodes
+
+calls DirectionsService.route()
+
+renders the route on the map
+
+returns { totalMiles, totalMinutes, googleMapsLink }
+
+Clearly comment the new code so it is easy to maintain.
+
+Confirm explicitly that pricing logic was not touched.
+
+FINAL CHECK BEFORE COMPLETING TASK
+
+Before finishing, verify and confirm in comments:
+
+Pricing logic = unchanged
+
+Admin price override flow = unchanged
+
+Driver sees only final assigned price = unchanged
+
+Existing bookings continue to work = unchanged
