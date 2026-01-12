@@ -915,7 +915,57 @@ export class SupabaseStorage implements IStorage {
   }
 
   async assignDriver(id: string, driverId: string, dispatcherId?: string): Promise<Job | undefined> {
-    return this.updateJob(id, { driverId, dispatcherId, status: 'assigned' });
+    const supabase = this.checkSupabase();
+    
+    // First update the job with driverId and status
+    const updatedJob = await this.updateJob(id, { driverId, dispatcherId, status: 'assigned' });
+    if (!updatedJob) {
+      console.error('[SupabaseStorage] assignDriver: Failed to update job');
+      return undefined;
+    }
+    
+    // Also create a job_assignments record so mobile app can see it
+    // First check if there's already an active assignment for this job
+    const { data: existingAssignment } = await supabase
+      .from('job_assignments')
+      .select('id')
+      .eq('job_id', id)
+      .eq('driver_id', driverId)
+      .in('status', ['pending', 'sent', 'offered', 'assigned', 'accepted'])
+      .maybeSingle();
+    
+    if (!existingAssignment) {
+      // Create new job assignment record
+      const assignmentId = randomUUID();
+      const now = new Date();
+      
+      // Use the job's driver_price if available, otherwise default to 0
+      const driverPrice = updatedJob.driverPrice || 0;
+      
+      const { error: assignmentError } = await supabase
+        .from('job_assignments')
+        .insert({
+          id: assignmentId,
+          job_id: id,
+          driver_id: driverId,
+          assigned_by: dispatcherId || null,
+          driver_price: driverPrice,
+          status: 'offered',
+          sent_at: now.toISOString(),
+          expires_at: null,
+        });
+      
+      if (assignmentError) {
+        console.error('[SupabaseStorage] assignDriver: Failed to create job assignment:', assignmentError);
+        // Don't fail the whole operation - job was already updated
+      } else {
+        console.log(`[SupabaseStorage] assignDriver: Created job assignment for job ${id} to driver ${driverId}`);
+      }
+    } else {
+      console.log(`[SupabaseStorage] assignDriver: Job assignment already exists for job ${id} to driver ${driverId}`);
+    }
+    
+    return updatedJob;
   }
 
   async updateJobPOD(

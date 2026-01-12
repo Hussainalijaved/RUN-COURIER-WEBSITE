@@ -781,11 +781,43 @@ export class MemStorage implements IStorage {
       return undefined;
     }
     
-    return this.updateJob(id, { 
+    const updatedJob = await this.updateJob(id, { 
       driverId, 
       dispatcherId: dispatcherId || null, 
       status: "assigned" 
     });
+    
+    if (updatedJob) {
+      // Also create a job_assignments record so mobile app can see it
+      const existingAssignment = Array.from(this.jobAssignments.values()).find(
+        a => a.jobId === id && a.driverId === driverId && 
+        ['pending', 'sent', 'offered', 'assigned', 'accepted'].includes(a.status)
+      );
+      
+      if (!existingAssignment) {
+        const assignmentId = randomUUID();
+        const now = new Date();
+        const assignment: JobAssignment = {
+          id: assignmentId,
+          jobId: id,
+          driverId: driverId,
+          assignedBy: dispatcherId || null,
+          driverPrice: String(updatedJob.driverPrice || 0),
+          status: 'offered' as JobAssignmentStatus,
+          sentAt: now,
+          expiresAt: null,
+          acceptedAt: null,
+          declinedAt: null,
+          declineReason: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        this.jobAssignments.set(assignmentId, assignment);
+        console.log(`[MemStorage] assignDriver: Created job assignment for job ${id} to driver ${driverId}`);
+      }
+    }
+    
+    return updatedJob;
   }
 
   async updateJobPOD(id: string, podPhotoUrl?: string, podSignatureUrl?: string, podRecipientName?: string, podPhotos?: string[], podNotes?: string): Promise<Job | undefined> {
