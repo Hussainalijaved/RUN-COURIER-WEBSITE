@@ -1262,10 +1262,11 @@ export async function registerRoutes(
           console.log(`[Jobs] Updated job assignment ${activeAssignment.id} for driver ${driver.driverCode || driver.id} with status=sent and price £${finalDriverPrice}`);
         } else {
           // No existing assignment found - create one (fallback)
+          // assigned_by must be a UUID or null - use dispatcherId if provided, otherwise null
           const assignment = await storage.createJobAssignment({
             jobId: job.id,
             driverId: driver.id,
-            assignedBy: "admin",
+            assignedBy: dispatcherId || null,
             driverPrice: finalDriverPrice,
             status: "sent",
             expiresAt: new Date(Date.now() + 30 * 60 * 1000),
