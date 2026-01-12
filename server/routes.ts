@@ -1244,21 +1244,36 @@ export async function registerRoutes(
       }
     }
     
-    // Also create a job assignment record so it appears in mobile app's job offers
+    // NOTE: Job assignment record is already created by storage.assignDriver() with status 'offered'
+    // We need to update it to 'sent' status and ensure driver_price is set correctly
     if (driverId && driver) {
       try {
-        const assignment = await storage.createJobAssignment({
-          jobId: job.id,
-          driverId: driver.id,
-          assignedBy: "admin", // Map assigns as admin
-          driverPrice: finalDriverPrice,
-          status: "sent", // Immediately sent so driver sees it
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
-        });
-        console.log(`[Jobs] Created job assignment ${assignment.id} for driver ${driver.driverCode || driver.id} with price £${finalDriverPrice}`);
+        // Find the assignment created by assignDriver() and update it with correct price/status
+        const assignments = await storage.getJobAssignments({ jobId: req.params.id, driverId: driver.id });
+        const activeAssignment = assignments.find(a => ['offered', 'pending'].includes(a.status));
+        
+        if (activeAssignment) {
+          await storage.updateJobAssignment(activeAssignment.id, {
+            status: 'sent' as any,
+            driverPrice: finalDriverPrice,
+            sentAt: new Date(),
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
+          });
+          console.log(`[Jobs] Updated job assignment ${activeAssignment.id} for driver ${driver.driverCode || driver.id} with status=sent and price £${finalDriverPrice}`);
+        } else {
+          // No existing assignment found - create one (fallback)
+          const assignment = await storage.createJobAssignment({
+            jobId: job.id,
+            driverId: driver.id,
+            assignedBy: "admin",
+            driverPrice: finalDriverPrice,
+            status: "sent",
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          });
+          console.log(`[Jobs] Created new job assignment ${assignment.id} for driver ${driver.driverCode || driver.id} with price £${finalDriverPrice}`);
+        }
       } catch (err) {
-        console.error(`[Jobs] Failed to create job assignment:`, err);
-        // Continue anyway - the job is still assigned
+        console.error(`[Jobs] Failed to update/create job assignment:`, err);
       }
     }
     
