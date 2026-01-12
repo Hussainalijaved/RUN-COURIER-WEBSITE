@@ -1,0 +1,139 @@
+You are working on the Run Courier system (Website Admin + Driver Mobile App) using the SAME Supabase backend.
+
+NON-NEGOTIABLE:
+- Do NOT change any pricing formulas or pricing logic in settings.
+- Do NOT recalculate prices.
+- Only fix job assignment delivery + price visibility.
+- Drivers must receive assigned jobs instantly and must ONLY see driver_price, NEVER customer_price.
+
+CURRENT BUG:
+Admin assigns a job on the website, but the driver mobile app does not receive it.
+
+GOAL:
+When admin assigns a job:
+1) job.assigned_driver_id is set
+2) job.driver_price is set (this is the only price drivers see)
+3) job.status becomes "assigned"
+4) driver app instantly receives the job via realtime or refresh
+
+REQUIRED DATA MODEL (do NOT rename existing fields; map to existing names if different):
+Jobs table must contain:
+- id
+- status (pending_admin / assigned / accepted / picked_up / delivered etc.)
+- customer_price (customer sees this; admin sees this)
+- driver_price (driver sees this; admin sets this on assignment)
+- assigned_driver_id (uuid of driver user)
+- created_by_customer_id
+- timestamps
+
+ADMIN ASSIGNMENT (WEBSITE):
+- In admin panel, the Assign button must:
+  A) require selected driver
+  B) require driver_price > 0
+  C) update the job record in ONE atomic update:
+     assigned_driver_id = <driver_id>,
+     driver_price = <entered>,
+     status = 'assigned',
+     assigned_at = now()
+- After update, trigger realtime update (Supabase Realtime) or immediately refresh the driver job list source.
+
+DRIVER APP (MOBILE):
+- Driver job list query MUST ONLY return jobs where:
+  assigned_driver_id == current_driver_user_id
+  AND status IN ('assigned','accepted','picked_up','in_transit') (use existing statuses)
+  AND driver_price IS NOT NULL
+- Driver UI MUST render ONLY driver_price and MUST NOT render customer_price anywhere.
+- If driver_price is NULL the job must not be visible.
+
+SECURITY / RLS (CRITICAL):
+Implement row-level security so:
+- Drivers can SELECT only rows where assigned_driver_id = auth.uid()
+- Drivers must not be able to read customer_price (never sent to driver app)
+- Admin can read both prices and update assignment fields
+
+If column-level hiding is not possible, create a driver-safe view (e.g. jobs_driver_view) that excludes customer_price and update driver app to read from that view.
+
+REALTIME:
+- Add a realtime subscription in driver app for INSERT/UPDATE on jobs (or the view) filtered by assigned_driver_id = auth.uid()
+- On event, refresh the job list so the new job appears instantly.
+
+DELIVERABLE:
+1) Identify current job table fields and map them to: customer_price, driver_price, assigned_driver_id, status
+2) Fix admin assign function (atomic update)
+3) Fix driver query and UI to show only driver_price
+4) Add realtime subscription or forced refresh
+5) Add/repair Supabase RLS policies or driver-safe view
+6) Provide a short checklist of files changed and what was changed.
+If your AI needs “exact SQL”, use this (safe default)
+Only use this if your table is named jobs and the driver is auth.uid().
+
+1) Create a driver-safe view (hides customer_price)
+sql
+Copy code
+create or replace view public.jobs_driver_view as
+select
+  id,
+  status,
+  driver_price,
+  assigned_driver_id,
+  pickup_address,
+  dropoff_address,
+  pickup_postcode,
+  dropoff_postcode,
+  distance_miles,
+  notes,
+  created_at,
+  updated_at,
+  assigned_at
+from public.jobs;
+2) RLS policies (drivers only see their assigned jobs)
+sql
+Copy code
+alter table public.jobs enable row level security;
+
+-- Drivers can read only their assigned jobs (table-level)
+create policy "drivers_read_assigned_jobs"
+on public.jobs
+for select
+to authenticated
+using (assigned_driver_id = auth.uid());
+
+-- Admin policy (example: if you use role claim or admin table)
+-- Replace this with YOUR admin check logic.
+-- create policy "admins_full_access" ...
+3) Lock down driver view access
+sql
+Copy code
+grant select on public.jobs_driver_view to authenticated;
+revoke all on public.jobs from anon;
+✅ Then make the driver app read from jobs_driver_view (not jobs) so customer_price never arrives to the app.
+
+Driver app query rule (must match exactly)
+Use one of these patterns:
+
+Option A (recommended):
+
+source: jobs_driver_view
+
+filter: assigned_driver_id = auth.uid() AND driver_price is not null
+
+Option B (if you can’t use a view):
+
+source: jobs
+
+still filter by assigned_driver_id
+
+BUT you must ensure UI never renders customer_price (less secure)
+
+Admin assignment must be one atomic update
+The admin button must do one update call that sets all 3 fields together:
+
+assigned_driver_id
+
+driver_price
+
+status='assigned'
+
+assigned_at=now()
+
+This is what usually fixes “driver didn’t receive it” because drivers are often listening for status='assigned' but the record is updated in multiple steps or without driver_price.
