@@ -59,75 +59,101 @@ export async function triggerStripeSync() {
   }
 }
 
-// PRODUCTION SAFE MODE
+// PRODUCTION MODE - Full API with static files
 if (IS_PROD) {
-  console.log("[BOOT] PRODUCTION SAFE MODE - Serving static files only");
+  console.log("[BOOT] PRODUCTION MODE - Full API enabled");
   
-  // Try to serve built static files
-  const distPath = path.resolve(process.cwd(), "dist", "public");
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   
-  if (fs.existsSync(distPath)) {
-    console.log("[BOOT] Serving from dist/public");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.resolve(distPath, "index.html"));
-    });
-  } else {
-    console.log("[BOOT] No dist/public - serving fallback HTML");
-    app.get("*", (req, res) => {
-      res.status(200).send(`
-        <!DOCTYPE html>
-        <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Run Courier - UK Delivery Services</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-                color: white;
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              }
-              .container { text-align: center; padding: 2rem; }
-              h1 { 
-                font-size: 3rem; 
-                margin-bottom: 1rem;
-                background: linear-gradient(90deg, #00d9ff, #00ff88);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-              }
-              p { font-size: 1.25rem; opacity: 0.9; margin-bottom: 2rem; }
-              .status {
-                display: inline-block;
-                background: rgba(0, 255, 136, 0.2);
-                border: 1px solid rgba(0, 255, 136, 0.5);
-                padding: 0.5rem 1.5rem;
-                border-radius: 2rem;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>Run Courier</h1>
-              <p>UK's Premier Delivery Service</p>
-              <div class="status">Server Online</div>
-            </div>
-          </body>
-        </html>
-      `);
-    });
-  }
+  (async () => {
+    try {
+      console.log("[BOOT] Registering routes...");
+      const { registerRoutes } = await import("./routes");
+      await registerRoutes(httpServer, app);
+      console.log("[BOOT] Routes registered");
+      
+      console.log("[BOOT] Setting up realtime...");
+      const { setupRealtimeServer } = await import('./realtime');
+      setupRealtimeServer(httpServer);
+      console.log("[BOOT] Realtime done");
+      
+      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        res.status(status).json({ message });
+      });
+      
+      // Serve static files AFTER API routes
+      const distPath = path.resolve(process.cwd(), "dist", "public");
+      
+      if (fs.existsSync(distPath)) {
+        console.log("[BOOT] Serving from dist/public");
+        app.use(express.static(distPath));
+        app.get("*", (req, res) => {
+          res.sendFile(path.resolve(distPath, "index.html"));
+        });
+      } else {
+        console.log("[BOOT] No dist/public - serving fallback HTML");
+        app.get("*", (req, res) => {
+          res.status(200).send(`
+            <!DOCTYPE html>
+            <html lang="en">
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Run Courier - UK Delivery Services</title>
+                <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                    color: white;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  }
+                  .container { text-align: center; padding: 2rem; }
+                  h1 { 
+                    font-size: 3rem; 
+                    margin-bottom: 1rem;
+                    background: linear-gradient(90deg, #00d9ff, #00ff88);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                  }
+                  p { font-size: 1.25rem; opacity: 0.9; margin-bottom: 2rem; }
+                  .status {
+                    display: inline-block;
+                    background: rgba(0, 255, 136, 0.2);
+                    border: 1px solid rgba(0, 255, 136, 0.5);
+                    padding: 0.5rem 1.5rem;
+                    border-radius: 2rem;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>Run Courier</h1>
+                  <p>UK's Premier Delivery Service</p>
+                  <div class="status">Server Online</div>
+                </div>
+              </body>
+            </html>
+          `);
+        });
+      }
 
-  // Start immediately - no async
-  httpServer.listen({ port: PORT, host: "0.0.0.0" }, () => {
-    log(`serving on port ${PORT}`);
-    console.log("[BOOT] PRODUCTION READY - No background tasks");
-  });
+      httpServer.listen({ port: PORT, host: "0.0.0.0" }, () => {
+        log(`serving on port ${PORT}`);
+        console.log("[BOOT] PRODUCTION READY");
+        runBackgroundTasks();
+      });
+      
+    } catch (error: any) {
+      console.error("[BOOT] FATAL:", error?.message || error);
+      process.exit(1);
+    }
+  })();
   
 } else {
   // DEVELOPMENT MODE - Full functionality
