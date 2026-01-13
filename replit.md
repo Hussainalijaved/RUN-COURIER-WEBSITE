@@ -22,6 +22,14 @@ Supabase PostgreSQL is the sole data store. The `SupabaseStorage` class implemen
 ### Authentication & Authorization
 Supabase Auth manages user authentication and session management. Role-based access control is implemented via `ProtectedRoute` components, directing users to specific dashboards based on their roles (admin, customer, driver, dispatcher, vendor).
 
+### Admin Identity Model
+Admins are identified by `auth.jwt()->>'email'` matching entries in the `public.admins` table:
+- **Primary Method**: Email-based admin check via `public.is_admin_by_email()` function
+- **Admins Table**: Simple table with `email` column for authorized admin emails
+- **RLS Policies**: All table policies use `is_admin_by_email()` for admin access
+- **Fallback**: `is_admin_or_dispatcher()` also checks `users.role` for backwards compatibility
+- **Migration**: `supabase/migrations/015_fix_admin_rls_policies.sql` must be run in Supabase SQL Editor
+
 ### Real-Time Features
 A WebSocket server (`ws` library) at `/ws/realtime` enables live driver location tracking, real-time job status updates, broadcasting, and offline detection. It uses secure token-based authentication with Supabase JWT verification and server-side role validation.
 
