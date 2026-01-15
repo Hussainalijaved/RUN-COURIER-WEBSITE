@@ -35,6 +35,7 @@ import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { calculateQuote, formatPrice, type QuoteBreakdown } from '@/lib/pricing';
 import { calculateDistanceFromPostcodes } from '@/lib/maps';
+import { RouteMapPreview } from '@/components/RouteMapPreview';
 import type { Driver, VehicleType, CustomerType } from '@shared/schema';
 import {
   Package,
@@ -127,8 +128,6 @@ export default function AdminCreateJob() {
   const [isMultiDropMode, setIsMultiDropMode] = useState(false);
   const [routeLegs, setRouteLegs] = useState<{ from: string; to: string; distance: number }[]>([]);
   
-  // Route map state - use Google Maps Embed API
-  const [mapEmbedUrl, setMapEmbedUrl] = useState<string | null>(null);
   
   const addDrop = () => {
     setDrops(prev => [...prev, { 
@@ -390,49 +389,6 @@ export default function AdminCreateJob() {
     return () => clearTimeout(timer);
   }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, waitingTime, isMultiDropMode, pickupDate, pickupTime]);
 
-  // Generate Google Maps Embed URL when postcodes change
-  const updateMapEmbed = useCallback(() => {
-    // Get all postcodes
-    const postcodes: string[] = [];
-    if (pickupPostcode && pickupPostcode.length >= 3) {
-      postcodes.push(pickupPostcode + ', UK');
-    }
-    
-    if (isMultiDropMode && drops.length > 0) {
-      // Multi-drop: add all drop points
-      const validDrops = drops.filter(d => d.postcode && d.postcode.length >= 3);
-      for (const drop of validDrops) {
-        postcodes.push(drop.postcode + ', UK');
-      }
-    } else if (deliveryPostcode && deliveryPostcode.length >= 3) {
-      // Single delivery
-      postcodes.push(deliveryPostcode + ', UK');
-    }
-    
-    // Need at least 2 postcodes for a route
-    if (postcodes.length < 2) {
-      setMapEmbedUrl(null);
-      return;
-    }
-    
-    // Use Google Maps Embed API (free, no restrictions)
-    const origin = encodeURIComponent(postcodes[0]);
-    const destination = encodeURIComponent(postcodes[postcodes.length - 1]);
-    const waypoints = postcodes.slice(1, -1).map(pc => encodeURIComponent(pc)).join('|');
-    
-    // Embed API URL format for directions
-    let embedUrl = `https://www.google.com/maps/embed/v1/directions?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&origin=${origin}&destination=${destination}&mode=driving`;
-    if (waypoints) {
-      embedUrl += `&waypoints=${waypoints}`;
-    }
-    
-    setMapEmbedUrl(embedUrl);
-  }, [pickupPostcode, deliveryPostcode, isMultiDropMode, drops]);
-
-  // Update map embed when postcodes change
-  useEffect(() => {
-    updateMapEmbed();
-  }, [updateMapEmbed]);
 
   const createJobMutation = useMutation({
     mutationFn: async (data: CreateJobInput) => {
@@ -1279,26 +1235,12 @@ export default function AdminCreateJob() {
                       className="w-full h-[280px] rounded-lg bg-muted overflow-hidden"
                       data-testid="route-map-container"
                     >
-                      {mapEmbedUrl ? (
-                        <iframe
-                          src={mapEmbedUrl}
-                          width="100%"
-                          height="100%"
-                          style={{ border: 0 }}
-                          allowFullScreen
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          title="Route Map"
-                          data-testid="route-map-iframe"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="text-center text-muted-foreground">
-                            <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">Enter pickup and delivery postcodes to see the route</p>
-                          </div>
-                        </div>
-                      )}
+                      <RouteMapPreview
+                        pickupPostcode={pickupPostcode}
+                        deliveryPostcode={deliveryPostcode}
+                        drops={drops}
+                        isMultiDrop={isMultiDropMode}
+                      />
                     </div>
                   </CardContent>
                 </Card>
