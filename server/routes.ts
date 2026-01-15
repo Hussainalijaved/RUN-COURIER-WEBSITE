@@ -4152,15 +4152,45 @@ export async function registerRoutes(
       });
     };
     
-    // Fetch job details if job IDs provided
+    // Fetch job details if job IDs provided (including multi-drop stops)
     let jobDetails: any[] = [];
     if (data.jobIds && data.jobIds.length > 0 && supabaseAdmin) {
+      // Handle both numeric and UUID job IDs
       const { data: jobs, error } = await supabaseAdmin
         .from('jobs')
-        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price')
-        .in('id', data.jobIds.map(id => parseInt(id)));
+        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+        .in('id', data.jobIds);
       
       if (!error && jobs) {
+        // Fetch multi-drop stops for all jobs that are multi-drop
+        const multiDropJobIds = jobs.filter(j => j.is_multi_drop).map(j => j.id);
+        let multiDropStopsMap: Record<string, any[]> = {};
+        
+        if (multiDropJobIds.length > 0) {
+          const { data: stops, error: stopsError } = await supabaseAdmin
+            .from('multi_drop_stops')
+            .select('job_id, stop_order, postcode, address, recipient_name, recipient_phone, instructions')
+            .in('job_id', multiDropJobIds)
+            .order('stop_order', { ascending: true });
+          
+          if (!stopsError && stops) {
+            // Group stops by job_id
+            for (const stop of stops) {
+              if (!multiDropStopsMap[stop.job_id]) {
+                multiDropStopsMap[stop.job_id] = [];
+              }
+              multiDropStopsMap[stop.job_id].push({
+                stopOrder: stop.stop_order,
+                postcode: stop.postcode,
+                address: stop.address,
+                recipientName: stop.recipient_name,
+                recipientPhone: stop.recipient_phone,
+                instructions: stop.instructions,
+              });
+            }
+          }
+        }
+        
         jobDetails = jobs.map(job => ({
           trackingNumber: job.tracking_number || `JOB-${job.id}`,
           pickupAddress: job.pickup_address || 'N/A',
@@ -4169,6 +4199,8 @@ export async function registerRoutes(
           scheduledDate: formatShortDate(job.scheduled_pickup_time),
           vehicleType: job.vehicle_type || 'car',
           price: parseFloat(job.total_price) || 0,
+          isMultiDrop: job.is_multi_drop || false,
+          multiDropStops: multiDropStopsMap[job.id] || [],
         }));
       }
     }
