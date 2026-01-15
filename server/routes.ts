@@ -1186,6 +1186,32 @@ export async function registerRoutes(
           console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
         } else {
           console.log(`[Jobs] Job synced to Supabase with id ${insertedJob?.id}, tracking: ${insertedJob?.tracking_number}`);
+          
+          // Save multi-drop stops to Supabase if present
+          const multiDropStops = req.body.multiDropStops;
+          if (job.isMultiDrop && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0 && insertedJob?.id) {
+            console.log(`[Jobs] Saving ${multiDropStops.length} multi-drop stops for job ${insertedJob.id}`);
+            const stopsToInsert = multiDropStops.map((stop: any, index: number) => ({
+              job_id: insertedJob.id,
+              stop_order: stop.stopOrder || index + 1,
+              address: stop.address || stop.fullAddress || '',
+              postcode: stop.postcode || '',
+              recipient_name: stop.recipientName || null,
+              recipient_phone: stop.recipientPhone || null,
+              instructions: stop.instructions || null,
+              status: 'pending',
+            }));
+            
+            const { error: stopsError } = await supabaseAdmin
+              .from('multi_drop_stops')
+              .insert(stopsToInsert);
+            
+            if (stopsError) {
+              console.error('[Jobs] Failed to save multi-drop stops:', stopsError);
+            } else {
+              console.log(`[Jobs] Successfully saved ${stopsToInsert.length} multi-drop stops`);
+            }
+          }
         }
       } else {
         console.error('[Jobs] supabaseAdmin is null - cannot sync to Supabase! Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
