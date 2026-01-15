@@ -16,6 +16,55 @@ export const supabaseAdmin = supabaseUrl && supabaseServiceKey
     })
   : null;
 
+// Cache for admin email checks to reduce database queries
+const adminEmailCache = new Map<string, { isAdmin: boolean; timestamp: number }>();
+const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check if an email is in the admins table
+ * This is the authoritative source for admin identification
+ * Uses email-based recognition as specified in the admin identity model
+ */
+export async function isAdminByEmail(email: string): Promise<boolean> {
+  if (!email || !supabaseAdmin) {
+    return false;
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  // Check cache first
+  const cached = adminEmailCache.get(normalizedEmail);
+  if (cached && Date.now() - cached.timestamp < ADMIN_CACHE_TTL) {
+    return cached.isAdmin;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('admins')
+      .select('email')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    const isAdmin = !error && !!data;
+    
+    // Update cache
+    adminEmailCache.set(normalizedEmail, { isAdmin, timestamp: Date.now() });
+    
+    console.log(`[Admin Check] Email ${normalizedEmail}: ${isAdmin ? 'IS admin' : 'NOT admin'}`);
+    return isAdmin;
+  } catch (error) {
+    console.error('[Admin Check] Error checking admin status:', error);
+    return false;
+  }
+}
+
+/**
+ * Clear the admin cache (useful when admin list changes)
+ */
+export function clearAdminCache(): void {
+  adminEmailCache.clear();
+}
+
 export interface VerifiedUser {
   id: string;
   email: string;

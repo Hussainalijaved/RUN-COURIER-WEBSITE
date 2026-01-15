@@ -14,6 +14,61 @@ const IS_PROD = process.env.NODE_ENV === "production";
 
 console.log(`[BOOT] Mode: ${IS_PROD ? 'PRODUCTION' : 'DEVELOPMENT'}, Port: ${PORT}`);
 
+// Environment variable validation with graceful failure
+function validateEnvironment(): { valid: boolean; warnings: string[]; critical: string[] } {
+  const warnings: string[] = [];
+  const critical: string[] = [];
+  
+  // Critical variables - required for core functionality
+  const criticalVars = [
+    { name: 'SUPABASE_URL', alt: 'VITE_SUPABASE_URL' },
+    { name: 'SUPABASE_SERVICE_ROLE_KEY', alt: null },
+    { name: 'SESSION_SECRET', alt: null },
+  ];
+  
+  // Warning variables - functionality degraded without them
+  const warningVars = [
+    { name: 'VITE_SUPABASE_ANON_KEY', alt: 'SUPABASE_ANON_KEY' },
+    { name: 'STRIPE_SECRET_KEY', alt: null },
+    { name: 'VITE_GOOGLE_MAPS_API_KEY', alt: 'GOOGLE_MAPS_API_KEY' },
+  ];
+  
+  for (const v of criticalVars) {
+    const value = process.env[v.name] || (v.alt ? process.env[v.alt] : null);
+    if (!value) {
+      critical.push(`Missing ${v.name}${v.alt ? ` (or ${v.alt})` : ''}`);
+    }
+  }
+  
+  for (const v of warningVars) {
+    const value = process.env[v.name] || (v.alt ? process.env[v.alt] : null);
+    if (!value) {
+      warnings.push(`Missing ${v.name}${v.alt ? ` (or ${v.alt})` : ''} - some features may be disabled`);
+    }
+  }
+  
+  // Log results
+  if (critical.length > 0) {
+    console.error('[ENV] Critical environment errors:');
+    critical.forEach(c => console.error(`  - ${c}`));
+  }
+  if (warnings.length > 0) {
+    console.warn('[ENV] Environment warnings:');
+    warnings.forEach(w => console.warn(`  - ${w}`));
+  }
+  if (critical.length === 0 && warnings.length === 0) {
+    console.log('[ENV] All environment variables validated');
+  }
+  
+  return { valid: critical.length === 0, warnings, critical };
+}
+
+const envCheck = validateEnvironment();
+if (!envCheck.valid && IS_PROD) {
+  console.error('[BOOT] Critical environment variables missing - server may not function correctly');
+  // Don't crash in production, but log the issue
+}
+
 const app = express();
 const httpServer = createServer(app);
 

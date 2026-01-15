@@ -28,6 +28,133 @@ import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending } from "./realtime";
 import { geocodeAddress } from "./geocoding";
 import { sendJobOfferNotification } from "./pushNotifications";
+import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
+
+/**
+ * Middleware to verify admin access using email-based recognition
+ * Checks the Authorization header token and verifies email is in admins table
+ * STRICT MODE: Rejects requests without valid admin credentials
+ * 
+ * SECURITY: Admin access is EXCLUSIVELY based on email in admins table
+ * No JWT role fallback - this prevents bypass via stale/incorrect role claims
+ */
+async function requireAdminAccessStrict(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authentication required', code: 'NO_TOKEN' });
+    return;
+  }
+
+  try {
+    const token = authHeader.slice(7);
+    
+    // Verify token with Supabase - MUST succeed for admin access
+    // No fallback to JWT payload decoding for admin routes
+    if (!supabaseAdmin) {
+      console.error('[Admin Access] Supabase admin client not initialized');
+      res.status(500).json({ error: 'Authentication service unavailable', code: 'AUTH_SERVICE_ERROR' });
+      return;
+    }
+    
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    
+    if (error || !authUser) {
+      console.log('[Admin Access] Token verification failed:', error?.message);
+      res.status(401).json({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' });
+      return;
+    }
+
+    // AUTHORITATIVE CHECK: email must be in admins table
+    // This is the SINGLE SOURCE OF TRUTH for admin access per the admin identity model
+    const emailIsAdmin = await isAdminByEmail(authUser.email || '');
+    
+    if (!emailIsAdmin) {
+      console.log(`[Admin Access] Denied for: ${authUser.email} (not in admins table)`);
+      res.status(403).json({ error: 'Admin access required', code: 'NOT_ADMIN' });
+      return;
+    }
+    
+    // Admin verified via email in admins table
+    console.log(`[Admin Access] Granted for: ${authUser.email} (verified via admins table)`);
+    (req as any).isAdmin = true;
+    (req as any).adminUser = {
+      id: authUser.id,
+      email: authUser.email || '',
+      role: 'admin',
+      fullName: authUser.user_metadata?.fullName || authUser.user_metadata?.full_name,
+    };
+    next();
+  } catch (error) {
+    console.error('[Admin Access] Error verifying admin status:', error);
+    res.status(500).json({ error: 'Authentication error', code: 'AUTH_ERROR' });
+  }
+}
+
+/**
+ * Soft middleware to set admin status without blocking
+ * Used for routes that need to check admin status but allow non-admin access
+ * 
+ * SECURITY: Admin status is ONLY set if email is in admins table
+ */
+async function requireAdminAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    (req as any).isAdmin = false;
+    next();
+    return;
+  }
+
+  try {
+    const token = authHeader.slice(7);
+    
+    // Only use Supabase auth verification for admin status
+    if (!supabaseAdmin) {
+      (req as any).isAdmin = false;
+      next();
+      return;
+    }
+    
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    
+    if (error || !authUser) {
+      (req as any).isAdmin = false;
+      next();
+      return;
+    }
+
+    // Admin status based ONLY on email in admins table
+    const emailIsAdmin = await isAdminByEmail(authUser.email || '');
+    
+    (req as any).isAdmin = emailIsAdmin;
+    if (emailIsAdmin) {
+      (req as any).adminUser = {
+        id: authUser.id,
+        email: authUser.email || '',
+        role: 'admin',
+        fullName: authUser.user_metadata?.fullName || authUser.user_metadata?.full_name,
+      };
+    }
+    next();
+  } catch (error) {
+    console.error('[Admin Access] Error verifying admin status:', error);
+    (req as any).isAdmin = false;
+    next();
+  }
+}
+
+/**
+ * Helper to enforce admin access within route handlers
+ * Returns true if admin, sends 403 if not
+ */
+function enforceAdminAccess(req: Request, res: Response): boolean {
+  if (!(req as any).isAdmin) {
+    res.status(403).json({ error: 'Admin access required', code: 'ADMIN_REQUIRED' });
+    return false;
+  }
+  return true;
+}
 
 // Server-side pricing configuration - SINGLE SOURCE OF TRUTH
 // This must match the client-side config in client/src/lib/pricing.ts
@@ -206,6 +333,17 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Apply STRICT admin access middleware to all admin-only routes
+  // These routes will REJECT requests without valid admin credentials
+  app.use('/api/admin', requireAdminAccessStrict);
+  app.use('/api/drivers/:id/verify', requireAdminAccessStrict);
+  app.use('/api/drivers/:id/deactivate', requireAdminAccessStrict);
+  app.use('/api/drivers/:id/reactivate', requireAdminAccessStrict);
+  app.use('/api/documents/:id/review', requireAdminAccessStrict);
+  app.use('/api/invoices/:id/send', requireAdminAccessStrict);
+  app.use('/api/invoices/:id/resend', requireAdminAccessStrict);
+  app.use('/api/job-assignments', requireAdminAccessStrict);
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -1683,6 +1821,9 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/drivers/:id/verify", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Driver verification is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     const { isVerified, bypassDocumentCheck } = req.body;
     const driverId = req.params.id;
     
@@ -1791,6 +1932,9 @@ export async function registerRoutes(
   }));
 
   app.post("/api/drivers/:id/deactivate", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Driver deactivation is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     const driverId = req.params.id;
     
     // Check if driver exists
@@ -1831,6 +1975,9 @@ export async function registerRoutes(
   }));
 
   app.post("/api/drivers/:id/reactivate", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Driver reactivation is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     const driverId = req.params.id;
     
     // Check if driver exists (include inactive)
@@ -2331,6 +2478,9 @@ export async function registerRoutes(
 
   // Admin endpoint to update Pay Later status by email
   app.post("/api/admin/update-pay-later", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Updating pay later is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     const { email, payLaterEnabled } = req.body;
     
     if (!email) {
@@ -2380,6 +2530,9 @@ export async function registerRoutes(
 
   // Admin endpoint to manually trigger Stripe sync (not auto-run on startup)
   app.post("/api/admin/sync-stripe", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Stripe sync is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     try {
       const { triggerStripeSync } = await import('./index');
       const result = await triggerStripeSync();
@@ -2911,6 +3064,9 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/documents/:id/review", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Document review is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     const { status, reviewedBy, reviewNotes } = req.body;
     const reviewedAt = new Date();
     
@@ -4305,6 +4461,9 @@ export async function registerRoutes(
 
   // Send invoice to customer email
   app.post("/api/invoices/:id/send", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Sending invoices is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     const { sendInvoiceToCustomer } = await import("./emailService");
     
     const invoice = await storage.getInvoice(req.params.id);
@@ -4340,6 +4499,9 @@ export async function registerRoutes(
 
   // Resend invoice email to customer
   app.post("/api/invoices/:id/resend", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Resending invoices is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
     const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
     
     const invoice = await storage.getInvoice(req.params.id);

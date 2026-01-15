@@ -1,0 +1,121 @@
+Goal:
+Make the entire system stable, correct, and production-safe across:
+- Supabase backend
+- Admin web app
+- Driver mobile app APIs
+- Deployment environment
+
+This project was migrated from Replit DB to Supabase and is now failing due to RLS, auth, environment, and deployment inconsistencies.
+
+Perform the following:
+
+========================
+1. Identity & Permissions
+========================
+Admins are identified by:
+  auth.jwt()->>'email' matching admins.email
+
+Fix all data access to enforce:
+- Admins: full read/write on all tables
+- Drivers: only their own data
+- Customers: only their own jobs & invoices
+
+Do NOT disable RLS.
+Do NOT use auth.uid() for admin checks.
+Use email-based admin recognition.
+
+Tables:
+- admins
+- drivers
+- jobs
+- invoices
+- payments
+- driver_documents
+- notifications
+- storage.objects
+
+Ensure:
+- Admin can see all drivers
+- Admin can verify drivers
+- Admin can assign jobs
+- Admin can resend invoices
+- Admin can approve documents
+- Drivers only see their jobs
+- Customers only see their jobs & invoices
+
+=====================
+2. Service Role Layer
+=====================
+Implement a server-side Supabase client using:
+SUPABASE_SERVICE_ROLE_KEY
+
+All admin actions must go through this client, never the browser.
+
+Convert:
+- Driver approval
+- Job assignment
+- Invoice resend
+- Document approval
+- Driver list
+- Job list
+
+to server API routes that use the service role key and bypass RLS.
+
+Protect these routes by verifying:
+auth.jwt()->>'email' exists in admins table.
+
+===================
+3. Mobile App Fixes
+===================
+Fix mobile job assignment and driver visibility.
+
+Ensure:
+- Verified drivers are queryable
+- Assigned jobs appear
+- POD upload validates Base64 before sending
+- Notification payloads include sound and high priority
+
+Do not change Supabase schema unless required.
+
+===================
+4. Deployment & Env
+===================
+Verify and enforce:
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_ANON_KEY
+- VITE_GOOGLE_MAPS_API_KEY
+- SUPABASE_SERVICE_ROLE_KEY (server only)
+
+Fail gracefully if missing.
+Never crash production build.
+
+Make Google Maps client-side only and SSR-safe.
+
+=====================
+5. Data Consistency
+=====================
+Fix Driver ID logic:
+- Must be immutable
+- Must follow format RC + 2 digits + 1 letter
+- Never regenerate on updates
+
+Migrate existing bad IDs if needed.
+
+====================
+6. Verification Pass
+====================
+After fixes, validate:
+- Admin sees all drivers
+- Admin can approve documents
+- Admin can assign drivers
+- Jobs appear in admin
+- Mobile app receives assigned jobs
+- Invoices can be printed and resent
+- Build passes in production
+
+Do not add features.
+Do not touch DNS.
+Do not touch SSL.
+Only stabilize, secure, and correct the system.
+
+Return when the system is fully operational.

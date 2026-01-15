@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { verifyAccessToken, type VerifiedUser, supabaseAdmin } from "./supabaseAdmin";
+import { verifyAccessToken, type VerifiedUser, supabaseAdmin, isAdminByEmail } from "./supabaseAdmin";
 import { storage } from "./storage";
 import { db } from "./db";
 import { drivers as driversTable } from "@shared/schema";
@@ -52,6 +52,10 @@ declare global {
   }
 }
 
+/**
+ * Middleware to verify Supabase authentication for mobile routes
+ * Uses direct Supabase auth verification - no JWT payload fallback
+ */
 export async function requireSupabaseAuth(
   req: Request,
   res: Response,
@@ -70,9 +74,20 @@ export async function requireSupabaseAuth(
   const token = authHeader.substring(7);
   
   try {
-    const user = await verifyAccessToken(token);
+    // Use direct Supabase auth verification - no fallback to JWT payload decoding
+    if (!supabaseAdmin) {
+      console.error("[Mobile Auth] Supabase admin client not initialized");
+      res.status(500).json({ 
+        error: "Authentication service unavailable",
+        code: "AUTH_SERVICE_ERROR"
+      });
+      return;
+    }
     
-    if (!user) {
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    
+    if (error || !authUser) {
+      console.log("[Mobile Auth] Token verification failed:", error?.message);
       res.status(401).json({ 
         error: "Invalid or expired token",
         code: "INVALID_TOKEN"
@@ -80,7 +95,13 @@ export async function requireSupabaseAuth(
       return;
     }
 
-    req.auth = user;
+    // Set verified user info
+    req.auth = {
+      id: authUser.id,
+      email: authUser.email || '',
+      role: authUser.user_metadata?.role || 'user',
+      fullName: authUser.user_metadata?.fullName || authUser.user_metadata?.full_name,
+    };
     next();
   } catch (error) {
     console.error("Auth middleware error:", error);
@@ -179,6 +200,12 @@ export async function requireDriverRole(
   }
 }
 
+/**
+ * Middleware for admin/dispatcher access on mobile routes
+ * 
+ * SECURITY: Uses email-based verification via admins table
+ * No JWT role fallback - prevents bypass via stale/incorrect role claims
+ */
 export async function requireAdminOrDispatcher(
   req: Request,
   res: Response,
@@ -192,13 +219,53 @@ export async function requireAdminOrDispatcher(
     return;
   }
 
-  if (!["admin", "dispatcher"].includes(req.auth.role)) {
+  // AUTHORITATIVE CHECK: verify email is in admins table
+  // This is the SINGLE SOURCE OF TRUTH per the admin identity model
+  // No JWT role fallback - email in admins table is the only valid admin verification
+  const emailIsAdmin = await isAdminByEmail(req.auth.email);
+  
+  if (!emailIsAdmin) {
+    console.log(`[Admin Auth] Access denied for: ${req.auth.email} (not in admins table)`);
     res.status(403).json({ 
-      error: "Admin or dispatcher access required",
-      code: "INSUFFICIENT_ROLE"
+      error: "Admin access required",
+      code: "NOT_ADMIN"
     });
     return;
   }
 
+  // Email is in admins table - grant access
+  console.log(`[Admin Auth] Access granted via admins table for: ${req.auth.email}`);
+  next();
+}
+
+/**
+ * Middleware specifically for admin-only routes (no dispatcher fallback)
+ * Uses email-based verification against admins table
+ */
+export async function requireAdminRole(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  if (!req.auth) {
+    res.status(401).json({ 
+      error: "Authentication required",
+      code: "NO_AUTH"
+    });
+    return;
+  }
+
+  const emailIsAdmin = await isAdminByEmail(req.auth.email);
+  
+  if (!emailIsAdmin) {
+    console.log(`[Admin Auth] Admin access denied for: ${req.auth.email}`);
+    res.status(403).json({ 
+      error: "Admin access required",
+      code: "NOT_ADMIN"
+    });
+    return;
+  }
+
+  console.log(`[Admin Auth] Admin access granted for: ${req.auth.email}`);
   next();
 }

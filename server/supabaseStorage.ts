@@ -208,6 +208,8 @@ function mapDbToInvoice(dbInvoice: any): Invoice {
     periodEnd: dbInvoice.period_end ? new Date(dbInvoice.period_end) : new Date(),
     jobIds: dbInvoice.job_ids,
     notes: dbInvoice.notes,
+    paymentToken: dbInvoice.payment_token || null,
+    jobDetails: dbInvoice.job_details || null,
     createdAt: dbInvoice.created_at ? new Date(dbInvoice.created_at) : new Date(),
   };
 }
