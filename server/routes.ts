@@ -3968,8 +3968,26 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Invoice not found" });
     }
     
+    // Build update object with all editable fields (except invoice_number which is never changed)
     const updateData: any = {};
-    if (req.body.status) updateData.status = req.body.status;
+    if (req.body.status !== undefined) updateData.status = req.body.status;
+    if (req.body.customer_name !== undefined) updateData.customer_name = req.body.customer_name;
+    if (req.body.customer_email !== undefined) updateData.customer_email = req.body.customer_email;
+    if (req.body.company_name !== undefined) updateData.company_name = req.body.company_name;
+    if (req.body.business_address !== undefined) updateData.business_address = req.body.business_address;
+    if (req.body.vat_number !== undefined) updateData.vat_number = req.body.vat_number;
+    if (req.body.subtotal !== undefined) updateData.subtotal = parseFloat(req.body.subtotal);
+    if (req.body.vat !== undefined) updateData.vat = parseFloat(req.body.vat);
+    if (req.body.amount !== undefined) updateData.amount = parseFloat(req.body.amount);
+    if (req.body.due_date !== undefined) updateData.due_date = req.body.due_date;
+    if (req.body.period_start !== undefined) updateData.period_start = req.body.period_start;
+    if (req.body.period_end !== undefined) updateData.period_end = req.body.period_end;
+    if (req.body.notes !== undefined) updateData.notes = req.body.notes;
+    if (req.body.job_details !== undefined) updateData.job_details = req.body.job_details;
+    
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
     
     const { data, error } = await supabaseAdmin
       .from('invoice_payment_tokens')
@@ -3979,6 +3997,7 @@ export async function registerRoutes(
       .single();
     
     if (error || !data) {
+      console.error('[Invoices] Error updating invoice:', error);
       return res.status(404).json({ error: "Invoice not found" });
     }
     
@@ -3988,19 +4007,19 @@ export async function registerRoutes(
       customer_id: null,
       customer_name: data.customer_name,
       customer_email: data.customer_email,
-      company_name: null,
-      business_address: null,
-      subtotal: String(data.amount),
-      vat: '0',
+      company_name: data.company_name || null,
+      business_address: data.business_address || null,
+      subtotal: String(data.subtotal || data.amount),
+      vat: String(data.vat || 0),
       total: String(data.amount),
       status: data.status,
       due_date: data.due_date,
       period_start: data.period_start,
       period_end: data.period_end,
-      job_ids: null,
+      job_ids: data.job_ids || null,
       notes: data.notes,
       payment_token: data.token,
-      job_details: null,
+      job_details: data.job_details || null,
       created_at: data.created_at,
     };
     

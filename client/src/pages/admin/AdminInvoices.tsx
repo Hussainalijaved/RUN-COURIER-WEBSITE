@@ -51,6 +51,7 @@ import {
   Clock,
   XCircle,
   RefreshCw,
+  Pencil,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -86,6 +87,22 @@ const createInvoiceFormSchema = z.object({
 });
 
 type CreateInvoiceFormData = z.infer<typeof createInvoiceFormSchema>;
+
+const editInvoiceFormSchema = z.object({
+  customer_name: z.string().min(1, "Customer name is required"),
+  customer_email: z.string().email("Valid email required"),
+  company_name: z.string().optional(),
+  business_address: z.string().optional(),
+  subtotal: z.string().min(1, "Subtotal is required"),
+  vat: z.string().optional(),
+  due_date: z.string().min(1, "Due date is required"),
+  period_start: z.string().min(1, "Period start is required"),
+  period_end: z.string().min(1, "Period end is required"),
+  notes: z.string().optional(),
+  status: z.string().optional(),
+});
+
+type EditInvoiceFormData = z.infer<typeof editInvoiceFormSchema>;
 
 const formatPrice = (price: string | number | null | undefined) => {
   if (price === null || price === undefined) return '£0.00';
@@ -140,6 +157,8 @@ export default function AdminInvoices() {
   const [sentInvoices, setSentInvoices] = useState<SentInvoice[]>([]);
   const [viewInvoice, setViewInvoice] = useState<SavedInvoice | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editInvoice, setEditInvoice] = useState<SavedInvoice | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<CreateInvoiceFormData>({
@@ -161,6 +180,41 @@ export default function AdminInvoices() {
 
   const watchedCustomerId = form.watch('customerId');
   const isManualInvoice = watchedCustomerId === 'manual-invoice';
+
+  const editForm = useForm<EditInvoiceFormData>({
+    resolver: zodResolver(editInvoiceFormSchema),
+    defaultValues: {
+      customer_name: '',
+      customer_email: '',
+      company_name: '',
+      business_address: '',
+      subtotal: '',
+      vat: '',
+      due_date: '',
+      period_start: '',
+      period_end: '',
+      notes: '',
+      status: '',
+    },
+  });
+
+  const openEditDialog = (invoice: SavedInvoice) => {
+    setEditInvoice(invoice);
+    editForm.reset({
+      customer_name: invoice.customer_name || '',
+      customer_email: invoice.customer_email || '',
+      company_name: invoice.company_name || '',
+      business_address: invoice.business_address || '',
+      subtotal: invoice.subtotal || '',
+      vat: invoice.vat || '0',
+      due_date: invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '',
+      period_start: invoice.period_start ? new Date(invoice.period_start).toISOString().split('T')[0] : '',
+      period_end: invoice.period_end ? new Date(invoice.period_end).toISOString().split('T')[0] : '',
+      notes: invoice.notes || '',
+      status: invoice.status || 'pending',
+    });
+    setEditDialogOpen(true);
+  };
 
   const { data: customers, isLoading: customersLoading } = useQuery<UserType[]>({
     queryKey: ['/api/users'],
@@ -266,6 +320,50 @@ export default function AdminInvoices() {
       });
     },
   });
+
+  // Edit invoice mutation
+  const editInvoiceMutation = useMutation({
+    mutationFn: async (data: EditInvoiceFormData & { invoiceId: string }) => {
+      const { invoiceId, ...updateData } = data;
+      const subtotal = parseFloat(updateData.subtotal);
+      const vat = parseFloat(updateData.vat || '0');
+      const total = subtotal + vat;
+      
+      const response = await apiRequest('PATCH', `/api/invoices/${invoiceId}`, {
+        customer_name: updateData.customer_name,
+        customer_email: updateData.customer_email,
+        company_name: updateData.company_name || null,
+        business_address: updateData.business_address || null,
+        subtotal: String(subtotal),
+        vat: String(vat),
+        amount: total,
+        due_date: updateData.due_date,
+        period_start: updateData.period_start,
+        period_end: updateData.period_end,
+        notes: updateData.notes || null,
+        status: updateData.status,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Invoice updated successfully' });
+      setEditDialogOpen(false);
+      setEditInvoice(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to update invoice', 
+        description: error?.message || 'Please try again',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const onEditSubmit = (data: EditInvoiceFormData) => {
+    if (!editInvoice) return;
+    editInvoiceMutation.mutate({ ...data, invoiceId: editInvoice.id });
+  };
 
   // Print invoice function
   const printInvoice = (invoice: SavedInvoice) => {
@@ -591,6 +689,24 @@ export default function AdminInvoices() {
                                 <DropdownMenuItem 
                                   onClick={() => {
                                     if (fullInvoice) {
+                                      openEditDialog(fullInvoice);
+                                    } else {
+                                      refetchInvoices().then(() => {
+                                        const refreshed = savedInvoices?.find(s => s.id === invoice.id);
+                                        if (refreshed) {
+                                          openEditDialog(refreshed);
+                                        }
+                                      });
+                                    }
+                                  }}
+                                  data-testid={`menu-edit-recent-${index}`}
+                                >
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit Invoice
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    if (fullInvoice) {
                                       resendInvoiceMutation.mutate(fullInvoice);
                                     } else {
                                       toast({ title: 'Loading invoice...', description: 'Please try again in a moment' });
@@ -709,6 +825,13 @@ export default function AdminInvoices() {
                               >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => openEditDialog(invoice)}
+                                data-testid={`menu-edit-invoice-${invoice.id}`}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Invoice
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => resendInvoiceMutation.mutate(invoice)}
@@ -854,6 +977,202 @@ export default function AdminInvoices() {
                 </Button>
               )}
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Invoice Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setEditInvoice(null);
+        }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Invoice</DialogTitle>
+              <DialogDescription>
+                {editInvoice?.invoice_number} (Invoice number cannot be changed)
+              </DialogDescription>
+            </DialogHeader>
+
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="customer_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Customer Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-edit-customer-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="customer_email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Customer Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" {...field} data-testid="input-edit-customer-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="company_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Name (Optional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-edit-company-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-status">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="overdue">Overdue</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={editForm.control}
+                  name="business_address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Address (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} rows={2} data-testid="input-edit-business-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="subtotal"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subtotal (£)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-edit-subtotal" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="vat"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>VAT (£)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-edit-vat" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="due_date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Due Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-edit-due-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="period_start"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Period Start</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-edit-period-start" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="period_end"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Period End</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-edit-period-end" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={editForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} rows={3} data-testid="input-edit-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="gap-2">
+                  <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={editInvoiceMutation.isPending} data-testid="button-save-invoice">
+                    {editInvoiceMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
 
