@@ -34,8 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { calculateQuote, formatPrice, type QuoteBreakdown } from '@/lib/pricing';
-import { calculateDistanceFromPostcodes, initGoogleMaps } from '@/lib/maps';
-import { useGoogleMaps } from '@/hooks/useGoogleMaps';
+import { calculateDistanceFromPostcodes } from '@/lib/maps';
 import type { Driver, VehicleType, CustomerType } from '@shared/schema';
 import {
   Package,
@@ -128,11 +127,9 @@ export default function AdminCreateJob() {
   const [isMultiDropMode, setIsMultiDropMode] = useState(false);
   const [routeLegs, setRouteLegs] = useState<{ from: string; to: string; distance: number }[]>([]);
   
-  // Route map state
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-  const { isReady: mapsReady } = useGoogleMaps();
+  // Route map state - use static map image instead of interactive map
+  const [routeMapUrl, setRouteMapUrl] = useState<string | null>(null);
+  const [isLoadingMap, setIsLoadingMap] = useState(false);
   
   const addDrop = () => {
     setDrops(prev => [...prev, { 
@@ -394,108 +391,55 @@ export default function AdminCreateJob() {
     return () => clearTimeout(timer);
   }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, waitingTime, isMultiDropMode, pickupDate, pickupTime]);
 
-  // Initialize map when Google Maps is ready
-  useEffect(() => {
-    if (!mapsReady || !mapContainerRef.current || mapInstanceRef.current) return;
-    
-    const initMap = async () => {
-      try {
-        await initGoogleMaps();
-        if (typeof google === 'undefined') return;
-        
-        // Create map centered on UK
-        mapInstanceRef.current = new google.maps.Map(mapContainerRef.current!, {
-          center: { lat: 51.5074, lng: -0.1278 }, // London
-          zoom: 10,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-        });
-        
-        // Create directions renderer
-        directionsRendererRef.current = new google.maps.DirectionsRenderer({
-          map: mapInstanceRef.current,
-          suppressMarkers: false,
-          polylineOptions: {
-            strokeColor: '#3B82F6',
-            strokeWeight: 5,
-            strokeOpacity: 0.8,
-          },
-        });
-      } catch (error) {
-        console.error('[AdminCreateJob] Failed to initialize map:', error);
-      }
-    };
-    
-    initMap();
-  }, [mapsReady]);
-
-  // Render route on map when postcodes change
-  const renderRoute = useCallback(async () => {
-    if (!mapInstanceRef.current || !directionsRendererRef.current) return;
-    if (typeof google === 'undefined') return;
-    
+  // Fetch static route map image when postcodes change
+  const fetchRouteMap = useCallback(async () => {
     // Get all postcodes
     const postcodes: string[] = [];
     if (pickupPostcode && pickupPostcode.length >= 3) {
-      postcodes.push(pickupPostcode);
+      postcodes.push(pickupPostcode + ', UK');
     }
     
     if (isMultiDropMode && drops.length > 0) {
       // Multi-drop: add all drop points
       const validDrops = drops.filter(d => d.postcode && d.postcode.length >= 3);
       for (const drop of validDrops) {
-        postcodes.push(drop.postcode);
+        postcodes.push(drop.postcode + ', UK');
       }
     } else if (deliveryPostcode && deliveryPostcode.length >= 3) {
       // Single delivery
-      postcodes.push(deliveryPostcode);
+      postcodes.push(deliveryPostcode + ', UK');
     }
     
     // Need at least 2 postcodes for a route
     if (postcodes.length < 2) {
-      directionsRendererRef.current.setDirections({ routes: [] } as any);
+      setRouteMapUrl(null);
       return;
     }
     
+    setIsLoadingMap(true);
     try {
-      const directionsService = new google.maps.DirectionsService();
-      const origin = postcodes[0] + ', UK';
-      const destination = postcodes[postcodes.length - 1] + ', UK';
+      const waypointsParam = postcodes.join('|');
+      const response = await fetch(`/api/maps/route-image?waypoints=${encodeURIComponent(waypointsParam)}&size=400x250`);
+      const data = await response.json();
       
-      // Waypoints are stops between origin and destination
-      const waypoints: google.maps.DirectionsWaypoint[] = postcodes
-        .slice(1, -1)
-        .map(postcode => ({
-          location: postcode + ', UK',
-          stopover: true,
-        }));
-      
-      const request: google.maps.DirectionsRequest = {
-        origin,
-        destination,
-        waypoints,
-        optimizeWaypoints: isMultiDropMode,
-        travelMode: google.maps.TravelMode.DRIVING,
-        unitSystem: google.maps.UnitSystem.IMPERIAL,
-        region: 'uk',
-      };
-      
-      directionsService.route(request, (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          directionsRendererRef.current?.setDirections(result);
-        }
-      });
+      if (data.url) {
+        setRouteMapUrl(data.url);
+      } else {
+        setRouteMapUrl(null);
+      }
     } catch (error) {
-      console.error('[AdminCreateJob] Failed to render route:', error);
+      console.error('[AdminCreateJob] Failed to fetch route map:', error);
+      setRouteMapUrl(null);
+    } finally {
+      setIsLoadingMap(false);
     }
   }, [pickupPostcode, deliveryPostcode, isMultiDropMode, drops]);
 
-  // Update route when postcodes change
+  // Update route map when postcodes change
   useEffect(() => {
-    const timer = setTimeout(renderRoute, 300);
+    const timer = setTimeout(fetchRouteMap, 500);
     return () => clearTimeout(timer);
-  }, [renderRoute]);
+  }, [fetchRouteMap]);
 
   const createJobMutation = useMutation({
     mutationFn: async (data: CreateJobInput) => {
@@ -1339,21 +1283,34 @@ export default function AdminCreateJob() {
                   </CardHeader>
                   <CardContent>
                     <div 
-                      ref={mapContainerRef}
-                      className="w-full h-[250px] rounded-lg bg-muted"
+                      className="w-full h-[250px] rounded-lg bg-muted overflow-hidden"
                       data-testid="route-map-container"
                     >
-                      {!mapsReady && (
+                      {isLoadingMap ? (
                         <div className="flex items-center justify-center h-full">
                           <div className="text-center text-muted-foreground">
                             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                            <p className="text-sm">Loading map...</p>
+                            <p className="text-sm">Loading route...</p>
+                          </div>
+                        </div>
+                      ) : routeMapUrl ? (
+                        <img 
+                          src={routeMapUrl} 
+                          alt="Route map" 
+                          className="w-full h-full object-cover"
+                          data-testid="route-map-image"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center text-muted-foreground">
+                            <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Enter postcodes to view route</p>
                           </div>
                         </div>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Enter pickup and delivery postcodes to see the route
+                      Route updates automatically when you enter postcodes
                     </p>
                   </CardContent>
                 </Card>
