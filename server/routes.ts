@@ -1143,11 +1143,9 @@ export async function registerRoutes(
           pickup_contact_name: job.pickupContactName || null,
           pickup_contact_phone: job.pickupContactPhone || null,
           pickup_instructions: job.pickupInstructions || null,
-          // Delivery details - map to both column names for Supabase compatibility
+          // Delivery details
           delivery_address: job.deliveryAddress || '',
-          dropoff_address: job.deliveryAddress || '',  // Supabase jobs table uses dropoff_address
           delivery_postcode: job.deliveryPostcode || null,
-          dropoff_postcode: job.deliveryPostcode || null,  // Supabase jobs table uses dropoff_postcode
           delivery_instructions: job.deliveryInstructions || null,
           // Recipient
           recipient_name: job.recipientName || 'Recipient',
