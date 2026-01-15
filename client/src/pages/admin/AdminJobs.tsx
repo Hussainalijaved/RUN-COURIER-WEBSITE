@@ -125,6 +125,135 @@ const getStatusBadge = (status: JobStatus) => {
   return <Badge className={`${config.className} text-white`} data-testid={`badge-status-${status}`}>{config.label}</Badge>;
 };
 
+// Type for multi-drop stop
+interface MultiDropStop {
+  id: string;
+  jobId: string;
+  stopOrder: number;
+  address: string;
+  postcode: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  instructions?: string;
+  status?: string;
+  deliveredAt?: string;
+  podPhotoUrl?: string;
+  podSignatureUrl?: string;
+  podRecipientName?: string;
+}
+
+// Component to display multi-drop stops for a job
+function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiDrop?: boolean }) {
+  const { data, isLoading } = useQuery<{ stops: MultiDropStop[] }>({
+    queryKey: [`/api/jobs/${jobId}/stops`],
+    enabled: !!isMultiDrop && !!jobId,
+  });
+
+  if (!isMultiDrop) return null;
+  
+  if (isLoading) {
+    return (
+      <div className="border-t pt-4">
+        <h4 className="font-semibold mb-3 flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-blue-600" />
+          Multi-Drop Stops
+        </h4>
+        <div className="space-y-2">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      </div>
+    );
+  }
+  
+  const stops = data?.stops || [];
+  
+  if (stops.length === 0) {
+    return (
+      <div className="border-t pt-4">
+        <h4 className="font-semibold mb-3 flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-blue-600" />
+          Multi-Drop Stops
+        </h4>
+        <p className="text-sm text-muted-foreground">No additional stops recorded</p>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="border-t pt-4">
+      <h4 className="font-semibold mb-3 flex items-center gap-2">
+        <MapPin className="h-4 w-4 text-blue-600" />
+        Multi-Drop Stops ({stops.length} stops)
+      </h4>
+      <div className="space-y-3">
+        {stops.map((stop, index) => (
+          <div 
+            key={stop.id} 
+            className="p-3 bg-muted/50 rounded-lg border"
+            data-testid={`stop-${stop.stopOrder}`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" className="text-xs">Stop {stop.stopOrder}</Badge>
+                  {stop.status === 'delivered' && (
+                    <Badge className="bg-green-500 text-white text-xs">Delivered</Badge>
+                  )}
+                  {stop.status === 'pending' && (
+                    <Badge variant="secondary" className="text-xs">Pending</Badge>
+                  )}
+                </div>
+                <p className="text-sm font-medium">{stop.address}</p>
+                <p className="text-sm font-mono text-muted-foreground">{stop.postcode}</p>
+                {stop.recipientName && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Recipient: {stop.recipientName}
+                    {stop.recipientPhone && ` • ${stop.recipientPhone}`}
+                  </p>
+                )}
+                {stop.instructions && (
+                  <p className="text-xs text-muted-foreground mt-1 italic">
+                    Instructions: {stop.instructions}
+                  </p>
+                )}
+              </div>
+              {/* POD for this stop */}
+              {(stop.podPhotoUrl || stop.podSignatureUrl) && (
+                <div className="flex gap-2">
+                  {stop.podPhotoUrl && (
+                    <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer">
+                      <img 
+                        src={stop.podPhotoUrl} 
+                        alt={`Stop ${stop.stopOrder} POD`}
+                        className="w-16 h-16 object-cover rounded border"
+                      />
+                    </a>
+                  )}
+                  {stop.podSignatureUrl && (
+                    <a href={stop.podSignatureUrl} target="_blank" rel="noopener noreferrer">
+                      <img 
+                        src={stop.podSignatureUrl} 
+                        alt={`Stop ${stop.stopOrder} Signature`}
+                        className="w-16 h-16 object-contain rounded border bg-white p-1"
+                      />
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+            {stop.podRecipientName && (
+              <p className="text-xs text-green-600 mt-2">
+                Signed by: {stop.podRecipientName}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminJobs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -1227,6 +1356,9 @@ export default function AdminJobs() {
                     <p className="text-sm text-muted-foreground">{selectedJob.recipientPhone}</p>
                   </div>
                 )}
+                
+                {/* Multi-Drop Stops Section */}
+                <MultiDropStopsSection jobId={selectedJob.id} isMultiDrop={selectedJob.isMultiDrop ?? false} />
                 
                 {/* Proof of Delivery Section */}
                 {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl || selectedJob.podRecipientName) && (

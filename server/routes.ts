@@ -952,6 +952,67 @@ export async function registerRoutes(
     return res.json(stripCustomerPricing(job));
   }));
 
+  // Get multi-drop stops for a job (admin only - contains POD and recipient data)
+  app.get("/api/jobs/:id/stops", asyncHandler(async (req, res) => {
+    const jobId = req.params.id;
+    
+    // SECURITY: Require admin access for POD and recipient data
+    let isAdmin = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { data: { user: authUser } } = await supabaseAdmin?.auth.getUser(token) || { data: { user: null } };
+      if (authUser?.email) {
+        isAdmin = await isAdminByEmail(authUser.email);
+      }
+    }
+    
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Admin access required", code: "NOT_ADMIN" });
+    }
+    
+    // First verify the job exists
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    // Fetch multi-drop stops from Supabase
+    if (!supabaseAdmin) {
+      return res.json({ stops: [] });
+    }
+    
+    const { data: stops, error } = await supabaseAdmin
+      .from('multi_drop_stops')
+      .select('id, job_id, stop_order, address, postcode, recipient_name, recipient_phone, instructions, status, delivered_at, pod_photo_url, pod_signature_url, pod_recipient_name')
+      .eq('job_id', jobId)
+      .order('stop_order', { ascending: true });
+    
+    if (error) {
+      console.error('[Stops] Error fetching multi-drop stops:', error);
+      return res.json({ stops: [] });
+    }
+    
+    // Map snake_case to camelCase
+    const mappedStops = (stops || []).map(stop => ({
+      id: stop.id,
+      jobId: stop.job_id,
+      stopOrder: stop.stop_order,
+      address: stop.address,
+      postcode: stop.postcode,
+      recipientName: stop.recipient_name,
+      recipientPhone: stop.recipient_phone,
+      instructions: stop.instructions,
+      status: stop.status,
+      deliveredAt: stop.delivered_at,
+      podPhotoUrl: stop.pod_photo_url,
+      podSignatureUrl: stop.pod_signature_url,
+      podRecipientName: stop.pod_recipient_name,
+    }));
+    
+    return res.json({ stops: mappedStops });
+  }));
+
   app.post("/api/jobs", asyncHandler(async (req, res) => {
     console.log('[Jobs] POST /api/jobs - Creating new job with driverId:', req.body.driverId);
     
