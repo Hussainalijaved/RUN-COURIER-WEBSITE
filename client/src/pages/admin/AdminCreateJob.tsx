@@ -1230,7 +1230,7 @@ export default function AdminCreateJob() {
                       Route Map
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-3">
                     <div 
                       className="w-full h-[280px] rounded-lg bg-muted overflow-hidden"
                       data-testid="route-map-container"
@@ -1242,6 +1242,33 @@ export default function AdminCreateJob() {
                         isMultiDrop={isMultiDropMode}
                       />
                     </div>
+                    {/* Route Legend */}
+                    {(pickupPostcode || deliveryPostcode || drops.some(d => d.postcode)) && (
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold">A</div>
+                          <span className="text-muted-foreground">Pickup:</span>
+                          <span className="font-medium">{pickupPostcode || 'Not set'}</span>
+                        </div>
+                        {isMultiDropMode ? (
+                          drops.filter(d => d.postcode).map((drop, idx) => (
+                            <div key={drop.id} className="flex items-center gap-2">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold ${idx === drops.filter(d => d.postcode).length - 1 ? 'bg-red-500' : 'bg-blue-500'}`}>
+                                {String.fromCharCode(66 + idx)}
+                              </div>
+                              <span className="text-muted-foreground">Stop {idx + 1}:</span>
+                              <span className="font-medium">{drop.postcode}</span>
+                            </div>
+                          ))
+                        ) : deliveryPostcode && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">B</div>
+                            <span className="text-muted-foreground">Delivery:</span>
+                            <span className="font-medium">{deliveryPostcode}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 

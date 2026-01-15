@@ -143,18 +143,21 @@ export function RouteMapPreview({
       // Create bounds
       const bounds = new google.maps.LatLngBounds();
 
-      // Add markers
+      // Add markers in order (A = pickup, B, C, D... = stops in sequence)
       validLocations.forEach((location, index) => {
         const isPickup = index === 0;
         const isLastDrop = index === validLocations.length - 1;
         
+        // Label: A for pickup, then B, C, D... for delivery stops
         const label = String.fromCharCode(65 + index);
         let iconColor = '#3b82f6'; // Blue for middle stops
         
         if (isPickup) {
-          iconColor = '#22c55e'; // Green for pickup
+          iconColor = '#22c55e'; // Green for pickup (A)
+        } else if (isLastDrop && validLocations.length === 2) {
+          iconColor = '#ef4444'; // Red for single delivery (B)
         } else if (isLastDrop) {
-          iconColor = '#ef4444'; // Red for final destination
+          iconColor = '#ef4444'; // Red for final stop
         }
 
         const marker = new google.maps.Marker({
@@ -163,31 +166,44 @@ export function RouteMapPreview({
           label: {
             text: label,
             color: '#fff',
-            fontSize: '11px',
+            fontSize: '12px',
             fontWeight: 'bold'
           },
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: isPickup || isLastDrop ? 12 : 10,
+            scale: 14,
             fillColor: iconColor,
             fillOpacity: 1,
             strokeColor: '#fff',
-            strokeWeight: 2,
+            strokeWeight: 3,
           },
-          title: postcodes[index]
+          title: `Stop ${label}: ${postcodes[index]}`,
+          zIndex: 100 + index // Ensure later markers are on top
         });
 
         markersRef.current.push(marker);
         bounds.extend(location);
       });
 
-      // Draw polyline connecting points
+      // Draw polyline connecting points with arrows
       polylineRef.current = new google.maps.Polyline({
         path: validLocations,
         geodesic: true,
         strokeColor: '#3b82f6',
         strokeOpacity: 0.8,
-        strokeWeight: 3,
+        strokeWeight: 4,
+        icons: [{
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 3,
+            strokeColor: '#1d4ed8',
+            strokeWeight: 2,
+            fillColor: '#3b82f6',
+            fillOpacity: 1
+          },
+          offset: '50%',
+          repeat: '100px'
+        }],
         map
       });
 
