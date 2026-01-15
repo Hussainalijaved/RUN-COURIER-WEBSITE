@@ -30,6 +30,8 @@ import {
 import { geocodePostcode, calculateDistance } from '@/lib/maps';
 import { calculateQuote, formatPrice, isCentralLondon, type QuoteBreakdown } from '@/lib/pricing';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
+import { RouteMapPreview } from '@/components/RouteMapPreview';
+import { Route } from 'lucide-react';
 import type { VehicleType } from '@shared/schema';
 
 interface DropPoint {
@@ -528,31 +530,31 @@ export default function AdminBusinessQuote() {
           </div>
 
           <div className="space-y-6">
+            {/* Route Map - shows in real-time as postcodes are entered */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Route className="h-5 w-5 text-blue-500" />
+                  Route Map
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Route is automatically optimized for efficiency</p>
+              </CardHeader>
+              <CardContent>
+                <div 
+                  className="w-full h-[380px] rounded-lg bg-muted overflow-hidden"
+                  data-testid="route-map-container"
+                >
+                  <RouteMapPreview
+                    pickupPostcode={pickupPostcode}
+                    drops={drops}
+                    isMultiDrop={true}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             {quoteResult && (
               <>
-                {quoteResult.routeMapUrl && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <MapPin className="h-5 w-5" />
-                        Route Map
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="rounded-lg overflow-hidden border">
-                        <img 
-                          src={quoteResult.routeMapUrl} 
-                          alt="Delivery route map" 
-                          className="w-full h-auto"
-                          data-testid="img-route-map"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        Green = Pickup • Blue = Intermediate Stops • Red = Final Destination
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
 
                 <Card>
                   <CardHeader>
