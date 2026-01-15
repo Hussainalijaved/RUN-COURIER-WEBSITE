@@ -40,8 +40,8 @@ CREATE POLICY "driver_view_assigned_stops" ON public.multi_drop_stops
   USING (
     EXISTS (
       SELECT 1 FROM public.jobs j
-      WHERE j.id::varchar = multi_drop_stops.job_id
-      AND j.driver_id = auth.uid()::varchar
+      WHERE j.id::text = multi_drop_stops.job_id
+      AND j.driver_id::text = auth.uid()::text
     )
   );
 
@@ -52,15 +52,15 @@ CREATE POLICY "driver_update_pod_stops" ON public.multi_drop_stops
   USING (
     EXISTS (
       SELECT 1 FROM public.jobs j
-      WHERE j.id::varchar = multi_drop_stops.job_id
-      AND j.driver_id = auth.uid()::varchar
+      WHERE j.id::text = multi_drop_stops.job_id
+      AND j.driver_id::text = auth.uid()::text
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.jobs j
-      WHERE j.id::varchar = multi_drop_stops.job_id
-      AND j.driver_id = auth.uid()::varchar
+      WHERE j.id::text = multi_drop_stops.job_id
+      AND j.driver_id::text = auth.uid()::text
     )
   );
 
