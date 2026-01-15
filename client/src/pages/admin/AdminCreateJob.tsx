@@ -127,8 +127,8 @@ export default function AdminCreateJob() {
   const [isMultiDropMode, setIsMultiDropMode] = useState(false);
   const [routeLegs, setRouteLegs] = useState<{ from: string; to: string; distance: number }[]>([]);
   
-  // Route map state - use Google Maps link
-  const [googleMapsLink, setGoogleMapsLink] = useState<string | null>(null);
+  // Route map state - use Google Maps Embed API
+  const [mapEmbedUrl, setMapEmbedUrl] = useState<string | null>(null);
   
   const addDrop = () => {
     setDrops(prev => [...prev, { 
@@ -390,48 +390,49 @@ export default function AdminCreateJob() {
     return () => clearTimeout(timer);
   }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, waitingTime, isMultiDropMode, pickupDate, pickupTime]);
 
-  // Generate Google Maps directions link when postcodes change
-  const updateGoogleMapsLink = useCallback(() => {
+  // Generate Google Maps Embed URL when postcodes change
+  const updateMapEmbed = useCallback(() => {
     // Get all postcodes
     const postcodes: string[] = [];
     if (pickupPostcode && pickupPostcode.length >= 3) {
-      postcodes.push(pickupPostcode);
+      postcodes.push(pickupPostcode + ', UK');
     }
     
     if (isMultiDropMode && drops.length > 0) {
       // Multi-drop: add all drop points
       const validDrops = drops.filter(d => d.postcode && d.postcode.length >= 3);
       for (const drop of validDrops) {
-        postcodes.push(drop.postcode);
+        postcodes.push(drop.postcode + ', UK');
       }
     } else if (deliveryPostcode && deliveryPostcode.length >= 3) {
       // Single delivery
-      postcodes.push(deliveryPostcode);
+      postcodes.push(deliveryPostcode + ', UK');
     }
     
     // Need at least 2 postcodes for a route
     if (postcodes.length < 2) {
-      setGoogleMapsLink(null);
+      setMapEmbedUrl(null);
       return;
     }
     
-    // Generate Google Maps directions URL
-    const origin = encodeURIComponent(postcodes[0] + ', UK');
-    const destination = encodeURIComponent(postcodes[postcodes.length - 1] + ', UK');
-    const waypoints = postcodes.slice(1, -1).map(pc => encodeURIComponent(pc + ', UK')).join('|');
+    // Use Google Maps Embed API (free, no restrictions)
+    const origin = encodeURIComponent(postcodes[0]);
+    const destination = encodeURIComponent(postcodes[postcodes.length - 1]);
+    const waypoints = postcodes.slice(1, -1).map(pc => encodeURIComponent(pc)).join('|');
     
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    // Embed API URL format for directions
+    let embedUrl = `https://www.google.com/maps/embed/v1/directions?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&origin=${origin}&destination=${destination}&mode=driving`;
     if (waypoints) {
-      url += `&waypoints=${waypoints}`;
+      embedUrl += `&waypoints=${waypoints}`;
     }
     
-    setGoogleMapsLink(url);
+    setMapEmbedUrl(embedUrl);
   }, [pickupPostcode, deliveryPostcode, isMultiDropMode, drops]);
 
-  // Update Google Maps link when postcodes change
+  // Update map embed when postcodes change
   useEffect(() => {
-    updateGoogleMapsLink();
-  }, [updateGoogleMapsLink]);
+    updateMapEmbed();
+  }, [updateMapEmbed]);
 
   const createJobMutation = useMutation({
     mutationFn: async (data: CreateJobInput) => {
@@ -1265,63 +1266,36 @@ export default function AdminCreateJob() {
 
               {/* Right Column - Map, Quote & Driver Assignment */}
               <div className="space-y-6">
-                {/* Route Preview */}
+                {/* Route Map */}
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2">
                       <Route className="h-5 w-5 text-blue-500" />
-                      Route Preview
+                      Route Map
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div 
-                      className="w-full rounded-lg bg-muted overflow-hidden"
+                      className="w-full h-[280px] rounded-lg bg-muted overflow-hidden"
                       data-testid="route-map-container"
                     >
-                      {googleMapsLink ? (
-                        <div className="space-y-3">
-                          {/* Route Summary */}
-                          <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                            <div className="flex items-start gap-3">
-                              <div className="flex flex-col items-center">
-                                <div className="w-3 h-3 rounded-full bg-green-500" />
-                                <div className="w-0.5 h-8 bg-blue-400" />
-                                <div className="w-3 h-3 rounded-full bg-red-500" />
-                              </div>
-                              <div className="flex-1 space-y-2">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Pickup</p>
-                                  <p className="font-medium text-sm">{pickupPostcode || 'Not set'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Delivery</p>
-                                  <p className="font-medium text-sm">
-                                    {isMultiDropMode 
-                                      ? `${drops.filter(d => d.postcode).length} stops`
-                                      : deliveryPostcode || 'Not set'}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* View on Google Maps button */}
-                          <a
-                            href={googleMapsLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                            data-testid="link-view-google-maps"
-                          >
-                            <MapPin className="h-4 w-4" />
-                            View Route on Google Maps
-                          </a>
-                        </div>
+                      {mapEmbedUrl ? (
+                        <iframe
+                          src={mapEmbedUrl}
+                          width="100%"
+                          height="100%"
+                          style={{ border: 0 }}
+                          allowFullScreen
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          title="Route Map"
+                          data-testid="route-map-iframe"
+                        />
                       ) : (
-                        <div className="flex items-center justify-center h-[120px]">
+                        <div className="flex items-center justify-center h-full">
                           <div className="text-center text-muted-foreground">
                             <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">Enter postcodes to preview route</p>
+                            <p className="text-sm">Enter pickup and delivery postcodes to see the route</p>
                           </div>
                         </div>
                       )}
