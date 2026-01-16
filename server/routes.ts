@@ -25,7 +25,7 @@ import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
-import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending } from "./realtime";
+import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn } from "./realtime";
 import { geocodeAddress } from "./geocoding";
 import { sendJobOfferNotification } from "./pushNotifications";
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
@@ -5344,6 +5344,17 @@ export async function registerRoutes(
       });
     }
 
+    // Broadcast job withdrawal via WebSocket for real-time mobile app updates
+    const job = await storage.getJob(assignment.jobId);
+    if (job) {
+      broadcastJobWithdrawn({
+        id: job.id,
+        trackingNumber: job.trackingNumber,
+        driverId: assignment.driverId,
+        reason: "Withdrawn by admin",
+      });
+    }
+
     res.json(updated);
   }));
 
@@ -5385,6 +5396,17 @@ export async function registerRoutes(
         message: `Your job assignment has been removed by admin.${reason ? ` Reason: ${reason}` : ""}`,
         type: "assignment_removed",
         data: { assignmentId: assignment.id, jobId: assignment.jobId },
+      });
+    }
+
+    // Broadcast job removal via WebSocket for real-time mobile app updates
+    const job = await storage.getJob(assignment.jobId);
+    if (job) {
+      broadcastJobWithdrawn({
+        id: job.id,
+        trackingNumber: job.trackingNumber,
+        driverId: assignment.driverId,
+        reason: reason || "Removed by admin",
       });
     }
 
@@ -5495,6 +5517,14 @@ export async function registerRoutes(
         data: { jobId, trackingNumber: job.trackingNumber },
       });
     }
+
+    // Broadcast job unassignment via WebSocket for real-time mobile app updates
+    broadcastJobWithdrawn({
+      id: job.id,
+      trackingNumber: job.trackingNumber,
+      driverId: previousDriverId,
+      reason: reason || "Unassigned by admin",
+    });
 
     res.json({ 
       success: true, 

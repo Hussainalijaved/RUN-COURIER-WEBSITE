@@ -1,0 +1,29 @@
+The "Master Integration" Prompt for Replit Agent
+Role: Act as a Senior Full-Stack Engineer and System Architect.
+Objective:
+Perform a full architectural audit and fix the synchronization issues between my Web Admin Dashboard and my Expo Mobile App. These two platforms are currently disconnected and must be integrated into a single, unified system using one shared backend and database.
+Primary Technical Requirements:
+Unified Backend & Database: Audit the current setup. Ensure the Website (runcourier.co.uk) and the Mobile App (expo-messenger) connect to the exact same API endpoints and database. Eliminate any duplicated logic.
+Real-Time Job Dispatch (Socket.io/FCM):
+Implement/Fix real-time updates so when an Admin creates a job, it is pushed to the Driver's mobile app instantly.
+If the app is closed, use Firebase Cloud Messaging (FCM) or Expo Push Notifications to ensure the driver is notified.
+Permanent Identity Logic:
+Fix the registration flow. Whether a user signs up on the Web or App, they must exist as a single record in the database.
+The Driver_ID must be a primary, immutable key that never changes.
+Job & Price Logic:
+Visibility: Modify the API response for drivers so they only see the driver_fee. The customer_price must be filtered out of the JSON response sent to the mobile app for security.
+Withdrawal: Ensure that if an Admin "Withdraws" a job on the web, a 'delete' or 'cancel' event is emitted to the mobile app instantly.
+Status & Map Sync:
+Ensure Job Statuses (Created, Accepted, Picked Up, Delivered) are synced via WebSockets so the Admin sees the driver moving and updating statuses without refreshing the page.
+Ensure the Pickup/Delivery coordinates are correctly passed to the Mobile App's map component.
+Current Bug Fix List (Fix these first):
+Sync Failure: Jobs created on the web are not appearing in the mobile app's "Available Jobs" list.
+Notification Failure: Drivers do not receive alerts when the app is in the background.
+Price Leak: Drivers can currently see the full price paid by the customer.
+Profile Mismatch: Updating a profile on the web does not reflect on the mobile app.
+Instructions for Replit Agent:
+Analyze the current database schema and API routes in both the website and mobile app folders.
+Identify where the API URLs are hardcoded and point them to the unified production backend.
+Refactor the authentication middleware to ensure the same JWT/Session works across both platforms.
+Verify the fix by simulating a job creation and checking the logs for a successful push to the mobile client.
+Final Goal: A stable, production-ready system where the Admin controls everything from the web and the Driver receives everything on the app in real-time.

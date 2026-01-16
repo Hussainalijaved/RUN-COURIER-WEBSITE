@@ -149,6 +149,17 @@ interface JobHiddenMessage {
   };
 }
 
+interface JobWithdrawnMessage {
+  type: 'job:withdrawn';
+  payload: {
+    jobId: string;
+    trackingNumber: string;
+    driverId: string;
+    reason?: string;
+    withdrawnAt: string;
+  };
+}
+
 type OutgoingMessage = 
   | OutgoingLocationMessage 
   | BulkSnapshotMessage 
@@ -160,6 +171,7 @@ type OutgoingMessage =
   | JobCreatedMessage
   | JobAssignedMessage
   | DocumentPendingMessage
+  | JobWithdrawnMessage
   | JobHiddenMessage
   | { type: 'pong' };
 
@@ -648,6 +660,52 @@ export function broadcastJobHidden(job: {
   });
 
   log(`Broadcasted job hidden status for ${job.id} (hidden: ${job.hidden}) to driver ${job.driverId} (${sentCount} clients)`, 'realtime');
+}
+
+export function broadcastJobWithdrawn(job: {
+  id: string;
+  trackingNumber: string;
+  driverId: string;
+  reason?: string;
+}): void {
+  const message: JobWithdrawnMessage = {
+    type: 'job:withdrawn',
+    payload: {
+      jobId: job.id,
+      trackingNumber: job.trackingNumber,
+      driverId: job.driverId,
+      reason: job.reason,
+      withdrawnAt: new Date().toISOString(),
+    },
+  };
+
+  let sentCount = 0;
+
+  // Send to the specific driver whose job was withdrawn
+  driverConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && client.driverId === job.driverId) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  // Also send to job subscribers who are this driver
+  jobSubscribers.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && client.driverId === job.driverId) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  // Also send to admins/dispatchers for monitoring
+  observerConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  log(`Broadcasted job withdrawn for ${job.id} to driver ${job.driverId} (${sentCount} clients)`, 'realtime');
 }
 
 export function broadcastDocumentPending(document: {

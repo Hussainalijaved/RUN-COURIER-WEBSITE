@@ -95,6 +95,15 @@ Supabase is the single source of truth for all data, ensuring consistency betwee
 - Supabase Edge Functions handle privileged operations (e.g., `create-driver`, `assign-driver`, `stripe-create-payment-intent`, `send-email`).
 - RLS policies control granular data access based on user roles.
 
+### Web-Mobile Integration
+The web admin dashboard and Expo mobile app share a unified backend:
+- **Unified Data Source**: Both platforms query Supabase directly via SupabaseStorage class
+- **Job Sync**: Jobs assigned on web immediately appear in mobile app (driver_id = auth.uid() RLS)
+- **Real-Time Events**: WebSocket broadcasts job:assigned, job:withdrawn, job:status_update to connected drivers
+- **Push Notifications**: Expo Push API sends high-priority notifications with sound for background alerts
+- **Profile Sync**: Driver profile updates sync via Supabase (both platforms read/write to same table)
+- **Price Isolation**: Mobile API never exposes customer pricing - explicit column selection enforced
+
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.
