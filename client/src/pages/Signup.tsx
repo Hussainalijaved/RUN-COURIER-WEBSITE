@@ -40,6 +40,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
 
@@ -120,8 +121,9 @@ export default function Signup({ role = 'customer' }: SignupProps) {
       const response = await apiRequest('POST', '/api/auth/verify-phone', { phone, code: verificationCode });
       const data = await response.json();
       
-      if (response.ok) {
+      if (response.ok && data.verificationToken) {
         setPhoneVerified(true);
+        setVerificationToken(data.verificationToken);
         toast({
           title: 'Phone Verified',
           description: 'Your phone number has been verified successfully.',
@@ -145,12 +147,50 @@ export default function Signup({ role = 'customer' }: SignupProps) {
   };
 
   const onSubmit = async (data: RegisterInput) => {
+    // Validate verification token before proceeding
+    if (!verificationToken) {
+      toast({
+        title: 'Phone Not Verified',
+        description: 'Please verify your phone number before creating an account.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate token server-side
+    try {
+      const tokenCheck = await apiRequest('POST', '/api/auth/validate-phone-token', { 
+        token: verificationToken, 
+        phone: data.phone 
+      });
+      if (!tokenCheck.ok) {
+        const tokenData = await tokenCheck.json();
+        toast({
+          title: 'Verification Expired',
+          description: tokenData.error || 'Your phone verification has expired. Please verify again.',
+          variant: 'destructive',
+        });
+        setPhoneVerified(false);
+        setVerificationToken(null);
+        setVerificationSent(false);
+        return;
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to validate phone verification. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { error } = await signUp(data.email, data.password, {
         fullName: data.fullName,
         full_name: data.fullName,
         phone: data.phone,
+        phoneVerificationToken: verificationToken,
         postcode: data.postcode,
         address: data.address,
         buildingName: data.buildingName,
@@ -396,6 +436,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                                   setPhoneVerified(false);
                                   setVerificationSent(false);
                                   setVerificationCode('');
+                                  setVerificationToken(null);
                                 }
                               }}
                               onBlur={field.onBlur}

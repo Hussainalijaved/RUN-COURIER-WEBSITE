@@ -5099,7 +5099,36 @@ export async function registerRoutes(
       return res.status(400).json({ error: result.error || "Invalid verification code" });
     }
     
-    res.status(200).json({ success: true, message: "Phone number verified successfully" });
+    // Return the verification token for use during registration
+    res.status(200).json({ 
+      success: true, 
+      message: "Phone number verified successfully",
+      verificationToken: result.token
+    });
+  }));
+
+  // Validate phone verification token (for registration)
+  app.post("/api/auth/validate-phone-token", asyncHandler(async (req, res) => {
+    const { token, phone } = req.body;
+    
+    if (!token || !phone) {
+      return res.status(400).json({ error: "Token and phone are required" });
+    }
+
+    const { validateVerificationToken } = await import("./twilioService");
+    const result = validateVerificationToken(token);
+    
+    if (!result.valid) {
+      return res.status(400).json({ error: "Invalid or expired verification token" });
+    }
+    
+    // Verify the token matches the phone number being registered
+    const normalizedPhone = phone.replace(/\D/g, '');
+    if (result.phone !== normalizedPhone) {
+      return res.status(400).json({ error: "Verification token does not match the phone number" });
+    }
+    
+    res.status(200).json({ success: true, verified: true });
   }));
 
   // Password reset endpoint using Resend for reliable email delivery

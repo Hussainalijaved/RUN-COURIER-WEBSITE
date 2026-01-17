@@ -6,13 +6,22 @@ import twilio from 'twilio';
 // In-memory store for verification codes (expires after 10 minutes)
 const verificationCodes: Map<string, { code: string; expiresAt: number; attempts: number }> = new Map();
 
-// Clean up expired codes every 5 minutes
+// Store for verified phones (token -> phone mapping, expires after 30 minutes)
+const verifiedPhones: Map<string, { phone: string; expiresAt: number }> = new Map();
+
+// Clean up expired codes and tokens every 5 minutes
 setInterval(() => {
   const now = Date.now();
-  const entries = Array.from(verificationCodes.entries());
-  for (const [phone, data] of entries) {
+  const codeEntries = Array.from(verificationCodes.entries());
+  for (const [phone, data] of codeEntries) {
     if (data.expiresAt < now) {
       verificationCodes.delete(phone);
+    }
+  }
+  const tokenEntries = Array.from(verifiedPhones.entries());
+  for (const [token, data] of tokenEntries) {
+    if (data.expiresAt < now) {
+      verifiedPhones.delete(token);
     }
   }
 }, 5 * 60 * 1000);
@@ -203,8 +212,18 @@ export async function sendVerificationCode(phone: string): Promise<{ success: bo
   }
 }
 
-// Verify the code
-export async function verifyCode(phone: string, code: string): Promise<{ success: boolean; error?: string }> {
+// Generate a random verification token
+function generateVerificationToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+// Verify the code and return a verification token
+export async function verifyCode(phone: string, code: string): Promise<{ success: boolean; token?: string; error?: string }> {
   const phoneKey = normalizePhoneKey(phone);
   const stored = verificationCodes.get(phoneKey);
   
@@ -221,14 +240,39 @@ export async function verifyCode(phone: string, code: string): Promise<{ success
     return { success: false, error: 'Invalid verification code. Please try again.' };
   }
   
-  // Code is valid - remove it
+  // Code is valid - remove it and create a verification token
   verificationCodes.delete(phoneKey);
-  console.log(`[Twilio] Phone verified successfully: ${phoneKey.slice(-4)}`);
-  return { success: true };
+  
+  // Create a verification token valid for 30 minutes
+  const token = generateVerificationToken();
+  const expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes
+  verifiedPhones.set(token, { phone: phoneKey, expiresAt });
+  
+  console.log(`[Twilio] Phone verified successfully: ${phoneKey.slice(-4)}, token issued`);
+  return { success: true, token };
 }
 
-// Check if a phone is verified (for validation before registration)
-export function isPhoneVerified(phone: string): boolean {
-  // This is called after verifyCode succeeds, so we track verified phones temporarily
-  return true; // Always return true after successful verification
+// Validate a verification token and return the phone number
+export function validateVerificationToken(token: string): { valid: boolean; phone?: string } {
+  const data = verifiedPhones.get(token);
+  
+  if (!data) {
+    return { valid: false };
+  }
+  
+  if (data.expiresAt < Date.now()) {
+    verifiedPhones.delete(token);
+    return { valid: false };
+  }
+  
+  return { valid: true, phone: data.phone };
+}
+
+// Consume a verification token (use once and invalidate)
+export function consumeVerificationToken(token: string): { valid: boolean; phone?: string } {
+  const result = validateVerificationToken(token);
+  if (result.valid) {
+    verifiedPhones.delete(token);
+  }
+  return result;
 }
