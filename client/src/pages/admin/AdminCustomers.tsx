@@ -48,6 +48,8 @@ import {
   Clock,
   User,
   Calendar,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -58,9 +60,12 @@ export default function AdminCustomers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<UserType | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<UserType | null>(null);
   const [payLaterEnabled, setPayLaterEnabled] = useState(false);
   const [stripeCustomerId, setStripeCustomerId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const { data: customers, isLoading } = useQuery<UserType[]>({
@@ -80,6 +85,28 @@ export default function AdminCustomers() {
       toast({ title: 'Failed to update customer', variant: 'destructive' });
     },
   });
+
+  const openDeleteDialog = (customer: UserType) => {
+    setCustomerToDelete(customer);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await apiRequest('DELETE', `/api/users/${customerToDelete.id}`);
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({ title: 'Customer deleted successfully' });
+      setDeleteDialogOpen(false);
+      setCustomerToDelete(null);
+    } catch (error) {
+      toast({ title: 'Failed to delete customer', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const filteredCustomers = customers?.filter((customer) => {
     const searchLower = searchQuery.toLowerCase();
@@ -278,6 +305,13 @@ export default function AdminCustomers() {
                               <CreditCard className="h-4 w-4 mr-2" />
                               Manage Pay Later
                             </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => openDeleteDialog(customer)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Customer
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -425,6 +459,60 @@ export default function AdminCustomers() {
                   <>
                     <Save className="h-4 w-4 mr-2" />
                     Save Changes
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Customer
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete this customer? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+
+            {customerToDelete && (
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <p><span className="font-medium">Name:</span> {customerToDelete.fullName}</p>
+                <p><span className="font-medium">Email:</span> {customerToDelete.email}</p>
+                {customerToDelete.companyName && (
+                  <p><span className="font-medium">Company:</span> {customerToDelete.companyName}</p>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setCustomerToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteCustomer} 
+                disabled={isDeleting}
+                data-testid="button-confirm-delete-customer"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Customer
                   </>
                 )}
               </Button>

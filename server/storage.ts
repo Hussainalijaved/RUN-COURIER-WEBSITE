@@ -43,6 +43,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   createUserWithId(id: string, user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
   incrementCompletedBookings(id: string): Promise<User | undefined>;
   deactivateUser(id: string): Promise<User | undefined>;
   reactivateUser(id: string): Promise<User | undefined>;
@@ -361,6 +362,23 @@ export class MemStorage implements IStorage {
     } catch (error) {
       console.error('[Storage] Error updating user:', error);
       return undefined;
+    }
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(users)
+        .where(eq(users.id, id))
+        .returning();
+      
+      if (result.length > 0) {
+        console.log(`[Storage] Deleted user ${id} from database`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('[Storage] Error deleting user:', error);
+      return false;
     }
   }
 

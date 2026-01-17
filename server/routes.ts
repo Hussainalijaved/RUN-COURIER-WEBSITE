@@ -2664,6 +2664,63 @@ export async function registerRoutes(
     res.json(updatedUser);
   }));
 
+  // Delete customer (admin only)
+  app.delete("/api/users/:id", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Deleting users is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const userId = req.params.id;
+    console.log(`[Users] Attempting to delete customer: ${userId}`);
+    
+    // 1. Get user info first
+    const user = await storage.getUser(userId);
+    const userEmail = user?.email;
+    
+    // 2. Delete from Supabase users table
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        const { error } = await supabaseAdmin
+          .from('users')
+          .delete()
+          .eq('id', userId);
+        if (error) {
+          console.error(`Failed to delete user from Supabase users table:`, error);
+        } else {
+          console.log(`[Users] Deleted from Supabase users table`);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to delete from Supabase users table:", e);
+    }
+    
+    // 3. Delete from Supabase Auth
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (error) {
+          console.error(`Failed to delete auth user:`, error);
+        } else {
+          console.log(`[Users] Deleted from Supabase Auth`);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to delete from Supabase Auth:", e);
+    }
+    
+    // 4. Delete from in-memory storage
+    try {
+      await storage.deleteUser(userId);
+      console.log(`[Users] Deleted from in-memory storage`);
+    } catch (e) {
+      console.error("Failed to delete from in-memory storage:", e);
+    }
+    
+    console.log(`[Users] DELETED customer ${userEmail || userId} from all systems`);
+    res.json({ success: true, message: "Customer permanently deleted" });
+  }));
+
   // Admin endpoint to update Pay Later status by email
   app.post("/api/admin/update-pay-later", asyncHandler(async (req, res) => {
     // ADMIN REQUIRED: Updating pay later is an admin-only operation
