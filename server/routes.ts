@@ -3228,10 +3228,10 @@ export async function registerRoutes(
       
       if (supabaseAdmin) {
         // Only update columns that exist in the driver_documents table
-        // Note: review_notes may not exist in some Supabase schemas
+        // The Supabase driver_documents table only has: status, updated_at
+        // It does NOT have: reviewed_by, review_notes columns
         const updateData: Record<string, any> = {
           status: status,
-          reviewed_by: reviewedBy,
           updated_at: reviewedAt.toISOString(),
         };
         
