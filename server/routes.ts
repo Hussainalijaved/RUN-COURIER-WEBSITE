@@ -5206,25 +5206,33 @@ export async function registerRoutes(
           // User is created in Supabase auth, continue even if DB insert fails
         }
 
-        // Generate email verification link and send it
+        // Generate email verification link and send it using magiclink
         try {
           const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-            type: 'signup',
+            type: 'magiclink',
             email: email,
             options: {
               redirectTo: 'https://www.runcourier.co.uk/login?verified=true'
             }
           });
           
+          console.log('[Registration] Generate link result:', { 
+            hasLink: !!linkData?.properties?.action_link, 
+            error: linkError?.message 
+          });
+          
           if (linkError) {
             console.error('[Registration] Failed to generate verification link:', linkError);
           } else if (linkData?.properties?.action_link) {
+            console.log(`[Registration] Sending verification email to ${email}...`);
             const emailSent = await sendEmailVerification(email, linkData.properties.action_link, fullName);
             if (emailSent) {
-              console.log(`[Registration] Verification email sent to ${email}`);
+              console.log(`[Registration] Verification email sent successfully to ${email}`);
             } else {
-              console.error('[Registration] Failed to send verification email');
+              console.error('[Registration] Failed to send verification email via Resend');
             }
+          } else {
+            console.error('[Registration] No action link returned from Supabase');
           }
         } catch (verifyError) {
           console.error('[Registration] Verification email error:', verifyError);
