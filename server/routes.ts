@@ -4961,9 +4961,11 @@ export async function registerRoutes(
   }));
 
   app.post("/api/job-assignments", asyncHandler(async (req, res) => {
+    console.log(`[Job Assignment API] POST /api/job-assignments called with body:`, JSON.stringify(req.body));
     const { jobId, driverId, assignedBy, driverPrice, expiresAt } = req.body;
     
     if (!jobId || !driverId || !assignedBy || !driverPrice) {
+      console.log(`[Job Assignment API] Missing required fields - jobId: ${jobId}, driverId: ${driverId}, assignedBy: ${assignedBy}, driverPrice: ${driverPrice}`);
       return res.status(400).json({ error: "Missing required fields: jobId, driverId, assignedBy, driverPrice" });
     }
 
