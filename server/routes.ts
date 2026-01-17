@@ -3913,6 +3913,33 @@ export async function registerRoutes(
 
     const job = await storage.createJob(jobData);
     
+    // Auto-geocode job coordinates for mobile app map display
+    try {
+      const geoUpdates: any = {};
+      if (jobData.pickupAddress) {
+        const pickupResult = await geocodeAddress(jobData.pickupAddress);
+        if (pickupResult) {
+          geoUpdates.pickupLatitude = pickupResult.lat;
+          geoUpdates.pickupLongitude = pickupResult.lng;
+          console.log(`[Embedded Payment] Geocoded pickup: ${pickupResult.lat}, ${pickupResult.lng}`);
+        }
+      }
+      if (jobData.deliveryAddress) {
+        const deliveryResult = await geocodeAddress(jobData.deliveryAddress);
+        if (deliveryResult) {
+          geoUpdates.deliveryLatitude = deliveryResult.lat;
+          geoUpdates.deliveryLongitude = deliveryResult.lng;
+          console.log(`[Embedded Payment] Geocoded delivery: ${deliveryResult.lat}, ${deliveryResult.lng}`);
+        }
+      }
+      if (Object.keys(geoUpdates).length > 0) {
+        await storage.updateJob(job.id, geoUpdates);
+        console.log(`[Embedded Payment] Updated job ${job.id} with geocoded coordinates`);
+      }
+    } catch (geoError) {
+      console.error('[Embedded Payment] Geocoding error:', geoError);
+    }
+    
     if (metadata.customerId) {
       await storage.incrementCompletedBookings(metadata.customerId);
     }
