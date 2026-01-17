@@ -714,6 +714,7 @@ export async function registerRoutes(
 
   app.get("/api/jobs", asyncHandler(async (req, res) => {
     const { status, customerId, driverId, vendorId, limit = 50 } = req.query;
+    console.log(`[API Jobs] Fetching jobs with customerId: ${customerId}, driverId: ${driverId}`);
     const jobs = await storage.getJobs({
       status: status as JobStatus | undefined,
       customerId: customerId as string | undefined,
@@ -721,6 +722,7 @@ export async function registerRoutes(
       vendorId: vendorId as string | undefined,
       limit: Number(limit),
     });
+    console.log(`[API Jobs] Found ${jobs.length} jobs for customerId: ${customerId}`);
     
     // SECURITY: Default to safe (no-pricing) unless explicitly admin/dispatcher
     // This prevents price leakage by omitting auth or using driver token

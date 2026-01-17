@@ -825,6 +825,7 @@ export class SupabaseStorage implements IStorage {
       query = query.eq('status', filters.status);
     }
     if (filters?.customerId) {
+      console.log(`[SupabaseStorage] Filtering jobs by customer_id: ${filters.customerId}`);
       query = query.eq('customer_id', filters.customerId);
     }
     if (filters?.driverId) {
@@ -838,7 +839,12 @@ export class SupabaseStorage implements IStorage {
     }
     
     const { data, error } = await query;
-    if (error || !data) return [];
+    if (error) {
+      console.error('[SupabaseStorage] getJobs error:', error);
+      return [];
+    }
+    if (!data) return [];
+    console.log(`[SupabaseStorage] getJobs returned ${data.length} jobs, first job customer_id: ${data[0]?.customer_id}`);
     return data.map(mapDbToJob);
   }
 
