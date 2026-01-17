@@ -5188,9 +5188,14 @@ export async function registerRoutes(
         
         // Check if email already exists - offer to resend verification
         if (authError.code === 'email_exists') {
+          console.log('[Registration] Email exists, checking if user is unverified...');
           // Check if the existing user is unverified
-          const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+          const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+          if (listErr) {
+            console.error('[Registration] Failed to list users:', listErr);
+          }
           const existingUser = users?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+          console.log('[Registration] Found user:', existingUser ? { email: existingUser.email, confirmed: !!existingUser.email_confirmed_at } : 'not found');
           
           if (existingUser && !existingUser.email_confirmed_at) {
             // User exists but unverified - resend verification email
