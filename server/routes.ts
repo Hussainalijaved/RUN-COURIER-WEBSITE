@@ -4390,6 +4390,45 @@ export async function registerRoutes(
     res.json(invoice);
   }));
 
+  // Delete invoice - admin only
+  app.delete("/api/invoices/:id", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Invoice deletion is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Database connection unavailable" });
+    }
+    
+    const invoiceId = req.params.id;
+    
+    // First check if invoice exists
+    const { data: existingInvoice, error: fetchError } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .select('token, invoice_number, status')
+      .eq('token', invoiceId)
+      .single();
+    
+    if (fetchError || !existingInvoice) {
+      console.error('[Invoices] Invoice not found for deletion:', invoiceId);
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    
+    // Delete the invoice
+    const { error: deleteError } = await supabaseAdmin
+      .from('invoice_payment_tokens')
+      .delete()
+      .eq('token', invoiceId);
+    
+    if (deleteError) {
+      console.error('[Invoices] Error deleting invoice:', deleteError);
+      return res.status(500).json({ error: "Failed to delete invoice" });
+    }
+    
+    console.log(`[Invoices] Admin deleted invoice ${existingInvoice.invoice_number} (${invoiceId})`);
+    res.json({ success: true, message: `Invoice ${existingInvoice.invoice_number} deleted successfully` });
+  }));
+
   // Helper functions for invoice payment tokens (using Supabase for persistence)
   const { supabaseAdmin } = await import('./supabaseAdmin');
   

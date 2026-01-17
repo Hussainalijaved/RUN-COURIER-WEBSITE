@@ -52,6 +52,7 @@ import {
   XCircle,
   RefreshCw,
   Pencil,
+  Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -159,6 +160,8 @@ export default function AdminInvoices() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editInvoice, setEditInvoice] = useState<SavedInvoice | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteInvoice, setDeleteInvoice] = useState<SavedInvoice | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<CreateInvoiceFormData>({
@@ -363,6 +366,38 @@ export default function AdminInvoices() {
   const onEditSubmit = (data: EditInvoiceFormData) => {
     if (!editInvoice) return;
     editInvoiceMutation.mutate({ ...data, invoiceId: editInvoice.id });
+  };
+
+  // Delete invoice mutation
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const response = await apiRequest('DELETE', `/api/invoices/${invoiceId}`);
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      toast({ title: 'Invoice deleted', description: result?.message || 'Invoice has been deleted successfully' });
+      setDeleteDialogOpen(false);
+      setDeleteInvoice(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to delete invoice', 
+        description: error?.message || 'Please try again',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const handleDeleteInvoice = (invoice: SavedInvoice) => {
+    setDeleteInvoice(invoice);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteInvoice = () => {
+    if (deleteInvoice) {
+      deleteInvoiceMutation.mutate(deleteInvoice.id);
+    }
   };
 
   // Print invoice function
@@ -743,6 +778,16 @@ export default function AdminInvoices() {
                                     Mark as Paid
                                   </DropdownMenuItem>
                                 )}
+                                {fullInvoice && (
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteInvoice(fullInvoice)}
+                                    className="text-destructive focus:text-destructive"
+                                    data-testid={`menu-delete-recent-${index}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Invoice
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -858,6 +903,14 @@ export default function AdminInvoices() {
                                   Mark as Paid
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteInvoice(invoice)}
+                                className="text-destructive focus:text-destructive"
+                                data-testid={`menu-delete-invoice-${invoice.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Invoice
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -869,6 +922,53 @@ export default function AdminInvoices() {
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Invoice</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this invoice? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            {deleteInvoice && (
+              <div className="py-4 space-y-2">
+                <p><span className="font-medium">Invoice:</span> {deleteInvoice.invoice_number}</p>
+                <p><span className="font-medium">Customer:</span> {deleteInvoice.customer_name}</p>
+                <p><span className="font-medium">Amount:</span> {formatPrice(deleteInvoice.total)}</p>
+                <p><span className="font-medium">Status:</span> {deleteInvoice.status}</p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setDeleteDialogOpen(false)}
+                data-testid="button-cancel-delete-invoice"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmDeleteInvoice}
+                disabled={deleteInvoiceMutation.isPending}
+                data-testid="button-confirm-delete-invoice"
+              >
+                {deleteInvoiceMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Invoice
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* View Invoice Dialog */}
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
