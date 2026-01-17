@@ -4358,28 +4358,28 @@ export async function registerRoutes(
     const { data, error } = await query;
     console.log('[Invoices] Found', data?.length || 0, 'invoices from tokens table');
     
-    // Transform invoice_payment_tokens to invoice format
+    // Transform invoice_payment_tokens to invoice format (snake_case for frontend)
     const invoicesFromTokens = (data || []).map((token: any) => ({
       id: token.token,
-      invoiceNumber: token.invoice_number || `INV-${token.token?.substring(0, 8)?.toUpperCase()}`,
-      customerId: null,
-      customerName: token.customer_name,
-      customerEmail: token.customer_email,
-      companyName: token.company_name || null,
-      businessAddress: token.business_address || null,
-      vatNumber: token.vat_number || null,
+      invoice_number: token.invoice_number || `INV-${token.token?.substring(0, 8)?.toUpperCase()}`,
+      customer_id: null,
+      customer_name: token.customer_name,
+      customer_email: token.customer_email,
+      company_name: token.company_name || null,
+      business_address: token.business_address || null,
+      vat_number: token.vat_number || null,
       subtotal: String(token.subtotal || token.amount || 0),
       vat: String(token.vat || 0),
       total: String(token.amount || 0),
       status: token.status || 'pending',
-      dueDate: token.due_date || token.created_at,
-      periodStart: token.period_start || token.created_at,
-      periodEnd: token.period_end || token.created_at,
-      jobIds: token.job_ids || null,
+      due_date: token.due_date || token.created_at,
+      period_start: token.period_start || token.created_at,
+      period_end: token.period_end || token.created_at,
+      job_ids: token.job_ids || null,
       notes: token.notes,
-      paymentToken: token.token,
-      jobDetails: token.job_details || null,
-      createdAt: token.created_at,
+      payment_token: token.token,
+      job_details: token.job_details || null,
+      created_at: token.created_at,
     }));
     
     // Also get jobs that don't have invoices yet and create virtual invoices for them
@@ -4420,8 +4420,8 @@ export async function registerRoutes(
     // Create virtual invoices for jobs that don't have a matching invoice
     const existingJobIds = new Set(
       invoicesFromTokens
-        .filter((inv: any) => inv.jobIds)
-        .flatMap((inv: any) => inv.jobIds)
+        .filter((inv: any) => inv.job_ids)
+        .flatMap((inv: any) => inv.job_ids)
     );
     
     const jobInvoices = (jobs || [])
@@ -4432,31 +4432,31 @@ export async function registerRoutes(
         const isBusiness = customerProfile?.user_type === 'business';
         return {
           id: `job-${job.id}`,
-          invoiceNumber: `INV-${job.tracking_number || job.id}`,
-          customerId: job.customer_id || null,
-          customerName: isBusiness ? (customerProfile?.company_name || job.pickup_contact_name || 'Customer') : (job.pickup_contact_name || customerProfile?.full_name || 'Customer'),
-          customerEmail: job.customer_email || '',
-          companyName: isBusiness ? customerProfile?.company_name : null,
-          businessAddress: isBusiness ? customerProfile?.business_address : null,
-          vatNumber: isBusiness ? customerProfile?.vat_number : null,
+          invoice_number: `INV-${job.tracking_number || job.id}`,
+          customer_id: job.customer_id || null,
+          customer_name: isBusiness ? (customerProfile?.company_name || job.pickup_contact_name || 'Customer') : (job.pickup_contact_name || customerProfile?.full_name || 'Customer'),
+          customer_email: job.customer_email || '',
+          company_name: isBusiness ? customerProfile?.company_name : null,
+          business_address: isBusiness ? customerProfile?.business_address : null,
+          vat_number: isBusiness ? customerProfile?.vat_number : null,
           subtotal: String(job.total_price || 0),
           vat: '0',
           total: String(job.total_price || 0),
           status: isPaid ? 'paid' : 'pending',
-          dueDate: job.created_at,
-          periodStart: job.created_at,
-          periodEnd: job.created_at,
-          jobIds: [job.id],
+          due_date: job.created_at,
+          period_start: job.created_at,
+          period_end: job.created_at,
+          job_ids: [job.id],
           notes: isPaid ? 'Card payment' : 'Pay Later',
-          paymentToken: null,
-          jobDetails: null,
-          createdAt: job.created_at,
+          payment_token: null,
+          job_details: null,
+          created_at: job.created_at,
         };
       });
     
     // Combine and sort by date
     const allInvoices = [...invoicesFromTokens, ...jobInvoices]
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     
     console.log('[Invoices] Total invoices:', allInvoices.length);
     res.json(allInvoices);
