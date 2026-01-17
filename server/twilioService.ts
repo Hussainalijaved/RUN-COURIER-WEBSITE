@@ -209,9 +209,9 @@ export async function sendVerificationCode(phone: string): Promise<{ success: bo
   try {
     const phoneKey = normalizePhoneKey(phone);
     
-    // Check rate limiting (max 3 requests per 10 minutes)
+    // Check rate limiting (max 5 requests per 10 minutes)
     const existing = verificationCodes.get(phoneKey);
-    if (existing && existing.attempts >= 3 && existing.expiresAt > Date.now()) {
+    if (existing && existing.attempts >= 5 && existing.expiresAt > Date.now()) {
       return { success: false, error: 'Too many verification attempts. Please wait 10 minutes.' };
     }
     
