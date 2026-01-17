@@ -5233,19 +5233,24 @@ export async function registerRoutes(
       // Create user record in users table
       if (authData?.user) {
         try {
-          await storage.createUser({
-            id: authData.user.id,
+          await storage.createUserWithId(authData.user.id, {
             email: authData.user.email!,
             fullName,
             phone,
             postcode,
             address,
+            buildingName,
             role: role || 'customer',
+            userType: userType || 'individual',
+            companyName,
+            registrationNumber,
+            businessAddress,
             isActive: true,
           });
-        } catch (dbError) {
-          console.error('[Registration] Failed to create user record:', dbError);
-          // User is created in Supabase auth, continue even if DB insert fails
+          console.log(`[Registration] User record created in database for ${email}`);
+        } catch (dbError: any) {
+          console.error('[Registration] Failed to create user record:', dbError?.message || dbError);
+          // User is created in Supabase auth, data will sync on first login
         }
 
         // Generate email verification link and send it using magiclink
