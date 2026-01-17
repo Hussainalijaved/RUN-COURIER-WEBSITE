@@ -5060,6 +5060,48 @@ export async function registerRoutes(
     res.status(200).json({ success: true, message: "Registration emails sent" });
   }));
 
+  // Phone verification endpoints for registration
+  app.post("/api/auth/send-verification-code", asyncHandler(async (req, res) => {
+    const { phone } = req.body;
+    
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+
+    // Validate UK phone format
+    const cleanedPhone = phone.replace(/\s+/g, '');
+    const ukPhoneRegex = /^(\+44|0044|0)?[1-9]\d{8,10}$/;
+    if (!ukPhoneRegex.test(cleanedPhone)) {
+      return res.status(400).json({ error: "Please enter a valid UK phone number" });
+    }
+
+    const { sendVerificationCode } = await import("./twilioService");
+    const result = await sendVerificationCode(phone);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || "Failed to send verification code" });
+    }
+    
+    res.status(200).json({ success: true, message: "Verification code sent to your phone" });
+  }));
+
+  app.post("/api/auth/verify-phone", asyncHandler(async (req, res) => {
+    const { phone, code } = req.body;
+    
+    if (!phone || !code) {
+      return res.status(400).json({ error: "Phone number and verification code are required" });
+    }
+
+    const { verifyCode } = await import("./twilioService");
+    const result = await verifyCode(phone, code);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || "Invalid verification code" });
+    }
+    
+    res.status(200).json({ success: true, message: "Phone number verified successfully" });
+  }));
+
   // Password reset endpoint using Resend for reliable email delivery
   app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
     const { email, redirectUrl } = req.body;
