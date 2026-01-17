@@ -61,9 +61,10 @@ const getStatusBadge = (status: JobStatus) => {
   }
 };
 
-const formatPrice = (price: string | number) => {
+const formatPrice = (price: string | number | null | undefined) => {
+  if (price === null || price === undefined) return '£0.00';
   const num = typeof price === 'string' ? parseFloat(price) : price;
-  return `£${num.toFixed(2)}`;
+  return `£${(num || 0).toFixed(2)}`;
 };
 
 const formatDate = (date: Date | string | null) => {
