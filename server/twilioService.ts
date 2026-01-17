@@ -29,6 +29,22 @@ setInterval(() => {
 let connectionSettings: any;
 
 async function getCredentials() {
+  // First try environment variables (user-provided secrets)
+  const envAccountSid = process.env.TWILIO_ACCOUNT_SID;
+  const envAuthToken = process.env.TWILIO_AUTH_TOKEN;
+  const envPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+  
+  if (envAccountSid && envAuthToken && envPhoneNumber) {
+    console.log('[Twilio] Using environment variable credentials');
+    return {
+      accountSid: envAccountSid,
+      authToken: envAuthToken,
+      phoneNumber: envPhoneNumber,
+      useAuthToken: true
+    };
+  }
+
+  // Fallback to Replit connector
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
@@ -37,7 +53,7 @@ async function getCredentials() {
     : null;
 
   if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+    throw new Error('Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER.');
   }
 
   connectionSettings = await fetch(
@@ -51,21 +67,29 @@ async function getCredentials() {
   ).then(res => res.json()).then(data => data.items?.[0]);
 
   if (!connectionSettings || (!connectionSettings.settings.account_sid || !connectionSettings.settings.api_key || !connectionSettings.settings.api_key_secret)) {
-    throw new Error('Twilio not connected');
+    throw new Error('Twilio not connected. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER.');
   }
   return {
     accountSid: connectionSettings.settings.account_sid,
     apiKey: connectionSettings.settings.api_key,
     apiKeySecret: connectionSettings.settings.api_key_secret,
-    phoneNumber: connectionSettings.settings.phone_number
+    phoneNumber: connectionSettings.settings.phone_number,
+    useAuthToken: false
   };
 }
 
 export async function getTwilioClient() {
-  const { accountSid, apiKey, apiKeySecret } = await getCredentials();
-  return twilio(apiKey, apiKeySecret, {
-    accountSid: accountSid
-  });
+  const creds = await getCredentials();
+  
+  if (creds.useAuthToken) {
+    // Using Account SID + Auth Token (from environment variables)
+    return twilio(creds.accountSid, creds.authToken);
+  } else {
+    // Using API Key authentication (from Replit connector)
+    return twilio(creds.apiKey, creds.apiKeySecret, {
+      accountSid: creds.accountSid
+    });
+  }
 }
 
 export async function getTwilioFromPhoneNumber() {
