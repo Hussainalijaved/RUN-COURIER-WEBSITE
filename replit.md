@@ -104,6 +104,13 @@ The web admin dashboard and Expo mobile app share a unified backend:
 - **Profile Sync**: Driver profile updates sync via Supabase (both platforms read/write to same table)
 - **Price Isolation**: Mobile API never exposes customer pricing - explicit column selection enforced
 
+### Job Geocoding
+Jobs are automatically geocoded when created or assigned:
+- **Auto-Geocoding**: Addresses are geocoded using Google Maps API to get coordinates
+- **Supabase Sync**: Geocoded coordinates (`pickup_latitude`, `pickup_longitude`, `delivery_latitude`, `delivery_longitude`) are synced to Supabase
+- **Mobile Map Display**: Driver mobile app uses coordinates to display pickup/delivery locations on map
+- **Fallback**: If geocoding fails, jobs still work but map preview will be unavailable
+
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.
