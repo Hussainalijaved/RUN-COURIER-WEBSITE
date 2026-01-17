@@ -1229,47 +1229,52 @@ export async function registerRoutes(
         // Map local job fields to Supabase jobs table columns
         // Column names match the create-job edge function schema
         // DO NOT include 'id' - let Supabase auto-generate it
+        // CRITICAL: Use finalJob (with geocoded coordinates) not original job
         const supabaseJobData = {
           // Required tracking
-          tracking_number: job.trackingNumber,
+          tracking_number: finalJob.trackingNumber,
           // Driver/customer IDs - CRITICAL: Use Supabase auth.uid, NOT local driver UUID
           driver_id: supabaseDriverId, // Must be Supabase auth.uid for RLS
-          customer_id: job.customerId !== 'admin-created' ? job.customerId : null,
+          customer_id: finalJob.customerId !== 'admin-created' ? finalJob.customerId : null,
           // Status and type
-          status: job.status === 'assigned' ? 'pending' : job.status,
-          vehicle_type: job.vehicleType || 'small_van',
-          payment_status: job.paymentStatus || 'pending',
-          // Pickup details
-          pickup_address: job.pickupAddress || '',
-          pickup_postcode: job.pickupPostcode || null,
-          pickup_contact_name: job.pickupContactName || null,
-          pickup_contact_phone: job.pickupContactPhone || null,
-          pickup_instructions: job.pickupInstructions || null,
-          // Delivery details
-          delivery_address: job.deliveryAddress || '',
-          delivery_postcode: job.deliveryPostcode || null,
-          delivery_instructions: job.deliveryInstructions || null,
+          status: finalJob.status === 'assigned' ? 'pending' : finalJob.status,
+          vehicle_type: finalJob.vehicleType || 'small_van',
+          payment_status: finalJob.paymentStatus || 'pending',
+          // Pickup details with geocoded coordinates
+          pickup_address: finalJob.pickupAddress || '',
+          pickup_postcode: finalJob.pickupPostcode || null,
+          pickup_latitude: finalJob.pickupLatitude || geocodeUpdates.pickupLatitude || null,
+          pickup_longitude: finalJob.pickupLongitude || geocodeUpdates.pickupLongitude || null,
+          pickup_contact_name: finalJob.pickupContactName || null,
+          pickup_contact_phone: finalJob.pickupContactPhone || null,
+          pickup_instructions: finalJob.pickupInstructions || null,
+          // Delivery details with geocoded coordinates
+          delivery_address: finalJob.deliveryAddress || '',
+          delivery_postcode: finalJob.deliveryPostcode || null,
+          delivery_latitude: finalJob.deliveryLatitude || geocodeUpdates.deliveryLatitude || null,
+          delivery_longitude: finalJob.deliveryLongitude || geocodeUpdates.deliveryLongitude || null,
+          delivery_instructions: finalJob.deliveryInstructions || null,
           // Recipient
-          recipient_name: job.recipientName || 'Recipient',
-          recipient_phone: job.recipientPhone || '',
+          recipient_name: finalJob.recipientName || 'Recipient',
+          recipient_phone: finalJob.recipientPhone || '',
           // Numeric fields - use correct column names matching create-job edge function
-          weight: job.weight ? parseFloat(String(job.weight)).toFixed(2) : '1.00',
-          distance: job.distance ? parseFloat(String(job.distance)).toFixed(2) : '0.00',
-          base_price: job.basePrice ? parseFloat(String(job.basePrice)).toFixed(2) : '0.00',
-          distance_price: job.distancePrice ? parseFloat(String(job.distancePrice)).toFixed(2) : '0.00',
-          weight_surcharge: job.weightSurcharge ? parseFloat(String(job.weightSurcharge)).toFixed(2) : '0.00',
-          multi_drop_charge: job.multiDropCharge ? parseFloat(String(job.multiDropCharge)).toFixed(2) : '0.00',
-          return_trip_charge: job.returnTripCharge ? parseFloat(String(job.returnTripCharge)).toFixed(2) : '0.00',
-          central_london_charge: job.centralLondonCharge ? parseFloat(String(job.centralLondonCharge)).toFixed(2) : '0.00',
-          waiting_time_charge: job.waitingTimeCharge ? parseFloat(String(job.waitingTimeCharge)).toFixed(2) : '0.00',
-          total_price: job.totalPrice ? parseFloat(String(job.totalPrice)).toFixed(2) : '0.00',
+          weight: finalJob.weight ? parseFloat(String(finalJob.weight)).toFixed(2) : '1.00',
+          distance: finalJob.distance ? parseFloat(String(finalJob.distance)).toFixed(2) : '0.00',
+          base_price: finalJob.basePrice ? parseFloat(String(finalJob.basePrice)).toFixed(2) : '0.00',
+          distance_price: finalJob.distancePrice ? parseFloat(String(finalJob.distancePrice)).toFixed(2) : '0.00',
+          weight_surcharge: finalJob.weightSurcharge ? parseFloat(String(finalJob.weightSurcharge)).toFixed(2) : '0.00',
+          multi_drop_charge: finalJob.multiDropCharge ? parseFloat(String(finalJob.multiDropCharge)).toFixed(2) : '0.00',
+          return_trip_charge: finalJob.returnTripCharge ? parseFloat(String(finalJob.returnTripCharge)).toFixed(2) : '0.00',
+          central_london_charge: finalJob.centralLondonCharge ? parseFloat(String(finalJob.centralLondonCharge)).toFixed(2) : '0.00',
+          waiting_time_charge: finalJob.waitingTimeCharge ? parseFloat(String(finalJob.waitingTimeCharge)).toFixed(2) : '0.00',
+          total_price: finalJob.totalPrice ? parseFloat(String(finalJob.totalPrice)).toFixed(2) : '0.00',
           // CRITICAL: driver_price is what drivers see - must be set by admin
-          driver_price: job.driverPrice ? parseFloat(String(job.driverPrice)).toFixed(2) : null,
+          driver_price: finalJob.driverPrice ? parseFloat(String(finalJob.driverPrice)).toFixed(2) : null,
           // Schedule
-          scheduled_pickup_time: job.scheduledPickupTime?.toISOString() || null,
-          scheduled_delivery_time: job.scheduledDeliveryTime?.toISOString() || null,
-          is_multi_drop: job.isMultiDrop || false,
-          is_return_trip: job.isReturnTrip || false,
+          scheduled_pickup_time: finalJob.scheduledPickupTime?.toISOString() || null,
+          scheduled_delivery_time: finalJob.scheduledDeliveryTime?.toISOString() || null,
+          is_multi_drop: finalJob.isMultiDrop || false,
+          is_return_trip: finalJob.isReturnTrip || false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -1289,12 +1294,12 @@ export async function registerRoutes(
         }
         
         // Save multi-drop stops to Supabase if present (independent of job sync)
-        // IMPORTANT: Use LOCAL job.id so frontend can query by local ID
+        // IMPORTANT: Use LOCAL finalJob.id so frontend can query by local ID
         const multiDropStops = req.body.multiDropStops;
-        if (job.isMultiDrop && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
-          console.log(`[Jobs] Saving ${multiDropStops.length} multi-drop stops for local job ${job.id}`);
+        if (finalJob.isMultiDrop && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
+          console.log(`[Jobs] Saving ${multiDropStops.length} multi-drop stops for local job ${finalJob.id}`);
           const stopsToInsert = multiDropStops.map((stop: any, index: number) => ({
-            job_id: String(job.id), // Use local job ID for consistency with frontend queries
+            job_id: String(finalJob.id), // Use local job ID for consistency with frontend queries
             stop_order: stop.stopOrder || index + 1,
             address: stop.address || stop.fullAddress || '',
             postcode: stop.postcode || '',
