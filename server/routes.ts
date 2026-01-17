@@ -3335,13 +3335,16 @@ export async function registerRoutes(
     // If not updated in Supabase driver_documents, try the storage layer
     // For UUID documents, this will try Supabase 'documents' table via SupabaseStorage
     if (!document) {
+      console.log('[Documents] Trying storage layer for document:', req.params.id, 'isUuid:', isUuidId);
       try {
         document = await storage.reviewDocument(req.params.id, status, reviewedBy, reviewNotes);
         if (document) {
           console.log('[Documents] Updated document via storage layer:', req.params.id);
+        } else {
+          console.log('[Documents] Storage layer returned undefined for:', req.params.id);
         }
-      } catch (storageErr) {
-        console.log('[Documents] Storage layer could not find document:', req.params.id);
+      } catch (storageErr: any) {
+        console.log('[Documents] Storage layer error:', storageErr?.message || storageErr);
       }
     }
     
