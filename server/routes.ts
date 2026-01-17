@@ -2798,7 +2798,7 @@ export async function registerRoutes(
           query = query.or(`doc_type.eq.${type},document_type.eq.${type}`);
         }
         
-        const { data: supabaseDocs, error } = await query.order('created_at', { ascending: false });
+        const { data: supabaseDocs, error } = await query.order('updated_at', { ascending: false });
         
         if (error) {
           console.error('[Documents] Supabase fetch error:', error);
@@ -2817,8 +2817,8 @@ export async function registerRoutes(
                 expiryDate: doc.expiry_date ? new Date(doc.expiry_date) : null,
                 reviewedBy: doc.reviewed_by,
                 reviewNotes: doc.review_notes,
-                uploadedAt: doc.created_at ? new Date(doc.created_at) : (doc.uploaded_at ? new Date(doc.uploaded_at) : null),
-                reviewedAt: doc.updated_at ? new Date(doc.updated_at) : null,
+                uploadedAt: doc.uploaded_at ? new Date(doc.uploaded_at) : (doc.updated_at ? new Date(doc.updated_at) : null),
+                reviewedAt: doc.reviewed_at ? new Date(doc.reviewed_at) : (doc.updated_at ? new Date(doc.updated_at) : null),
               });
             }
           });
