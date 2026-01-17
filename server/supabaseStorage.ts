@@ -1556,57 +1556,20 @@ export class SupabaseStorage implements IStorage {
     };
     
     try {
+      console.log('[SupabaseStorage] Creating job assignment with data:', JSON.stringify(dbAssignment));
       const { data, error } = await supabase.from('job_assignments').insert(dbAssignment).select().single();
       if (error) {
         console.error('[SupabaseStorage] Error creating job assignment:', error);
-        // Return a simulated assignment object if Supabase insert fails
-        return {
-          id,
-          jobId: assignment.jobId,
-          driverId: assignment.driverId,
-          assignedBy: assignment.assignedBy,
-          driverPrice: assignment.driverPrice,
-          status: (assignment.status || 'pending') as any,
-          sentAt: assignment.status === 'sent' ? now : null,
-          respondedAt: null,
-          expiresAt: assignment.expiresAt || null,
-          cancelledAt: null,
-          cancellationReason: null,
-          rejectionReason: null,
-          createdAt: now,
-          withdrawnAt: null,
-          withdrawnBy: null,
-          removedAt: null,
-          removedBy: null,
-          cleanedAt: null,
-          cleanedBy: null,
-        } as JobAssignment;
+        console.error('[SupabaseStorage] CRITICAL: Assignment was NOT created in database!');
+        // Throw an error so the API returns a proper error response
+        throw new Error(`Failed to create job assignment: ${error.message}`);
       }
+      console.log('[SupabaseStorage] Successfully created job assignment:', data.id);
       return mapDbToJobAssignment(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[SupabaseStorage] Exception creating job assignment:', err);
-      // Return a simulated assignment to allow the flow to continue
-      return {
-        id,
-        jobId: assignment.jobId,
-        driverId: assignment.driverId,
-        assignedBy: assignment.assignedBy,
-        driverPrice: assignment.driverPrice,
-        status: (assignment.status || 'pending') as any,
-        sentAt: assignment.status === 'sent' ? now : null,
-        respondedAt: null,
-        expiresAt: assignment.expiresAt || null,
-        cancelledAt: null,
-        cancellationReason: null,
-        rejectionReason: null,
-        createdAt: now,
-        withdrawnAt: null,
-        withdrawnBy: null,
-        removedAt: null,
-        removedBy: null,
-        cleanedAt: null,
-        cleanedBy: null,
-      } as JobAssignment;
+      // Re-throw the error so the API returns a proper error response
+      throw err;
     }
   }
 
