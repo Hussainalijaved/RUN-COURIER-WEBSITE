@@ -11,7 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Loader2, CreditCard, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+if (!stripePublishableKey) {
+  console.error('[Payment] VITE_STRIPE_PUBLISHABLE_KEY is not set');
+}
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 interface BookingData {
   pickupPostcode: string;
@@ -332,6 +336,21 @@ export function EmbeddedPayment({
 
   if (!clientSecret) {
     return null;
+  }
+
+  if (!stripePromise) {
+    return (
+      <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+        <CardContent className="pt-6 text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-600 mb-4" />
+          <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">Payment Configuration Error</h3>
+          <p className="text-red-700 dark:text-red-300 mt-2">Payment system is not configured. Please contact support.</p>
+          <Button variant="outline" onClick={onCancel} className="mt-4">
+            Go Back
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   const appearance = {
