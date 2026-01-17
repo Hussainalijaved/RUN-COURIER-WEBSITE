@@ -9,7 +9,8 @@ const verificationCodes: Map<string, { code: string; expiresAt: number; attempts
 // Clean up expired codes every 5 minutes
 setInterval(() => {
   const now = Date.now();
-  for (const [phone, data] of verificationCodes.entries()) {
+  const entries = Array.from(verificationCodes.entries());
+  for (const [phone, data] of entries) {
     if (data.expiresAt < now) {
       verificationCodes.delete(phone);
     }

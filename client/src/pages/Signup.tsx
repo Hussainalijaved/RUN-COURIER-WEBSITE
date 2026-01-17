@@ -20,10 +20,11 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, User, Building2 } from 'lucide-react';
+import { Loader2, User, Building2, CheckCircle2, Phone } from 'lucide-react';
 import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
 import type { UserRole } from '@shared/schema';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
+import { apiRequest } from '@/lib/queryClient';
 
 type SignupRole = 'driver' | 'customer' | 'vendor';
 
@@ -36,6 +37,11 @@ export default function Signup({ role = 'customer' }: SignupProps) {
   const { signUp } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -56,6 +62,87 @@ export default function Signup({ role = 'customer' }: SignupProps) {
   });
 
   const userType = form.watch('userType');
+  const phoneValue = form.watch('phone');
+
+  const handleSendVerificationCode = async () => {
+    const phone = form.getValues('phone');
+    if (!phone || phone.length < 10) {
+      toast({
+        title: 'Invalid Phone Number',
+        description: 'Please enter a valid UK phone number first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSendingCode(true);
+    try {
+      const response = await apiRequest('POST', '/api/auth/send-verification-code', { phone });
+      const data = await response.json();
+      
+      if (response.ok) {
+        setVerificationSent(true);
+        toast({
+          title: 'Code Sent',
+          description: 'A verification code has been sent to your phone.',
+        });
+      } else {
+        toast({
+          title: 'Failed to Send Code',
+          description: data.error || 'Could not send verification code. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send verification code. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode || verificationCode.length !== 6) {
+      toast({
+        title: 'Invalid Code',
+        description: 'Please enter the 6-digit verification code.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setVerifyingCode(true);
+    try {
+      const phone = form.getValues('phone');
+      const response = await apiRequest('POST', '/api/auth/verify-phone', { phone, code: verificationCode });
+      const data = await response.json();
+      
+      if (response.ok) {
+        setPhoneVerified(true);
+        toast({
+          title: 'Phone Verified',
+          description: 'Your phone number has been verified successfully.',
+        });
+      } else {
+        toast({
+          title: 'Verification Failed',
+          description: data.error || 'Invalid verification code. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to verify code. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
 
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true);
@@ -290,18 +377,83 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>UK Phone Number</FormLabel>
-                      <FormControl>
-                        <PhoneInput
-                          value={field.value}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          data-testid="input-phone"
-                        />
-                      </FormControl>
+                      <FormLabel className="flex items-center gap-2">
+                        UK Phone Number
+                        {phoneVerified && (
+                          <span className="inline-flex items-center gap-1 text-xs text-green-600 font-normal">
+                            <CheckCircle2 className="h-3 w-3" /> Verified
+                          </span>
+                        )}
+                      </FormLabel>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <PhoneInput
+                              value={field.value}
+                              onChange={(val) => {
+                                field.onChange(val);
+                                if (phoneVerified) {
+                                  setPhoneVerified(false);
+                                  setVerificationSent(false);
+                                  setVerificationCode('');
+                                }
+                              }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              data-testid="input-phone"
+                            />
+                          </FormControl>
+                          {!phoneVerified && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="default"
+                              onClick={handleSendVerificationCode}
+                              disabled={sendingCode || !field.value || field.value.length < 10}
+                              data-testid="button-send-code"
+                            >
+                              {sendingCode ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Phone className="h-4 w-4" />
+                              )}
+                              <span className="ml-2 hidden sm:inline">
+                                {verificationSent ? 'Resend' : 'Verify'}
+                              </span>
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {verificationSent && !phoneVerified && (
+                          <div className="flex gap-2">
+                            <Input
+                              type="text"
+                              placeholder="Enter 6-digit code"
+                              value={verificationCode}
+                              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              maxLength={6}
+                              className="flex-1"
+                              data-testid="input-verification-code"
+                            />
+                            <Button
+                              type="button"
+                              onClick={handleVerifyCode}
+                              disabled={verifyingCode || verificationCode.length !== 6}
+                              data-testid="button-verify-code"
+                            >
+                              {verifyingCode ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : null}
+                              Verify
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       <FormDescription>
-                        Enter your UK mobile or landline number
+                        {verificationSent && !phoneVerified 
+                          ? 'Enter the 6-digit code sent to your phone'
+                          : 'Enter your UK mobile number and verify it'
+                        }
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -390,7 +542,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading}
+                  disabled={isLoading || !phoneVerified}
                   data-testid="button-submit-signup"
                 >
                   {isLoading ? (
@@ -398,6 +550,12 @@ export default function Signup({ role = 'customer' }: SignupProps) {
                   ) : null}
                   Create Account
                 </Button>
+                
+                {!phoneVerified && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Please verify your phone number to continue
+                  </p>
+                )}
               </form>
             </Form>
 
