@@ -14,6 +14,26 @@ import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "
 // Helper to map Supabase job to local Job format for mobile API response
 // CRITICAL: Only expose driver_price to drivers, NEVER total_price or customer pricing
 function mapSupabaseJobToMobileFormat(job: any) {
+  // Debug logging to trace coordinate and phone issues
+  const pickupLat = job.pickup_latitude?.toString() || job.pickup_lat?.toString() || null;
+  const pickupLng = job.pickup_longitude?.toString() || job.pickup_lng?.toString() || null;
+  const deliveryLat = job.delivery_latitude?.toString() || job.dropoff_lat?.toString() || null;
+  const deliveryLng = job.delivery_longitude?.toString() || job.dropoff_lng?.toString() || null;
+  const senderPhone = job.sender_phone || job.pickup_contact_phone || null;
+  const recipientPhone = job.recipient_phone || null;
+  
+  console.log(`[Mobile Job Map] Job ${job.id}:`, {
+    pickup_latitude: job.pickup_latitude,
+    pickup_longitude: job.pickup_longitude,
+    delivery_latitude: job.delivery_latitude,
+    delivery_longitude: job.delivery_longitude,
+    sender_phone: job.sender_phone,
+    pickup_contact_phone: job.pickup_contact_phone,
+    recipient_phone: job.recipient_phone,
+    mappedPickupLat: pickupLat,
+    mappedSenderPhone: senderPhone
+  });
+  
   return {
     id: String(job.id),
     trackingNumber: job.tracking_number,
@@ -21,17 +41,20 @@ function mapSupabaseJobToMobileFormat(job: any) {
     pickupAddress: job.pickup_address || job.dropoff_address,
     pickupPostcode: job.pickup_postcode || null,
     pickupInstructions: job.pickup_instructions || job.notes,
-    pickupLatitude: job.pickup_latitude?.toString() || job.pickup_lat?.toString() || null,
-    pickupLongitude: job.pickup_longitude?.toString() || job.pickup_lng?.toString() || null,
+    pickupLatitude: pickupLat,
+    pickupLongitude: pickupLng,
     deliveryAddress: job.delivery_address || job.dropoff_address,
     deliveryPostcode: job.delivery_postcode || null,
     deliveryInstructions: job.delivery_instructions || null,
-    deliveryLatitude: job.delivery_latitude?.toString() || job.dropoff_lat?.toString() || null,
-    deliveryLongitude: job.delivery_longitude?.toString() || job.dropoff_lng?.toString() || null,
+    deliveryLatitude: deliveryLat,
+    deliveryLongitude: deliveryLng,
     recipientName: job.recipient_name,
-    recipientPhone: job.recipient_phone,
+    recipientPhone: recipientPhone,
     senderName: job.sender_name || job.pickup_contact_name,
-    senderPhone: job.sender_phone || job.pickup_contact_phone,
+    senderPhone: senderPhone,
+    // Also include pickupContactPhone directly for mobile app compatibility
+    pickupContactPhone: job.pickup_contact_phone || null,
+    pickupContactName: job.pickup_contact_name || null,
     vehicleType: job.vehicle_type,
     distance: job.distance?.toString() || job.distance_miles?.toString() || null,
     weight: job.weight?.toString() || job.parcel_weight?.toString() || null,
@@ -785,32 +808,46 @@ export function registerMobileRoutes(app: Express): void {
         jobs = jobs.filter(j => completedStatuses.includes(j.status) || j.driverPrice != null);
       }
 
-      mobileJobs = jobs.map(job => ({
-        id: job.id,
-        trackingNumber: job.trackingNumber,
-        status: job.status,
-        pickupAddress: job.pickupAddress,
-        pickupPostcode: job.pickupPostcode,
-        pickupInstructions: job.pickupInstructions,
-        pickupLatitude: job.pickupLatitude,
-        pickupLongitude: job.pickupLongitude,
-        deliveryAddress: job.deliveryAddress,
-        deliveryPostcode: job.deliveryPostcode,
-        deliveryInstructions: job.deliveryInstructions,
-        deliveryLatitude: job.deliveryLatitude,
-        deliveryLongitude: job.deliveryLongitude,
-        recipientName: job.recipientName,
-        recipientPhone: job.recipientPhone,
-        vehicleType: job.vehicleType,
-        distance: job.distance,
-        weight: job.weight,
-        driverPrice: job.driverPrice,
-        scheduledPickupTime: job.scheduledPickupTime,
-        isMultiDrop: job.isMultiDrop,
-        isReturnTrip: job.isReturnTrip,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
-      }));
+      mobileJobs = jobs.map(job => {
+        const j = job as any;
+        console.log(`[Mobile Job Map Fallback] Job ${j.id}:`, {
+          pickupLatitude: j.pickupLatitude,
+          pickupLongitude: j.pickupLongitude,
+          pickupContactPhone: j.pickupContactPhone,
+          senderPhone: j.senderPhone,
+          recipientPhone: j.recipientPhone
+        });
+        return {
+          id: job.id,
+          trackingNumber: job.trackingNumber,
+          status: job.status,
+          pickupAddress: job.pickupAddress,
+          pickupPostcode: job.pickupPostcode,
+          pickupInstructions: job.pickupInstructions,
+          pickupLatitude: job.pickupLatitude?.toString() || null,
+          pickupLongitude: job.pickupLongitude?.toString() || null,
+          deliveryAddress: job.deliveryAddress,
+          deliveryPostcode: job.deliveryPostcode,
+          deliveryInstructions: job.deliveryInstructions,
+          deliveryLatitude: job.deliveryLatitude?.toString() || null,
+          deliveryLongitude: job.deliveryLongitude?.toString() || null,
+          recipientName: job.recipientName,
+          recipientPhone: job.recipientPhone || null,
+          senderName: j.senderName || j.pickupContactName || null,
+          senderPhone: j.senderPhone || j.pickupContactPhone || null,
+          pickupContactPhone: j.pickupContactPhone || null,
+          pickupContactName: j.pickupContactName || null,
+          vehicleType: job.vehicleType,
+          distance: job.distance?.toString() || null,
+          weight: job.weight?.toString() || null,
+          driverPrice: job.driverPrice?.toString() || null,
+          scheduledPickupTime: job.scheduledPickupTime,
+          isMultiDrop: job.isMultiDrop,
+          isReturnTrip: job.isReturnTrip,
+          createdAt: job.createdAt,
+          updatedAt: job.updatedAt,
+        };
+      });
 
       res.json({
         jobs: mobileJobs,
@@ -943,6 +980,14 @@ export function registerMobileRoutes(app: Express): void {
       if (job) {
         // Use assignment driver_price if job.driverPrice is null
         const effectiveDriverPrice = job.driverPrice ?? assignmentDriverPrice;
+        const j = job as any;
+        console.log(`[Job Details] Local job ${job.id}:`, {
+          pickupLatitude: job.pickupLatitude,
+          pickupLongitude: job.pickupLongitude,
+          pickupContactPhone: j.pickupContactPhone,
+          senderPhone: j.senderPhone,
+          recipientPhone: job.recipientPhone
+        });
         res.json({
           id: job.id,
           trackingNumber: job.trackingNumber,
@@ -950,19 +995,23 @@ export function registerMobileRoutes(app: Express): void {
           pickupAddress: job.pickupAddress,
           pickupPostcode: job.pickupPostcode,
           pickupInstructions: job.pickupInstructions,
-          pickupLatitude: job.pickupLatitude,
-          pickupLongitude: job.pickupLongitude,
+          pickupLatitude: job.pickupLatitude?.toString() || null,
+          pickupLongitude: job.pickupLongitude?.toString() || null,
           deliveryAddress: job.deliveryAddress,
           deliveryPostcode: job.deliveryPostcode,
           deliveryInstructions: job.deliveryInstructions,
-          deliveryLatitude: job.deliveryLatitude,
-          deliveryLongitude: job.deliveryLongitude,
+          deliveryLatitude: job.deliveryLatitude?.toString() || null,
+          deliveryLongitude: job.deliveryLongitude?.toString() || null,
           recipientName: job.recipientName,
-          recipientPhone: job.recipientPhone,
+          recipientPhone: job.recipientPhone || null,
+          senderName: j.senderName || j.pickupContactName || null,
+          senderPhone: j.senderPhone || j.pickupContactPhone || null,
+          pickupContactPhone: j.pickupContactPhone || null,
+          pickupContactName: j.pickupContactName || null,
           vehicleType: job.vehicleType,
-          distance: job.distance,
-          weight: job.weight,
-          driverPrice: effectiveDriverPrice,
+          distance: job.distance?.toString() || null,
+          weight: job.weight?.toString() || null,
+          driverPrice: effectiveDriverPrice?.toString() || null,
           scheduledPickupTime: job.scheduledPickupTime,
           isMultiDrop: job.isMultiDrop,
           isReturnTrip: job.isReturnTrip,
@@ -979,6 +1028,13 @@ export function registerMobileRoutes(app: Express): void {
       } else {
         // Use assignment driver_price if supabaseJob.driver_price is null
         const effectiveDriverPrice = supabaseJob.driver_price ?? assignmentDriverPrice;
+        console.log(`[Job Details] Supabase job ${supabaseJob.id}:`, {
+          pickup_latitude: supabaseJob.pickup_latitude,
+          pickup_longitude: supabaseJob.pickup_longitude,
+          pickup_contact_phone: supabaseJob.pickup_contact_phone,
+          sender_phone: supabaseJob.sender_phone,
+          recipient_phone: supabaseJob.recipient_phone
+        });
         // Map from Supabase format (snake_case to camelCase)
         res.json({
           id: String(supabaseJob.id),
@@ -987,17 +1043,19 @@ export function registerMobileRoutes(app: Express): void {
           pickupAddress: supabaseJob.pickup_address,
           pickupPostcode: supabaseJob.pickup_postcode || null,
           pickupInstructions: supabaseJob.notes || supabaseJob.pickup_instructions,
-          pickupLatitude: supabaseJob.pickup_lat?.toString() || supabaseJob.pickup_latitude || null,
-          pickupLongitude: supabaseJob.pickup_lng?.toString() || supabaseJob.pickup_longitude || null,
-          deliveryAddress: supabaseJob.dropoff_address || supabaseJob.delivery_address,
+          pickupLatitude: supabaseJob.pickup_latitude?.toString() || supabaseJob.pickup_lat?.toString() || null,
+          pickupLongitude: supabaseJob.pickup_longitude?.toString() || supabaseJob.pickup_lng?.toString() || null,
+          deliveryAddress: supabaseJob.delivery_address || supabaseJob.dropoff_address,
           deliveryPostcode: supabaseJob.delivery_postcode || null,
           deliveryInstructions: supabaseJob.delivery_instructions || null,
-          deliveryLatitude: supabaseJob.dropoff_lat?.toString() || supabaseJob.delivery_latitude || null,
-          deliveryLongitude: supabaseJob.dropoff_lng?.toString() || supabaseJob.delivery_longitude || null,
+          deliveryLatitude: supabaseJob.delivery_latitude?.toString() || supabaseJob.dropoff_lat?.toString() || null,
+          deliveryLongitude: supabaseJob.delivery_longitude?.toString() || supabaseJob.dropoff_lng?.toString() || null,
           recipientName: supabaseJob.recipient_name,
-          recipientPhone: supabaseJob.recipient_phone,
-          senderName: supabaseJob.sender_name || supabaseJob.pickup_contact_name,
-          senderPhone: supabaseJob.sender_phone || supabaseJob.pickup_contact_phone,
+          recipientPhone: supabaseJob.recipient_phone || null,
+          senderName: supabaseJob.sender_name || supabaseJob.pickup_contact_name || null,
+          senderPhone: supabaseJob.sender_phone || supabaseJob.pickup_contact_phone || null,
+          pickupContactPhone: supabaseJob.pickup_contact_phone || null,
+          pickupContactName: supabaseJob.pickup_contact_name || null,
           customerName: supabaseJob.customer_name,
           customerPhone: supabaseJob.customer_phone,
           customerEmail: supabaseJob.customer_email,

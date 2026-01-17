@@ -1,0 +1,31 @@
+ROLE:
+Act as an Expert Full-Stack Developer and Systems Architect specializing in Node.js, React, Expo (React Native), and Real-time WebSockets.
+OBJECTIVE:
+Perform a total system reconstruction to integrate my Web Admin Dashboard (runcourier.co.uk) and Mobile App (expo-messenger) into a single, unified production-ready logistics ecosystem. Currently, the system is fragmented: data is not syncing, notifications are failing, and the mobile app is not receiving job details correctly.
+YOU MUST EXECUTE THE FOLLOWING 5 PHASES:
+PHASE 1: Unified Backend & Data Integrity
+Single Source of Truth: Audit the backend. Ensure both the Web and Mobile platforms connect to the EXACT same database and API endpoints. Remove all hardcoded local URLs.
+Permanent Driver Identity: Fix the registration logic. Whether a driver signs up via Web or Mobile, the system must assign a unique, immutable Driver_ID that never changes.
+Data Validation: Fix the "No phone number available" and "Location data unavailable" errors shown in the UI. Ensure the database schema correctly captures and serves:
+Pickup/Delivery Latitude & Longitude (GeoJSON format).
+Customer contact details.
+Specific Driver_Fee (calculated separately from Customer_Price).
+PHASE 2: Real-Time Dispatch Engine (The "Instant" Requirement)
+Socket.io Integration: Implement a global WebSocket server. When an Admin clicks "Send Job" on the Web, the mobile app must receive a "New Job" event instantly without a page refresh.
+Background Push Notifications (FCM/Expo): Implement Firebase Cloud Messaging (FCM).
+CRITICAL: Drivers must receive a High-Priority Push Notification with a Custom Sound Alert even if the app is closed, in the background, or the phone is locked.
+Configure the "Background Tasks" in the mobile app to handle these incoming signals.
+PHASE 3: Security & Business Logic
+Price Masking: Modify the API response logic. Drivers must ONLY be able to see the price assigned to them. The "Customer Price" (the amount the customer paid the company) must be strictly hidden from all Driver-level API calls for security and business privacy.
+Job State Synchronization: Ensure the job status (Created -> Assigned -> Accepted -> Picked Up -> Delivered) updates in real-time. If a driver clicks "Accepted" on the phone, the Admin Dashboard on the web must reflect that change within 1 second.
+PHASE 4: UI/UX & Mapping Fixes
+Map Rendering: Fix the Map component in the Mobile App. It must use the coordinates provided by the Admin to drop pins for Pickup and Delivery. Ensure the Google Maps (or MapBox) API key is correctly configured.
+Navigation: Ensure the "Tap to enable GPS tracking" and "Contact Sender" buttons are fully functional and linked to the actual data fields in the database.
+PHASE 5: Stress Test & Deployment
+Verification: Simulate a complete job flow: Admin creates job -> Mobile receives push alert (while closed) -> Driver opens app and sees Map/Phone/Price -> Driver accepts -> Admin sees update.
+Error Handling: Implement robust error catching. If a network drop occurs, the app must automatically reconnect to the socket and fetch the latest job state.
+STRICT REQUIREMENTS:
+No temporary fixes. Refactor the core logic if needed.
+No duplicated code. Use shared utility functions for data handling.
+Stability is priority. The system must be production-ready and survive app restarts.
+DO NOT STOP UNTIL THE FULL DISPATCH CIRCLE IS TESTED AND FUNCTIONAL.
