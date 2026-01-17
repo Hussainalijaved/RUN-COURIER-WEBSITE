@@ -5131,6 +5131,102 @@ export async function registerRoutes(
     res.status(200).json({ success: true, verified: true });
   }));
 
+  // Server-side registration with phone verification enforcement
+  app.post("/api/auth/register", asyncHandler(async (req, res) => {
+    const { email, password, fullName, phone, phoneVerificationToken, postcode, address, buildingName, role, userType, companyName, registrationNumber, businessAddress } = req.body;
+    
+    // Validate required fields
+    if (!email || !password || !fullName || !phone || !phoneVerificationToken) {
+      return res.status(400).json({ error: "Missing required fields: email, password, fullName, phone, and phoneVerificationToken" });
+    }
+
+    // Validate and consume the phone verification token
+    const { consumeVerificationToken } = await import("./twilioService");
+    const tokenResult = consumeVerificationToken(phoneVerificationToken);
+    
+    if (!tokenResult.valid) {
+      return res.status(400).json({ error: "Invalid or expired phone verification. Please verify your phone number again." });
+    }
+    
+    // Verify the token matches the phone number
+    const normalizedPhone = phone.replace(/\D/g, '');
+    if (tokenResult.phone !== normalizedPhone) {
+      return res.status(400).json({ error: "Phone verification token does not match the phone number" });
+    }
+
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Authentication service not configured" });
+      }
+
+      // Create user via Supabase Admin
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false, // User will receive confirmation email
+        user_metadata: {
+          fullName,
+          full_name: fullName,
+          phone,
+          phoneVerified: true,
+          postcode,
+          address,
+          buildingName,
+          role: role || 'customer',
+          userType: userType || 'individual',
+          companyName,
+          registrationNumber,
+          businessAddress,
+        }
+      });
+
+      if (authError) {
+        console.error('[Registration] Supabase auth error:', authError);
+        return res.status(400).json({ error: authError.message });
+      }
+
+      // Create user record in users table
+      if (authData?.user) {
+        try {
+          await storage.createUser({
+            id: authData.user.id,
+            email: authData.user.email!,
+            fullName,
+            phone,
+            postcode,
+            address,
+            role: role || 'customer',
+            isActive: true,
+          });
+        } catch (dbError) {
+          console.error('[Registration] Failed to create user record:', dbError);
+          // User is created in Supabase auth, continue even if DB insert fails
+        }
+
+        // Send welcome and notification emails
+        try {
+          await sendWelcomeEmail(email, fullName, role || 'customer').catch(err => console.error('Failed to send welcome email:', err));
+          await sendNewRegistrationNotification(email, fullName, role || 'customer', companyName).catch(err => console.error('Failed to send registration notification:', err));
+        } catch (emailError) {
+          console.error('[Registration] Email error:', emailError);
+        }
+      }
+
+      console.log(`[Registration] User registered successfully: ${email} (phone verified)`);
+      
+      res.status(200).json({ 
+        success: true, 
+        message: "Account created successfully. Please check your email to verify your account.",
+        user: authData?.user ? { id: authData.user.id, email: authData.user.email } : null
+      });
+    } catch (error: any) {
+      console.error('[Registration] Error:', error);
+      res.status(500).json({ error: "Registration failed. Please try again." });
+    }
+  }));
+
   // Password reset endpoint using Resend for reliable email delivery
   app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
     const { email, redirectUrl } = req.body;

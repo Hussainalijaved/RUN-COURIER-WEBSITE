@@ -157,38 +157,13 @@ export default function Signup({ role = 'customer' }: SignupProps) {
       return;
     }
 
-    // Validate token server-side
-    try {
-      const tokenCheck = await apiRequest('POST', '/api/auth/validate-phone-token', { 
-        token: verificationToken, 
-        phone: data.phone 
-      });
-      if (!tokenCheck.ok) {
-        const tokenData = await tokenCheck.json();
-        toast({
-          title: 'Verification Expired',
-          description: tokenData.error || 'Your phone verification has expired. Please verify again.',
-          variant: 'destructive',
-        });
-        setPhoneVerified(false);
-        setVerificationToken(null);
-        setVerificationSent(false);
-        return;
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to validate phone verification. Please try again.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const { error } = await signUp(data.email, data.password, {
+      // Use server-side registration endpoint with phone verification enforcement
+      const response = await apiRequest('POST', '/api/auth/register', {
+        email: data.email,
+        password: data.password,
         fullName: data.fullName,
-        full_name: data.fullName,
         phone: data.phone,
         phoneVerificationToken: verificationToken,
         postcode: data.postcode,
@@ -201,10 +176,18 @@ export default function Signup({ role = 'customer' }: SignupProps) {
         businessAddress: data.businessAddress,
       });
 
-      if (error) {
+      const result = await response.json();
+
+      if (!response.ok) {
+        // Check if it's a phone verification error
+        if (result.error?.includes('phone verification') || result.error?.includes('verification token')) {
+          setPhoneVerified(false);
+          setVerificationToken(null);
+          setVerificationSent(false);
+        }
         toast({
           title: 'Registration Failed',
-          description: error.message,
+          description: result.error || 'Failed to create account. Please try again.',
           variant: 'destructive',
         });
       } else {
