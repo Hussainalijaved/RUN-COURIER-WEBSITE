@@ -4266,7 +4266,7 @@ export async function registerRoutes(
       return res.json([]);
     }
     
-    const { status } = req.query;
+    const { status, customerId } = req.query;
     let query = supabaseAdmin
       .from('invoice_payment_tokens')
       .select('*')
@@ -4274,6 +4274,20 @@ export async function registerRoutes(
     
     if (status) {
       query = query.eq('status', status);
+    }
+    
+    // Filter by customer email if customerId is provided
+    // First get the customer's email from auth
+    if (customerId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const { verifyAccessToken } = await import("./supabaseAdmin");
+        const user = await verifyAccessToken(token);
+        if (user?.email) {
+          query = query.eq('customer_email', user.email);
+        }
+      }
     }
     
     const { data, error } = await query;
@@ -4284,28 +4298,28 @@ export async function registerRoutes(
     }
     
     // Transform invoice_payment_tokens to invoice format for frontend compatibility
-    // Frontend expects snake_case field names
+    // Frontend expects camelCase field names
     const invoices = data.map((token: any) => ({
       id: token.token,
-      invoice_number: token.invoice_number,
-      customer_id: null,
-      customer_name: token.customer_name,
-      customer_email: token.customer_email,
-      company_name: token.company_name || null,
-      business_address: token.business_address || null,
-      vat_number: token.vat_number || null,
-      subtotal: String(token.subtotal || token.amount),
+      invoiceNumber: token.invoice_number || `INV-${token.token?.substring(0, 8)?.toUpperCase()}`,
+      customerId: null,
+      customerName: token.customer_name,
+      customerEmail: token.customer_email,
+      companyName: token.company_name || null,
+      businessAddress: token.business_address || null,
+      vatNumber: token.vat_number || null,
+      subtotal: String(token.subtotal || token.amount || 0),
       vat: String(token.vat || 0),
-      total: String(token.amount),
-      status: token.status,
-      due_date: token.due_date,
-      period_start: token.period_start,
-      period_end: token.period_end,
-      job_ids: token.job_ids || null,
+      total: String(token.amount || 0),
+      status: token.status || 'pending',
+      dueDate: token.due_date || token.created_at,
+      periodStart: token.period_start || token.created_at,
+      periodEnd: token.period_end || token.created_at,
+      jobIds: token.job_ids || null,
       notes: token.notes,
-      payment_token: token.token,
-      job_details: token.job_details || null,
-      created_at: token.created_at,
+      paymentToken: token.token,
+      jobDetails: token.job_details || null,
+      createdAt: token.created_at,
     }));
     
     res.json(invoices);
@@ -4330,25 +4344,25 @@ export async function registerRoutes(
     
     const invoice = {
       id: data.token,
-      invoice_number: data.invoice_number,
-      customer_id: null,
-      customer_name: data.customer_name,
-      customer_email: data.customer_email,
-      company_name: data.company_name || null,
-      business_address: data.business_address || null,
-      vat_number: data.vat_number || null,
-      subtotal: String(data.subtotal || data.amount),
+      invoiceNumber: data.invoice_number || `INV-${data.token?.substring(0, 8)?.toUpperCase()}`,
+      customerId: null,
+      customerName: data.customer_name,
+      customerEmail: data.customer_email,
+      companyName: data.company_name || null,
+      businessAddress: data.business_address || null,
+      vatNumber: data.vat_number || null,
+      subtotal: String(data.subtotal || data.amount || 0),
       vat: String(data.vat || 0),
-      total: String(data.amount),
-      status: data.status,
-      due_date: data.due_date,
-      period_start: data.period_start,
-      period_end: data.period_end,
-      job_ids: data.job_ids || null,
+      total: String(data.amount || 0),
+      status: data.status || 'pending',
+      dueDate: data.due_date || data.created_at,
+      periodStart: data.period_start || data.created_at,
+      periodEnd: data.period_end || data.created_at,
+      jobIds: data.job_ids || null,
       notes: data.notes,
-      payment_token: data.token,
-      job_details: data.job_details || null,
-      created_at: data.created_at,
+      paymentToken: data.token,
+      jobDetails: data.job_details || null,
+      createdAt: data.created_at,
     };
     
     res.json(invoice);
