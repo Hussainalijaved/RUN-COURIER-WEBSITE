@@ -737,8 +737,8 @@ export async function registerRoutes(
       isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
       authenticatedUserId = user?.id || null;
       
-      // Customer viewing their own jobs - they can see their prices
-      if (user?.role === 'customer' && customerId && authenticatedUserId === customerId) {
+      // Customer or Business viewing their own jobs - they can see their prices
+      if ((user?.role === 'customer' || user?.role === 'business') && customerId && authenticatedUserId === customerId) {
         isCustomerViewingOwn = true;
       }
     }
@@ -968,17 +968,22 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
     
-    // SECURITY: Default to safe (no-pricing) unless explicitly admin/dispatcher
+    // SECURITY: Check if user can see pricing
     let isAdmin = false;
+    let isOwner = false;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       const { verifyAccessToken } = await import("./supabaseAdmin");
       const user = await verifyAccessToken(token);
       isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
+      // Customer or Business viewing their own job
+      if ((user?.role === 'customer' || user?.role === 'business') && user?.id === job.customerId) {
+        isOwner = true;
+      }
     }
     
-    if (isAdmin) {
+    if (isAdmin || isOwner) {
       return res.json(job);
     }
     
