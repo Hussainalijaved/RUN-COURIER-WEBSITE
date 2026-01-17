@@ -3976,11 +3976,37 @@ export async function registerRoutes(
         const now = new Date();
         const invoiceToken = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
         
+        // Get customer profile for business details
+        let companyName = null;
+        let businessAddress = null;
+        let vatNumber = null;
+        let customerName = metadata.pickupName || jobData.pickupContactName || 'Customer';
+        
+        if (metadata.customerId) {
+          const { data: profile } = await supabaseAdmin
+            .from('users')
+            .select('full_name, company_name, business_address, vat_number, user_type')
+            .eq('id', metadata.customerId)
+            .single();
+          
+          if (profile?.user_type === 'business') {
+            companyName = profile.company_name;
+            businessAddress = profile.business_address;
+            vatNumber = profile.vat_number;
+            customerName = profile.company_name || customerName;
+          } else if (profile?.full_name) {
+            customerName = profile.full_name;
+          }
+        }
+        
         await supabaseAdmin.from('invoice_payment_tokens').insert({
           token: invoiceToken,
           invoice_number: invoiceNumber,
-          customer_name: metadata.pickupName || jobData.pickupContactName || 'Customer',
+          customer_name: customerName,
           customer_email: metadata.customerEmail || jobData.customerEmail || '',
+          company_name: companyName,
+          business_address: businessAddress,
+          vat_number: vatNumber,
           amount: parseFloat(jobData.totalPrice),
           subtotal: parseFloat(jobData.totalPrice),
           vat: 0,
@@ -4362,10 +4388,21 @@ export async function registerRoutes(
       customerEmail = user?.email || null;
     }
     
+    // Get customer profile for business details
+    let customerProfile: any = null;
+    if (customerId) {
+      const { data: profile } = await supabaseAdmin
+        .from('users')
+        .select('full_name, company_name, business_address, vat_number, user_type')
+        .eq('id', customerId)
+        .single();
+      customerProfile = profile;
+    }
+    
     // Get jobs for this customer
     let jobsQuery = supabaseAdmin
       .from('jobs')
-      .select('id, tracking_number, customer_email, total_price, payment_intent_id, created_at, pickup_contact_name, status')
+      .select('id, tracking_number, customer_email, total_price, payment_intent_id, created_at, pickup_contact_name, status, customer_id')
       .order('created_at', { ascending: false });
     
     if (customerEmail && customerId) {
@@ -4386,15 +4423,17 @@ export async function registerRoutes(
       .filter((job: any) => !existingJobIds.has(job.id))
       .map((job: any) => {
         const isPaid = !!job.payment_intent_id;
+        // Use company info from profile for business accounts
+        const isBusiness = customerProfile?.user_type === 'business';
         return {
           id: `job-${job.id}`,
           invoiceNumber: `INV-${job.tracking_number || job.id}`,
-          customerId: null,
-          customerName: job.pickup_contact_name || 'Customer',
+          customerId: job.customer_id || null,
+          customerName: isBusiness ? (customerProfile?.company_name || job.pickup_contact_name || 'Customer') : (job.pickup_contact_name || customerProfile?.full_name || 'Customer'),
           customerEmail: job.customer_email || '',
-          companyName: null,
-          businessAddress: null,
-          vatNumber: null,
+          companyName: isBusiness ? customerProfile?.company_name : null,
+          businessAddress: isBusiness ? customerProfile?.business_address : null,
+          vatNumber: isBusiness ? customerProfile?.vat_number : null,
           subtotal: String(job.total_price || 0),
           vat: '0',
           total: String(job.total_price || 0),
