@@ -1608,6 +1608,7 @@ export class SupabaseStorage implements IStorage {
     const supabase = this.checkSupabase();
     const dbData: any = {};
     if (data.status !== undefined) dbData.status = data.status;
+    if (data.driverPrice !== undefined) dbData.driver_price = data.driverPrice;
     if (data.sentAt !== undefined) dbData.sent_at = data.sentAt;
     if (data.respondedAt !== undefined) dbData.responded_at = data.respondedAt;
     if (data.cancelledAt !== undefined) dbData.cancelled_at = data.cancelledAt;
