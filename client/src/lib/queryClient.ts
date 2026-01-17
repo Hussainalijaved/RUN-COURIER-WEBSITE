@@ -11,17 +11,36 @@ async function throwIfResNotOk(res: Response) {
 // Get Supabase access token for authenticated API requests with timeout
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
-    // Add 3 second timeout to prevent hanging
+    // Add 5 second timeout to prevent hanging (increased from 3s for slow connections)
     const timeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), 3000);
+      setTimeout(() => resolve(null), 5000);
     });
     
     const sessionPromise = supabase.auth.getSession();
     const result = await Promise.race([sessionPromise, timeoutPromise]);
     
     if (result && 'data' in result && result.data.session?.access_token) {
+      console.log("[Auth] Session token available for API request");
       return { "Authorization": `Bearer ${result.data.session.access_token}` };
     }
+    
+    // Session not available - check if we're on production domain but session is stored
+    // This can happen due to race conditions on page load
+    if (result === null) {
+      console.warn("[Auth] Session request timed out - retrying once");
+      // Retry once without timeout as a fallback
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.access_token) {
+          console.log("[Auth] Session retrieved on retry");
+          return { "Authorization": `Bearer ${data.session.access_token}` };
+        }
+      } catch (retryError) {
+        console.warn("[Auth] Retry also failed:", retryError);
+      }
+    }
+    
+    console.warn("[Auth] No session available for API request");
   } catch (error) {
     console.warn("[Auth] Failed to get session for API request:", error);
   }

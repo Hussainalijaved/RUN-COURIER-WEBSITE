@@ -1,0 +1,111 @@
+I need you to carefully review and resolve the issues outlined below on the courier platform. These are critical workflow problems affecting driver assignments, notifications, and job visibility between the admin web panel and the driver mobile app.
+
+Please read each point carefully and ensure everything is fully fixed, properly synced, and thoroughly tested before providing feedback.
+
+1. Driver Assignment Not Reaching Mobile App
+
+Issue:
+
+When a job is assigned to a driver from the admin website, the driver does not receive it on the mobile app.
+
+The driver’s phone does not alert, notify, or display the assigned job.
+
+From the admin side, the assignment attempt sometimes fails with an “Authentication required / Failed to send assignment” error.
+
+Expected Behavior:
+
+Once an admin assigns a job:
+
+The driver should immediately receive the job on the mobile app
+
+A push notification should be triggered
+
+The job should appear under Active Jobs without delay
+
+Action Required:
+
+Investigate authentication/session handling between the web admin panel and the driver app
+
+Fix any API, token, or permission issues preventing assignments from being delivered
+
+Confirm push notification service is correctly triggered and received on mobile devices
+
+2. Job Details Missing on Driver App (Map & Price)
+
+Issue:
+
+When (or if) the job appears on the driver app:
+
+The map does not load
+
+Location data shows as unavailable
+
+The price assigned by admin is not visible to the driver
+
+Expected Behavior:
+
+The driver should clearly see:
+
+Pickup and drop-off locations on the map
+
+Live GPS tracking once enabled
+
+The exact payment amount assigned by the admin
+
+Complete job details synced from the admin panel
+
+Action Required:
+
+Verify job payload data sent from backend to mobile app
+
+Ensure location, route, and pricing fields are included and correctly parsed
+
+Fix any frontend rendering issues preventing map and price display
+
+Confirm GPS permissions and location services are handled correctly
+
+3. End-to-End Testing (Mandatory)
+
+Once all fixes are applied, you must test the full flow before reporting back:
+
+Testing Checklist:
+
+Assign a job from the admin website
+
+Confirm:
+
+Assignment succeeds without errors
+
+Driver receives push notification
+
+Job appears instantly in the driver app
+
+Map loads correctly with pickup/drop-off points
+
+Assigned price is visible to the driver
+
+Test on a real mobile device, not just emulator
+
+Test both fresh login and already-logged-in driver sessions
+
+4. Feedback & Confirmation
+
+After testing, please send back:
+
+A clear explanation of what was fixed
+
+Screenshots or screen recordings showing:
+
+Successful assignment
+
+Job appearing on driver app
+
+Map and price visible
+
+Confirmation that the issue is fully resolved and stable
+
+This needs to be handled carefully, as it directly affects live job dispatching and driver operations.
+
+Please prioritize this and ensure everything is working exactly as expected before responding.
+
+Thank you.
