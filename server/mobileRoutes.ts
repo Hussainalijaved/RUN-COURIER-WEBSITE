@@ -14,25 +14,12 @@ import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "
 // Helper to map Supabase job to local Job format for mobile API response
 // CRITICAL: Only expose driver_price to drivers, NEVER total_price or customer pricing
 function mapSupabaseJobToMobileFormat(job: any) {
-  // Debug logging to trace coordinate and phone issues
   const pickupLat = job.pickup_latitude?.toString() || job.pickup_lat?.toString() || null;
   const pickupLng = job.pickup_longitude?.toString() || job.pickup_lng?.toString() || null;
   const deliveryLat = job.delivery_latitude?.toString() || job.dropoff_lat?.toString() || null;
   const deliveryLng = job.delivery_longitude?.toString() || job.dropoff_lng?.toString() || null;
   const senderPhone = job.sender_phone || job.pickup_contact_phone || null;
   const recipientPhone = job.recipient_phone || null;
-  
-  console.log(`[Mobile Job Map] Job ${job.id}:`, {
-    pickup_latitude: job.pickup_latitude,
-    pickup_longitude: job.pickup_longitude,
-    delivery_latitude: job.delivery_latitude,
-    delivery_longitude: job.delivery_longitude,
-    sender_phone: job.sender_phone,
-    pickup_contact_phone: job.pickup_contact_phone,
-    recipient_phone: job.recipient_phone,
-    mappedPickupLat: pickupLat,
-    mappedSenderPhone: senderPhone
-  });
   
   return {
     id: String(job.id),
@@ -810,13 +797,6 @@ export function registerMobileRoutes(app: Express): void {
 
       mobileJobs = jobs.map(job => {
         const j = job as any;
-        console.log(`[Mobile Job Map Fallback] Job ${j.id}:`, {
-          pickupLatitude: j.pickupLatitude,
-          pickupLongitude: j.pickupLongitude,
-          pickupContactPhone: j.pickupContactPhone,
-          senderPhone: j.senderPhone,
-          recipientPhone: j.recipientPhone
-        });
         return {
           id: job.id,
           trackingNumber: job.trackingNumber,
@@ -981,13 +961,6 @@ export function registerMobileRoutes(app: Express): void {
         // Use assignment driver_price if job.driverPrice is null
         const effectiveDriverPrice = job.driverPrice ?? assignmentDriverPrice;
         const j = job as any;
-        console.log(`[Job Details] Local job ${job.id}:`, {
-          pickupLatitude: job.pickupLatitude,
-          pickupLongitude: job.pickupLongitude,
-          pickupContactPhone: j.pickupContactPhone,
-          senderPhone: j.senderPhone,
-          recipientPhone: job.recipientPhone
-        });
         res.json({
           id: job.id,
           trackingNumber: job.trackingNumber,
@@ -1028,13 +1001,6 @@ export function registerMobileRoutes(app: Express): void {
       } else {
         // Use assignment driver_price if supabaseJob.driver_price is null
         const effectiveDriverPrice = supabaseJob.driver_price ?? assignmentDriverPrice;
-        console.log(`[Job Details] Supabase job ${supabaseJob.id}:`, {
-          pickup_latitude: supabaseJob.pickup_latitude,
-          pickup_longitude: supabaseJob.pickup_longitude,
-          pickup_contact_phone: supabaseJob.pickup_contact_phone,
-          sender_phone: supabaseJob.sender_phone,
-          recipient_phone: supabaseJob.recipient_phone
-        });
         // Map from Supabase format (snake_case to camelCase)
         res.json({
           id: String(supabaseJob.id),
