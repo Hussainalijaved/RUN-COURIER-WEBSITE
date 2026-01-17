@@ -4298,6 +4298,8 @@ export async function registerRoutes(
     }
     
     const { status, customerId } = req.query;
+    console.log('[Invoices] Fetching invoices with customerId:', customerId, 'status:', status);
+    
     let query = supabaseAdmin
       .from('invoice_payment_tokens')
       .select('*')
@@ -4315,6 +4317,7 @@ export async function registerRoutes(
         const token = authHeader.slice(7);
         const { verifyAccessToken } = await import("./supabaseAdmin");
         const user = await verifyAccessToken(token);
+        console.log('[Invoices] Filtering by customer email:', user?.email);
         if (user?.email) {
           query = query.eq('customer_email', user.email);
         }
@@ -4322,15 +4325,10 @@ export async function registerRoutes(
     }
     
     const { data, error } = await query;
+    console.log('[Invoices] Found', data?.length || 0, 'invoices from tokens table');
     
-    if (error || !data) {
-      console.error('[Invoices] Error fetching invoices:', error);
-      return res.json([]);
-    }
-    
-    // Transform invoice_payment_tokens to invoice format for frontend compatibility
-    // Frontend expects camelCase field names
-    const invoices = data.map((token: any) => ({
+    // Transform invoice_payment_tokens to invoice format
+    const invoicesFromTokens = (data || []).map((token: any) => ({
       id: token.token,
       invoiceNumber: token.invoice_number || `INV-${token.token?.substring(0, 8)?.toUpperCase()}`,
       customerId: null,
@@ -4353,7 +4351,71 @@ export async function registerRoutes(
       createdAt: token.created_at,
     }));
     
-    res.json(invoices);
+    // Also get jobs that don't have invoices yet and create virtual invoices for them
+    // This ensures older orders also appear in the invoice list
+    const authHeader = req.headers.authorization;
+    let customerEmail: string | null = null;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { verifyAccessToken } = await import("./supabaseAdmin");
+      const user = await verifyAccessToken(token);
+      customerEmail = user?.email || null;
+    }
+    
+    // Get jobs for this customer
+    let jobsQuery = supabaseAdmin
+      .from('jobs')
+      .select('id, tracking_number, customer_email, total_price, payment_intent_id, created_at, pickup_contact_name, status')
+      .order('created_at', { ascending: false });
+    
+    if (customerEmail && customerId) {
+      jobsQuery = jobsQuery.eq('customer_email', customerEmail);
+    }
+    
+    const { data: jobs } = await jobsQuery;
+    console.log('[Invoices] Found', jobs?.length || 0, 'jobs for customer');
+    
+    // Create virtual invoices for jobs that don't have a matching invoice
+    const existingJobIds = new Set(
+      invoicesFromTokens
+        .filter((inv: any) => inv.jobIds)
+        .flatMap((inv: any) => inv.jobIds)
+    );
+    
+    const jobInvoices = (jobs || [])
+      .filter((job: any) => !existingJobIds.has(job.id))
+      .map((job: any) => {
+        const isPaid = !!job.payment_intent_id;
+        return {
+          id: `job-${job.id}`,
+          invoiceNumber: `INV-${job.tracking_number || job.id}`,
+          customerId: null,
+          customerName: job.pickup_contact_name || 'Customer',
+          customerEmail: job.customer_email || '',
+          companyName: null,
+          businessAddress: null,
+          vatNumber: null,
+          subtotal: String(job.total_price || 0),
+          vat: '0',
+          total: String(job.total_price || 0),
+          status: isPaid ? 'paid' : 'pending',
+          dueDate: job.created_at,
+          periodStart: job.created_at,
+          periodEnd: job.created_at,
+          jobIds: [job.id],
+          notes: isPaid ? 'Card payment' : 'Pay Later',
+          paymentToken: null,
+          jobDetails: null,
+          createdAt: job.created_at,
+        };
+      });
+    
+    // Combine and sort by date
+    const allInvoices = [...invoicesFromTokens, ...jobInvoices]
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    console.log('[Invoices] Total invoices:', allInvoices.length);
+    res.json(allInvoices);
   }));
 
   app.get("/api/invoices/:id", asyncHandler(async (req, res) => {
