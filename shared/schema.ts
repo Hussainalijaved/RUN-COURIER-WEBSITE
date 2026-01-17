@@ -443,7 +443,7 @@ export const registerSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string()
     .min(10, "Phone number must be at least 10 digits")
-    .regex(/^(\+44|0044|0)?[1-9]\d{8,10}$/, "Please enter a valid UK phone number"),
+    .regex(/^(\+44\s?|0044\s?|0)?[1-9][\d\s]{8,14}$/, "Please enter a valid UK phone number"),
   postcode: z.string()
     .min(5, "Please enter a valid UK postcode")
     .regex(/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, "Please enter a valid UK postcode"),
