@@ -3900,7 +3900,7 @@ export async function registerRoutes(
       customerId: metadata.customerId || '',
       customerEmail: metadata.customerEmail || '',
       paymentStatus: 'paid',
-      stripePaymentIntentId: paymentIntentId,
+      paymentIntentId: paymentIntentId,
       status: 'pending' as JobStatus,
       isMultiDrop: metadata.isMultiDrop === 'true',
       isReturnTrip: metadata.isReturnTrip === 'true',
@@ -3911,7 +3911,19 @@ export async function registerRoutes(
       isScheduled: !!metadata.scheduledPickupTime,
     };
 
-    const job = await storage.createJob(jobData);
+    let job;
+    try {
+      console.log('[Embedded Payment] Creating job with data:', JSON.stringify(jobData, null, 2));
+      job = await storage.createJob(jobData);
+      console.log('[Embedded Payment] Job created successfully:', job.id);
+    } catch (createError: any) {
+      console.error('[Embedded Payment] Failed to create job:', createError);
+      return res.status(500).json({ 
+        success: false, 
+        error: `Failed to create booking: ${createError.message || 'Database error'}`,
+        paymentIntentId 
+      });
+    }
     
     // Auto-geocode job coordinates for mobile app map display
     try {
