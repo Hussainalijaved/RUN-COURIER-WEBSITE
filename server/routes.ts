@@ -5068,11 +5068,12 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Phone number is required" });
     }
 
-    // Validate UK phone format
+    // Validate UK phone format - accepts formats like:
+    // 07956503009, 7956503009, +447956503009, 00447956503009
     const cleanedPhone = phone.replace(/\s+/g, '');
-    const ukPhoneRegex = /^(\+44|0044|0)?[1-9]\d{8,10}$/;
+    const ukPhoneRegex = /^(\+44|0044|0)?[7][0-9]{9}$/;
     if (!ukPhoneRegex.test(cleanedPhone)) {
-      return res.status(400).json({ error: "Please enter a valid UK phone number" });
+      return res.status(400).json({ error: "Please enter a valid UK mobile number (e.g., 07956503009 or 7956503009)" });
     }
 
     const { sendVerificationCode } = await import("./twilioService");
