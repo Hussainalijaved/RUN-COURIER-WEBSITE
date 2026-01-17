@@ -114,20 +114,27 @@ function PaymentForm({
     setBookingError(null);
     
     try {
-      const response = await apiRequest('POST', '/api/booking/confirm-embedded-payment', {
-        paymentIntentId: intentId,
-        bookingData,
+      // Use fetch directly to handle error responses properly
+      const response = await fetch('/api/booking/confirm-embedded-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentIntentId: intentId,
+          bookingData,
+        }),
       });
       
       const result = await response.json();
       
-      if (result.success) {
+      if (response.ok && result.success) {
         onSuccess(result.trackingNumber, result.jobId);
       } else {
+        console.error('[Payment] Booking creation failed:', result);
         setBookingError(result.error || 'Failed to create booking. Your payment was successful - please contact support with your payment reference.');
         setIsConfirmingBooking(false);
       }
     } catch (err: any) {
+      console.error('[Payment] Booking creation error:', err);
       setBookingError('Failed to create booking. Your payment was successful - please contact support.');
       setIsConfirmingBooking(false);
     }
