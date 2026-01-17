@@ -20,6 +20,7 @@ export type DocumentStatus = "pending" | "approved" | "rejected";
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  authId: text("auth_id").unique(),
   email: text("email").notNull().unique(),
   password: text("password"),
   fullName: text("full_name").notNull(),

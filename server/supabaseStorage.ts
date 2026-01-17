@@ -31,7 +31,8 @@ import { randomUUID } from "crypto";
 
 function mapDbToUser(dbUser: any): User {
   return {
-    id: dbUser.id,
+    id: String(dbUser.id),
+    authId: dbUser.auth_id || null,
     email: dbUser.email,
     password: dbUser.password,
     fullName: dbUser.full_name,
@@ -401,14 +402,29 @@ export class SupabaseStorage implements IStorage {
 
   async getUser(id: string): Promise<User | undefined> {
     const supabase = this.checkSupabase();
-    const { data, error } = await supabase
+    
+    // First try to find by auth_id (Supabase Auth UUID)
+    const { data: authData, error: authError } = await supabase
       .from('users')
       .select('*')
-      .eq('id', id)
+      .eq('auth_id', id)
       .single();
     
-    if (error || !data) return undefined;
-    return mapDbToUser(data);
+    if (!authError && authData) return mapDbToUser(authData);
+    
+    // Fallback: try by numeric id (for backwards compatibility)
+    const numericId = parseInt(id, 10);
+    if (!isNaN(numericId)) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', numericId)
+        .single();
+      
+      if (!error && data) return mapDbToUser(data);
+    }
+    
+    return undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -417,6 +433,18 @@ export class SupabaseStorage implements IStorage {
       .from('users')
       .select('*')
       .eq('email', username)
+      .single();
+    
+    if (error || !data) return undefined;
+    return mapDbToUser(data);
+  }
+
+  async getUserByAuthId(authId: string): Promise<User | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', authId)
       .single();
     
     if (error || !data) return undefined;
@@ -446,14 +474,31 @@ export class SupabaseStorage implements IStorage {
     return this.createUserWithId(id, insertUser);
   }
 
-  async createUserWithId(id: string, insertUser: InsertUser): Promise<User> {
+  async createUserWithId(authId: string, insertUser: InsertUser): Promise<User> {
     const supabase = this.checkSupabase();
     
-    const existing = await this.getUser(id);
-    if (existing) return existing;
+    // Check if user already exists by auth_id or email
+    const existingByAuthId = await this.getUserByAuthId(authId);
+    if (existingByAuthId) return existingByAuthId;
     
+    const existingByEmail = await this.getUserByUsername(insertUser.email);
+    if (existingByEmail) {
+      // User exists by email but no auth_id - update to link auth_id
+      if (!existingByEmail.authId) {
+        const { data: updated } = await supabase
+          .from('users')
+          .update({ auth_id: authId })
+          .eq('email', insertUser.email)
+          .select()
+          .single();
+        if (updated) return mapDbToUser(updated);
+      }
+      return existingByEmail;
+    }
+    
+    // Create new user - don't set id, let database auto-generate it
     const dbUser = {
-      id,
+      auth_id: authId,
       email: insertUser.email,
       full_name: insertUser.fullName,
       password: insertUser.password || null,
@@ -481,14 +526,15 @@ export class SupabaseStorage implements IStorage {
     
     if (error) {
       if (error.code === '23505') {
-        const existing = await this.getUser(id);
+        // Duplicate - try to find existing
+        const existing = await this.getUserByAuthId(authId) || await this.getUserByUsername(insertUser.email);
         if (existing) return existing;
       }
       console.error('[SupabaseStorage] Error creating user:', error);
       throw error;
     }
     
-    console.log(`[SupabaseStorage] Created user ${id}`);
+    console.log(`[SupabaseStorage] Created user with auth_id ${authId}`);
     return mapDbToUser(data);
   }
 
@@ -515,16 +561,36 @@ export class SupabaseStorage implements IStorage {
     if (data.isActive !== undefined) dbData.is_active = data.isActive;
     if (data.deactivatedAt !== undefined) dbData.deactivated_at = data.deactivatedAt;
     
+    // First try to update by auth_id (Supabase Auth UUID)
     const { data: updated, error } = await supabase
       .from('users')
       .update(dbData)
-      .eq('id', id)
+      .eq('auth_id', id)
       .select()
       .single();
     
-    if (error || !updated) return undefined;
-    console.log(`[SupabaseStorage] Updated user ${id}`);
-    return mapDbToUser(updated);
+    if (!error && updated) {
+      console.log(`[SupabaseStorage] Updated user by auth_id ${id}`);
+      return mapDbToUser(updated);
+    }
+    
+    // Fallback: try by numeric id
+    const numericId = parseInt(id, 10);
+    if (!isNaN(numericId)) {
+      const { data: updatedById, error: errorById } = await supabase
+        .from('users')
+        .update(dbData)
+        .eq('id', numericId)
+        .select()
+        .single();
+      
+      if (!errorById && updatedById) {
+        console.log(`[SupabaseStorage] Updated user by id ${id}`);
+        return mapDbToUser(updatedById);
+      }
+    }
+    
+    return undefined;
   }
 
   async incrementCompletedBookings(id: string): Promise<User | undefined> {
