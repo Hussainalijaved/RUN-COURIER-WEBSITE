@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   PaymentElement,
@@ -11,11 +11,45 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Loader2, CreditCard, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
-const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-if (!stripePublishableKey) {
-  console.error('[Payment] VITE_STRIPE_PUBLISHABLE_KEY is not set');
+// Cache the stripe promise to avoid re-fetching
+let stripePromiseCache: Promise<Stripe | null> | null = null;
+
+async function getStripePromise(): Promise<Stripe | null> {
+  if (stripePromiseCache) {
+    return stripePromiseCache;
+  }
+  
+  stripePromiseCache = (async () => {
+    try {
+      // First try build-time env var
+      const buildTimeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+      if (buildTimeKey) {
+        console.log('[Payment] Using build-time Stripe publishable key');
+        return loadStripe(buildTimeKey);
+      }
+      
+      // Fall back to fetching from API at runtime
+      console.log('[Payment] Fetching Stripe config from API...');
+      const response = await fetch('/api/stripe/config');
+      if (!response.ok) {
+        console.error('[Payment] Failed to fetch Stripe config');
+        return null;
+      }
+      const { publishableKey } = await response.json();
+      if (!publishableKey) {
+        console.error('[Payment] No publishable key in config response');
+        return null;
+      }
+      console.log('[Payment] Using runtime Stripe publishable key');
+      return loadStripe(publishableKey);
+    } catch (error) {
+      console.error('[Payment] Error loading Stripe:', error);
+      return null;
+    }
+  })();
+  
+  return stripePromiseCache;
 }
-const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 interface BookingData {
   pickupPostcode: string;
@@ -260,6 +294,19 @@ export function EmbeddedPayment({
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(prefetchedPaymentIntentId || null);
   const [isLoading, setIsLoading] = useState(!prefetchedClientSecret);
   const [error, setError] = useState<string | null>(null);
+  const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(true);
+
+  // Load Stripe instance
+  useEffect(() => {
+    getStripePromise().then((stripe) => {
+      setStripeInstance(stripe);
+      setStripeLoading(false);
+    }).catch((err) => {
+      console.error('[Payment] Failed to load Stripe:', err);
+      setStripeLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
     // Skip fetching if we have prefetched values
@@ -297,7 +344,7 @@ export function EmbeddedPayment({
     createPaymentIntent();
   }, [prefetchedClientSecret, prefetchedPaymentIntentId]);
 
-  if (isLoading) {
+  if (isLoading || stripeLoading) {
     return (
       <Card>
         <CardContent className="pt-6 space-y-4">
@@ -338,7 +385,7 @@ export function EmbeddedPayment({
     return null;
   }
 
-  if (!stripePromise) {
+  if (!stripeInstance) {
     return (
       <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
         <CardContent className="pt-6 text-center">
@@ -367,7 +414,7 @@ export function EmbeddedPayment({
 
   return (
     <Elements 
-      stripe={stripePromise} 
+      stripe={stripeInstance} 
       options={{ 
         clientSecret, 
         appearance,
