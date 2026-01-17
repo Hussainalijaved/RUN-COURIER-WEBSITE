@@ -5185,6 +5185,43 @@ export async function registerRoutes(
 
       if (authError) {
         console.error('[Registration] Supabase auth error:', authError);
+        
+        // Check if email already exists - offer to resend verification
+        if (authError.code === 'email_exists') {
+          // Check if the existing user is unverified
+          const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+          const existingUser = users?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+          
+          if (existingUser && !existingUser.email_confirmed_at) {
+            // User exists but unverified - resend verification email
+            try {
+              const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+                type: 'magiclink',
+                email: email,
+                options: {
+                  redirectTo: 'https://www.runcourier.co.uk/login?verified=true'
+                }
+              });
+              
+              if (linkData?.properties?.action_link) {
+                const userName = existingUser.user_metadata?.fullName || existingUser.user_metadata?.full_name || fullName;
+                await sendEmailVerification(email, linkData.properties.action_link, userName);
+                console.log(`[Registration] Resent verification email to existing unverified user: ${email}`);
+              }
+            } catch (resendErr) {
+              console.error('[Registration] Failed to resend verification:', resendErr);
+            }
+            
+            return res.status(200).json({ 
+              success: true, 
+              message: "This email is already registered but not verified. We've sent a new verification email. Please check your inbox.",
+              needsVerification: true
+            });
+          }
+          
+          return res.status(400).json({ error: "An account with this email already exists. Please log in or reset your password." });
+        }
+        
         return res.status(400).json({ error: authError.message });
       }
 
@@ -5304,6 +5341,73 @@ export async function registerRoutes(
       res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
     } catch (error) {
       console.error('Password reset error:', error);
+      res.status(500).json({ error: "An error occurred. Please try again later." });
+    }
+  }));
+
+  // Resend email verification endpoint
+  app.post("/api/auth/resend-verification", asyncHandler(async (req, res) => {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Authentication service not configured" });
+      }
+
+      // Check if user exists and get their info
+      const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (listError) {
+        console.error('[ResendVerification] Error listing users:', listError);
+        return res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a verification link." });
+      }
+
+      const user = users?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      
+      if (!user) {
+        // Don't reveal if email exists or not for security
+        return res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a verification link." });
+      }
+
+      if (user.email_confirmed_at) {
+        return res.status(400).json({ error: "This email is already verified. You can log in." });
+      }
+
+      // Generate verification link
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: email,
+        options: {
+          redirectTo: 'https://www.runcourier.co.uk/login?verified=true'
+        }
+      });
+
+      if (linkError) {
+        console.error('[ResendVerification] Failed to generate link:', linkError);
+        return res.status(500).json({ error: "Failed to generate verification link" });
+      }
+
+      if (linkData?.properties?.action_link) {
+        const fullName = user.user_metadata?.fullName || user.user_metadata?.full_name || 'Customer';
+        const emailSent = await sendEmailVerification(email, linkData.properties.action_link, fullName);
+        
+        if (emailSent) {
+          console.log(`[ResendVerification] Verification email sent to ${email}`);
+        } else {
+          console.error('[ResendVerification] Failed to send email');
+          return res.status(500).json({ error: "Failed to send verification email" });
+        }
+      }
+
+      res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a verification link." });
+    } catch (error) {
+      console.error('[ResendVerification] Error:', error);
       res.status(500).json({ error: "An error occurred. Please try again later." });
     }
   }));
