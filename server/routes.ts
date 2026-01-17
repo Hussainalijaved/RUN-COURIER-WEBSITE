@@ -1013,6 +1013,69 @@ export async function registerRoutes(
     return res.json({ stops: mappedStops });
   }));
 
+  // Update a multi-drop stop status (admin only)
+  app.patch("/api/jobs/:jobId/stops/:stopId", asyncHandler(async (req, res) => {
+    const { jobId, stopId } = req.params;
+    const { status } = req.body;
+    
+    // SECURITY: Require admin access
+    let isAdmin = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { data: { user: authUser } } = await supabaseAdmin?.auth.getUser(token) || { data: { user: null } };
+      if (authUser?.email) {
+        isAdmin = await isAdminByEmail(authUser.email);
+      }
+    }
+    
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Admin access required", code: "NOT_ADMIN" });
+    }
+    
+    if (!status || !['pending', 'delivered'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be 'pending' or 'delivered'" });
+    }
+    
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Database not available" });
+    }
+    
+    // Update the stop status
+    const updateData: Record<string, any> = { status };
+    if (status === 'delivered') {
+      updateData.delivered_at = new Date().toISOString();
+    } else {
+      updateData.delivered_at = null;
+    }
+    
+    const { data: updatedStop, error } = await supabaseAdmin
+      .from('multi_drop_stops')
+      .update(updateData)
+      .eq('id', stopId)
+      .eq('job_id', jobId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[Stops] Error updating stop:', error);
+      return res.status(500).json({ error: "Failed to update stop status" });
+    }
+    
+    console.log(`[Stops] Updated stop ${stopId} status to ${status}`);
+    
+    return res.json({ 
+      success: true, 
+      stop: {
+        id: updatedStop.id,
+        jobId: updatedStop.job_id,
+        stopOrder: updatedStop.stop_order,
+        status: updatedStop.status,
+        deliveredAt: updatedStop.delivered_at,
+      }
+    });
+  }));
+
   app.post("/api/jobs", asyncHandler(async (req, res) => {
     console.log('[Jobs] POST /api/jobs - Creating new job with driverId:', req.body.driverId);
     

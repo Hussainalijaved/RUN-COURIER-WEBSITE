@@ -142,11 +142,30 @@ interface MultiDropStop {
   podRecipientName?: string;
 }
 
-// Component to display multi-drop stops for a job
+// Component to display multi-drop stops for a job with status update capability
 function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiDrop?: boolean }) {
+  const { toast } = useToast();
+  const [updatingStopId, setUpdatingStopId] = useState<string | null>(null);
   const { data, isLoading } = useQuery<{ stops: MultiDropStop[] }>({
     queryKey: [`/api/jobs/${jobId}/stops`],
     enabled: !!isMultiDrop && !!jobId,
+  });
+
+  const updateStopStatusMutation = useMutation({
+    mutationFn: async ({ stopId, status }: { stopId: string; status: string }) => {
+      setUpdatingStopId(stopId);
+      const response = await apiRequest('PATCH', `/api/jobs/${jobId}/stops/${stopId}`, { status });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/stops`] });
+      toast({ title: 'Stop status updated' });
+      setUpdatingStopId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update stop', description: error?.message, variant: 'destructive' });
+      setUpdatingStopId(null);
+    },
   });
 
   if (!isMultiDrop) return null;
@@ -195,14 +214,37 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Badge variant="outline" className="text-xs">Stop {stop.stopOrder}</Badge>
-                  {stop.status === 'delivered' && (
+                  {stop.status === 'delivered' ? (
                     <Badge className="bg-green-500 text-white text-xs">Delivered</Badge>
-                  )}
-                  {stop.status === 'pending' && (
+                  ) : (
                     <Badge variant="secondary" className="text-xs">Pending</Badge>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={updatingStopId === stop.id}
+                    onClick={() => updateStopStatusMutation.mutate({
+                      stopId: stop.id,
+                      status: stop.status === 'delivered' ? 'pending' : 'delivered'
+                    })}
+                    data-testid={`button-toggle-stop-${stop.stopOrder}`}
+                  >
+                    {updatingStopId === stop.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : stop.status === 'delivered' ? (
+                      <>
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Mark Pending
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Mark Delivered
+                      </>
+                    )}
+                  </Button>
                 </div>
                 <p className="text-sm font-medium">{stop.address}</p>
                 <p className="text-sm font-mono text-muted-foreground">{stop.postcode}</p>
@@ -1272,15 +1314,15 @@ export default function AdminJobs() {
 
         {/* View Job Details Dialog */}
         <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Job Details - {selectedJob?.trackingNumber}</DialogTitle>
               <DialogDescription>
                 Created on {selectedJob && formatDate(selectedJob.createdAt)}
               </DialogDescription>
             </DialogHeader>
             {selectedJob && (
-              <div className="space-y-6">
+              <div className="space-y-6 overflow-y-auto flex-1 pr-2">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-semibold mb-2">Pickup</h4>
