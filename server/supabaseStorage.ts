@@ -1525,8 +1525,14 @@ export class SupabaseStorage implements IStorage {
     if (filters?.jobId) query = query.eq('job_id', filters.jobId);
     if (filters?.driverId) query = query.eq('driver_id', filters.driverId);
     if (filters?.status) query = query.eq('status', filters.status);
+    console.log(`[SupabaseStorage] getJobAssignments filters=`, JSON.stringify(filters));
     const { data, error } = await query;
-    if (error || !data) return [];
+    if (error) {
+      console.error(`[SupabaseStorage] getJobAssignments error:`, error);
+      return [];
+    }
+    console.log(`[SupabaseStorage] getJobAssignments found ${data?.length || 0} assignments`);
+    if (!data) return [];
     return data.map(mapDbToJobAssignment);
   }
 
@@ -1622,8 +1628,17 @@ export class SupabaseStorage implements IStorage {
     if (data.cleanedAt !== undefined) dbData.cleaned_at = data.cleanedAt;
     if (data.cleanedBy !== undefined) dbData.cleaned_by = data.cleanedBy;
     
+    console.log(`[SupabaseStorage] updateJobAssignment id=${id} dbData=`, JSON.stringify(dbData));
     const { data: updated, error } = await supabase.from('job_assignments').update(dbData).eq('id', id).select().single();
-    if (error || !updated) return undefined;
+    if (error) {
+      console.error(`[SupabaseStorage] updateJobAssignment error:`, error);
+      return undefined;
+    }
+    if (!updated) {
+      console.error(`[SupabaseStorage] updateJobAssignment: No data returned for id=${id}`);
+      return undefined;
+    }
+    console.log(`[SupabaseStorage] updateJobAssignment success:`, JSON.stringify(updated));
     return mapDbToJobAssignment(updated);
   }
 
