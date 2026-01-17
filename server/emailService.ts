@@ -1266,6 +1266,38 @@ export async function sendPaymentReceivedConfirmation(
   return sendEmailNotification(customerEmail, `Payment Received - Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
 
+export async function sendEmailVerification(
+  email: string,
+  verificationLink: string,
+  fullName: string
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #333;">Welcome to Run Courier!</h2>
+    <p style="color: #666; font-size: 16px;">
+      Hi ${fullName},
+    </p>
+    <p style="color: #666; font-size: 16px;">
+      Thank you for registering. Please verify your email address by clicking the button below:
+    </p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${verificationLink}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+        Verify Email Address
+      </a>
+    </div>
+    <p style="color: #666; font-size: 14px;">
+      If you didn't create an account, you can safely ignore this email.
+    </p>
+    <p style="color: #666; font-size: 14px;">
+      This link will expire in 24 hours.
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Verify Your Email');
+  const textContent = `Welcome to Run Courier!\n\nHi ${fullName},\n\nThank you for registering. Please verify your email address by clicking this link:\n\n${verificationLink}\n\nIf you didn't create an account, you can safely ignore this email.\n\nThis link will expire in 24 hours.\n\nRun Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(email, 'Verify Your Email - Run Courier', htmlContent, textContent);
+}
+
 export async function sendPasswordResetEmail(
   email: string,
   resetLink: string

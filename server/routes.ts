@@ -22,7 +22,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn } from "./realtime";
@@ -5206,12 +5206,35 @@ export async function registerRoutes(
           // User is created in Supabase auth, continue even if DB insert fails
         }
 
-        // Send welcome and notification emails
+        // Generate email verification link and send it
         try {
-          await sendWelcomeEmail(email, fullName, role || 'customer').catch(err => console.error('Failed to send welcome email:', err));
+          const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'signup',
+            email: email,
+            options: {
+              redirectTo: 'https://www.runcourier.co.uk/login?verified=true'
+            }
+          });
+          
+          if (linkError) {
+            console.error('[Registration] Failed to generate verification link:', linkError);
+          } else if (linkData?.properties?.action_link) {
+            const emailSent = await sendEmailVerification(email, linkData.properties.action_link, fullName);
+            if (emailSent) {
+              console.log(`[Registration] Verification email sent to ${email}`);
+            } else {
+              console.error('[Registration] Failed to send verification email');
+            }
+          }
+        } catch (verifyError) {
+          console.error('[Registration] Verification email error:', verifyError);
+        }
+
+        // Send notification to admin about new registration
+        try {
           await sendNewRegistrationNotification(email, fullName, role || 'customer', companyName).catch(err => console.error('Failed to send registration notification:', err));
         } catch (emailError) {
-          console.error('[Registration] Email error:', emailError);
+          console.error('[Registration] Notification email error:', emailError);
         }
       }
 
