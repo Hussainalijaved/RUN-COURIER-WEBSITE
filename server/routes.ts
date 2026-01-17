@@ -3968,6 +3968,37 @@ export async function registerRoutes(
     
     console.log(`[Embedded Payment] Created job ${trackingNumber} with payment ${paymentIntentId}`);
 
+    // Create invoice for this booking (paid by card)
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        const invoiceNumber = `INV-${trackingNumber}`;
+        const now = new Date();
+        const invoiceToken = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+        
+        await supabaseAdmin.from('invoice_payment_tokens').insert({
+          token: invoiceToken,
+          invoice_number: invoiceNumber,
+          customer_name: metadata.pickupName || jobData.pickupContactName || 'Customer',
+          customer_email: metadata.customerEmail || jobData.customerEmail || '',
+          amount: parseFloat(jobData.totalPrice),
+          subtotal: parseFloat(jobData.totalPrice),
+          vat: 0,
+          status: 'paid', // Card payment - already paid
+          due_date: now.toISOString(),
+          period_start: now.toISOString(),
+          period_end: now.toISOString(),
+          job_ids: [job.id],
+          notes: `Card payment - ${paymentIntentId}`,
+          created_at: now.toISOString(),
+        });
+        console.log(`[Embedded Payment] Created invoice ${invoiceNumber} for job ${trackingNumber}`);
+      }
+    } catch (invoiceError) {
+      console.error('[Embedded Payment] Failed to create invoice:', invoiceError);
+      // Don't fail the booking if invoice creation fails
+    }
+
     // Send email notifications
     await sendNewJobNotification(job.id, job).catch(err => console.error('Failed to send admin notification:', err));
     const embeddedCustomerEmail = (job as any).customerEmail || metadata.customerEmail;
