@@ -732,52 +732,11 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
         </tr>
       </table>
 
-      <!-- Price Breakdown -->
-      <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">PRICE BREAKDOWN</h3>
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-        <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Base Price (${vehicleDisplay}):</strong></td>
-          <td style="padding: 8px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.basePrice || 0).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Distance Charge:</strong></td>
-          <td style="padding: 8px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}</td>
-        </tr>
-        ${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Weight Surcharge:</strong></td>
-          <td style="padding: 8px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.weightSurcharge).toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        ${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Multi-Drop Charge:</strong></td>
-          <td style="padding: 8px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.multiDropCharge).toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        ${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Return Trip Charge:</strong></td>
-          <td style="padding: 8px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.returnTripCharge).toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        ${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Central London Charge:</strong></td>
-          <td style="padding: 8px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        ${parseFloat(jobDetails.waitingTimeCharge || 0) > 0 ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Waiting Time Charge:</strong></td>
-          <td style="padding: 8px 0; color: #333; text-align: right;">£${parseFloat(jobDetails.waitingTimeCharge).toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        <tr style="border-top: 2px solid #007BFF;">
-          <td style="padding: 12px 0; color: #007BFF; font-size: 18px;"><strong>TOTAL:</strong></td>
-          <td style="padding: 12px 0; color: #007BFF; font-size: 18px; text-align: right; font-weight: bold;">£${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}</td>
-        </tr>
-      </table>
+      <!-- Total Price -->
+      <div style="background-color: #007BFF; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+        <p style="margin: 0; font-size: 14px; opacity: 0.9;">Total Amount</p>
+        <p style="margin: 10px 0 0; font-size: 32px; font-weight: bold;">£${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}</p>
+      </div>
 
       <!-- Payment Status -->
       <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center;">
@@ -835,12 +794,7 @@ Weight: ${jobDetails.weight || '0'} kg
 Distance: ${jobDetails.distance || '0'} miles
 ${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 'Return Trip: Yes\n' : ''}
 
-PRICE BREAKDOWN
----------------
-Base Price (${vehicleDisplay}): £${parseFloat(jobDetails.basePrice || 0).toFixed(2)}
-Distance Charge: £${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}
-${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `Weight Surcharge: £${parseFloat(jobDetails.weightSurcharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `Multi-Drop Charge: £${parseFloat(jobDetails.multiDropCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `Return Trip Charge: £${parseFloat(jobDetails.returnTripCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `Central London Charge: £${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}\n` : ''}${parseFloat(jobDetails.waitingTimeCharge || 0) > 0 ? `Waiting Time Charge: £${parseFloat(jobDetails.waitingTimeCharge).toFixed(2)}\n` : ''}
-TOTAL: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
+TOTAL AMOUNT: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
 Payment Status: ${jobDetails.paymentStatus === 'paid' ? 'CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER' : 'PENDING'}
 
 Track your delivery: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}
