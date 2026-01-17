@@ -193,12 +193,13 @@ export default function Signup({ role = 'customer' }: SignupProps) {
       } else {
         toast({
           title: 'Account Created',
-          description: 'Please check your email to verify your account.',
+          description: result.message || 'Please check your email to verify your account before logging in.',
         });
-        const redirectPath = role === 'driver' ? '/driver'
-          : role === 'vendor' ? '/vendor'
-          : '/customer';
-        setLocation(redirectPath);
+        // Redirect to login page since user needs to verify email first
+        const loginRedirect = role === 'driver' ? '/driver/login'
+          : role === 'vendor' ? '/vendor/login'
+          : '/login';
+        setLocation(loginRedirect);
       }
     } catch (error) {
       toast({
