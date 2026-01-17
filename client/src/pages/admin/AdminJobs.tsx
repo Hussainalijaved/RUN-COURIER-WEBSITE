@@ -1533,12 +1533,12 @@ export default function AdminJobs() {
               </Button>
               <Button
                 onClick={() => {
-                  if (jobToAssign && selectedDriverForAssign && assignDriverPrice) {
+                  if (jobToAssign && selectedDriverForAssign && assignDriverPrice && user?.id) {
                     assignDriverMutation.mutate({
                       jobId: jobToAssign.id,
                       driverId: selectedDriverForAssign,
                       driverPrice: assignDriverPrice,
-                      assignedBy: 'admin', // This would be the actual admin user ID
+                      assignedBy: user.id,
                     });
                   }
                 }}
