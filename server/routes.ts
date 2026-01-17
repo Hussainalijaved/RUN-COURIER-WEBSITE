@@ -724,23 +724,31 @@ export async function registerRoutes(
     });
     console.log(`[API Jobs] Found ${jobs.length} jobs for customerId: ${customerId}`);
     
-    // SECURITY: Default to safe (no-pricing) unless explicitly admin/dispatcher
-    // This prevents price leakage by omitting auth or using driver token
+    // SECURITY: Check user role and identity
     let isAdmin = false;
+    let isCustomerViewingOwn = false;
+    let authenticatedUserId: string | null = null;
+    
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       const { verifyAccessToken } = await import("./supabaseAdmin");
       const user = await verifyAccessToken(token);
       isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
+      authenticatedUserId = user?.id || null;
+      
+      // Customer viewing their own jobs - they can see their prices
+      if (user?.role === 'customer' && customerId && authenticatedUserId === customerId) {
+        isCustomerViewingOwn = true;
+      }
     }
     
-    if (isAdmin) {
-      // Admin/dispatcher see full pricing
+    if (isAdmin || isCustomerViewingOwn) {
+      // Admin/dispatcher OR customer viewing their own jobs see full pricing
       return res.json(jobs);
     }
     
-    // CRITICAL: Everyone else (drivers, customers, unauthenticated) gets NO customer pricing
+    // CRITICAL: Drivers and unauthenticated users get NO customer pricing
     const safeJobs = jobs.map(job => stripCustomerPricing(job));
     return res.json(safeJobs);
   }));
