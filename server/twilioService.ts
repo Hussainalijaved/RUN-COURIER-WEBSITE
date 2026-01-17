@@ -123,10 +123,12 @@ function formatPhoneNumber(phone: string): string {
 // Send SMS notification
 export async function sendSMS(to: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
+    console.log('[Twilio] Attempting to send SMS...');
     const client = await getTwilioClient();
     const fromNumber = await getTwilioFromPhoneNumber();
     
     const formattedTo = formatPhoneNumber(to);
+    console.log(`[Twilio] Sending SMS from ${fromNumber} to ${formattedTo.slice(0, 6)}***`);
     
     const result = await client.messages.create({
       body: message,
@@ -134,10 +136,12 @@ export async function sendSMS(to: string, message: string): Promise<{ success: b
       to: formattedTo
     });
     
-    console.log(`[Twilio] SMS sent successfully to ${formattedTo}, SID: ${result.sid}`);
+    console.log(`[Twilio] SMS sent successfully, SID: ${result.sid}`);
     return { success: true, messageId: result.sid };
   } catch (error: any) {
     console.error('[Twilio] Failed to send SMS:', error.message);
+    console.error('[Twilio] Error code:', error.code);
+    console.error('[Twilio] Error status:', error.status);
     return { success: false, error: error.message };
   }
 }
