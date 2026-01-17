@@ -371,20 +371,12 @@ export default function AdminJobs() {
   const assignDriverMutation = useMutation({
     mutationFn: async ({ jobId, driverId, driverPrice, assignedBy }: { jobId: string; driverId: string; driverPrice: string; assignedBy: string }) => {
       // Use backend API for job assignment - supports reassigning same driver with new price
-      const response = await fetch('/api/job-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          driverId,
-          driverPrice,
-          assignedBy,
-        }),
+      const response = await apiRequest('POST', '/api/job-assignments', {
+        jobId,
+        driverId,
+        driverPrice,
+        assignedBy,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to assign driver');
-      }
       return response.json();
     },
     onSuccess: () => {
@@ -403,22 +395,13 @@ export default function AdminJobs() {
 
   const batchAssignMutation = useMutation({
     mutationFn: async ({ jobIds, driverId, driverPrice }: { jobIds: string[]; driverId: string; driverPrice: string }) => {
-      // Use local backend API for batch assignment
-      const response = await fetch('/api/job-assignments/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobIds,
-          driverId,
-          assignedBy: user?.id,
-          driverPrice,
-        }),
+      // Use local backend API for batch assignment with auth headers
+      const response = await apiRequest('POST', '/api/job-assignments/batch', {
+        jobIds,
+        driverId,
+        assignedBy: user?.id,
+        driverPrice,
       });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to batch assign jobs');
-      }
       
       return response.json();
     },
