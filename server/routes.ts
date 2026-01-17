@@ -3227,11 +3227,12 @@ export async function registerRoutes(
     const docId = isUuidId ? req.params.id : parseInt(req.params.id, 10);
     
     // First try to update in Supabase driver_documents (where mobile app uploads)
-    // Supabase driver_documents typically uses bigint IDs, but try both
+    // Supabase driver_documents uses bigint IDs, so only try for numeric IDs
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       
-      if (supabaseAdmin) {
+      // Only try Supabase driver_documents for numeric IDs (not UUIDs)
+      if (supabaseAdmin && !isUuidId) {
         // The Supabase driver_documents table only has: status, updated_at
         // It does NOT have: reviewed_by, review_notes columns
         const updateData: Record<string, any> = {
@@ -3239,7 +3240,7 @@ export async function registerRoutes(
           updated_at: reviewedAt.toISOString(),
         };
         
-        // Try to update using the appropriate ID type
+        // Use numeric ID for Supabase query
         const { data: updatedDoc, error } = await supabaseAdmin
           .from('driver_documents')
           .update(updateData)
@@ -3331,9 +3332,56 @@ export async function registerRoutes(
       console.error('[Documents] Failed to update document in Supabase:', e);
     }
     
-    // If not updated in Supabase, try in-memory storage
+    // If not updated in Supabase driver_documents, try the storage layer
+    // For UUID documents, this will try Supabase 'documents' table via SupabaseStorage
     if (!document) {
-      document = await storage.reviewDocument(req.params.id, status, reviewedBy, reviewNotes);
+      try {
+        document = await storage.reviewDocument(req.params.id, status, reviewedBy, reviewNotes);
+        if (document) {
+          console.log('[Documents] Updated document via storage layer:', req.params.id);
+        }
+      } catch (storageErr) {
+        console.log('[Documents] Storage layer could not find document:', req.params.id);
+      }
+    }
+    
+    // For UUID documents, try direct Supabase 'documents' table update
+    if (!document && isUuidId) {
+      try {
+        const { supabaseAdmin } = await import("./supabaseAdmin");
+        if (supabaseAdmin) {
+          const { data: updatedDoc, error } = await supabaseAdmin
+            .from('documents')
+            .update({
+              status: status,
+              reviewed_by: reviewedBy,
+              review_notes: reviewNotes || null,
+              reviewed_at: reviewedAt.toISOString(),
+            })
+            .eq('id', req.params.id)
+            .select()
+            .single();
+          
+          if (!error && updatedDoc) {
+            console.log('[Documents] Updated document in Supabase documents table:', req.params.id);
+            document = {
+              id: updatedDoc.id,
+              driverId: updatedDoc.driver_id,
+              type: updatedDoc.type || updatedDoc.doc_type || 'unknown',
+              fileName: updatedDoc.file_name || 'document',
+              fileUrl: updatedDoc.file_url || '',
+              status: updatedDoc.status,
+              expiryDate: updatedDoc.expiry_date ? new Date(updatedDoc.expiry_date) : null,
+              reviewedBy: updatedDoc.reviewed_by,
+              reviewNotes: updatedDoc.review_notes,
+              uploadedAt: updatedDoc.uploaded_at ? new Date(updatedDoc.uploaded_at) : null,
+              reviewedAt: reviewedAt,
+            };
+          }
+        }
+      } catch (e) {
+        console.log('[Documents] Supabase documents table update failed:', e);
+      }
     }
     
     // If not found in memory, try updating directly in PostgreSQL
