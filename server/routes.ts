@@ -3227,14 +3227,17 @@ export async function registerRoutes(
       const { supabaseAdmin } = await import("./supabaseAdmin");
       
       if (supabaseAdmin) {
+        // Only update columns that exist in the driver_documents table
+        // Note: review_notes may not exist in some Supabase schemas
+        const updateData: Record<string, any> = {
+          status: status,
+          reviewed_by: reviewedBy,
+          updated_at: reviewedAt.toISOString(),
+        };
+        
         const { data: updatedDoc, error } = await supabaseAdmin
           .from('driver_documents')
-          .update({
-            status: status,
-            reviewed_by: reviewedBy,
-            review_notes: reviewNotes || null,
-            updated_at: reviewedAt.toISOString(),
-          })
+          .update(updateData)
           .eq('id', req.params.id)
           .select()
           .single();
