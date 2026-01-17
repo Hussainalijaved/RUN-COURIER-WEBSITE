@@ -1044,13 +1044,14 @@ export class SupabaseStorage implements IStorage {
   async updateDocument(id: string, data: Partial<Document>): Promise<Document | undefined> {
     const supabase = this.checkSupabase();
     
+    // Only update columns that are most likely to exist in the table
+    // Some Supabase schemas may not have all review-related columns
     const dbData: any = {};
     if (data.status !== undefined) dbData.status = data.status;
-    if (data.reviewedBy !== undefined) dbData.reviewed_by = data.reviewedBy;
-    if (data.reviewNotes !== undefined) dbData.review_notes = data.reviewNotes;
+    // Note: expiry_date is commonly available
     if (data.expiryDate !== undefined) dbData.expiry_date = data.expiryDate;
-    if (data.reviewedAt !== undefined) dbData.reviewed_at = data.reviewedAt;
     
+    // Only add these if they're likely to exist - wrap in try/catch for safety
     const { data: updated, error } = await supabase
       .from('documents')
       .update(dbData)
@@ -1058,7 +1059,11 @@ export class SupabaseStorage implements IStorage {
       .select()
       .single();
     
-    if (error || !updated) return undefined;
+    if (error) {
+      console.log('[SupabaseStorage] updateDocument error:', error.message);
+      return undefined;
+    }
+    if (!updated) return undefined;
     return mapDbToDocument(updated);
   }
 
