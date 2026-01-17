@@ -323,6 +323,8 @@ export default function AdminJobs() {
   const [batchDriverId, setBatchDriverId] = useState<string>('');
   const [batchDriverPrice, setBatchDriverPrice] = useState<string>('');
   const [batchErrors, setBatchErrors] = useState<{ jobId: string; error: string }[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
@@ -480,6 +482,22 @@ export default function AdminJobs() {
     },
     onError: () => {
       toast({ title: 'Failed to cancel job', variant: 'destructive' });
+    },
+  });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest('DELETE', `/api/jobs/${jobId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
+      toast({ title: 'Job deleted', description: 'The job has been permanently removed.' });
+      setDeleteDialogOpen(false);
+      setJobToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to delete job', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 
@@ -1295,6 +1313,15 @@ export default function AdminJobs() {
                                 Withdraw from Driver
                               </DropdownMenuItem>
                             )}
+                            {/* Delete Job - permanent deletion */}
+                            <DropdownMenuItem 
+                              onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}
+                              className="text-destructive"
+                              data-testid={`menu-delete-${job.id}`}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Job
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -1954,6 +1981,78 @@ export default function AdminJobs() {
                   <>
                     <UserPlus className="mr-2 h-4 w-4" />
                     Assign {selectedJobIds.size} Job{selectedJobIds.size > 1 ? 's' : ''}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Job Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setJobToDelete(null);
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-destructive">Delete Job</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete this job? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            {jobToDelete && (
+              <div className="space-y-3 py-4">
+                <div className="p-3 bg-muted rounded-md space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Tracking #</span>
+                    <span className="font-mono font-medium">{jobToDelete.trackingNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Route</span>
+                    <span className="font-mono text-sm">{jobToDelete.pickupPostcode} → {jobToDelete.deliveryPostcode}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Status</span>
+                    {getStatusBadge(jobToDelete.status)}
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Amount</span>
+                    <span className="font-medium">{formatPrice(jobToDelete.totalPrice)}</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="text-sm text-destructive">
+                    This will permanently remove the job and all associated data including assignments and payment records.
+                  </p>
+                </div>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setJobToDelete(null);
+                }}
+                data-testid="button-cancel-delete"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={() => jobToDelete && deleteJobMutation.mutate(jobToDelete.id)}
+                disabled={deleteJobMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteJobMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Job
                   </>
                 )}
               </Button>
