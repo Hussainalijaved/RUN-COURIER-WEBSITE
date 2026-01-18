@@ -268,6 +268,8 @@ export const driverApplications = pgTable("driver_applications", {
   fullName: text("full_name").notNull(),
   email: text("email").notNull(),
   phone: text("phone").notNull(),
+  phoneVerified: boolean("phone_verified").default(false),
+  phoneVerificationToken: text("phone_verification_token"),
   postcode: text("postcode").notNull(),
   fullAddress: text("full_address").notNull(),
   buildingName: text("building_name"),
