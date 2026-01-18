@@ -370,8 +370,71 @@ export async function registerRoutes(
   app.use('/api/job-assignments', requireAdminAccessStrict);
 
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+    res.json({ status: "ok", mode, timestamp: new Date().toISOString() });
   });
+
+  // Diagnostic endpoint to check job assignment state (admin only)
+  app.get("/api/debug/job-assignment/:jobId", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    const jobId = req.params.jobId;
+    
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    
+    // Get job directly from Supabase
+    const { data: job, error: jobError } = await supabaseAdmin
+      .from('jobs')
+      .select('id, tracking_number, status, driver_id, driver_price, driver_hidden, pickup_latitude, pickup_longitude')
+      .eq('id', jobId)
+      .single();
+    
+    // Get job assignments for this job
+    const { data: assignments, error: assignError } = await supabaseAdmin
+      .from('job_assignments')
+      .select('id, driver_id, status, driver_price, created_at')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false });
+    
+    // Get driver info if driver_id exists
+    let driver = null;
+    if (job?.driver_id) {
+      const { data: driverData } = await supabaseAdmin
+        .from('drivers')
+        .select('id, driver_id, full_name, email')
+        .eq('id', job.driver_id)
+        .single();
+      driver = driverData;
+    }
+    
+    // Get driver devices if driver exists
+    let devices: any[] = [];
+    if (job?.driver_id) {
+      const { data: deviceData } = await supabaseAdmin
+        .from('driver_devices')
+        .select('id, push_token, platform, last_seen_at')
+        .eq('driver_id', job.driver_id);
+      devices = deviceData || [];
+    }
+    
+    res.json({
+      job: job || null,
+      jobError: jobError?.message || null,
+      assignments: assignments || [],
+      assignError: assignError?.message || null,
+      driver: driver || null,
+      devices,
+      summary: {
+        jobExists: !!job,
+        driverAssigned: !!job?.driver_id,
+        driverHidden: job?.driver_hidden || false,
+        activeAssignments: (assignments || []).filter((a: any) => ['sent', 'pending', 'accepted'].includes(a.status)).length,
+        pushDevicesRegistered: devices.length,
+        hasCoordinates: !!(job?.pickup_latitude && job?.pickup_longitude),
+      }
+    });
+  }));
 
   // Google Maps Optimized Route endpoint - finds optimal route through all drops
   // Uses Distance Matrix API to get all distances, then implements nearest-neighbor TSP
@@ -5726,6 +5789,7 @@ export async function registerRoutes(
     }
 
     // Create the assignment
+    console.log(`[Job Assignment] Creating assignment: jobId=${jobId}, driverId=${driverId}, price=${driverPrice}`);
     const assignment = await storage.createJobAssignment({
       jobId,
       driverId,
@@ -5735,14 +5799,33 @@ export async function registerRoutes(
       sentAt: new Date(),
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     });
+    console.log(`[Job Assignment] Assignment created: id=${assignment.id}, status=${assignment.status}`);
 
     // Automatically update job status to "assigned" AND set the driverId when assignment is created
     // This ensures the job appears in the driver's mobile app immediately
-    await storage.updateJob(jobId, {
+    console.log(`[Job Assignment] Updating job ${jobId} with driverId=${driverId} and status=assigned`);
+    const updatedJob = await storage.updateJob(jobId, {
       status: "assigned" as any,
       driverId: driverId,
       driverPrice: driverPrice
     });
+    console.log(`[Job Assignment] Job ${jobId} update result:`, updatedJob ? `success, driver_id=${updatedJob.driverId}` : 'FAILED - no job returned');
+    
+    // Verify the job was updated in Supabase
+    const { supabaseAdmin: verifyClient } = await import('./supabaseAdmin');
+    if (verifyClient) {
+      const { data: verifyJob, error: verifyError } = await verifyClient
+        .from('jobs')
+        .select('id, driver_id, status, driver_price')
+        .eq('id', jobId)
+        .single();
+      if (verifyError) {
+        console.error(`[Job Assignment] VERIFICATION FAILED: Could not verify job in Supabase:`, verifyError.message);
+      } else {
+        console.log(`[Job Assignment] VERIFIED in Supabase: job ${jobId} driver_id=${verifyJob?.driver_id}, status=${verifyJob?.status}, driver_price=${verifyJob?.driver_price}`);
+      }
+    }
+    
     console.log(`[Job Assignment] Job ${jobId} assigned to driver ${driverId} with price £${driverPrice}`);
     
     // Auto-geocode job coordinates if missing (for mobile app map preview)

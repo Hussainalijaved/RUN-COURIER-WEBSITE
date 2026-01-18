@@ -1,0 +1,65 @@
+I’ve received confirmation from the client that nothing has changed on the mobile app. Jobs are still not reaching the driver app, and the behavior remains the same as before.
+
+This means the issue is not resolved in practice, regardless of code changes or internal logs. We now need to focus strictly on real-world behavior, not assumptions.
+
+Please do the following carefully and in order:
+
+⸻
+
+1. Investigate Using the Live App Flow (Not Code-Only Review)
+
+You must reproduce the issue exactly as the client experiences it:
+	•	Use the same environment the mobile app is connected to (production / live API)
+	•	Do not rely only on logs or backend success messages
+	•	Assume nothing is working until proven in the app UI
+
+⸻
+
+2. Mandatory End-to-End Testing Using Replit App Testing
+
+Using Replit’s app testing features (and a real or emulated mobile device):
+	1.	Create a new job from the admin panel
+	2.	Assign the job to a driver
+	3.	Confirm all of the following on the mobile app:
+	•	Driver receives a push notification
+	•	Job appears under Active Jobs
+	•	Map loads correctly (no “location data unavailable”)
+	•	Assigned price is visible
+	•	Sender phone number appears when provided
+
+If any step fails, stop and fix it before continuing.
+
+⸻
+
+3. Verify Environment & Sync
+
+Please explicitly confirm:
+	•	Admin panel and mobile app are using the same backend and Supabase project
+	•	No environment mismatch (dev vs prod)
+	•	Driver authentication tokens are valid and not rejected by RLS or API guards
+	•	Push notifications are triggered and received on the device, not just logged
+
+⸻
+
+4. Do NOT Send Feedback Until All Testing Passes
+
+Important:
+	•	If something is partially working, do not report success
+	•	If you discover another issue during testing, fix it first
+	•	Only send feedback after the full flow works consistently
+	•	If testing reveals blockers, continue working and update once resolved
+
+⸻
+
+5. When You Respond, Include Proof
+
+Your response should include:
+	•	Confirmation that the full flow was tested end-to-end
+	•	Screenshots or short recordings showing:
+	•	Job assignment from admin
+	•	Job received on driver app
+	•	Map and price visible
+
+Until this is verified through the app itself, I cannot update the client.
+
+Thank you — please treat this as a priority and test thoroughly before responding.

@@ -540,7 +540,8 @@ export function registerMobileRoutes(app: Express): void {
       const driver = req.driver!;
       const { status } = req.query;
 
-      console.log(`[Mobile Jobs] Fetching jobs for driver ${driver.driverCode} (${driver.id})`);
+      console.log(`[Mobile Jobs] *** FETCHING JOBS for driver ${driver.driverCode} (id=${driver.id}) ***`);
+      console.log(`[Mobile Jobs] Driver auth userId: ${driver.userId}, driverCode: ${driver.driverCode}`);
 
       let mobileJobs: any[] = [];
 
@@ -572,6 +573,7 @@ export function registerMobileRoutes(app: Express): void {
         let supabaseJobs: any[] = [];
         
         // Query jobs directly assigned to driver (exclude hidden jobs)
+        console.log(`[Mobile Jobs] Querying jobs with driver_id=${driver.id}`);
         const { data: directJobs, error: directError } = await supabaseAdmin
           .from('jobs')
           .select(`
