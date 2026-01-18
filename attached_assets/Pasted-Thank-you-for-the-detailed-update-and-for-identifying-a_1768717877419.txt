@@ -1,0 +1,115 @@
+Thank you for the detailed update and for identifying and fixing the geocoding and authentication issues. Before I relay this to the client, I need final confirmation through repeated verification and full end-to-end testing.
+
+Please follow the steps below carefully and only send feedback after all steps are completed and verified using Replit’s app testing features.
+
+1. Re-Confirm All Fixes Are Properly Applied
+
+Please double-check (not assume) the following in the codebase:
+
+The Supabase sync always uses finalJob, not job
+
+The following fields are persisted and returned correctly:
+
+pickup_latitude
+
+pickup_longitude
+
+delivery_latitude
+
+delivery_longitude
+
+Multi-drop stops reference finalJob consistently
+
+No legacy or fallback code paths are still using un-geocoded job data
+
+Authentication/session handling is stable across:
+
+Fresh login
+
+Existing session
+
+Admin → driver assignment flow
+
+Please explicitly confirm each of the above.
+
+2. Mandatory End-to-End Flow Testing (No Exceptions)
+
+Using Replit’s app testing tools and a real device/emulated mobile session, test the full flow from start to finish:
+
+Test Scenario
+
+Create a new job from the admin panel with:
+
+Pickup & delivery addresses
+
+Sender phone number
+
+Driver payment assigned
+
+Assign the job to a driver from the admin dashboard
+
+Confirm:
+
+Assignment succeeds without authentication errors
+
+Driver receives a push notification
+
+Job appears immediately in the driver app
+
+Open the job in the driver app and verify:
+
+Map loads correctly
+
+Pickup & delivery pins are visible
+
+“Location data unavailable” does NOT appear
+
+Assigned price is visible
+
+Sender phone number is visible (when provided)
+
+Repeat this test at least twice:
+
+Once with a fresh driver login
+
+Once with a driver already logged in
+
+3. Push Notification Verification
+
+Please explicitly verify and confirm:
+
+Push notification is triggered at assignment time
+
+Notification is received on mobile (not just logged)
+
+Tapping the notification opens the correct job
+
+4. Evidence & Feedback Required
+
+When responding, please include:
+
+Confirmation that all steps above were completed
+
+Screenshots or short screen recordings showing:
+
+Successful admin assignment
+
+Job appearing in driver app
+
+Map and price visible
+
+Any remaining edge cases or limitations (if any)
+
+If anything is not 100% reliable, please fix it before responding.
+
+Important Note
+
+I cannot update the client until:
+
+The full workflow is tested
+
+The results are confirmed visually
+
+The system behaves consistently without manual refresh or retries
+
+Thank you for your attention to detail on this. Looking forward to your confirmed test results.
