@@ -436,6 +436,173 @@ export async function registerRoutes(
     });
   }));
 
+  // Diagnostic endpoint to check driver push notification status (admin only)
+  app.get("/api/debug/driver-notifications/:driverId", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    const driverId = req.params.driverId;
+    
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    
+    // Get driver info
+    const { data: driver, error: driverError } = await supabaseAdmin
+      .from('drivers')
+      .select('id, driver_id, full_name, email, online_status, is_verified')
+      .eq('id', driverId)
+      .single();
+    
+    // Get all registered devices for this driver
+    const { data: devices, error: deviceError } = await supabaseAdmin
+      .from('driver_devices')
+      .select('*')
+      .eq('driver_id', driverId);
+    
+    // Get recent job assignments for this driver
+    const { data: assignments } = await supabaseAdmin
+      .from('job_assignments')
+      .select('id, job_id, status, driver_price, created_at')
+      .eq('driver_id', driverId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    // Get active jobs assigned to this driver
+    const { data: activeJobs } = await supabaseAdmin
+      .from('jobs')
+      .select('id, tracking_number, status, driver_price')
+      .eq('driver_id', driverId)
+      .in('status', ['pending', 'assigned', 'picked_up', 'in_transit'])
+      .limit(5);
+    
+    res.json({
+      driver: driver || null,
+      driverError: driverError?.message || null,
+      devices: devices || [],
+      deviceError: deviceError?.message || null,
+      recentAssignments: assignments || [],
+      activeJobs: activeJobs || [],
+      summary: {
+        driverExists: !!driver,
+        driverVerified: driver?.is_verified || false,
+        onlineStatus: driver?.online_status || 'unknown',
+        pushDevicesCount: (devices || []).length,
+        canReceivePushNotifications: (devices || []).length > 0,
+        activeJobsCount: (activeJobs || []).length,
+        recentAssignmentsCount: (assignments || []).length,
+      },
+      troubleshooting: {
+        noDevices: (devices || []).length === 0 
+          ? "Mobile app needs to call POST /api/mobile/v1/driver/push-token on startup"
+          : null,
+        notVerified: !driver?.is_verified
+          ? "Driver account needs admin verification to receive jobs"
+          : null,
+        offline: driver?.online_status !== 'online'
+          ? "Driver needs to set status to 'online' in mobile app"
+          : null,
+      }
+    });
+  }));
+
+  // Admin endpoint to test push notification for a driver
+  app.post("/api/admin/test-push/:driverId", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    const { sendJobOfferNotification } = await import('./pushNotifications');
+    const driverId = req.params.driverId;
+    
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    
+    // Get driver devices
+    const { data: devices } = await supabaseAdmin
+      .from('driver_devices')
+      .select('*')
+      .eq('driver_id', driverId);
+    
+    if (!devices || devices.length === 0) {
+      return res.json({
+        success: false,
+        error: "No push devices registered for this driver",
+        troubleshooting: "The mobile app needs to call POST /api/mobile/v1/driver/push-token with the Expo push token on startup",
+        driverId
+      });
+    }
+    
+    // Send a test notification
+    const result = await sendJobOfferNotification(driverId, {
+      jobId: 'test-' + Date.now(),
+      trackingNumber: 'TEST-NOTIFICATION',
+      pickupAddress: 'Test Pickup Location',
+      deliveryAddress: 'Test Delivery Location',
+      driverPrice: '10.00',
+      vehicleType: 'small_van'
+    });
+    
+    res.json({
+      success: result.success,
+      deviceCount: devices.length,
+      notificationsSent: result.sentCount,
+      message: result.success 
+        ? `Test notification sent to ${result.sentCount} device(s)` 
+        : "Failed to send test notification",
+      devices: devices.map(d => ({
+        id: d.id,
+        platform: d.platform,
+        tokenPrefix: d.push_token?.substring(0, 30) + '...',
+        lastSeen: d.last_seen_at
+      }))
+    });
+  }));
+
+  // Diagnostic endpoint to list all driver devices (admin only)
+  app.get("/api/debug/all-driver-devices", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    
+    const { data: devices, error } = await supabaseAdmin
+      .from('driver_devices')
+      .select('driver_id, platform, app_version, last_seen_at, created_at')
+      .order('created_at', { ascending: false });
+    
+    // Get driver names for context
+    const driverIds = [...new Set((devices || []).map(d => d.driver_id))];
+    let drivers: any[] = [];
+    if (driverIds.length > 0) {
+      const { data: driverData } = await supabaseAdmin
+        .from('drivers')
+        .select('id, driver_id, full_name')
+        .in('id', driverIds);
+      drivers = driverData || [];
+    }
+    
+    const driverMap = new Map(drivers.map(d => [d.id, d]));
+    
+    const enrichedDevices = (devices || []).map(d => ({
+      ...d,
+      driverCode: driverMap.get(d.driver_id)?.driver_id || 'unknown',
+      driverName: driverMap.get(d.driver_id)?.full_name || 'unknown'
+    }));
+    
+    res.json({
+      totalDevices: (devices || []).length,
+      devices: enrichedDevices,
+      error: error?.message || null,
+      status: (devices || []).length === 0 
+        ? "NO DEVICES REGISTERED - Mobile app must call POST /api/mobile/v1/driver/push-token"
+        : "OK"
+    });
+  }));
+
   // Google Maps Optimized Route endpoint - finds optimal route through all drops
   // Uses Distance Matrix API to get all distances, then implements nearest-neighbor TSP
   app.get("/api/maps/optimized-route", asyncHandler(async (req, res) => {
