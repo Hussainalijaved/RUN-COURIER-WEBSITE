@@ -1709,7 +1709,7 @@ export async function registerRoutes(
 
   // Toggle job visibility for driver mobile app (admin only)
   app.patch("/api/jobs/:id/driver-visibility", asyncHandler(async (req, res) => {
-    const { hidden, adminId } = req.body;
+    const { hidden } = req.body;
     const jobId = req.params.id;
     
     if (typeof hidden !== 'boolean') {
@@ -1721,16 +1721,8 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
     
-    const updateData: any = {
-      driverHidden: hidden,
-      driverHiddenAt: hidden ? new Date() : null,
-      driverHiddenBy: hidden ? (adminId || null) : null,
-    };
-    
-    // Update in-memory/Supabase storage (SupabaseStorage handles both)
-    await storage.updateJob(jobId, updateData);
-    
-    // Also update Supabase directly to ensure mobile app sync
+    // Update Supabase directly (source of truth for mobile app)
+    // Note: driver_hidden_by removed since it expects UUID and we don't have admin user ID here
     const { supabaseAdmin } = await import("./supabaseAdmin");
     if (supabaseAdmin) {
       const { error: supabaseError } = await supabaseAdmin
@@ -1738,7 +1730,6 @@ export async function registerRoutes(
         .update({
           driver_hidden: hidden,
           driver_hidden_at: hidden ? new Date().toISOString() : null,
-          driver_hidden_by: hidden ? (adminId || null) : null,
         })
         .eq('id', jobId);
       
@@ -1750,7 +1741,7 @@ export async function registerRoutes(
       }
     }
     
-    console.log(`[Jobs] Job ${jobId} visibility for driver: ${hidden ? 'hidden' : 'visible'} by admin ${adminId || 'unknown'}`);
+    console.log(`[Jobs] Job ${jobId} visibility for driver: ${hidden ? 'hidden' : 'visible'}`);
     
     const updatedJob = await storage.getJob(jobId);
     
