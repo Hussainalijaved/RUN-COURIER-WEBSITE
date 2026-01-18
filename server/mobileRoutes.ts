@@ -159,6 +159,7 @@ export function registerMobileRoutes(app: Express): void {
         auth: "/api/mobile/v1/debug/auth",
         profile: "/api/mobile/v1/driver/profile",
         jobs: "/api/mobile/v1/driver/jobs",
+        hideJob: "/api/mobile/v1/driver/jobs/:jobId/hide",
         jobOffers: "/api/mobile/v1/driver/job-offers",
         location: "/api/mobile/v1/driver/location",
         availability: "/api/mobile/v1/driver/availability",
@@ -548,17 +549,23 @@ export function registerMobileRoutes(app: Express): void {
       if (supabaseAdmin) {
         console.log("[Mobile Jobs] Querying Supabase for jobs (driver-safe columns only)...");
         
-        // STEP 1: Get ALL job_assignments for this driver first (includes pending/sent offers)
+        // STEP 1: Get job_assignments for this driver (exclude rejected/expired/withdrawn)
+        // CRITICAL: Don't show jobs from rejected assignments - driver declined them
         const { data: allAssignments, error: assignmentsError } = await supabaseAdmin
           .from('job_assignments')
           .select('job_id, driver_price, status')
-          .eq('driver_id', driver.id);
+          .eq('driver_id', driver.id)
+          .not('status', 'in', '("rejected","expired","withdrawn")');
         
         if (assignmentsError) {
           console.log(`[Mobile Jobs] Error fetching assignments:`, assignmentsError.message);
         }
         
-        const assignmentJobIds = (allAssignments || []).map(a => String(a.job_id));
+        // Filter to only include valid (non-rejected) assignments
+        const validAssignments = (allAssignments || []).filter(a => 
+          !['rejected', 'expired', 'withdrawn'].includes(a.status)
+        );
+        const assignmentJobIds = validAssignments.map(a => String(a.job_id));
         console.log(`[Mobile Jobs] Found ${allAssignments?.length || 0} job assignments for driver ${driver.id}`);
         
         // STEP 2: Get jobs where driver_id is set OR job has an assignment for this driver
@@ -693,9 +700,9 @@ export function registerMobileRoutes(app: Express): void {
           supabaseJobs = supabaseJobs.filter(j => j.driver_hidden !== true);
           console.log(`[Mobile Jobs] Filtered ${beforeHiddenFilter - supabaseJobs.length} hidden jobs, ${supabaseJobs.length} remaining`);
           
-          // Create assignment map for driver_price lookup
-          const assignments = allAssignments || [];
-          console.log(`[Mobile Jobs] Found ${assignments.length} matching assignments`);
+          // Create assignment map for driver_price lookup (using filtered valid assignments)
+          const assignments = validAssignments || [];
+          console.log(`[Mobile Jobs] Found ${assignments.length} valid assignments (excluded rejected/expired/withdrawn)`);
           
           // Create a map of job_id -> assignment with driver_price
           const assignmentMap = new Map<string, { driver_price: number | null, status: string }>();
@@ -832,6 +839,106 @@ export function registerMobileRoutes(app: Express): void {
       res.json({
         jobs: mobileJobs,
         count: mobileJobs.length,
+      });
+    })
+  );
+
+  // Hide a job from driver's view (for failed/cancelled/completed jobs)
+  app.post("/api/mobile/v1/driver/jobs/:jobId/hide",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { jobId } = req.params;
+      
+      console.log(`[Mobile] Driver ${driver.driverCode} hiding job ${jobId}`);
+      
+      // Verify this job belongs to the driver
+      if (supabaseAdmin) {
+        const { data: job, error } = await supabaseAdmin
+          .from('jobs')
+          .select('id, driver_id, status')
+          .eq('id', jobId)
+          .single();
+        
+        if (error || !job) {
+          return res.status(404).json({
+            success: false,
+            error: "Job not found"
+          });
+        }
+        
+        if (job.driver_id !== driver.id) {
+          return res.status(403).json({
+            success: false,
+            error: "You can only hide your own jobs"
+          });
+        }
+        
+        // Only allow hiding completed jobs (delivered, cancelled, failed)
+        const allowedStatuses = ['delivered', 'cancelled', 'failed'];
+        if (!allowedStatuses.includes(job.status)) {
+          return res.status(400).json({
+            success: false,
+            error: "Can only hide completed, cancelled, or failed jobs"
+          });
+        }
+        
+        // Mark job as hidden from driver view
+        const { error: updateError } = await supabaseAdmin
+          .from('jobs')
+          .update({ 
+            driver_hidden: true,
+            driver_hidden_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+        
+        if (updateError) {
+          console.error(`[Mobile] Failed to hide job ${jobId}:`, updateError.message);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to hide job"
+          });
+        }
+        
+        console.log(`[Mobile] Job ${jobId} hidden for driver ${driver.driverCode}`);
+        
+        return res.json({
+          success: true,
+          message: "Job hidden successfully"
+        });
+      }
+      
+      // Fallback to local storage
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          error: "Job not found"
+        });
+      }
+      
+      if (job.driverId !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          error: "You can only hide your own jobs"
+        });
+      }
+      
+      // Only allow hiding completed jobs (delivered, cancelled, failed)
+      const allowedStatuses = ['delivered', 'cancelled', 'failed'];
+      if (!allowedStatuses.includes(job.status)) {
+        return res.status(400).json({
+          success: false,
+          error: "Can only hide completed, cancelled, or failed jobs"
+        });
+      }
+      
+      await storage.updateJob(jobId, { driverHidden: true, driverHiddenAt: new Date() } as any);
+      
+      res.json({
+        success: true,
+        message: "Job hidden successfully"
       });
     })
   );
@@ -1846,6 +1953,32 @@ export function registerMobileRoutes(app: Express): void {
         respondedAt: new Date(),
         rejectionReason: reason || null
       });
+      
+      // CRITICAL: Clear driver_id from job or mark as hidden so rejected jobs don't appear in driver's list
+      // If job.driver_id equals this driver, clear it so job returns to unassigned pool
+      if (supabaseAdmin) {
+        const { data: job } = await supabaseAdmin
+          .from('jobs')
+          .select('id, driver_id, status')
+          .eq('id', assignment.jobId)
+          .single();
+        
+        if (job && job.driver_id === driver.id) {
+          // Job was assigned to this driver - return to unassigned pool
+          // Only if job status is still pending/assigned (not already picked up)
+          if (['pending', 'assigned', 'offered'].includes(job.status)) {
+            await supabaseAdmin
+              .from('jobs')
+              .update({ 
+                driver_id: null,
+                driver_price: null,
+                status: 'pending'
+              })
+              .eq('id', assignment.jobId);
+            console.log(`[Mobile] Cleared driver_id from job ${assignment.jobId} after rejection`);
+          }
+        }
+      }
       
       console.log(`[Mobile] Driver ${driver.driverCode} rejected job offer ${assignmentId}`);
       
