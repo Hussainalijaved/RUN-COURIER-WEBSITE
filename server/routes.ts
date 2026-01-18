@@ -438,6 +438,9 @@ export async function registerRoutes(
 
   // Diagnostic endpoint to check driver push notification status (admin only)
   app.get("/api/debug/driver-notifications/:driverId", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Sensitive driver information
+    if (!enforceAdminAccess(req, res)) return;
+    
     const { supabaseAdmin } = await import('./supabaseAdmin');
     const driverId = req.params.driverId;
     
