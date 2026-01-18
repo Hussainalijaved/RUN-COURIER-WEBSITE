@@ -1721,25 +1721,16 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
     
-    // Update job visibility in database
-    const { db } = await import("./db");
-    const { jobs: jobsTable } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
-    
     const updateData: any = {
       driverHidden: hidden,
       driverHiddenAt: hidden ? new Date() : null,
       driverHiddenBy: hidden ? (adminId || null) : null,
     };
     
-    await db.update(jobsTable)
-      .set(updateData)
-      .where(eq(jobsTable.id, jobId));
-    
-    // Also update in-memory storage
+    // Update in-memory/Supabase storage (SupabaseStorage handles both)
     await storage.updateJob(jobId, updateData);
     
-    // CRITICAL: Also update Supabase (source of truth for mobile app)
+    // Also update Supabase directly to ensure mobile app sync
     const { supabaseAdmin } = await import("./supabaseAdmin");
     if (supabaseAdmin) {
       const { error: supabaseError } = await supabaseAdmin
@@ -1753,6 +1744,7 @@ export async function registerRoutes(
       
       if (supabaseError) {
         console.error(`[Jobs] Supabase update failed for job ${jobId}:`, supabaseError.message);
+        return res.status(500).json({ error: "Failed to update job visibility" });
       } else {
         console.log(`[Jobs] Supabase updated: job ${jobId} driver_hidden=${hidden}`);
       }
