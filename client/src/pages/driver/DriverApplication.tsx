@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check } from "lucide-react";
+import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Phone, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import { PostcodeAutocomplete } from "@/components/PostcodeAutocomplete";
 import { cn } from "@/lib/utils";
 
 const COUNTRIES = [
@@ -82,6 +83,14 @@ export default function DriverApplication() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
   const [nationalityOpen, setNationalityOpen] = useState(false);
+  
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [showVerificationInput, setShowVerificationInput] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
   
   const [uploadedFiles, setUploadedFiles] = useState<{
     profilePicture: string | null;
@@ -163,10 +172,109 @@ export default function DriverApplication() {
     },
   });
 
+  const sendVerificationCode = useCallback(async () => {
+    const phone = form.getValues("phone");
+    if (!phone || phone.length < 10) {
+      toast({
+        title: "Invalid phone number",
+        description: "Please enter a valid phone number first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingCode(true);
+    try {
+      const response = await fetch("/api/auth/send-verification-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send verification code");
+      }
+
+      setShowVerificationInput(true);
+      setResendCountdown(60);
+      
+      const interval = setInterval(() => {
+        setResendCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      toast({
+        title: "Code sent",
+        description: "A verification code has been sent to your phone.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to send code",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingCode(false);
+    }
+  }, [form, toast]);
+
+  const verifyPhoneCode = useCallback(async () => {
+    const phone = form.getValues("phone");
+    if (!verificationCode || verificationCode.length !== 6) {
+      toast({
+        title: "Invalid code",
+        description: "Please enter the 6-digit verification code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const response = await fetch("/api/auth/verify-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code: verificationCode }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Verification failed");
+      }
+
+      setPhoneVerified(true);
+      setPhoneVerificationToken(data.token);
+      setShowVerificationInput(false);
+      
+      toast({
+        title: "Phone verified",
+        description: "Your phone number has been verified successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
+        description: error.message || "Invalid verification code.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  }, [verificationCode, form, toast]);
+
   const submitApplicationMutation = useMutation({
     mutationFn: async (data: DriverApplicationFormValues) => {
       const applicationData = {
         ...data,
+        phoneVerified,
+        phoneVerificationToken,
         profilePictureUrl: uploadedFiles.profilePicture,
         drivingLicenceFrontUrl: uploadedFiles.drivingLicenceFront,
         drivingLicenceBackUrl: uploadedFiles.drivingLicenceBack,
@@ -238,6 +346,15 @@ export default function DriverApplication() {
               variant: "destructive",
             });
           }
+          return false;
+        }
+        
+        if (!phoneVerified) {
+          toast({
+            title: "Phone verification required",
+            description: "Please verify your phone number before continuing.",
+            variant: "destructive",
+          });
           return false;
         }
         
@@ -418,34 +535,133 @@ export default function DriverApplication() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number *</FormLabel>
-                          <FormControl>
-                            <PhoneInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} data-testid="input-phone" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="postcode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Postcode *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="SW1A 1AA" {...field} data-testid="input-postcode" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          Phone Number *
+                          {phoneVerified && (
+                            <span className="flex items-center gap-1 text-green-600 text-xs font-normal">
+                              <Shield className="h-3 w-3" />
+                              Verified
+                            </span>
+                          )}
+                        </FormLabel>
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            <FormControl>
+                              {phoneVerified ? (
+                                <div className="flex items-center h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground">
+                                  {field.value}
+                                </div>
+                              ) : (
+                                <PhoneInput 
+                                  value={field.value} 
+                                  onChange={field.onChange} 
+                                  onBlur={field.onBlur} 
+                                  name={field.name} 
+                                  data-testid="input-phone"
+                                />
+                              )}
+                            </FormControl>
+                            {!phoneVerified ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={sendVerificationCode}
+                                disabled={isSendingCode || !field.value || field.value.length < 10}
+                                data-testid="button-send-code"
+                              >
+                                {isSendingCode ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Phone className="h-4 w-4 mr-1" />
+                                )}
+                                {showVerificationInput ? (resendCountdown > 0 ? `Resend (${resendCountdown}s)` : "Resend") : "Verify"}
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setPhoneVerified(false);
+                                  setPhoneVerificationToken(null);
+                                  setShowVerificationInput(false);
+                                  setVerificationCode("");
+                                }}
+                                data-testid="button-change-phone"
+                              >
+                                Change
+                              </Button>
+                            )}
+                          </div>
+                          
+                          {showVerificationInput && !phoneVerified && (
+                            <div className="flex gap-2 p-3 bg-muted rounded-md">
+                              <Input
+                                type="text"
+                                placeholder="Enter 6-digit code"
+                                value={verificationCode}
+                                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                className="w-32"
+                                maxLength={6}
+                                data-testid="input-verification-code"
+                              />
+                              <Button
+                                type="button"
+                                onClick={verifyPhoneCode}
+                                disabled={isVerifying || verificationCode.length !== 6}
+                                data-testid="button-verify-code"
+                              >
+                                {isVerifying ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                )}
+                                Verify
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        <FormDescription>
+                          {phoneVerified 
+                            ? "Your phone number is verified." 
+                            : "We'll send a verification code to confirm your phone number."}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="postcode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Postcode *</FormLabel>
+                        <FormControl>
+                          <PostcodeAutocomplete
+                            value={field.value}
+                            onChange={(postcode, fullAddress) => {
+                              field.onChange(postcode);
+                              if (fullAddress && !form.getValues("fullAddress")) {
+                                form.setValue("fullAddress", fullAddress);
+                              }
+                            }}
+                            placeholder="Start typing postcode..."
+                            data-testid="input-postcode"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Start typing to see address suggestions
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -786,7 +1002,12 @@ export default function DriverApplication() {
                         </div>
                         <div className="flex justify-between">
                           <dt className="text-muted-foreground">Phone:</dt>
-                          <dd className="font-medium">{form.getValues("phone")}</dd>
+                          <dd className="font-medium flex items-center gap-1">
+                            {form.getValues("phone")}
+                            {phoneVerified && (
+                              <Shield className="h-3 w-3 text-green-600" />
+                            )}
+                          </dd>
                         </div>
                         <div className="flex justify-between">
                           <dt className="text-muted-foreground">Postcode:</dt>

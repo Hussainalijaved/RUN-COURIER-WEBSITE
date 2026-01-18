@@ -39,6 +39,12 @@ A global `BookingContext` persists booking data to `localStorage` with a 24-hour
 ### Driver Application System
 A multi-step application process allows prospective drivers to submit details for admin review and approval, activating their account upon verification.
 
+**Phone Verification**: Drivers must verify their phone number via SMS OTP before submitting their application. The Twilio integration sends a 6-digit code that expires after 10 minutes. Both frontend and backend enforce verification.
+
+**Postcode Autocomplete**: The PostcodeAutocomplete component uses Google Maps Places API to suggest UK addresses as drivers type their postcode, automatically filling the full address field.
+
+**Fields Saved**: fullName, email, phone (verified), postcode, fullAddress, buildingName, nationality, isBritish, nationalInsuranceNumber, rightToWorkShareCode, vehicleType, bankName, accountHolderName, sortCode, accountNumber, plus document URLs for profile picture, driving licence (front/back), DBS certificate, goods in transit insurance, and hire & reward insurance.
+
 ### Mobile API
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities including profile management, location updates, job management, and proof of delivery uploads, authenticated via Supabase JWT. It supports admin-to-driver job assignments, with drivers receiving offers in their mobile app.
 

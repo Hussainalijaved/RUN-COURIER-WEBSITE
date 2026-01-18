@@ -4560,6 +4560,24 @@ export async function registerRoutes(
       });
     }
 
+    const { phoneVerified, phoneVerificationToken } = req.body;
+    
+    if (!phoneVerified || !phoneVerificationToken) {
+      return res.status(400).json({ 
+        error: "Phone verification is required",
+        code: "PHONE_VERIFICATION_REQUIRED"
+      });
+    }
+    
+    const { consumeVerificationToken } = await import('./twilioService');
+    const tokenResult = consumeVerificationToken(phoneVerificationToken);
+    if (!tokenResult.valid) {
+      return res.status(400).json({ 
+        error: "Invalid or expired phone verification. Please verify your phone number again.",
+        code: "INVALID_PHONE_TOKEN"
+      });
+    }
+
     const data = insertDriverApplicationSchema.parse(req.body);
     const application = await storage.createDriverApplication(data);
     res.status(201).json(application);
