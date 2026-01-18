@@ -1,0 +1,140 @@
+We’ve identified critical architectural and production-level issues that are still blocking the system from working correctly. Please read this carefully and address every point below. Partial fixes or code-only changes are not acceptable at this stage.
+
+⸻
+
+1. Driver Registration Flow – MUST Be Corrected
+
+Current Problem
+	•	When a driver registers, their data is being saved only in the users table.
+	•	The drivers table is missing or incomplete for newly registered drivers.
+	•	Backend job assignment and notifications rely on the drivers table, which causes inconsistent behavior.
+
+Required Fix
+	•	On driver registration:
+	•	Create or update the driver record in the drivers table
+	•	Ensure it is correctly linked to:
+	•	auth.users.id
+	•	users.id (if both are used)
+	•	The drivers table must contain:
+	•	Driver ID
+	•	User reference
+	•	Status (active / available)
+	•	Push notification token(s)
+	•	Any fields used in job assignment queries
+
+Verification
+	•	Register a brand-new driver
+	•	Confirm:
+	•	Entry exists in auth.users
+	•	Entry exists in users
+	•	Entry exists in drivers
+	•	No manual inserts or patches allowed
+
+⸻
+
+2. Push Notifications – MUST Work When App Is Closed
+
+Current Problem
+	•	Drivers only receive jobs when the app is open.
+	•	This means push notifications are not functioning correctly.
+
+Required Fix
+	•	Ensure:
+	•	Push tokens are captured and stored correctly in the drivers table
+	•	Tokens are updated on login and app reinstall
+	•	Notifications are sent using the stored token at assignment time
+	•	Job assignment must not rely on polling or app refresh
+
+Verification
+	•	Assign a job when:
+	•	App is open
+	•	App is in background
+	•	App is fully closed
+	•	Driver must:
+	•	Receive push notification
+	•	Be able to open the job directly from notification
+
+If this fails in any state, the issue is not fixed.
+
+⸻
+
+3. Map & Geocoding – STILL BROKEN IN PRODUCTION
+
+Current Problem
+	•	Jobs appear on the driver app but:
+	•	Map does not render
+	•	“Location data unavailable” still shows
+	•	This indicates missing or improperly synced coordinates.
+
+Required Fix
+	•	Ensure every job includes:
+	•	pickup_latitude
+	•	pickup_longitude
+	•	delivery_latitude
+	•	delivery_longitude
+	•	These must:
+	•	Be generated during job creation or assignment
+	•	Be saved to Supabase
+	•	Be returned by mobile API endpoints
+	•	Field names must match exactly what the mobile app expects
+
+Verification
+	•	Open an assigned job on the driver app
+	•	Confirm:
+	•	Map renders without error
+	•	Pickup and delivery markers appear
+	•	No console or runtime map errors
+
+⸻
+
+4. Environment & Data Consistency Check
+
+You must explicitly confirm:
+	•	Admin panel and mobile app are connected to the same Supabase project
+	•	No dev / staging / prod mismatch
+	•	RLS policies allow drivers to:
+	•	Read their assigned jobs
+	•	Read coordinates
+	•	Receive notifications
+	•	No silent permission failures
+
+⸻
+
+5. Mandatory End-to-End Testing (Non-Negotiable)
+
+Using Replit app testing tools and a real or emulated mobile device:
+	1.	Register a new driver
+	2.	Confirm driver record exists in drivers
+	3.	Create a job from admin panel
+	4.	Assign job to driver
+	5.	With app closed:
+	•	Receive push notification
+	6.	Open job and confirm:
+	•	Job details visible
+	•	Price visible
+	•	Map loads correctly
+
+Repeat the test at least once more.
+
+⸻
+
+6. DO NOT SEND FEEDBACK UNTIL ALL TESTS PASS
+
+If:
+	•	Any part fails
+	•	Any workaround is needed
+	•	Any manual step is required
+
+→ Continue fixing before responding.
+
+When you do respond, include:
+	•	Confirmation of all fixes
+	•	Screenshots or recordings of:
+	•	Supabase tables
+	•	Job assignment
+	•	Push notification
+	•	Map rendering
+
+This must be production-ready. The client is actively testing and will immediately detect any incomplete work.
+
+Please prioritize and handle this carefully.
