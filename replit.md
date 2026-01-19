@@ -110,6 +110,12 @@ The web admin dashboard and Expo mobile app share a unified backend:
 - **Profile Sync**: Driver profile updates sync via Supabase (both platforms read/write to same table)
 - **Price Isolation**: Mobile API never exposes customer pricing - explicit column selection enforced
 
+**CRITICAL Mobile App Requirements:**
+1. **Push Token Registration**: Mobile app MUST call `POST /api/mobile/v1/driver/push-token` on startup with Expo push token
+2. **WebSocket Connection**: Mobile app MUST connect to `/ws/realtime` and authenticate to receive real-time job updates
+3. **See**: `MOBILE_INTEGRATION_GUIDE.md` for complete integration instructions
+4. **Migration**: Run `supabase/migrations/020_driver_devices_and_pod.sql` in Supabase SQL Editor to create driver_devices table
+
 ### Job Geocoding
 Jobs are automatically geocoded when created or assigned:
 - **Auto-Geocoding**: Addresses are geocoded using Google Maps API to get coordinates

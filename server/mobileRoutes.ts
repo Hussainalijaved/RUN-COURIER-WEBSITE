@@ -1660,7 +1660,39 @@ export function registerMobileRoutes(app: Express): void {
       const finalSignatureUrl = podSignatureUrl || existingSignatureUrl || undefined;
       const finalRecipientName = recipientName || existingRecipientName || undefined;
 
-      const updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName);
+      let updatedJob = await storage.updateJobPOD(jobId, finalPhotoUrl, finalSignatureUrl, finalRecipientName);
+
+      // Fallback: Update Supabase directly if storage layer fails
+      if (!updatedJob && supabaseAdmin) {
+        console.log(`[POD Upload] Storage layer failed, updating Supabase directly for job ${jobId}`);
+        const { data: directUpdate, error: directError } = await supabaseAdmin
+          .from('jobs')
+          .update({
+            pod_photo_url: finalPhotoUrl,
+            pod_signature_url: finalSignatureUrl,
+            pod_recipient_name: finalRecipientName,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId)
+          .select('id, pod_photo_url, pod_signature_url, pod_recipient_name')
+          .single();
+        
+        if (directError) {
+          console.error(`[POD Upload] Direct Supabase update failed:`, directError);
+          return res.status(500).json({ 
+            error: "Failed to save POD to database",
+            code: "POD_SAVE_FAILED",
+            details: directError.message
+          });
+        }
+        
+        updatedJob = {
+          podPhotoUrl: directUpdate.pod_photo_url,
+          podSignatureUrl: directUpdate.pod_signature_url,
+          podRecipientName: directUpdate.pod_recipient_name
+        } as any;
+        console.log(`[POD Upload] Direct Supabase update successful for job ${jobId}`);
+      }
 
       if (!updatedJob) {
         return res.status(500).json({ 
@@ -1669,7 +1701,7 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      console.log(`[POD Upload] Job ${jobId}: photo=${podPhotoUrl || 'none'}, signature=${podSignatureUrl || 'none'}, recipient=${recipientName || 'none'}`);
+      console.log(`[POD Upload] Job ${jobId}: photo=${finalPhotoUrl || 'none'}, signature=${finalSignatureUrl || 'none'}, recipient=${finalRecipientName || 'none'}`);
 
       res.json({
         success: true,

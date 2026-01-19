@@ -1,0 +1,30 @@
+Role: Senior Mobile Systems Architect (Expert in Expo, Node.js, and Real-time Dispatch)
+Urgent Problem: My delivery system is failing in a production environment. The driver has to manually refresh the app to see jobs, sound alerts do not trigger when the app is closed, maps are blank, and Proof of Delivery (POD) images are not saving to the Admin dashboard. This must be fixed immediately.
+Required Technical Fixes:
+1. Eliminate Manual Refresh (Real-Time Push):
+Problem: The app currently requires a "pull-to-refresh" to see jobs.
+Fix: Implement/Fix Socket.io or Ably for a constant real-time connection. The moment an Admin assigns a job, the Mobile App useEffect hook must trigger a state update to show the job instantly.
+Sound Alert: Implement FCM (Firebase Cloud Messaging) with "High Priority" status. The app MUST play a loud notification sound even if the phone is locked or the app is closed. If on Android, configure the NotificationChannel with "Importance: High."
+2. Map & Coordinate Rendering:
+Problem: The "Active Job" screen shows "Location data unavailable."
+Fix: Audit the coordinate flow. Ensure the pickup_lat/lng and destination_lat/lng are being passed in the API response. Verify that the Google Maps API Key is correctly injected into the MapView component. If coordinates are null, the app must show a fallback, but the priority is making the pins appear.
+3. Proof of Delivery (POD) System:
+Problem: Drivers upload photos, but they don't show up on the Admin side.
+Fix:
+Check the Image Upload Logic: Ensure the mobile app is sending a multipart/form-data request.
+Check Storage: Ensure images are being saved to a permanent directory (Cloudinary, AWS S3, or a dedicated /uploads folder in the backend).
+Check Database: The jobs table must have a pod_image_url column that gets updated with the file path once the upload is successful.
+4. Admin Dashboard Sync:
+Problem: Admin cannot see the completed job proof.
+Fix: Update the Admin "Job Detail" view to fetch and display the image stored in the pod_image_url field. If the job status is "Completed," the image must be visible and downloadable.
+5. System Integrity Check:
+Ensure the Website (runcourier.co.uk) and the Mobile App are looking at the same database.
+Verify that the "Job ID" remains consistent from the moment of creation to the moment of POD upload.
+Deliverable:
+I want to perform a test where:
+I create a job on the Web.
+My closed phone makes a loud alert sound instantly.
+I open the app and see the Map pins immediately (no refresh).
+I take a POD photo and "Complete" the job.
+I go to the Web Admin and see that photo attached to the job.
+DO NOT give me partial code. Apply these fixes to the files and confirm when the end-to-end loop is functional.
