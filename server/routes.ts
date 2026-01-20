@@ -1745,11 +1745,25 @@ export async function registerRoutes(
     const { driverId, dispatcherId, driverPrice } = req.body;
     
     // Validate driver is active before assignment
+    // Support both auth.uid() format and driver code format (RC01A)
     let driver = null;
+    let actualDriverId = driverId;
     if (driverId) {
+      // First try to find by auth.uid (id column)
       driver = await storage.getDriver(driverId);
+      
+      // If not found, try to find by driver code (RC01A format)
       if (!driver) {
-        return res.status(404).json({ error: "Driver not found" });
+        driver = await storage.getDriverByDriverCode(driverId);
+        if (driver) {
+          // Use the actual Supabase id (auth.uid) for job assignment
+          actualDriverId = driver.id;
+          console.log(`[Jobs] Found driver by code ${driverId}, using id ${actualDriverId} for assignment`);
+        }
+      }
+      
+      if (!driver) {
+        return res.status(404).json({ error: `Driver not found: ${driverId}` });
       }
       if (driver.isActive === false) {
         return res.status(400).json({ error: "Cannot assign jobs to deactivated drivers" });
@@ -1770,7 +1784,7 @@ export async function registerRoutes(
     }
     const finalDriverPrice = String(driverPrice);
     
-    const job = await storage.assignDriver(req.params.id, driverId, dispatcherId);
+    const job = await storage.assignDriver(req.params.id, actualDriverId, dispatcherId);
     if (!job) {
       return res.status(404).json({ error: "Failed to assign job" });
     }
@@ -4608,6 +4622,50 @@ export async function registerRoutes(
 
     if (!application) {
       return res.status(404).json({ error: "Application not found" });
+    }
+
+    // CRITICAL: When application is approved, also set is_verified = true on the driver
+    if (status === 'approved') {
+      try {
+        // Find the driver by email and update their verification status
+        const { supabaseAdmin } = await import('./supabaseAdmin');
+        if (supabaseAdmin) {
+          // Find driver by email
+          const { data: driver, error: findError } = await supabaseAdmin
+            .from('drivers')
+            .select('id, driver_id, is_verified')
+            .ilike('email', application.email)
+            .maybeSingle();
+          
+          if (driver && !driver.is_verified) {
+            // Update driver verification status
+            const { error: updateError } = await supabaseAdmin
+              .from('drivers')
+              .update({ 
+                is_verified: true,
+                approval_status: 'approved',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', driver.id);
+            
+            if (updateError) {
+              console.error(`[Driver Application] Failed to verify driver ${driver.driver_id}:`, updateError);
+            } else {
+              console.log(`[Driver Application] Driver ${driver.driver_id} verified after application approval`);
+              
+              // Also update local storage for consistency
+              await storage.verifyDriver(driver.id, true);
+            }
+          } else if (findError) {
+            console.error(`[Driver Application] Error finding driver by email ${application.email}:`, findError);
+          } else if (!driver) {
+            console.log(`[Driver Application] No driver found for email ${application.email} - they may need to register first`);
+          }
+        }
+      } catch (verifyErr) {
+        console.error(`[Driver Application] Error verifying driver after approval:`, verifyErr);
+        // Don't fail the request - application was already reviewed
+      }
     }
 
     // Send admin notification for driver application review

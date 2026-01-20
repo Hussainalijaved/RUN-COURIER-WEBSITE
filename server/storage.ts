@@ -50,6 +50,7 @@ export interface IStorage {
 
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByUserId(userId: string): Promise<Driver | undefined>;
+  getDriverByDriverCode(driverCode: string): Promise<Driver | undefined>;
   getDrivers(filters?: { isAvailable?: boolean; isVerified?: boolean; vehicleType?: VehicleType; includeInactive?: boolean }): Promise<Driver[]>;
   createDriver(driver: InsertDriver): Promise<Driver>;
   updateDriver(id: string, data: Partial<Driver>): Promise<Driver | undefined>;
@@ -445,6 +446,10 @@ export class MemStorage implements IStorage {
 
   async getDriverByUserId(userId: string): Promise<Driver | undefined> {
     return Array.from(this.drivers.values()).find((d) => d.userId === userId);
+  }
+
+  async getDriverByDriverCode(driverCode: string): Promise<Driver | undefined> {
+    return Array.from(this.drivers.values()).find((d) => d.driverCode === driverCode);
   }
 
   async getDrivers(filters?: { isAvailable?: boolean; isVerified?: boolean; vehicleType?: VehicleType; includeInactive?: boolean }): Promise<Driver[]> {

@@ -625,6 +625,26 @@ export class SupabaseStorage implements IStorage {
     return this.getDriver(userId);
   }
 
+  async getDriverByDriverCode(driverCode: string): Promise<Driver | undefined> {
+    const supabase = this.checkSupabase();
+    // Normalize driver code: trim whitespace and convert to uppercase
+    const normalizedCode = driverCode.trim().toUpperCase();
+    
+    const { data, error } = await supabase
+      .from('drivers')
+      .select('*')
+      .eq('driver_id', normalizedCode)
+      .single();
+    
+    if (error) {
+      console.log(`[SupabaseStorage] getDriverByDriverCode: No driver found for code ${normalizedCode}`);
+      return undefined;
+    }
+    if (!data) return undefined;
+    console.log(`[SupabaseStorage] getDriverByDriverCode: Found driver ${data.driver_id} (id: ${data.id})`);
+    return mapDbToDriver(data);
+  }
+
   async getDrivers(filters?: { isAvailable?: boolean; isVerified?: boolean; vehicleType?: VehicleType; includeInactive?: boolean }): Promise<Driver[]> {
     const supabase = this.checkSupabase();
     let query = supabase.from('drivers').select('*');
