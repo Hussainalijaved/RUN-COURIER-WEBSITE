@@ -740,6 +740,7 @@ export class SupabaseStorage implements IStorage {
     if (data.vehicleColor !== undefined) dbData.vehicle_color = data.vehicleColor;
     if (data.isAvailable !== undefined) dbData.online_status = data.isAvailable ? 'online' : 'offline';
     if (data.isVerified !== undefined) dbData.is_verified = data.isVerified;
+    if ((data as any).approvalStatus !== undefined) dbData.approval_status = (data as any).approvalStatus;
     if (data.currentLatitude !== undefined) dbData.current_latitude = data.currentLatitude;
     if (data.currentLongitude !== undefined) dbData.current_longitude = data.currentLongitude;
     if (data.lastLocationUpdate !== undefined) dbData.last_location_update = data.lastLocationUpdate;

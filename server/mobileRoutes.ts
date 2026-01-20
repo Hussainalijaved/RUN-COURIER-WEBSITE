@@ -779,12 +779,12 @@ export function registerMobileRoutes(app: Express): void {
           // CRITICAL: Fetch multi-drop stops for jobs that have is_multi_drop = true
           const multiDropJobIds = enrichedJobs
             .filter(j => j.is_multi_drop === true)
-            .map(j => j.id);
+            .map(j => String(j.id)); // Convert to strings for varchar job_id column
           
           let multiDropStopsMap: Record<string, any[]> = {};
           
           if (multiDropJobIds.length > 0) {
-            console.log(`[Mobile Jobs] Fetching multi-drop stops for ${multiDropJobIds.length} jobs`);
+            console.log(`[Mobile Jobs] Fetching multi-drop stops for ${multiDropJobIds.length} jobs:`, multiDropJobIds);
             const { data: allStops, error: stopsError } = await supabaseAdmin
               .from('multi_drop_stops')
               .select('*')
@@ -994,6 +994,212 @@ export function registerMobileRoutes(app: Express): void {
       res.json({
         success: true,
         message: "Job hidden successfully"
+      });
+    })
+  );
+
+  // Complete an individual multi-drop stop
+  // Allows drivers to mark each stop as delivered one by one
+  app.patch("/api/mobile/v1/driver/jobs/:jobId/stops/:stopId/complete",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { jobId, stopId } = req.params;
+      const { podPhotoUrl, podSignatureUrl, recipientName, notes } = req.body;
+      
+      console.log(`[Multi-Drop] Driver ${driver.driverCode} completing stop ${stopId} for job ${jobId}`);
+      
+      if (!supabaseAdmin) {
+        return res.status(500).json({
+          success: false,
+          error: "Database not available"
+        });
+      }
+      
+      // Verify the job belongs to this driver
+      const { data: job, error: jobError } = await supabaseAdmin
+        .from('jobs')
+        .select('id, driver_id, is_multi_drop, status')
+        .eq('id', jobId)
+        .single();
+      
+      if (jobError || !job) {
+        return res.status(404).json({
+          success: false,
+          error: "Job not found"
+        });
+      }
+      
+      if (job.driver_id !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          error: "This job is not assigned to you"
+        });
+      }
+      
+      if (!job.is_multi_drop) {
+        return res.status(400).json({
+          success: false,
+          error: "This is not a multi-drop job"
+        });
+      }
+      
+      // Verify the stop exists and belongs to this job
+      const { data: stop, error: stopError } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('*')
+        .eq('id', stopId)
+        .eq('job_id', String(jobId))
+        .single();
+      
+      if (stopError || !stop) {
+        return res.status(404).json({
+          success: false,
+          error: "Stop not found"
+        });
+      }
+      
+      if (stop.status === 'delivered') {
+        return res.status(400).json({
+          success: false,
+          error: "This stop has already been completed"
+        });
+      }
+      
+      // Update the stop as completed
+      const { data: updatedStop, error: updateError } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .update({
+          status: 'delivered',
+          delivered_at: new Date().toISOString(),
+          pod_photo_url: podPhotoUrl || null,
+          pod_signature_url: podSignatureUrl || null,
+          pod_recipient_name: recipientName || null,
+          notes: notes || stop.notes,
+        })
+        .eq('id', stopId)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error(`[Multi-Drop] Failed to complete stop ${stopId}:`, updateError.message);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to complete stop"
+        });
+      }
+      
+      // Check if all stops are now completed
+      const { data: allStops, error: allStopsError } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('id, status')
+        .eq('job_id', String(jobId));
+      
+      const allCompleted = allStops && allStops.every(s => s.status === 'delivered');
+      const completedCount = allStops?.filter(s => s.status === 'delivered').length || 0;
+      const totalCount = allStops?.length || 0;
+      
+      console.log(`[Multi-Drop] Stop ${stopId} completed. Progress: ${completedCount}/${totalCount}`);
+      
+      res.json({
+        success: true,
+        stop: {
+          id: updatedStop.id,
+          stopOrder: updatedStop.stop_order,
+          address: updatedStop.address,
+          status: updatedStop.status,
+          deliveredAt: updatedStop.delivered_at,
+        },
+        progress: {
+          completed: completedCount,
+          total: totalCount,
+          allCompleted,
+        },
+        message: allCompleted 
+          ? "All stops completed! You can now mark the job as delivered."
+          : `Stop ${completedCount} of ${totalCount} completed.`
+      });
+    })
+  );
+
+  // Get all stops for a multi-drop job
+  app.get("/api/mobile/v1/driver/jobs/:jobId/stops",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { jobId } = req.params;
+      
+      if (!supabaseAdmin) {
+        return res.status(500).json({
+          success: false,
+          error: "Database not available"
+        });
+      }
+      
+      // Verify the job belongs to this driver
+      const { data: job, error: jobError } = await supabaseAdmin
+        .from('jobs')
+        .select('id, driver_id, is_multi_drop')
+        .eq('id', jobId)
+        .single();
+      
+      if (jobError || !job) {
+        return res.status(404).json({
+          success: false,
+          error: "Job not found"
+        });
+      }
+      
+      if (job.driver_id !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          error: "This job is not assigned to you"
+        });
+      }
+      
+      // Get all stops for this job
+      const { data: stops, error: stopsError } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('*')
+        .eq('job_id', String(jobId))
+        .order('stop_order', { ascending: true });
+      
+      if (stopsError) {
+        console.error(`[Multi-Drop] Error fetching stops for job ${jobId}:`, stopsError.message);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to fetch stops"
+        });
+      }
+      
+      const mappedStops = (stops || []).map(stop => ({
+        id: String(stop.id),
+        stopOrder: stop.stop_order,
+        address: stop.address,
+        postcode: stop.postcode || null,
+        contactName: stop.contact_name || stop.recipient_name || null,
+        contactPhone: stop.contact_phone || stop.recipient_phone || null,
+        instructions: stop.instructions || null,
+        latitude: stop.latitude?.toString() || null,
+        longitude: stop.longitude?.toString() || null,
+        status: stop.status || 'pending',
+        deliveredAt: stop.delivered_at || null,
+        podPhotoUrl: stop.pod_photo_url || null,
+        podSignatureUrl: stop.pod_signature_url || null,
+      }));
+      
+      const completedCount = mappedStops.filter(s => s.status === 'delivered').length;
+      
+      res.json({
+        success: true,
+        stops: mappedStops,
+        progress: {
+          completed: completedCount,
+          total: mappedStops.length,
+          allCompleted: completedCount === mappedStops.length && mappedStops.length > 0,
+        }
       });
     })
   );

@@ -2351,6 +2351,29 @@ export async function registerRoutes(
       console.error("Failed to sync driver verification to PostgreSQL:", e);
     }
     
+    // Also sync to Supabase directly to ensure consistency
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        const { error: supabaseError } = await supabaseAdmin
+          .from('drivers')
+          .update({ 
+            is_verified: isVerified,
+            approval_status: isVerified ? 'approved' : 'pending',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', driverId);
+        
+        if (supabaseError) {
+          console.error("Failed to sync driver verification to Supabase:", supabaseError.message);
+        } else {
+          console.log(`[Drivers] Verification synced to Supabase: ${driverId} -> is_verified=${isVerified}`);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to sync driver verification to Supabase:", e);
+    }
+    
     res.json(driver);
   }));
 
