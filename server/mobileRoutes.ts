@@ -13,13 +13,28 @@ import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "
 
 // Helper to map Supabase job to local Job format for mobile API response
 // CRITICAL: Only expose driver_price to drivers, NEVER total_price or customer pricing
-function mapSupabaseJobToMobileFormat(job: any) {
+function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
   const pickupLat = job.pickup_latitude?.toString() || job.pickup_lat?.toString() || null;
   const pickupLng = job.pickup_longitude?.toString() || job.pickup_lng?.toString() || null;
   const deliveryLat = job.delivery_latitude?.toString() || job.dropoff_lat?.toString() || null;
   const deliveryLng = job.delivery_longitude?.toString() || job.dropoff_lng?.toString() || null;
   const senderPhone = job.sender_phone || job.pickup_contact_phone || null;
   const recipientPhone = job.recipient_phone || null;
+  
+  // Map multi-drop stops to mobile format
+  const mappedStops = (multiDropStops || []).map(stop => ({
+    id: String(stop.id),
+    stopOrder: stop.stop_order,
+    address: stop.address,
+    postcode: stop.postcode || null,
+    contactName: stop.contact_name || null,
+    contactPhone: stop.contact_phone || null,
+    instructions: stop.instructions || null,
+    latitude: stop.latitude?.toString() || null,
+    longitude: stop.longitude?.toString() || null,
+    status: stop.status || 'pending',
+    completedAt: stop.completed_at || null,
+  }));
   
   return {
     id: String(job.id),
@@ -50,6 +65,8 @@ function mapSupabaseJobToMobileFormat(job: any) {
     scheduledPickupTime: job.scheduled_pickup_time,
     isMultiDrop: job.is_multi_drop || false,
     isReturnTrip: job.is_return_trip || false,
+    // Include multi-drop stops for the driver to see all delivery points
+    multiDropStops: mappedStops,
     createdAt: job.created_at,
     updatedAt: job.updated_at,
     // SECURITY: Explicitly exclude customer pricing fields - these must NEVER be exposed to drivers
@@ -759,7 +776,41 @@ export function registerMobileRoutes(app: Express): void {
           
           console.log(`[Mobile Jobs] ${enrichedJobs.length} jobs after filtering`);
           
-          mobileJobs = enrichedJobs.map(mapSupabaseJobToMobileFormat);
+          // CRITICAL: Fetch multi-drop stops for jobs that have is_multi_drop = true
+          const multiDropJobIds = enrichedJobs
+            .filter(j => j.is_multi_drop === true)
+            .map(j => j.id);
+          
+          let multiDropStopsMap: Record<string, any[]> = {};
+          
+          if (multiDropJobIds.length > 0) {
+            console.log(`[Mobile Jobs] Fetching multi-drop stops for ${multiDropJobIds.length} jobs`);
+            const { data: allStops, error: stopsError } = await supabaseAdmin
+              .from('multi_drop_stops')
+              .select('*')
+              .in('job_id', multiDropJobIds)
+              .order('stop_order', { ascending: true });
+            
+            if (stopsError) {
+              console.log(`[Mobile Jobs] Error fetching multi-drop stops:`, stopsError.message);
+            } else if (allStops) {
+              // Group stops by job_id
+              for (const stop of allStops) {
+                const jobId = String(stop.job_id);
+                if (!multiDropStopsMap[jobId]) {
+                  multiDropStopsMap[jobId] = [];
+                }
+                multiDropStopsMap[jobId].push(stop);
+              }
+              console.log(`[Mobile Jobs] Found ${allStops.length} multi-drop stops for ${Object.keys(multiDropStopsMap).length} jobs`);
+            }
+          }
+          
+          // Map jobs with their multi-drop stops
+          mobileJobs = enrichedJobs.map(j => {
+            const stops = multiDropStopsMap[String(j.id)] || [];
+            return mapSupabaseJobToMobileFormat(j, stops);
+          });
           
           return res.json({
             jobs: mobileJobs,
@@ -833,6 +884,8 @@ export function registerMobileRoutes(app: Express): void {
           scheduledPickupTime: job.scheduledPickupTime,
           isMultiDrop: job.isMultiDrop,
           isReturnTrip: job.isReturnTrip,
+          // Include multi-drop stops (empty array for fallback path - would need separate query)
+          multiDropStops: [],
           createdAt: job.createdAt,
           updatedAt: job.updatedAt,
         };
