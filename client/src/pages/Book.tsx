@@ -393,40 +393,52 @@ export default function Book() {
           let multiDropDistances: number[] = [];
           let totalDistance = distanceResult.distance;
           let allDropPostcodes = [deliveryPostcode];
+          let baseDistance = distanceResult.distance;
+          let firstDropPostcode = deliveryPostcode;
           
-          // Use optimized route API for multi-drop (same as admin pages)
+          // Use optimized route API for multi-drop (same logic as AdminBusinessQuote)
           if (isMultiDrop && multiDropStops.length > 0) {
             const validStops = multiDropStops.filter(stop => stop.length >= 3);
             
             if (validStops.length > 0) {
-              // Use the same optimized route calculation as admin business quote
+              // All drops: first delivery + additional stops (same as AdminBusinessQuote)
               const allDrops = [deliveryPostcode, ...validStops];
               const optimizedRoute = await calculateOptimizedRoute(pickupPostcode, allDrops);
               
               if (optimizedRoute && optimizedRoute.legs.length > 0) {
+                // Validate optimizedOrder matches drop count (same validation as AdminBusinessQuote)
+                if (!optimizedRoute.optimizedOrder || optimizedRoute.optimizedOrder.length !== allDrops.length) {
+                  toast({
+                    title: 'Route Optimization Failed',
+                    description: 'Could not optimize route. Please check your postcodes and try again.',
+                    variant: 'destructive',
+                  });
+                  setIsCalculating(false);
+                  return;
+                }
+                
                 // Use optimized route distances for consistent pricing
                 totalDistance = optimizedRoute.totalDistance;
                 totalEstimatedTime = optimizedRoute.totalDuration;
-                // First leg is pickup to first drop, remaining are multi-drop distances
-                multiDropDistances = optimizedRoute.legs.slice(1).map(leg => leg.distance);
-                allDropPostcodes = allDrops;
-              } else {
-                // Fallback to leg-by-leg if optimization fails
-                let previousLocation = { lat: deliveryLocation.lat, lng: deliveryLocation.lng };
                 
-                for (const stop of validStops) {
-                  const stopLocation = await geocodePostcode(stop);
-                  if (stopLocation) {
-                    const legDistance = await calculateDistance(previousLocation, { lat: stopLocation.lat, lng: stopLocation.lng });
-                    if (legDistance) {
-                      multiDropDistances.push(legDistance.distance);
-                      totalEstimatedTime += legDistance.duration;
-                    }
-                    previousLocation = { lat: stopLocation.lat, lng: stopLocation.lng };
-                  }
-                }
-                totalDistance = distanceResult.distance + multiDropDistances.reduce((sum, d) => sum + d, 0);
-                allDropPostcodes = [deliveryPostcode, ...validStops];
+                // First leg is pickup to first optimized drop (base distance)
+                baseDistance = optimizedRoute.legs[0]?.distance || 0;
+                
+                // Remaining legs are multi-drop distances
+                multiDropDistances = optimizedRoute.legs.slice(1).map(leg => leg.distance);
+                
+                // Reorder drops based on optimized route
+                allDropPostcodes = optimizedRoute.optimizedOrder.map((idx: number) => allDrops[idx]);
+                firstDropPostcode = allDropPostcodes[0];
+              } else {
+                // Route optimization failed - fail fast like AdminBusinessQuote
+                toast({
+                  title: 'Could Not Calculate Route',
+                  description: 'Unable to calculate optimized multi-drop route. Please check your postcodes and try again.',
+                  variant: 'destructive',
+                });
+                setIsCalculating(false);
+                return;
               }
             }
           }
@@ -436,9 +448,8 @@ export default function Book() {
           
           let returnDistance = 0;
           if (isReturnTrip && !returnToSameLocation && returnPostcode && returnPostcode.length >= 3) {
-            const lastStopLocation = isMultiDrop && multiDropStops.length > 0 
-              ? await geocodePostcode(multiDropStops[multiDropStops.length - 1]) 
-              : deliveryLocation;
+            const lastDropPostcode = allDropPostcodes[allDropPostcodes.length - 1];
+            const lastStopLocation = await geocodePostcode(lastDropPostcode);
             const returnLocation = await geocodePostcode(returnPostcode);
             
             if (lastStopLocation && returnLocation) {
@@ -471,16 +482,13 @@ export default function Book() {
             ? new Date(`${pickupDateVal}T${pickupTimeVal}`) 
             : new Date();
           
-          // Use first leg distance for base calculation, additional drops via multiDropDistances
-          const baseDistance = isMultiDrop && multiDropDistances.length > 0 
-            ? (totalDistance - multiDropDistances.reduce((sum, d) => sum + d, 0))
-            : distanceResult.distance;
-          
+          // Calculate quote: base distance is first leg, multiDropDistances for additional legs
+          // multiDropCount is number of additional drops beyond the first (same as AdminBusinessQuote)
           const calculatedQuote = calculateQuote(finalVehicleType, baseDistance, weight, {
             pickupPostcode,
-            deliveryPostcode,
+            deliveryPostcode: firstDropPostcode,
             isMultiDrop,
-            multiDropCount: multiDropStops.filter(s => s.length >= 3).length,
+            multiDropCount: allDropPostcodes.length - 1,
             multiDropDistances,
             allDropPostcodes,
             isReturnTrip,
