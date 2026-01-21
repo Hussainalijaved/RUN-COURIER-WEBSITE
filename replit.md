@@ -62,6 +62,15 @@ Approved business customers can utilize a "Pay Later" option for bookings, leadi
 ### Pricing Engine
 A TypeScript-based pricing engine calculates delivery costs, considering vehicle type, distance, rush hour surcharges, congestion charges, multi-drop fees, and waiting times. It includes fixed base charges for different vehicle types. Pricing configurations are synchronized between client and server.
 
+### Pricing Consistency Architecture (Critical)
+All pages calculating quotes use identical distance logic via the `/api/maps/optimized-route` API:
+- **Pages**: Book.tsx, Quote.tsx, AdminBusinessQuote.tsx, AdminCreateJob.tsx
+- **Shared Helper**: `calculateOptimizedRoute()` in `client/src/lib/maps.ts`
+- **Multi-Drop Logic**: `baseDistance = legs[0].distance`, `multiDropDistances = legs.slice(1)`, `multiDropCount = allDropPostcodes.length - 1`
+- **Validation**: All pages validate `optimizedOrder` exists and length matches drop count
+- **Fail-Fast**: If route optimization fails or validation fails, pages show error and abort (no approximate fallback)
+- **Drop Ordering**: `allDropPostcodes` is reordered using `optimizedOrder` to match actual optimized route
+
 ### Price Isolation (Critical Security)
 Strict separation between customer and driver pricing:
 - **customer_price** (stored as `total_price`): Visible ONLY to admin and the job's customer
