@@ -136,6 +136,11 @@ export default function AdminBusinessQuote() {
           d.id === validDrops[0].id ? { ...d, address: dropGeo.formattedAddress } : d
         ));
 
+        // Create scheduled time from date and time for rush hour calculation
+        const scheduledTime = pickupDate && pickupTime 
+          ? new Date(`${pickupDate}T${pickupTime}`) 
+          : new Date();
+        
         const breakdown = calculateQuote(
           vehicleType,
           distResult.distance,
@@ -147,6 +152,7 @@ export default function AdminBusinessQuote() {
             isMultiDrop: false,
             multiDropCount: 0,
             multiDropDistances: [],
+            scheduledTime, // Apply rush hour pricing if applicable
           }
         );
 
@@ -231,6 +237,11 @@ export default function AdminBusinessQuote() {
       // Get all drop postcodes for congestion zone check (£18 applied ONCE if any postcode is in zone)
       const allDropPostcodes = reorderedDrops.map((drop: DropPoint) => drop.postcode);
       
+      // Create scheduled time from date and time for rush hour calculation
+      const scheduledTime = pickupDate && pickupTime 
+        ? new Date(`${pickupDate}T${pickupTime}`) 
+        : new Date();
+      
       const breakdown = calculateQuote(
         vehicleType,
         legs[0]?.distance || 0,
@@ -242,6 +253,7 @@ export default function AdminBusinessQuote() {
           multiDropCount: reorderedDrops.length - 1,
           multiDropDistances,
           allDropPostcodes, // Pass all postcodes for single congestion charge
+          scheduledTime, // Apply rush hour pricing if applicable
         }
       );
 
