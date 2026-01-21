@@ -54,7 +54,7 @@ import {
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType, type DeliveryContact } from '@shared/schema';
 import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
-import { geocodePostcode, calculateDistance, calculateETA } from '@/lib/maps';
+import { geocodePostcode, calculateDistance, calculateETA, calculateOptimizedRoute } from '@/lib/maps';
 import { EmbeddedPayment } from '@/components/EmbeddedPayment';
 import { useBooking } from '@/context/BookingContext';
 
@@ -390,29 +390,47 @@ export default function Book() {
 
         if (distanceResult) {
           let totalEstimatedTime = distanceResult.duration;
-          const multiDropDistances: number[] = [];
+          let multiDropDistances: number[] = [];
+          let totalDistance = distanceResult.distance;
+          let allDropPostcodes = [deliveryPostcode];
           
+          // Use optimized route API for multi-drop (same as admin pages)
           if (isMultiDrop && multiDropStops.length > 0) {
             const validStops = multiDropStops.filter(stop => stop.length >= 3);
             
             if (validStops.length > 0) {
-              let previousLocation = { lat: deliveryLocation.lat, lng: deliveryLocation.lng };
+              // Use the same optimized route calculation as admin business quote
+              const allDrops = [deliveryPostcode, ...validStops];
+              const optimizedRoute = await calculateOptimizedRoute(pickupPostcode, allDrops);
               
-              for (const stop of validStops) {
-                const stopLocation = await geocodePostcode(stop);
-                if (stopLocation) {
-                  const legDistance = await calculateDistance(previousLocation, { lat: stopLocation.lat, lng: stopLocation.lng });
-                  if (legDistance) {
-                    multiDropDistances.push(legDistance.distance);
-                    totalEstimatedTime += legDistance.duration;
+              if (optimizedRoute && optimizedRoute.legs.length > 0) {
+                // Use optimized route distances for consistent pricing
+                totalDistance = optimizedRoute.totalDistance;
+                totalEstimatedTime = optimizedRoute.totalDuration;
+                // First leg is pickup to first drop, remaining are multi-drop distances
+                multiDropDistances = optimizedRoute.legs.slice(1).map(leg => leg.distance);
+                allDropPostcodes = allDrops;
+              } else {
+                // Fallback to leg-by-leg if optimization fails
+                let previousLocation = { lat: deliveryLocation.lat, lng: deliveryLocation.lng };
+                
+                for (const stop of validStops) {
+                  const stopLocation = await geocodePostcode(stop);
+                  if (stopLocation) {
+                    const legDistance = await calculateDistance(previousLocation, { lat: stopLocation.lat, lng: stopLocation.lng });
+                    if (legDistance) {
+                      multiDropDistances.push(legDistance.distance);
+                      totalEstimatedTime += legDistance.duration;
+                    }
+                    previousLocation = { lat: stopLocation.lat, lng: stopLocation.lng };
                   }
-                  previousLocation = { lat: stopLocation.lat, lng: stopLocation.lng };
                 }
+                totalDistance = distanceResult.distance + multiDropDistances.reduce((sum, d) => sum + d, 0);
+                allDropPostcodes = [deliveryPostcode, ...validStops];
               }
             }
           }
           
-          const totalDistance = distanceResult.distance + multiDropDistances.reduce((sum, d) => sum + d, 0);
           setDistance(totalDistance);
           setEstimatedTime(totalEstimatedTime);
           
@@ -453,10 +471,12 @@ export default function Book() {
             ? new Date(`${pickupDateVal}T${pickupTimeVal}`) 
             : new Date();
           
-          // Collect all drop postcodes for congestion zone check (£18 applied ONCE if any is in zone)
-          const allDropPostcodes = [deliveryPostcode, ...multiDropStops.filter(s => s.length >= 3)];
+          // Use first leg distance for base calculation, additional drops via multiDropDistances
+          const baseDistance = isMultiDrop && multiDropDistances.length > 0 
+            ? (totalDistance - multiDropDistances.reduce((sum, d) => sum + d, 0))
+            : distanceResult.distance;
           
-          const calculatedQuote = calculateQuote(finalVehicleType, distanceResult.distance, weight, {
+          const calculatedQuote = calculateQuote(finalVehicleType, baseDistance, weight, {
             pickupPostcode,
             deliveryPostcode,
             isMultiDrop,

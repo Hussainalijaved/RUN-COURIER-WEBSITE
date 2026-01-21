@@ -228,3 +228,54 @@ export async function calculateDistanceFromPostcodes(
     return null;
   }
 }
+
+export interface RouteLeg {
+  from: string;
+  to: string;
+  distance: number;
+  duration: number;
+}
+
+export interface OptimizedRouteResult {
+  legs: RouteLeg[];
+  optimizedOrder: number[];
+  totalDistance: number;
+  totalDuration: number;
+  routeMapUrl?: string;
+}
+
+export async function calculateOptimizedRoute(
+  pickupPostcode: string,
+  dropPostcodes: string[]
+): Promise<OptimizedRouteResult | null> {
+  try {
+    const validDrops = dropPostcodes.filter(p => p && p.trim().length >= 3);
+    if (validDrops.length === 0) {
+      console.error('No valid drop postcodes provided');
+      return null;
+    }
+
+    const dropParam = validDrops.join('|');
+    const response = await fetch(
+      `/api/maps/optimized-route?origin=${encodeURIComponent(pickupPostcode)}&drops=${encodeURIComponent(dropParam)}`
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Optimized route calculation failed:', errorData.error);
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      legs: data.legs || [],
+      optimizedOrder: data.optimizedOrder || [],
+      totalDistance: data.totalDistance || 0,
+      totalDuration: data.totalDuration || 0,
+      routeMapUrl: data.routeMapUrl,
+    };
+  } catch (error) {
+    console.error('Error calculating optimized route:', error);
+    return null;
+  }
+}
