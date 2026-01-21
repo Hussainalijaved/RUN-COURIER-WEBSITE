@@ -269,32 +269,33 @@ export default function AdminCreateJob() {
       
       const routeData = await routeResponse.json();
       
-      // Extract distance legs and total distance from optimized route response
-      // API returns { legs: [{from, to, distance, duration}], totalDistance, totalDuration, optimizedOrder }
-      const legs: { from: string; to: string; distance: number }[] = [];
-      let totalDistance = 0;
-      
-      if (routeData.legs && routeData.legs.length > 0) {
-        for (const leg of routeData.legs) {
-          legs.push({
-            from: leg.from || '',
-            to: leg.to || '',
-            distance: leg.distance || 0,
-          });
-          totalDistance += leg.distance || 0;
-        }
+      // Validate optimized route response (same validation as Book.tsx/Quote.tsx/AdminBusinessQuote)
+      if (!routeData.legs || routeData.legs.length === 0) {
+        throw new Error('No valid route legs returned');
       }
       
-      // Use total from API if available
-      if (routeData.totalDistance) {
-        totalDistance = routeData.totalDistance;
+      // Validate optimizedOrder exists and matches drop count
+      if (!routeData.optimizedOrder || routeData.optimizedOrder.length !== validDrops.length) {
+        throw new Error('Route optimization failed - please check postcodes');
       }
+      
+      // Extract distance legs from optimized route response
+      const legs: { from: string; to: string; distance: number }[] = routeData.legs.map((leg: any) => ({
+        from: leg.from || '',
+        to: leg.to || '',
+        distance: leg.distance || 0,
+      }));
+      
+      const totalDistance = routeData.totalDistance || legs.reduce((sum: number, leg: any) => sum + leg.distance, 0);
       
       setDistance(totalDistance);
       setRouteLegs(legs);
       
-      // Get all postcodes for congestion check (pickup + all drops)
-      const allDropPostcodes = validDrops.map(d => d.postcode);
+      // Reorder drops based on optimized route (same as AdminBusinessQuote)
+      const reorderedDrops = routeData.optimizedOrder.map((idx: number) => validDrops[idx]);
+      
+      // Get all postcodes for congestion check (in optimized order)
+      const allDropPostcodes = reorderedDrops.map((d: any) => d.postcode);
       
       // Use scheduled pickup time for rush hour calculation if available
       let scheduledTime: Date | undefined;
@@ -302,16 +303,18 @@ export default function AdminCreateJob() {
         scheduledTime = new Date(`${pickupDate}T${pickupTime}`);
       }
       
-      // Calculate quote with multi-drop pricing
-      // For multi-drop: pass 0 as base distance since ALL distance is in multiDropDistances
-      // This prevents double-counting the distance
-      const quoteResult = calculateQuote(vehicleType as VehicleType, 0, weight || 1, {
+      // Calculate quote with multi-drop pricing (same logic as AdminBusinessQuote)
+      // First leg is base distance (pickup to first optimized drop), remaining legs are multi-drop distances
+      const baseDistance = legs[0]?.distance || 0;
+      const multiDropDistances = legs.slice(1).map(l => l.distance);
+      
+      const quoteResult = calculateQuote(vehicleType as VehicleType, baseDistance, weight || 1, {
         pickupPostcode,
-        deliveryPostcode: validDrops[validDrops.length - 1].postcode,
+        deliveryPostcode: reorderedDrops[0]?.postcode || '',
         allDropPostcodes,
         isMultiDrop: true,
-        multiDropCount: validDrops.length,
-        multiDropDistances: legs.map(l => l.distance),
+        multiDropCount: reorderedDrops.length - 1,
+        multiDropDistances,
         isReturnTrip: isReturnTrip || false,
         returnToSameLocation: isReturnTrip || false,
         scheduledTime,
