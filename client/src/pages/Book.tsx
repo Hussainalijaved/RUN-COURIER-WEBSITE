@@ -660,7 +660,7 @@ export default function Book() {
                             name="deliveryPostcode"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Delivery Postcode</FormLabel>
+                                <FormLabel>{isMultiDrop ? 'Drop 1 (First Delivery)' : 'Delivery Postcode'}</FormLabel>
                                 <FormControl>
                                   <PostcodeAutocomplete
                                     value={field.value}
@@ -881,14 +881,18 @@ export default function Book() {
 
                         {isMultiDrop && (
                           <div className="space-y-3">
-                            <Label>Additional Stops</Label>
+                            <Label>Additional Drops</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Your first delivery address above is Drop 1. Add more drops below.
+                            </p>
                             {multiDropStops.map((stop, index) => (
-                              <div key={index} className="flex gap-2">
+                              <div key={index} className="flex gap-2 items-center">
+                                <span className="text-sm font-medium text-muted-foreground w-16">Drop {index + 2}</span>
                                 <div className="flex-1">
                                   <PostcodeAutocomplete
                                     value={stop}
                                     onChange={(value, fullAddress) => updateMultiDropStop(index, value, fullAddress)}
-                                    placeholder={`Stop ${index + 1} postcode or address`}
+                                    placeholder={`Drop ${index + 2} postcode or address`}
                                     data-testid={`input-stop-${index}`}
                                   />
                                 </div>
@@ -910,7 +914,7 @@ export default function Book() {
                               data-testid="button-add-stop"
                             >
                               <Plus className="h-4 w-4 mr-2" />
-                              Add Stop
+                              Add Drop {multiDropStops.length + 2}
                             </Button>
                           </div>
                         )}
