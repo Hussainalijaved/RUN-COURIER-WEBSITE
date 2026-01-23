@@ -749,8 +749,35 @@ export default function AdminCreateJob() {
                             form.setValue('isMultiDrop', checked);
                             setQuote(null);
                             setRouteLegs([]);
-                            if (checked && drops.length === 0) {
-                              addDrop();
+                            if (checked) {
+                              // When enabling multi-drop, preserve existing delivery info as Drop 1
+                              const existingPostcode = form.getValues('deliveryPostcode');
+                              const existingAddress = form.getValues('deliveryAddress');
+                              const existingRecipientName = form.getValues('recipientName');
+                              const existingRecipientPhone = form.getValues('recipientPhone');
+                              const existingInstructions = form.getValues('deliveryInstructions');
+                              
+                              if (drops.length === 0) {
+                                // Create first drop with existing delivery data
+                                setDrops([{
+                                  id: String(Date.now()),
+                                  postcode: existingPostcode || '',
+                                  address: existingAddress || '',
+                                  recipientName: existingRecipientName || '',
+                                  recipientPhone: existingRecipientPhone || '',
+                                  instructions: existingInstructions || '',
+                                }]);
+                              } else if (drops.length > 0 && !drops[0].postcode && existingPostcode) {
+                                // Update first drop if it's empty but we have delivery data
+                                setDrops(prev => prev.map((d, i) => i === 0 ? {
+                                  ...d,
+                                  postcode: existingPostcode || d.postcode,
+                                  address: existingAddress || d.address,
+                                  recipientName: existingRecipientName || d.recipientName,
+                                  recipientPhone: existingRecipientPhone || d.recipientPhone,
+                                  instructions: existingInstructions || d.instructions,
+                                } : d));
+                              }
                             }
                           }}
                           data-testid="switch-multi-drop"
