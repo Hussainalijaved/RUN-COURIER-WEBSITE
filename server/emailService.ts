@@ -1808,3 +1808,102 @@ Run Courier - www.runcourier.co.uk`;
     textContent
   );
 }
+
+export async function sendJobCancellationEmail(
+  customerEmail: string,
+  data: {
+    customerName?: string;
+    trackingNumber: string;
+    pickupPostcode: string;
+    deliveryPostcode: string;
+    cancellationReason?: string;
+    totalPrice?: string;
+  }
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #dc3545; margin-top: 0;">Booking Cancelled</h2>
+    <p style="color: #666; font-size: 16px;">
+      Dear ${data.customerName || 'Valued Customer'},
+    </p>
+    <p style="color: #666; font-size: 16px;">
+      We regret to inform you that your delivery booking has been cancelled.
+    </p>
+    
+    <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0;">Booking Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Tracking #:</strong></td>
+          <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Pickup:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.pickupPostcode}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Delivery:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.deliveryPostcode}</td>
+        </tr>
+        ${data.totalPrice ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Amount:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.totalPrice}</td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+    
+    ${data.cancellationReason ? `
+    <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #856404; margin-top: 0;">Reason for Cancellation</h3>
+      <p style="color: #856404; font-size: 14px; margin: 0;">
+        ${data.cancellationReason}
+      </p>
+    </div>
+    ` : ''}
+    
+    <p style="color: #666; font-size: 14px;">
+      If you have already made a payment for this booking, a refund will be processed within 5-7 business days.
+    </p>
+    
+    <p style="color: #666; font-size: 14px;">
+      If you have any questions or would like to rebook, please don't hesitate to contact us.
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${BASE_URL}/book" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+        Book Another Delivery
+      </a>
+    </div>
+    
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="tel:+442046346100" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-size: 14px; display: inline-block;">
+        Call Us: +44 20 4634 6100
+      </a>
+    </div>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Booking Cancelled');
+  const textContent = `Booking Cancelled
+
+Dear ${data.customerName || 'Valued Customer'},
+
+We regret to inform you that your delivery booking has been cancelled.
+
+Booking Details:
+- Tracking #: ${data.trackingNumber}
+- Pickup: ${data.pickupPostcode}
+- Delivery: ${data.deliveryPostcode}
+${data.totalPrice ? `- Amount: ${data.totalPrice}` : ''}
+
+${data.cancellationReason ? `Reason for Cancellation:
+${data.cancellationReason}` : ''}
+
+If you have already made a payment for this booking, a refund will be processed within 5-7 business days.
+
+If you have any questions or would like to rebook, please contact us at +44 20 4634 6100.
+
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(customerEmail, `Booking Cancelled - ${data.trackingNumber}`, htmlContent, textContent);
+}

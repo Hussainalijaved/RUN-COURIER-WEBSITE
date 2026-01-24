@@ -22,7 +22,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn } from "./realtime";
@@ -1620,7 +1620,7 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/jobs/:id/status", asyncHandler(async (req, res) => {
-    const { status, rejectionReason } = req.body;
+    const { status, rejectionReason, cancellationReason } = req.body;
     const previousJob = await storage.getJob(req.params.id);
     
     if (!previousJob) {
@@ -1637,10 +1637,44 @@ export async function registerRoutes(
       }
     }
     
+    // If cancelling, update the job with the cancellation reason
+    if (status === "cancelled" && cancellationReason) {
+      await storage.updateJob(req.params.id, { cancellationReason });
+    }
+    
     const job = await storage.updateJobStatus(req.params.id, status, rejectionReason);
     if (!job) {
       return res.status(404).json({ error: "Failed to update job status" });
     }
+    
+    // Send cancellation email to customer if status is cancelled
+    if (status === "cancelled") {
+      try {
+        // Get customer email
+        let customerEmail = job.customerEmail;
+        if (!customerEmail && job.customerId) {
+          const customer = await storage.getUser(job.customerId);
+          customerEmail = customer?.email;
+        }
+        
+        if (customerEmail) {
+          await sendJobCancellationEmail(customerEmail, {
+            customerName: job.customerName || job.pickupContactName,
+            trackingNumber: job.trackingNumber || job.id,
+            pickupPostcode: job.pickupPostcode,
+            deliveryPostcode: job.deliveryPostcode,
+            cancellationReason: cancellationReason,
+            totalPrice: job.totalPrice ? `£${(Number(job.totalPrice) / 100).toFixed(2)}` : undefined,
+          });
+          console.log(`[Job Cancellation] Sent cancellation email to ${customerEmail} for job ${job.trackingNumber}`);
+        } else {
+          console.log(`[Job Cancellation] No customer email found for job ${job.trackingNumber}`);
+        }
+      } catch (emailError) {
+        console.error(`[Job Cancellation] Failed to send cancellation email:`, emailError);
+      }
+    }
+    
     // Broadcast job status update for real-time updates
     broadcastJobUpdate({
       id: job.id,

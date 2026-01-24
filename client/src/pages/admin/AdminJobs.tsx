@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { useJobUpdates } from '@/hooks/useJobUpdates';
 import {
   Table,
@@ -325,6 +326,9 @@ export default function AdminJobs() {
   const [batchErrors, setBatchErrors] = useState<{ jobId: string; error: string }[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [jobToCancel, setJobToCancel] = useState<Job | null>(null);
+  const [cancellationReason, setCancellationReason] = useState('');
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
@@ -473,12 +477,15 @@ export default function AdminJobs() {
   });
 
   const cancelJobMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status: 'cancelled' });
+    mutationFn: async ({ jobId, cancellationReason }: { jobId: string; cancellationReason?: string }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status: 'cancelled', cancellationReason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      toast({ title: 'Job cancelled' });
+      toast({ title: 'Job cancelled', description: 'Cancellation email sent to customer.' });
+      setCancelDialogOpen(false);
+      setJobToCancel(null);
+      setCancellationReason('');
     },
     onError: () => {
       toast({ title: 'Failed to cancel job', variant: 'destructive' });
@@ -1273,7 +1280,7 @@ export default function AdminJobs() {
                             {job.status !== 'delivered' && job.status !== 'cancelled' && (
                               <DropdownMenuItem 
                                 className="text-destructive"
-                                onClick={() => cancelJobMutation.mutate(job.id)}
+                                onClick={() => { setJobToCancel(job); setCancelDialogOpen(true); }}
                                 data-testid={`menu-cancel-${job.id}`}
                               >
                                 <XCircle className="mr-2 h-4 w-4" />
@@ -1981,6 +1988,87 @@ export default function AdminJobs() {
                   <>
                     <UserPlus className="mr-2 h-4 w-4" />
                     Assign {selectedJobIds.size} Job{selectedJobIds.size > 1 ? 's' : ''}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel Job Dialog */}
+        <Dialog open={cancelDialogOpen} onOpenChange={(open) => {
+          setCancelDialogOpen(open);
+          if (!open) {
+            setJobToCancel(null);
+            setCancellationReason('');
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-destructive">Cancel Job</DialogTitle>
+              <DialogDescription>
+                Please provide a reason for cancelling this job. The customer will receive an email notification.
+              </DialogDescription>
+            </DialogHeader>
+            {jobToCancel && (
+              <div className="space-y-4 py-4">
+                <div className="p-3 bg-muted rounded-md space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Tracking #</span>
+                    <span className="font-mono font-medium">{jobToCancel.trackingNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Route</span>
+                    <span className="font-mono text-sm">{jobToCancel.pickupPostcode} → {jobToCancel.deliveryPostcode}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Customer</span>
+                    <span className="text-sm">{jobToCancel.pickupContactName || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cancellation-reason">Cancellation Reason</Label>
+                  <Textarea
+                    id="cancellation-reason"
+                    placeholder="Enter the reason for cancellation (e.g., Customer request, Unable to fulfil order, etc.)"
+                    value={cancellationReason}
+                    onChange={(e) => setCancellationReason(e.target.value)}
+                    rows={3}
+                    data-testid="input-cancellation-reason"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setCancelDialogOpen(false);
+                  setJobToCancel(null);
+                  setCancellationReason('');
+                }}
+                data-testid="button-cancel-dialog-close"
+              >
+                Go Back
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={() => jobToCancel && cancelJobMutation.mutate({ 
+                  jobId: jobToCancel.id, 
+                  cancellationReason: cancellationReason.trim() || undefined 
+                })}
+                disabled={cancelJobMutation.isPending}
+                data-testid="button-confirm-cancel"
+              >
+                {cancelJobMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Cancel Job
                   </>
                 )}
               </Button>
