@@ -7320,5 +7320,20 @@ export async function registerRoutes(
     res.status(500).json({ error: "Internal server error" });
   });
 
+  // TEMPORARY: Force verify a driver (for debugging)
+  app.post("/api/admin/force-verify-driver/:id", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const driverId = req.params.id;
+    const driver = await storage.updateDriver(driverId, { isVerified: true });
+    
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+    
+    console.log(`[Admin] Force verified driver ${driver.driverCode || driverId}`);
+    res.json({ success: true, driver });
+  }));
+
   return httpServer;
 }
