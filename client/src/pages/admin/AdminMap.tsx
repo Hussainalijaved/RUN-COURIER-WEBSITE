@@ -85,7 +85,9 @@ export default function AdminMap() {
     },
   });
 
-  const activeDrivers = drivers?.filter(d => d.isVerified) || [];
+  // Show all online drivers in the list (not just verified ones)
+  // This helps admin see drivers who are online but missing GPS or verification
+  const activeDrivers = drivers?.filter(d => d.isVerified || d.isAvailable) || [];
   const availableDrivers = activeDrivers.filter(d => d.isAvailable);
   
   const pendingJobs = jobs?.filter(j => j.status === 'pending' && !j.driverId) || [];
@@ -669,13 +671,16 @@ export default function AdminMap() {
                                 <Truck className="h-3 w-3" />
                                 <span className="capitalize">{driver.vehicleType?.replace('_', ' ')}</span>
                               </div>
-                              <div className="mt-1 flex items-center gap-2">
+                              <div className="mt-1 flex items-center gap-2 flex-wrap">
                                 {getStatusBadge(driver)}
                                 {isLive && (
                                   <span className="text-[10px] text-green-600 font-medium">LIVE</span>
                                 )}
                                 {isOnlineNoGps && (
                                   <span className="text-[10px] text-orange-600 font-medium">NO GPS</span>
+                                )}
+                                {!driver.isVerified && (
+                                  <span className="text-[10px] text-red-600 font-medium">NOT VERIFIED</span>
                                 )}
                               </div>
                               {currentJob && (
