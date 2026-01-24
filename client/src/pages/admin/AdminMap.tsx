@@ -85,6 +85,19 @@ export default function AdminMap() {
     },
   });
 
+  const toggleAvailabilityMutation = useMutation({
+    mutationFn: async ({ driverId, isAvailable }: { driverId: string; isAvailable: boolean }) => {
+      return apiRequest('PATCH', `/api/admin/drivers/${driverId}/availability`, { isAvailable });
+    },
+    onSuccess: (_, { isAvailable }) => {
+      toast({ title: isAvailable ? 'Driver set to Online' : 'Driver set to Offline' });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to update availability', description: error.message, variant: 'destructive' });
+    },
+  });
+
   // Show all online drivers in the list (not just verified ones)
   // This helps admin see drivers who are online but missing GPS or verification
   const activeDrivers = drivers?.filter(d => d.isVerified || d.isAvailable) || [];
@@ -682,6 +695,22 @@ export default function AdminMap() {
                                 {!driver.isVerified && (
                                   <span className="text-[10px] text-red-600 font-medium">NOT VERIFIED</span>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant={driver.isAvailable ? "outline" : "default"}
+                                  className="h-5 px-2 text-[10px]"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleAvailabilityMutation.mutate({
+                                      driverId: driver.id,
+                                      isAvailable: !driver.isAvailable
+                                    });
+                                  }}
+                                  disabled={toggleAvailabilityMutation.isPending}
+                                  data-testid={`toggle-availability-${driver.id}`}
+                                >
+                                  {driver.isAvailable ? 'Set Offline' : 'Set Online'}
+                                </Button>
                               </div>
                               {currentJob && (
                                 <div className="text-xs text-muted-foreground mt-1">

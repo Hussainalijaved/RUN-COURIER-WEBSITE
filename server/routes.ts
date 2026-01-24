@@ -7320,6 +7320,27 @@ export async function registerRoutes(
     res.status(500).json({ error: "Internal server error" });
   });
 
+  // Admin: Toggle driver availability (online/offline)
+  app.patch("/api/admin/drivers/:id/availability", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const driverId = req.params.id;
+    const { isAvailable } = req.body;
+    
+    if (typeof isAvailable !== 'boolean') {
+      return res.status(400).json({ error: "isAvailable must be a boolean" });
+    }
+    
+    const driver = await storage.updateDriver(driverId, { isAvailable });
+    
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+    
+    console.log(`[Admin] Set driver ${driver.driverCode || driverId} availability to ${isAvailable}`);
+    res.json({ success: true, driver });
+  }));
+
   // TEMPORARY: Force verify a driver (for debugging)
   app.post("/api/admin/force-verify-driver/:id", asyncHandler(async (req, res) => {
     if (!enforceAdminAccess(req, res)) return;
