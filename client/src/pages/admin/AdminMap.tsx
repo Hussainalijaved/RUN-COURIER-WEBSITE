@@ -624,6 +624,8 @@ export default function AdminMap() {
                     activeDrivers.map((driver) => {
                       const currentJob = getDriverCurrentJob(driver.id);
                       const isLive = realtimeLocations.has(driver.id);
+                      const hasLocation = getDriverLocation(driver) !== null;
+                      const isOnlineNoGps = driver.isAvailable && !hasLocation;
                       
                       return (
                         <button
@@ -651,6 +653,9 @@ export default function AdminMap() {
                               {isLive && (
                                 <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
                               )}
+                              {isOnlineNoGps && (
+                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-orange-500 rounded-full border-2 border-background" />
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm truncate">
@@ -668,6 +673,9 @@ export default function AdminMap() {
                                 {getStatusBadge(driver)}
                                 {isLive && (
                                   <span className="text-[10px] text-green-600 font-medium">LIVE</span>
+                                )}
+                                {isOnlineNoGps && (
+                                  <span className="text-[10px] text-orange-600 font-medium">NO GPS</span>
                                 )}
                               </div>
                               {currentJob && (
