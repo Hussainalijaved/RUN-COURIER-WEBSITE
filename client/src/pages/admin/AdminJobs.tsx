@@ -1234,8 +1234,12 @@ export default function AdminJobs() {
                           <div className="flex flex-col items-end gap-1">
                             <span className="font-medium text-green-600">{formatPrice(job.driverPrice)}</span>
                             <Badge 
-                              variant={job.driverPaymentStatus === 'paid' ? 'default' : 'secondary'}
-                              className={`text-xs ${job.driverPaymentStatus === 'paid' ? 'bg-green-600' : ''}`}
+                              variant="default"
+                              className={`text-xs cursor-pointer ${job.driverPaymentStatus === 'paid' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                              onClick={() => updateDriverPaymentMutation.mutate({ 
+                                jobId: job.id, 
+                                driverPaymentStatus: job.driverPaymentStatus === 'paid' ? 'unpaid' : 'paid' 
+                              })}
                               data-testid={`badge-payment-${job.id}`}
                             >
                               {job.driverPaymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
@@ -1426,8 +1430,12 @@ export default function AdminJobs() {
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-muted-foreground">Driver Payment</p>
                       <Badge 
-                        variant={selectedJob.driverPaymentStatus === 'paid' ? 'default' : 'secondary'}
-                        className={selectedJob.driverPaymentStatus === 'paid' ? 'bg-green-600' : ''}
+                        variant="default"
+                        className={`cursor-pointer ${selectedJob.driverPaymentStatus === 'paid' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                        onClick={() => updateDriverPaymentMutation.mutate({ 
+                          jobId: selectedJob.id, 
+                          driverPaymentStatus: selectedJob.driverPaymentStatus === 'paid' ? 'unpaid' : 'paid' 
+                        })}
                         data-testid="badge-driver-payment-status"
                       >
                         {selectedJob.driverPaymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
