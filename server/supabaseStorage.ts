@@ -140,6 +140,8 @@ function mapDbToJob(dbJob: any): Job {
     totalPrice: dbJob.total_price,
     driverPrice: dbJob.driver_price,
     paymentStatus: dbJob.payment_status,
+    driverPaymentStatus: dbJob.driver_payment_status || 'unpaid',
+    driverPaidAt: dbJob.driver_paid_at ? new Date(dbJob.driver_paid_at) : null,
     paymentIntentId: dbJob.payment_intent_id,
     podPhotoUrl: dbJob.pod_photo_url,
     podPhotos: dbJob.pod_photos || [],
@@ -980,6 +982,8 @@ export class SupabaseStorage implements IStorage {
     if (data.deliveryPostcode !== undefined) dbData.delivery_postcode = data.deliveryPostcode;
     if (data.pickupAddress !== undefined) dbData.pickup_address = data.pickupAddress;
     if (data.pickupPostcode !== undefined) dbData.pickup_postcode = data.pickupPostcode;
+    if (data.driverPaymentStatus !== undefined) dbData.driver_payment_status = data.driverPaymentStatus;
+    if (data.driverPaidAt !== undefined) dbData.driver_paid_at = data.driverPaidAt;
     
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
