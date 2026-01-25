@@ -66,6 +66,7 @@ import {
   RotateCcw,
   Building2,
   User,
+  Check,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -489,6 +490,22 @@ export default function AdminJobs() {
     },
     onError: () => {
       toast({ title: 'Failed to cancel job', variant: 'destructive' });
+    },
+  });
+
+  const updateDriverPaymentMutation = useMutation({
+    mutationFn: async ({ jobId, driverPaymentStatus }: { jobId: string; driverPaymentStatus: 'unpaid' | 'paid' }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/driver-payment`, { driverPaymentStatus });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ 
+        title: variables.driverPaymentStatus === 'paid' ? 'Driver marked as paid' : 'Payment status updated',
+        description: variables.driverPaymentStatus === 'paid' ? 'Driver payment has been recorded.' : 'Status set to unpaid.' 
+      });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update payment status', variant: 'destructive' });
     },
   });
 
@@ -1388,9 +1405,63 @@ export default function AdminJobs() {
                   </div>
                 </div>
                 {selectedJob.driverPrice && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Driver Payment</p>
-                    <p className="font-medium text-green-600">{formatPrice(selectedJob.driverPrice)}</p>
+                  <div className="p-3 bg-muted/50 rounded-md space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">Driver Payment</p>
+                      <Badge 
+                        variant={selectedJob.driverPaymentStatus === 'paid' ? 'default' : 'secondary'}
+                        className={selectedJob.driverPaymentStatus === 'paid' ? 'bg-green-600' : ''}
+                        data-testid="badge-driver-payment-status"
+                      >
+                        {selectedJob.driverPaymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                      </Badge>
+                    </div>
+                    <p className="font-semibold text-lg text-green-600">{formatPrice(selectedJob.driverPrice)}</p>
+                    {selectedJob.driverPaymentStatus === 'paid' && selectedJob.driverPaidAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Paid on {new Date(selectedJob.driverPaidAt).toLocaleDateString('en-GB', { 
+                          day: 'numeric', month: 'short', year: 'numeric' 
+                        })}
+                      </p>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                      {selectedJob.driverPaymentStatus !== 'paid' ? (
+                        <Button 
+                          size="sm" 
+                          variant="default"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => updateDriverPaymentMutation.mutate({ 
+                            jobId: selectedJob.id, 
+                            driverPaymentStatus: 'paid' 
+                          })}
+                          disabled={updateDriverPaymentMutation.isPending}
+                          data-testid="button-mark-paid"
+                        >
+                          {updateDriverPaymentMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <Check className="h-4 w-4 mr-1" />
+                          )}
+                          Mark as Paid
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => updateDriverPaymentMutation.mutate({ 
+                            jobId: selectedJob.id, 
+                            driverPaymentStatus: 'unpaid' 
+                          })}
+                          disabled={updateDriverPaymentMutation.isPending}
+                          data-testid="button-mark-unpaid"
+                        >
+                          {updateDriverPaymentMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : null}
+                          Mark as Unpaid
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="flex gap-2 flex-wrap">

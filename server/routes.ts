@@ -1688,6 +1688,35 @@ export async function registerRoutes(
     res.json(job);
   }));
 
+  // Update driver payment status
+  app.patch("/api/jobs/:id/driver-payment", asyncHandler(async (req, res) => {
+    const { driverPaymentStatus } = req.body;
+    const job = await storage.getJob(req.params.id);
+    
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    if (!['unpaid', 'paid'].includes(driverPaymentStatus)) {
+      return res.status(400).json({ error: "Invalid payment status. Must be 'unpaid' or 'paid'" });
+    }
+    
+    const updates: any = {
+      driverPaymentStatus,
+    };
+    
+    // Set paid timestamp when marking as paid
+    if (driverPaymentStatus === 'paid') {
+      updates.driverPaidAt = new Date();
+    } else {
+      updates.driverPaidAt = null;
+    }
+    
+    const updatedJob = await storage.updateJob(req.params.id, updates);
+    console.log(`[Jobs] Driver payment status updated for job ${req.params.id}: ${driverPaymentStatus}`);
+    res.json(updatedJob);
+  }));
+
   app.post("/api/jobs/:id/geocode", asyncHandler(async (req, res) => {
     const job = await storage.getJob(req.params.id);
     if (!job) {

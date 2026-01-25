@@ -161,6 +161,8 @@ export const jobs = pgTable("jobs", {
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
   driverPrice: decimal("driver_price", { precision: 10, scale: 2 }),
   paymentStatus: text("payment_status").default("pending"),
+  driverPaymentStatus: text("driver_payment_status").default("unpaid"),
+  driverPaidAt: timestamp("driver_paid_at"),
   paymentIntentId: text("payment_intent_id"),
   podPhotoUrl: text("pod_photo_url"),
   podPhotos: jsonb("pod_photos").$type<string[]>(),
