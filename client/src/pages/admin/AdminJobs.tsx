@@ -1180,6 +1180,7 @@ export default function AdminJobs() {
                     <TableHead>Status</TableHead>
                     <TableHead>Pickup Time</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Driver Pay</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1228,6 +1229,22 @@ export default function AdminJobs() {
                       <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(job.createdAt)}</TableCell>
                       <TableCell className="text-right font-medium">{formatPrice(job.totalPrice)}</TableCell>
+                      <TableCell className="text-right">
+                        {job.driverPrice ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="font-medium text-green-600">{formatPrice(job.driverPrice)}</span>
+                            <Badge 
+                              variant={job.driverPaymentStatus === 'paid' ? 'default' : 'secondary'}
+                              className={`text-xs ${job.driverPaymentStatus === 'paid' ? 'bg-green-600' : ''}`}
+                              data-testid={`badge-payment-${job.id}`}
+                            >
+                              {job.driverPaymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
