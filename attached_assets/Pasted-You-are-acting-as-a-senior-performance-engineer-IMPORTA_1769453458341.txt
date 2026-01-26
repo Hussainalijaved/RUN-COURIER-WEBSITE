@@ -1,0 +1,75 @@
+You are acting as a senior performance engineer.
+
+IMPORTANT RULES (MUST FOLLOW):
+- DO NOT change any business logic
+- DO NOT change pricing, calculations, API behavior, or database structure
+- DO NOT change UI design, layout, colors, fonts, text, or content
+- DO NOT remove any existing feature
+- DO NOT refactor logic unless it is 100% behavior-preserving
+- DO NOT introduce new frameworks or libraries
+- DO NOT move hosting or rebuild the project
+- DO NOT break compatibility with Hostinger deployment
+
+OBJECTIVE:
+Make the website feel faster and more responsive like a native software app,
+ONLY by optimizing performance, loading behavior, and navigation smoothness.
+
+ALLOWED ACTIONS ONLY:
+1. Performance optimizations that do NOT change output
+2. Loading optimizations (defer, async, lazy loading)
+3. Caching (browser-side only)
+4. Code splitting without logic changes
+5. Non-visual UX speed techniques (skeleton loaders, preloading)
+6. Network request reduction
+7. Asset optimization
+
+TASKS TO PERFORM:
+
+1. JavaScript
+- Add `defer` or `async` to all non-critical scripts
+- Split heavy JS into smaller files if currently monolithic
+- Ensure no JS blocks initial page render
+- Remove unused imports ONLY if confirmed unused
+
+2. Images
+- Add `loading="lazy"` to all images except the first visible image
+- Ensure images are not loaded before needed
+- DO NOT change image files or visuals
+
+3. Google Maps & External APIs
+- Ensure Google Maps loads ONLY after user interaction
+- Prevent Maps or APIs from loading on page load
+- Cache API responses in memory for reuse
+
+4. CSS & Fonts
+- Ensure CSS is non-blocking
+- Preload only critical fonts
+- DO NOT change styles or layout
+
+5. Caching
+- Add a service worker ONLY for static assets (CSS, JS, icons, fonts)
+- Do NOT cache dynamic pricing, user data, or API POST requests
+- Use safe cache versioning
+
+6. Navigation & Perceived Speed
+- Add skeleton loaders where data is fetched
+- Add instant visual feedback for clicks
+- Prevent white flashes or reload jank
+
+7. Network
+- Reduce duplicate API calls
+- Ensure each user action triggers ONE request only
+
+8. Safety Checks
+- After optimization, all flows must behave IDENTICALLY
+- Booking, pricing, maps, login, admin, driver logic must remain unchanged
+- If ANY change risks logic alteration, SKIP IT
+
+DELIVERABLE:
+- Apply optimizations directly to the existing codebase
+- Provide a brief summary listing ONLY what performance improvements were applied
+- Confirm explicitly that no logic, pricing, UI, or functionality was changed
+
+FINAL RULE:
+If a change improves speed but risks altering behavior, DO NOT apply it.
+Speed is secondary to correctness.
