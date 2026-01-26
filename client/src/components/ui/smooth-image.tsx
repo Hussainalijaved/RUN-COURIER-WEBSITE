@@ -43,6 +43,8 @@ export function SmoothImage({
       <img
         src={src}
         alt={alt}
+        loading="lazy"
+        decoding="async"
         className={cn(
           "transition-opacity duration-300 ease-out",
           loaded ? "opacity-100" : "opacity-0",
