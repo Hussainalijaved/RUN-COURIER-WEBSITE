@@ -199,17 +199,19 @@ export default function AdminMap() {
       if (!jobs || !mapLoaded) return;
       
       // Load locations for ALL active bookings (not delivered/cancelled)
-      const allDisplayJobs = allActiveBookings.filter(job => !jobLocations.has(job.id));
+      // Use string IDs consistently since Maps are keyed by string
+      const allDisplayJobs = allActiveBookings.filter(job => !jobLocations.has(String(job.id)));
       
       for (const job of allDisplayJobs) {
+        const jobIdStr = String(job.id);
         // First try to use stored coordinates from the database
         const hasStoredPickup = job.pickupLatitude && job.pickupLongitude;
         const hasStoredDelivery = job.deliveryLatitude && job.deliveryLongitude;
         
         if (hasStoredPickup && hasStoredDelivery) {
           // Use stored coordinates directly
-          setJobLocations(prev => new Map(prev).set(job.id, {
-            jobId: job.id,
+          setJobLocations(prev => new Map(prev).set(jobIdStr, {
+            jobId: jobIdStr,
             pickupLat: parseFloat(String(job.pickupLatitude)),
             pickupLng: parseFloat(String(job.pickupLongitude)),
             deliveryLat: parseFloat(String(job.deliveryLatitude)),
@@ -226,8 +228,8 @@ export default function AdminMap() {
             ]);
             
             if (pickupResult && deliveryResult) {
-              setJobLocations(prev => new Map(prev).set(job.id, {
-                jobId: job.id,
+              setJobLocations(prev => new Map(prev).set(jobIdStr, {
+                jobId: jobIdStr,
                 pickupLat: pickupResult.lat,
                 pickupLng: pickupResult.lng,
                 deliveryLat: deliveryResult.lat,
@@ -237,7 +239,7 @@ export default function AdminMap() {
               }));
             }
           } catch (error) {
-            console.error(`Failed to geocode job ${job.id}:`, error);
+            console.error(`Failed to geocode job ${jobIdStr}:`, error);
           }
         }
       }
@@ -341,12 +343,13 @@ export default function AdminMap() {
     const allDisplayJobs = allActiveBookings;
 
     allDisplayJobs.forEach((job) => {
-      const location = jobLocations.get(job.id);
+      const jobIdStr = String(job.id);
+      const location = jobLocations.get(jobIdStr);
       if (!location) return;
 
-      currentJobIds.add(job.id);
+      currentJobIds.add(jobIdStr);
       const isPending = job.status === 'pending' && !job.driverId;
-      const existingJobMarkers = jobMarkersRef.current.get(job.id);
+      const existingJobMarkers = jobMarkersRef.current.get(jobIdStr);
 
       if (existingJobMarkers) {
         existingJobMarkers.pickup.setPosition({ lat: location.pickupLat, lng: location.pickupLng });
@@ -463,7 +466,7 @@ export default function AdminMap() {
           if (infoWindowRef.current) infoWindowRef.current.close();
         });
 
-        jobMarkersRef.current.set(job.id, { pickup: pickupMarker, delivery: deliveryMarker, polyline });
+        jobMarkersRef.current.set(jobIdStr, { pickup: pickupMarker, delivery: deliveryMarker, polyline });
       }
     });
 
