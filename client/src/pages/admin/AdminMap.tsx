@@ -237,15 +237,37 @@ export default function AdminMap() {
             const response = await apiRequest('GET', `/api/jobs/${job.id}/stops`);
             const data = await response.json();
             if (data.stops && Array.isArray(data.stops)) {
-              multiDropStops = data.stops
-                .filter((stop: MultiDropStop) => stop.latitude && stop.longitude)
-                .sort((a: MultiDropStop, b: MultiDropStop) => a.stopOrder - b.stopOrder)
-                .map((stop: MultiDropStop) => ({
-                  lat: parseFloat(String(stop.latitude)),
-                  lng: parseFloat(String(stop.longitude)),
-                  postcode: stop.postcode,
-                  stopOrder: stop.stopOrder,
-                }));
+              const sortedStops = data.stops.sort((a: MultiDropStop, b: MultiDropStop) => a.stopOrder - b.stopOrder);
+              
+              // Process each stop - use stored coords or geocode from postcode
+              const processedStops: { lat: number; lng: number; postcode: string; stopOrder: number }[] = [];
+              for (const stop of sortedStops) {
+                if (stop.latitude && stop.longitude) {
+                  // Use stored coordinates
+                  processedStops.push({
+                    lat: parseFloat(String(stop.latitude)),
+                    lng: parseFloat(String(stop.longitude)),
+                    postcode: stop.postcode,
+                    stopOrder: stop.stopOrder,
+                  });
+                } else if (stop.postcode) {
+                  // Geocode from postcode
+                  try {
+                    const geocoded = await geocodePostcode(stop.postcode);
+                    if (geocoded) {
+                      processedStops.push({
+                        lat: geocoded.lat,
+                        lng: geocoded.lng,
+                        postcode: stop.postcode,
+                        stopOrder: stop.stopOrder,
+                      });
+                    }
+                  } catch (geocodeError) {
+                    console.error(`Failed to geocode stop ${stop.stopOrder}:`, geocodeError);
+                  }
+                }
+              }
+              multiDropStops = processedStops;
             }
           } catch (error) {
             console.error(`Failed to fetch multi-drop stops for job ${jobIdStr}:`, error);

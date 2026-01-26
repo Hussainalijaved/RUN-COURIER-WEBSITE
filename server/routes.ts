@@ -1254,11 +1254,15 @@ export async function registerRoutes(
       return res.json({ stops: [] });
     }
     
+    console.log(`[Stops] Fetching stops for job ${jobId}`);
+    
     const { data: stops, error } = await supabaseAdmin
       .from('multi_drop_stops')
-      .select('id, job_id, stop_order, address, postcode, recipient_name, recipient_phone, instructions, status, delivered_at, pod_photo_url, pod_signature_url, pod_recipient_name')
+      .select('id, job_id, stop_order, address, postcode, latitude, longitude, recipient_name, recipient_phone, instructions, status, delivered_at, pod_photo_url, pod_signature_url, pod_recipient_name')
       .eq('job_id', jobId)
       .order('stop_order', { ascending: true });
+    
+    console.log(`[Stops] Found ${stops?.length || 0} stops for job ${jobId}`);
     
     if (error) {
       console.error('[Stops] Error fetching multi-drop stops:', error);
@@ -1272,6 +1276,8 @@ export async function registerRoutes(
       stopOrder: stop.stop_order,
       address: stop.address,
       postcode: stop.postcode,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
       recipientName: stop.recipient_name,
       recipientPhone: stop.recipient_phone,
       instructions: stop.instructions,
