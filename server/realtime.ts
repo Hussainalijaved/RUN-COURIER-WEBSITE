@@ -800,6 +800,9 @@ export async function hydrateLocationCache(): Promise<void> {
             lat,
             lng,
             timestamp: driver.lastLocationUpdate?.getTime() || Date.now(),
+            isAvailable: driver.isAvailable === true,
+            driverCode: driver.driverCode || undefined,
+            driverName: driver.fullName || undefined,
           });
           count++;
         }

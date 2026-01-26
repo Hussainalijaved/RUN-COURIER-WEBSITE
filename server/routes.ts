@@ -25,7 +25,7 @@ import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
-import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn } from "./realtime";
+import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability } from "./realtime";
 import { geocodeAddress } from "./geocoding";
 import { sendJobOfferNotification } from "./pushNotifications";
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
@@ -7399,6 +7399,9 @@ export async function registerRoutes(
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
+    
+    // Broadcast availability change for instant map updates
+    await broadcastDriverAvailability(driverId, isAvailable);
     
     console.log(`[Admin] Set driver ${driver.driverCode || driverId} availability to ${isAvailable}`);
     res.json({ success: true, driver });
