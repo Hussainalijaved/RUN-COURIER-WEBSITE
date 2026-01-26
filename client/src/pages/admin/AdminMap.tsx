@@ -133,6 +133,14 @@ export default function AdminMap() {
   const getDriverStatus = (driver: Driver) => {
     const currentJob = getDriverCurrentJob(driver.id);
     if (currentJob) return 'on_delivery';
+    
+    // Use real-time availability from WebSocket if available (instant updates)
+    const realtimeLocation = realtimeLocations.get(driver.id);
+    if (realtimeLocation?.isAvailable !== undefined) {
+      return realtimeLocation.isAvailable ? 'available' : 'offline';
+    }
+    
+    // Fallback to API data
     if (driver.isAvailable) return 'available';
     return 'offline';
   };
