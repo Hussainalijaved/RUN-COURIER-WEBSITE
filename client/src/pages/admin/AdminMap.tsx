@@ -100,8 +100,21 @@ export default function AdminMap() {
 
   // Show all online drivers in the list (not just verified ones)
   // This helps admin see drivers who are online but missing GPS or verification
-  const activeDrivers = drivers?.filter(d => d.isVerified || d.isAvailable) || [];
-  const availableDrivers = activeDrivers.filter(d => d.isAvailable);
+  // Include drivers from real-time WebSocket who are online (instant status updates)
+  const activeDrivers = drivers?.filter(d => {
+    // Check real-time status first (instant updates from mobile app)
+    const realtimeLoc = realtimeLocations.get(d.id);
+    if (realtimeLoc?.isAvailable !== undefined) {
+      return realtimeLoc.isAvailable || d.isVerified;
+    }
+    // Fallback to API data
+    return d.isVerified || d.isAvailable;
+  }) || [];
+  
+  const availableDrivers = activeDrivers.filter(d => {
+    const realtimeLoc = realtimeLocations.get(d.id);
+    return realtimeLoc?.isAvailable ?? d.isAvailable;
+  });
   
   const pendingJobs = jobs?.filter(j => j.status === 'pending' && !j.driverId) || [];
   const activeJobs = jobs?.filter(j => !['delivered', 'cancelled'].includes(j.status) && j.driverId) || [];
