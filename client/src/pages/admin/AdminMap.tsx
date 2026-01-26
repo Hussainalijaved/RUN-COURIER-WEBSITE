@@ -116,8 +116,10 @@ export default function AdminMap() {
     return realtimeLoc?.isAvailable ?? d.isAvailable;
   });
   
-  const pendingJobs = jobs?.filter(j => j.status === 'pending' && !j.driverId) || [];
-  const activeJobs = jobs?.filter(j => !['delivered', 'cancelled'].includes(j.status) && j.driverId) || [];
+  // Show ALL jobs that are not completed (delivered/cancelled) on the map
+  const pendingJobs = jobs?.filter(j => j.status === 'pending') || [];
+  const activeJobs = jobs?.filter(j => !['delivered', 'cancelled', 'pending'].includes(j.status)) || [];
+  const allActiveBookings = jobs?.filter(j => !['delivered', 'cancelled'].includes(j.status)) || [];
 
   const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number } | null => {
     const realtimeLoc = realtimeLocations.get(driver.id);
@@ -196,7 +198,8 @@ export default function AdminMap() {
     const loadJobLocations = async () => {
       if (!jobs || !mapLoaded) return;
       
-      const allDisplayJobs = [...pendingJobs, ...activeJobs].filter(job => !jobLocations.has(job.id));
+      // Load locations for ALL active bookings (not delivered/cancelled)
+      const allDisplayJobs = allActiveBookings.filter(job => !jobLocations.has(job.id));
       
       for (const job of allDisplayJobs) {
         // First try to use stored coordinates from the database
@@ -241,7 +244,7 @@ export default function AdminMap() {
     };
     
     loadJobLocations();
-  }, [jobs, mapLoaded, pendingJobs, activeJobs]);
+  }, [jobs, mapLoaded, allActiveBookings]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -334,7 +337,8 @@ export default function AdminMap() {
     if (!map || !mapLoaded) return;
 
     const currentJobIds = new Set<string>();
-    const allDisplayJobs = [...pendingJobs, ...activeJobs];
+    // Show ALL active bookings on the map until completed
+    const allDisplayJobs = allActiveBookings;
 
     allDisplayJobs.forEach((job) => {
       const location = jobLocations.get(job.id);
@@ -471,7 +475,7 @@ export default function AdminMap() {
         jobMarkersRef.current.delete(jobId);
       }
     });
-  }, [pendingJobs, activeJobs, jobLocations, mapLoaded]);
+  }, [allActiveBookings, jobLocations, mapLoaded]);
 
   const handleDriverClick = (driver: Driver) => {
     setSelectedDriver(driver);
