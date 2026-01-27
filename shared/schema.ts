@@ -8,7 +8,7 @@ export type CustomerType = "individual" | "business";
 // CRITICAL: Job status values must match Supabase and mobile app
 // Flow: pending -> assigned/offered -> accepted -> arrived_pickup -> picked_up -> on_the_way -> delivered
 // Legacy: on_the_way_pickup, collected, on_the_way_delivery (kept for backward compatibility)
-export type JobStatus = "pending" | "assigned" | "offered" | "accepted" | "arrived_pickup" | "picked_up" | "on_the_way" | "delivered" | "cancelled" | "on_the_way_pickup" | "collected" | "on_the_way_delivery";
+export type JobStatus = "pending" | "assigned" | "offered" | "accepted" | "arrived_pickup" | "picked_up" | "on_the_way" | "delivered" | "cancelled" | "on_the_way_pickup" | "collected" | "on_the_way_delivery" | "failed";
 export type VehicleType = "motorbike" | "car" | "small_van" | "medium_van";
 export type DocumentType = 
   | "id_passport" | "driving_licence" | "right_to_work" | "vehicle_photo" | "insurance" | "goods_in_transit" | "hire_reward"

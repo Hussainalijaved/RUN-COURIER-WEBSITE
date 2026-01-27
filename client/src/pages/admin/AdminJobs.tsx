@@ -106,6 +106,7 @@ const JOB_STATUSES: { value: JobStatus; label: string }[] = [
   { value: 'on_the_way_delivery', label: 'On the Way to Delivery' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'failed', label: 'Failed' },
 ];
 
 const getStatusBadge = (status: JobStatus) => {
@@ -122,6 +123,7 @@ const getStatusBadge = (status: JobStatus) => {
     on_the_way_delivery: { label: 'Delivering', className: 'bg-blue-600' },
     delivered: { label: 'Delivered', className: 'bg-green-500' },
     cancelled: { label: 'Cancelled', className: 'bg-red-500' },
+    failed: { label: 'Failed', className: 'bg-red-700' },
   };
   const config = statusConfig[status] || { label: status, className: 'bg-gray-500' };
   return <Badge className={`${config.className} text-white`} data-testid={`badge-status-${status}`}>{config.label}</Badge>;
@@ -1137,6 +1139,7 @@ export default function AdminJobs() {
                   <SelectItem value="on_the_way_delivery">Delivering</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
