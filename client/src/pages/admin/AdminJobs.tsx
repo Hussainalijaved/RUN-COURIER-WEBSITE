@@ -73,6 +73,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ShippingLabel } from '@/components/ShippingLabel';
+import { MultiDropShippingLabels } from '@/components/MultiDropShippingLabels';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
@@ -332,6 +333,8 @@ export default function AdminJobs() {
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [jobForLabel, setJobForLabel] = useState<Job | null>(null);
+  const [multiDropStops, setMultiDropStops] = useState<{ id: number; address: string; postcode: string; stopOrder: number; recipientName?: string; recipientPhone?: string; deliveryInstructions?: string; }[]>([]);
+  const [loadingStops, setLoadingStops] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
   const [assignDriverPrice, setAssignDriverPrice] = useState<string>('');
@@ -977,9 +980,25 @@ export default function AdminJobs() {
     });
   };
 
-  const openLabelDialog = (job: Job) => {
+  const openLabelDialog = async (job: Job) => {
     setJobForLabel(job);
+    setMultiDropStops([]);
     setLabelDialogOpen(true);
+    
+    if (job.isMultiDrop) {
+      setLoadingStops(true);
+      try {
+        const response = await fetch(`/api/jobs/${job.id}/stops`);
+        if (response.ok) {
+          const data = await response.json();
+          setMultiDropStops(data.stops || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch multi-drop stops:', error);
+      } finally {
+        setLoadingStops(false);
+      }
+    }
   };
 
   const handlePrintLabel = async () => {
@@ -2175,18 +2194,35 @@ export default function AdminJobs() {
 
         {/* Print Label Dialog */}
         <Dialog open={labelDialogOpen} onOpenChange={setLabelDialogOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className={jobForLabel?.isMultiDrop && multiDropStops.length > 0 ? "max-w-2xl max-h-[80vh]" : "max-w-lg"}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Printer className="h-5 w-5" />
-                Print Shipping Label
+                Print Shipping Label{jobForLabel?.isMultiDrop && multiDropStops.length > 0 ? 's' : ''}
               </DialogTitle>
               <DialogDescription>
-                4" x 6" Professional Shipping Label for {jobForLabel?.trackingNumber}
+                {jobForLabel?.isMultiDrop && multiDropStops.length > 0 
+                  ? `${multiDropStops.length + 1} labels for multi-drop job ${jobForLabel?.trackingNumber}`
+                  : `4" x 6" Professional Shipping Label for ${jobForLabel?.trackingNumber}`
+                }
               </DialogDescription>
             </DialogHeader>
-            <div className="flex justify-center py-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-auto">
-              {jobForLabel && (
+            <div className="flex justify-center py-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-auto" style={{ maxHeight: '50vh' }}>
+              {loadingStops ? (
+                <div className="flex items-center gap-2 py-8">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Loading multi-drop stops...</span>
+                </div>
+              ) : jobForLabel && jobForLabel.isMultiDrop && multiDropStops.length > 0 ? (
+                <div className="transform origin-top" style={{ transform: 'scale(0.5)' }}>
+                  <MultiDropShippingLabels 
+                    ref={labelRef} 
+                    job={jobForLabel} 
+                    stops={multiDropStops}
+                    driverName={getDriverName(jobForLabel.driverId)} 
+                  />
+                </div>
+              ) : jobForLabel ? (
                 <div className="transform origin-top" style={{ transform: 'scale(0.6)' }}>
                   <ShippingLabel 
                     ref={labelRef} 
@@ -2194,15 +2230,15 @@ export default function AdminJobs() {
                     driverName={getDriverName(jobForLabel.driverId)} 
                   />
                 </div>
-              )}
+              ) : null}
             </div>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setLabelDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handlePrintLabel} className="gap-2" data-testid="button-print-label">
+              <Button onClick={handlePrintLabel} className="gap-2" data-testid="button-print-label" disabled={loadingStops}>
                 <Printer className="h-4 w-4" />
-                Print Label
+                Print {jobForLabel?.isMultiDrop && multiDropStops.length > 0 ? `${multiDropStops.length + 1} Labels` : 'Label'}
               </Button>
             </DialogFooter>
           </DialogContent>
