@@ -81,6 +81,7 @@ import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
+import { supabase } from '@/lib/supabase';
 import type { Job, Driver, JobStatus, JobAssignment, CustomerType, VehicleType } from '@shared/schema';
 import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
 
@@ -771,16 +772,35 @@ export default function AdminJobs() {
     setEditIsReturnTrip(job.isReturnTrip || false);
     setEditMultiDropStops([]);
     if (job.isMultiDrop) {
-      fetch(`/api/jobs/${job.id}/stops`)
-        .then(res => res.ok ? res.json() : { stops: [] })
-        .then(data => setEditMultiDropStops((data.stops || []).map((s: any) => ({
-          address: s.address || '',
-          postcode: s.postcode || '',
-          recipientName: s.recipientName || '',
-          recipientPhone: s.recipientPhone || '',
-          deliveryInstructions: s.instructions || '',
-        }))))
-        .catch(() => setEditMultiDropStops([]));
+      // Fetch stops with auth token
+      const fetchStops = async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const headers: HeadersInit = {};
+          if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+          }
+          const res = await fetch(`/api/jobs/${job.id}/stops`, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            console.log(`[EditDialog] Fetched ${data.stops?.length || 0} stops for job ${job.id}:`, data.stops);
+            setEditMultiDropStops((data.stops || []).map((s: any) => ({
+              address: s.address || '',
+              postcode: s.postcode || '',
+              recipientName: s.recipientName || '',
+              recipientPhone: s.recipientPhone || '',
+              deliveryInstructions: s.instructions || '',
+            })));
+          } else {
+            console.error('[EditDialog] Failed to fetch stops:', res.status);
+            setEditMultiDropStops([]);
+          }
+        } catch (err) {
+          console.error('[EditDialog] Error fetching stops:', err);
+          setEditMultiDropStops([]);
+        }
+      };
+      fetchStops();
     }
     setEditDialogOpen(true);
   };
