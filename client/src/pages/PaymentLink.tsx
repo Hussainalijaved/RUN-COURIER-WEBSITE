@@ -69,9 +69,14 @@ export default function PaymentLink() {
 
   const checkoutMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', `/api/payment-links/${token}/checkout`);
+      const res = await apiRequest('POST', `/api/payment-links/${token}/checkout`);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to create checkout session');
+      }
+      return res.json();
     },
-    onSuccess: async (data: any) => {
+    onSuccess: (data: any) => {
       if (data.url) {
         window.location.href = data.url;
       }
