@@ -1345,6 +1345,13 @@ export interface PaymentLinkEmailData {
   centralLondonCharge?: string;
   multiDropCharge?: string;
   returnTripCharge?: string;
+  isMultiDrop?: boolean;
+  isReturnTrip?: boolean;
+  multiDropStops?: Array<{
+    address: string;
+    postcode: string;
+    recipientName?: string;
+  }>;
 }
 
 export async function sendPaymentLinkEmail(
@@ -1385,16 +1392,28 @@ export async function sendPaymentLinkEmail(
     </div>
     
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Route</h3>
+      <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Route${data.isMultiDrop ? ' (Multi-Drop)' : ''}${data.isReturnTrip ? ' + Return' : ''}</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 8px 0; color: #666; width: 140px; vertical-align: top;"><strong>Pickup:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.pickupAddress}<br><span style="font-family: monospace; color: #007BFF;">${data.pickupPostcode}</span></td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Delivery:</strong></td>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Drop 1:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.deliveryAddress}<br><span style="font-family: monospace; color: #007BFF;">${data.deliveryPostcode}</span></td>
         </tr>
+        ${data.isMultiDrop && data.multiDropStops && data.multiDropStops.length > 0 ? data.multiDropStops.map((stop, index) => `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Drop ${index + 2}:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${stop.address}${stop.recipientName ? ` (${stop.recipientName})` : ''}<br><span style="font-family: monospace; color: #007BFF;">${stop.postcode}</span></td>
+        </tr>
+        `).join('') : ''}
+        ${data.isReturnTrip ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Return:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.pickupAddress}<br><span style="font-family: monospace; color: #28a745;">${data.pickupPostcode}</span></td>
+        </tr>
+        ` : ''}
       </table>
     </div>
     
@@ -1420,6 +1439,12 @@ export async function sendPaymentLinkEmail(
   `;
 
   const htmlContent = wrapEmailContent(content, 'Payment Required');
+  // Build multi-drop stops text
+  const multiDropStopsText = data.isMultiDrop && data.multiDropStops && data.multiDropStops.length > 0
+    ? data.multiDropStops.map((stop, index) => `- Drop ${index + 2}: ${stop.address}${stop.recipientName ? ` (${stop.recipientName})` : ''} (${stop.postcode})`).join('\n')
+    : '';
+  const returnTripText = data.isReturnTrip ? `- Return: ${data.pickupAddress} (${data.pickupPostcode})` : '';
+
   const textContent = `Payment Required for Your Delivery
 
 Dear ${data.customerName || 'Customer'},
@@ -1432,9 +1457,10 @@ Booking Details:
 - Weight: ${data.weight} kg
 - Distance: ${data.distance} miles
 
-Route:
+Route${data.isMultiDrop ? ' (Multi-Drop)' : ''}${data.isReturnTrip ? ' + Return' : ''}:
 - Pickup: ${data.pickupAddress} (${data.pickupPostcode})
-- Delivery: ${data.deliveryAddress} (${data.deliveryPostcode})
+- Drop 1: ${data.deliveryAddress} (${data.deliveryPostcode})
+${multiDropStopsText}${returnTripText}
 
 Amount Due: ${data.amount}
 

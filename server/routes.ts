@@ -6878,6 +6878,23 @@ export async function registerRoutes(
     // Generate the payment URL
     const paymentUrl = `${BASE_URL}/pay/${token}`;
 
+    // Fetch multi-drop stops if job is multi-drop
+    let multiDropStops: Array<{ address: string; postcode: string; recipientName?: string }> = [];
+    if (job.isMultiDrop && supabaseAdmin) {
+      const { data: stops } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('address, postcode, recipient_name')
+        .eq('job_id', jobId)
+        .order('stop_order', { ascending: true });
+      if (stops && stops.length > 0) {
+        multiDropStops = stops.map((s: any) => ({
+          address: s.address || '',
+          postcode: s.postcode || '',
+          recipientName: s.recipient_name || undefined,
+        }));
+      }
+    }
+
     // Send email to customer
     const emailSent = await sendPaymentLinkEmail(customerEmail!, {
       customerName,
@@ -6899,6 +6916,9 @@ export async function registerRoutes(
       vehicleType: job.vehicleType,
       weight: job.weight,
       distance: job.distance || "N/A",
+      isMultiDrop: job.isMultiDrop || false,
+      isReturnTrip: job.isReturnTrip || false,
+      multiDropStops,
     });
 
     if (emailSent) {
@@ -7030,6 +7050,23 @@ export async function registerRoutes(
 
     const paymentUrl = `${BASE_URL}/pay/${link.token}`;
 
+    // Fetch multi-drop stops if job is multi-drop
+    let multiDropStops: Array<{ address: string; postcode: string; recipientName?: string }> = [];
+    if (job.isMultiDrop && supabaseAdmin) {
+      const { data: stops } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('address, postcode, recipient_name')
+        .eq('job_id', link.jobId)
+        .order('stop_order', { ascending: true });
+      if (stops && stops.length > 0) {
+        multiDropStops = stops.map((s: any) => ({
+          address: s.address || '',
+          postcode: s.postcode || '',
+          recipientName: s.recipient_name || undefined,
+        }));
+      }
+    }
+
     const emailSent = await sendPaymentLinkEmail(customerEmail, {
       customerName,
       trackingNumber: job.trackingNumber,
@@ -7050,6 +7087,9 @@ export async function registerRoutes(
       vehicleType: job.vehicleType,
       weight: job.weight,
       distance: job.distance || "N/A",
+      isMultiDrop: job.isMultiDrop || false,
+      isReturnTrip: job.isReturnTrip || false,
+      multiDropStops,
     });
 
     if (emailSent) {
@@ -7116,6 +7156,23 @@ export async function registerRoutes(
     const customer = await storage.getUser(oldLink.customerId);
     const paymentUrl = `${BASE_URL}/pay/${token}`;
 
+    // Fetch multi-drop stops if job is multi-drop
+    let multiDropStops: Array<{ address: string; postcode: string; recipientName?: string }> = [];
+    if (job?.isMultiDrop && supabaseAdmin) {
+      const { data: stops } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('address, postcode, recipient_name')
+        .eq('job_id', oldLink.jobId)
+        .order('stop_order', { ascending: true });
+      if (stops && stops.length > 0) {
+        multiDropStops = stops.map((s: any) => ({
+          address: s.address || '',
+          postcode: s.postcode || '',
+          recipientName: s.recipient_name || undefined,
+        }));
+      }
+    }
+
     let emailSent = false;
     if (customer?.email && job) {
       emailSent = await sendPaymentLinkEmail(customer.email, {
@@ -7138,6 +7195,9 @@ export async function registerRoutes(
         vehicleType: job.vehicleType,
         weight: job.weight,
         distance: job.distance || "N/A",
+        isMultiDrop: job.isMultiDrop || false,
+        isReturnTrip: job.isReturnTrip || false,
+        multiDropStops,
       });
 
       if (emailSent) {
