@@ -1849,14 +1849,151 @@ export class SupabaseStorage implements IStorage {
     return mapDbToDriverPayment(updated);
   }
 
-  async getPaymentLink(id: string): Promise<PaymentLink | undefined> { return undefined; }
-  async getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined> { return undefined; }
-  async getPaymentLinkByTokenHash(tokenHash: string): Promise<PaymentLink | undefined> { return undefined; }
-  async getPaymentLinks(filters?: { jobId?: string; customerId?: string; status?: PaymentLinkStatus }): Promise<PaymentLink[]> { return []; }
-  async getActivePaymentLinkForJob(jobId: string): Promise<PaymentLink | undefined> { return undefined; }
-  async createPaymentLink(link: InsertPaymentLink): Promise<PaymentLink> { throw new Error('Not implemented'); }
-  async updatePaymentLink(id: string, data: Partial<PaymentLink>): Promise<PaymentLink | undefined> { return undefined; }
-  async appendPaymentLinkAuditLog(id: string, event: string, actor?: string, details?: string): Promise<PaymentLink | undefined> { return undefined; }
-  async cancelPaymentLink(id: string, actor?: string): Promise<PaymentLink | undefined> { return undefined; }
-  async expirePaymentLinks(): Promise<number> { return 0; }
+  private mapDbToPaymentLink(row: any): PaymentLink {
+    return {
+      id: row.id,
+      jobId: row.job_id,
+      customerId: row.customer_id,
+      customerEmail: row.customer_email,
+      token: row.token,
+      tokenHash: row.token_hash,
+      amount: row.amount,
+      status: row.status,
+      stripeSessionId: row.stripe_session_id,
+      stripePaymentIntentId: row.stripe_payment_intent_id,
+      stripeReceiptUrl: row.stripe_receipt_url,
+      sentViaEmail: row.sent_via_email,
+      sentViaSms: row.sent_via_sms,
+      auditLog: row.audit_log || [],
+      expiresAt: row.expires_at ? new Date(row.expires_at) : null,
+      openedAt: row.opened_at ? new Date(row.opened_at) : null,
+      paidAt: row.paid_at ? new Date(row.paid_at) : null,
+      cancelledAt: row.cancelled_at ? new Date(row.cancelled_at) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      createdBy: row.created_by,
+    };
+  }
+
+  async getPaymentLink(id: string): Promise<PaymentLink | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('payment_links').select('*').eq('id', id).single();
+    if (error || !data) return undefined;
+    return this.mapDbToPaymentLink(data);
+  }
+
+  async getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('payment_links').select('*').eq('token', token).single();
+    if (error || !data) return undefined;
+    return this.mapDbToPaymentLink(data);
+  }
+
+  async getPaymentLinkByTokenHash(tokenHash: string): Promise<PaymentLink | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('payment_links').select('*').eq('token_hash', tokenHash).single();
+    if (error || !data) return undefined;
+    return this.mapDbToPaymentLink(data);
+  }
+
+  async getPaymentLinks(filters?: { jobId?: string; customerId?: string; status?: PaymentLinkStatus }): Promise<PaymentLink[]> {
+    const supabase = this.checkSupabase();
+    let query = supabase.from('payment_links').select('*');
+    if (filters?.jobId) query = query.eq('job_id', filters.jobId);
+    if (filters?.customerId) query = query.eq('customer_id', filters.customerId);
+    if (filters?.status) query = query.eq('status', filters.status);
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return data.map(row => this.mapDbToPaymentLink(row));
+  }
+
+  async getActivePaymentLinkForJob(jobId: string): Promise<PaymentLink | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase
+      .from('payment_links')
+      .select('*')
+      .eq('job_id', jobId)
+      .in('status', ['pending', 'sent', 'opened'])
+      .single();
+    if (error || !data) return undefined;
+    return this.mapDbToPaymentLink(data);
+  }
+
+  async createPaymentLink(link: InsertPaymentLink): Promise<PaymentLink> {
+    const supabase = this.checkSupabase();
+    const id = randomUUID();
+    const dbLink = {
+      id,
+      job_id: link.jobId,
+      customer_id: link.customerId,
+      customer_email: link.customerEmail,
+      token: link.token,
+      token_hash: link.tokenHash,
+      amount: link.amount,
+      status: link.status || 'pending',
+      stripe_session_id: link.stripeSessionId || null,
+      stripe_payment_intent_id: link.stripePaymentIntentId || null,
+      stripe_receipt_url: link.stripeReceiptUrl || null,
+      sent_via_email: link.sentViaEmail || false,
+      sent_via_sms: link.sentViaSms || false,
+      audit_log: link.auditLog || [],
+      expires_at: link.expiresAt,
+      opened_at: link.openedAt || null,
+      paid_at: link.paidAt || null,
+      cancelled_at: link.cancelledAt || null,
+      created_by: link.createdBy || null,
+    };
+    const { data, error } = await supabase.from('payment_links').insert(dbLink).select().single();
+    if (error) {
+      console.error('[PaymentLink] Create error:', error);
+      throw error;
+    }
+    return this.mapDbToPaymentLink(data);
+  }
+
+  async updatePaymentLink(id: string, data: Partial<PaymentLink>): Promise<PaymentLink | undefined> {
+    const supabase = this.checkSupabase();
+    const dbData: any = {};
+    if (data.status !== undefined) dbData.status = data.status;
+    if (data.stripeSessionId !== undefined) dbData.stripe_session_id = data.stripeSessionId;
+    if (data.stripePaymentIntentId !== undefined) dbData.stripe_payment_intent_id = data.stripePaymentIntentId;
+    if (data.stripeReceiptUrl !== undefined) dbData.stripe_receipt_url = data.stripeReceiptUrl;
+    if (data.sentViaEmail !== undefined) dbData.sent_via_email = data.sentViaEmail;
+    if (data.sentViaSms !== undefined) dbData.sent_via_sms = data.sentViaSms;
+    if (data.auditLog !== undefined) dbData.audit_log = data.auditLog;
+    if (data.openedAt !== undefined) dbData.opened_at = data.openedAt;
+    if (data.paidAt !== undefined) dbData.paid_at = data.paidAt;
+    if (data.cancelledAt !== undefined) dbData.cancelled_at = data.cancelledAt;
+    const { data: updated, error } = await supabase.from('payment_links').update(dbData).eq('id', id).select().single();
+    if (error || !updated) return undefined;
+    return this.mapDbToPaymentLink(updated);
+  }
+
+  async appendPaymentLinkAuditLog(id: string, event: string, actor?: string, details?: string): Promise<PaymentLink | undefined> {
+    const supabase = this.checkSupabase();
+    const link = await this.getPaymentLink(id);
+    if (!link) return undefined;
+    const auditLog = [...(link.auditLog || []), { event, timestamp: new Date().toISOString(), actor, details }];
+    return this.updatePaymentLink(id, { auditLog });
+  }
+
+  async cancelPaymentLink(id: string, actor?: string): Promise<PaymentLink | undefined> {
+    await this.appendPaymentLinkAuditLog(id, 'cancelled', actor);
+    return this.updatePaymentLink(id, { status: 'cancelled', cancelledAt: new Date() });
+  }
+
+  async expirePaymentLinks(): Promise<number> {
+    const supabase = this.checkSupabase();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('payment_links')
+      .update({ status: 'expired' })
+      .in('status', ['pending', 'sent', 'opened'])
+      .lt('expires_at', now)
+      .select();
+    if (error) {
+      console.error('[PaymentLink] Expire error:', error);
+      return 0;
+    }
+    return data?.length || 0;
+  }
 }
