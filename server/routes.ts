@@ -6745,7 +6745,8 @@ export async function registerRoutes(
 
   // Payment Links Routes
   const PAYMENT_LINK_EXPIRY_HOURS = 72; // Links expire after 72 hours
-  const BASE_URL = process.env.APP_URL || 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev';
+  const BASE_URL = process.env.APP_URL || 'https://runcourier.co.uk';
+  console.log('[PaymentLinks] BASE_URL:', BASE_URL, 'APP_URL env:', process.env.APP_URL);
 
   function generateSecureToken(): string {
     return randomBytes(32).toString('hex');
