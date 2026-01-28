@@ -1907,3 +1907,202 @@ Run Courier - www.runcourier.co.uk`;
 
   return sendEmailNotification(customerEmail, `Booking Cancelled - ${data.trackingNumber}`, htmlContent, textContent);
 }
+
+// Send failed delivery notification email to customer
+export async function sendFailedDeliveryEmail(customerEmail: string, data: {
+  customerName?: string;
+  trackingNumber: string;
+  pickupAddress?: string;
+  pickupPostcode?: string;
+  pickupBuildingName?: string;
+  deliveryAddress?: string;
+  deliveryPostcode?: string;
+  deliveryBuildingName?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  vehicleType?: string;
+  weight?: string;
+  distance?: string;
+  failureReason?: string;
+  attemptedAt?: string | Date;
+  driverName?: string;
+  totalPrice?: string;
+}): Promise<boolean> {
+  const vehicleDisplay = (data.vehicleType || 'car').replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  
+  const formatDateTime = (date: string | Date | null | undefined) => {
+    if (!date) return null;
+    const d = new Date(date);
+    return d.toLocaleString('en-GB', { 
+      weekday: 'short', 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const attemptedTime = formatDateTime(data.attemptedAt) || formatDateTime(new Date());
+
+  const content = `
+    <h2 style="color: #dc3545; margin-top: 0;">Delivery Attempt Failed</h2>
+    <p style="color: #666; font-size: 16px;">We're sorry to inform you that we were unable to complete your delivery. Our driver attempted delivery but was unsuccessful.</p>
+    
+    <!-- Tracking Number Banner -->
+    <div style="background-color: #dc3545; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+      <p style="margin: 0; font-size: 14px;">Tracking Number</p>
+      <p style="margin: 10px 0 5px; font-size: 28px; font-weight: bold; letter-spacing: 3px;">${data.trackingNumber || 'N/A'}</p>
+      <p style="margin: 0; font-size: 12px; opacity: 0.9;">Delivery Attempt Failed</p>
+    </div>
+    
+    ${data.failureReason ? `
+    <!-- Failure Reason -->
+    <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #856404; margin-top: 0; font-size: 16px;">Reason for Failed Delivery</h3>
+      <p style="color: #856404; font-size: 14px; margin: 0;">
+        ${data.failureReason}
+      </p>
+    </div>
+    ` : ''}
+    
+    <div style="background-color: white; border-radius: 8px; padding: 20px; border: 1px solid #eee;">
+      
+      <!-- Delivery Attempt Details -->
+      <h3 style="color: #dc3545; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #dc3545; padding-bottom: 8px;">DELIVERY ATTEMPT DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 130px;"><strong>Attempted:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${attemptedTime}</td>
+        </tr>
+        ${data.driverName ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Driver:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.driverName}</td>
+        </tr>
+        ` : ''}
+      </table>
+
+      <!-- Collection Details -->
+      <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">COLLECTION DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;">
+            ${data.pickupBuildingName ? `${data.pickupBuildingName}<br>` : ''}
+            ${data.pickupAddress || 'N/A'}<br>
+            <strong>${data.pickupPostcode || 'N/A'}</strong>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Delivery Details -->
+      <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">DELIVERY DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;">
+            ${data.deliveryBuildingName ? `${data.deliveryBuildingName}<br>` : ''}
+            ${data.deliveryAddress || 'N/A'}<br>
+            <strong>${data.deliveryPostcode || 'N/A'}</strong>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient:</strong></td>
+          <td style="padding: 8px 0; color: #333;">
+            ${data.recipientName || 'N/A'}<br>
+            ${data.recipientPhone ? `<a href="tel:${data.recipientPhone}" style="color: #007BFF;">${data.recipientPhone}</a>` : 'N/A'}
+          </td>
+        </tr>
+      </table>
+
+      <!-- Service Details -->
+      <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">SERVICE DETAILS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 130px;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
+        </tr>
+        ${data.weight ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.weight} kg</td>
+        </tr>
+        ` : ''}
+        ${data.distance ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.distance} miles</td>
+        </tr>
+        ` : ''}
+        ${data.totalPrice ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;"><strong>Amount:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${data.totalPrice}</td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+    
+    <p style="color: #666; font-size: 14px; margin: 20px 0;">
+      Our team will be in touch shortly to arrange a redelivery or discuss alternative options. If you'd like to speak with us immediately, please contact our customer service team.
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="tel:+442046346100" style="background-color: #dc3545; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+        Call Us: +44 20 4634 6100
+      </a>
+    </div>
+    
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+      <p style="color: #666; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
+      <p style="color: #333; margin: 0; font-size: 14px;">
+        Call us: <a href="tel:+447311121217" style="color: #007BFF; font-weight: bold;">+44 7311 121 217</a><br>
+        Email: <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a>
+      </p>
+    </div>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Delivery Failed');
+  
+  const textContent = `DELIVERY ATTEMPT FAILED
+
+Dear ${data.customerName || 'Valued Customer'},
+
+We're sorry to inform you that we were unable to complete your delivery.
+
+Tracking Number: ${data.trackingNumber}
+Attempted: ${attemptedTime}
+${data.driverName ? `Driver: ${data.driverName}` : ''}
+
+${data.failureReason ? `REASON FOR FAILED DELIVERY
+--------------------------
+${data.failureReason}
+
+` : ''}COLLECTION DETAILS
+------------------
+${data.pickupBuildingName ? `${data.pickupBuildingName}\n` : ''}${data.pickupAddress || 'N/A'}
+${data.pickupPostcode || 'N/A'}
+
+DELIVERY DETAILS
+----------------
+${data.deliveryBuildingName ? `${data.deliveryBuildingName}\n` : ''}${data.deliveryAddress || 'N/A'}
+${data.deliveryPostcode || 'N/A'}
+Recipient: ${data.recipientName || 'N/A'}
+${data.recipientPhone ? `Phone: ${data.recipientPhone}` : ''}
+
+SERVICE DETAILS
+---------------
+Vehicle: ${vehicleDisplay}
+${data.weight ? `Weight: ${data.weight} kg` : ''}
+${data.distance ? `Distance: ${data.distance} miles` : ''}
+${data.totalPrice ? `Amount: ${data.totalPrice}` : ''}
+
+Our team will be in touch shortly to arrange a redelivery or discuss alternative options.
+
+If you'd like to speak with us immediately, please contact our customer service team at +44 20 4634 6100.
+
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(customerEmail, `Delivery Failed - ${data.trackingNumber}`, htmlContent, textContent);
+}
