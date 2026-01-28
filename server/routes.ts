@@ -1606,10 +1606,43 @@ export async function registerRoutes(
 
   app.patch("/api/jobs/:id", asyncHandler(async (req, res) => {
     const previousJob = await storage.getJob(req.params.id);
-    const job = await storage.updateJob(req.params.id, req.body);
+    const { multiDropStops, ...updateData } = req.body;
+    const job = await storage.updateJob(req.params.id, updateData);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
+    
+    // Handle multi-drop stops update
+    if (supabaseAdmin && updateData.isMultiDrop !== undefined) {
+      // Delete existing stops first
+      await supabaseAdmin
+        .from('multi_drop_stops')
+        .delete()
+        .eq('job_id', parseInt(req.params.id));
+      
+      // Insert new stops if multi-drop is enabled and stops are provided
+      if (updateData.isMultiDrop && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
+        console.log(`[Jobs] Updating ${multiDropStops.length} multi-drop stops for job ${req.params.id}`);
+        const stopsToInsert = multiDropStops.map((stop: any, index: number) => ({
+          job_id: parseInt(req.params.id),
+          address: stop.address,
+          postcode: stop.postcode,
+          stop_order: index + 1,
+          recipient_name: stop.recipientName || null,
+          recipient_phone: stop.recipientPhone || null,
+          delivery_instructions: stop.deliveryInstructions || null,
+        }));
+        
+        const { error: stopsError } = await supabaseAdmin
+          .from('multi_drop_stops')
+          .insert(stopsToInsert);
+        
+        if (stopsError) {
+          console.error('[Jobs] Failed to update multi-drop stops:', stopsError);
+        }
+      }
+    }
+    
     // Broadcast job update if status changed
     if (previousJob && previousJob.status !== job.status) {
       broadcastJobUpdate({

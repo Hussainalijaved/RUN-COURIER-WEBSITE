@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useJobUpdates } from '@/hooks/useJobUpdates';
 import {
@@ -67,6 +68,8 @@ import {
   Building2,
   User,
   Check,
+  Route,
+  X,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -330,6 +333,9 @@ export default function AdminJobs() {
   const [editVehicleType, setEditVehicleType] = useState<string>('car');
   const [editWeight, setEditWeight] = useState<string>('1');
   const [editDistance, setEditDistance] = useState<string>('0');
+  const [editIsMultiDrop, setEditIsMultiDrop] = useState(false);
+  const [editIsReturnTrip, setEditIsReturnTrip] = useState(false);
+  const [editMultiDropStops, setEditMultiDropStops] = useState<{ address: string; postcode: string; recipientName?: string; recipientPhone?: string; deliveryInstructions?: string; }[]>([]);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [jobForLabel, setJobForLabel] = useState<Job | null>(null);
@@ -760,6 +766,21 @@ export default function AdminJobs() {
     setEditVehicleType(job.vehicleType || 'car');
     setEditWeight(job.weight?.toString() || '1');
     setEditDistance(job.distance?.toString() || '0');
+    setEditIsMultiDrop(job.isMultiDrop || false);
+    setEditIsReturnTrip(job.isReturnTrip || false);
+    setEditMultiDropStops([]);
+    if (job.isMultiDrop) {
+      fetch(`/api/jobs/${job.id}/stops`)
+        .then(res => res.ok ? res.json() : [])
+        .then(stops => setEditMultiDropStops(stops.map((s: any) => ({
+          address: s.address || '',
+          postcode: s.postcode || '',
+          recipientName: s.recipientName || '',
+          recipientPhone: s.recipientPhone || '',
+          deliveryInstructions: s.deliveryInstructions || '',
+        }))))
+        .catch(() => setEditMultiDropStops([]));
+    }
     setEditDialogOpen(true);
   };
 
@@ -772,9 +793,17 @@ export default function AdminJobs() {
     
     setIsRecalculating(true);
     try {
+      // Build all drop postcodes (first delivery + multi-drop stops)
+      const allDropPostcodes = [editDeliveryPostcode];
+      if (editIsMultiDrop && editMultiDropStops.length > 0) {
+        editMultiDropStops.forEach(stop => {
+          if (stop.postcode) allDropPostcodes.push(stop.postcode);
+        });
+      }
+      
       // Get distance from API - use GET with query params
       const origin = encodeURIComponent(editPickupPostcode + ', UK');
-      const drops = encodeURIComponent(editDeliveryPostcode + ', UK');
+      const drops = allDropPostcodes.map(p => encodeURIComponent(p + ', UK')).join(',');
       const response = await fetch(`/api/maps/optimized-route?origin=${origin}&drops=${drops}`);
       
       if (!response.ok) {
@@ -784,7 +813,7 @@ export default function AdminJobs() {
       }
       
       const data = await response.json();
-      const distance = data.legs?.[0]?.distance || data.totalDistance || 0;
+      const distance = data.totalDistance || data.legs?.[0]?.distance || 0;
       setEditDistance(distance.toFixed(1));
       
       // Import pricing calculation
@@ -795,10 +824,17 @@ export default function AdminJobs() {
       const quote = calculateQuote(vehicleType, distance, weight, {
         pickupPostcode: editPickupPostcode,
         deliveryPostcode: editDeliveryPostcode,
+        isMultiDrop: editIsMultiDrop,
+        multiDropCount: editMultiDropStops.length,
+        isReturnTrip: editIsReturnTrip,
       });
       
       setEditTotalPrice(quote.totalPrice.toFixed(2));
-      toast({ title: 'Quote recalculated', description: `New price: £${quote.totalPrice.toFixed(2)} (${distance.toFixed(1)} miles)` });
+      const extras = [];
+      if (editIsMultiDrop && editMultiDropStops.length > 0) extras.push(`${editMultiDropStops.length} extra stops`);
+      if (editIsReturnTrip) extras.push('return trip');
+      const extrasText = extras.length > 0 ? ` (includes ${extras.join(', ')})` : '';
+      toast({ title: 'Quote recalculated', description: `New price: £${quote.totalPrice.toFixed(2)} (${distance.toFixed(1)} miles)${extrasText}` });
     } catch (error: any) {
       console.error('Quote recalculation error:', error);
       toast({ title: 'Failed to recalculate quote', description: error?.message || 'Please try again', variant: 'destructive' });
@@ -830,6 +866,9 @@ export default function AdminJobs() {
       vehicleType: editVehicleType as VehicleType,
       weight: editWeight,
       distance: editDistance,
+      isMultiDrop: editIsMultiDrop,
+      isReturnTrip: editIsReturnTrip,
+      multiDropStops: editIsMultiDrop ? editMultiDropStops : [],
     };
 
     if (editDriverId !== 'unassigned' && editDriverId !== jobToEdit.driverId) {
@@ -2081,6 +2120,148 @@ export default function AdminJobs() {
                   <p className="text-xs text-muted-foreground text-center">
                     Click to recalculate distance and price based on the current postcodes
                   </p>
+                </div>
+
+                <Separator />
+
+                {/* Delivery Options Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Route className="h-4 w-4" />
+                    Delivery Options
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="space-y-0.5">
+                        <Label>Multi-Drop Delivery</Label>
+                        <p className="text-xs text-muted-foreground">Add multiple delivery stops</p>
+                      </div>
+                      <Switch 
+                        checked={editIsMultiDrop} 
+                        onCheckedChange={setEditIsMultiDrop}
+                        data-testid="switch-edit-multi-drop"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="space-y-0.5">
+                        <Label>Return Trip</Label>
+                        <p className="text-xs text-muted-foreground">Driver returns to pickup</p>
+                      </div>
+                      <Switch 
+                        checked={editIsReturnTrip} 
+                        onCheckedChange={setEditIsReturnTrip}
+                        data-testid="switch-edit-return-trip"
+                      />
+                    </div>
+                  </div>
+                  
+                  {editIsMultiDrop && (
+                    <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">Additional Drop Stops</h4>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => setEditMultiDropStops([...editMultiDropStops, { address: '', postcode: '', recipientName: '', recipientPhone: '', deliveryInstructions: '' }])}
+                          data-testid="button-add-drop-stop"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Stop
+                        </Button>
+                      </div>
+                      
+                      {editMultiDropStops.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          No additional stops. Click "Add Stop" to add more delivery locations.
+                        </p>
+                      )}
+                      
+                      {editMultiDropStops.map((stop, index) => (
+                        <div key={index} className="p-3 bg-background border rounded-lg space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">Stop {index + 2}</span>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-6 w-6 text-destructive"
+                              onClick={() => setEditMultiDropStops(editMultiDropStops.filter((_, i) => i !== index))}
+                              data-testid={`button-remove-stop-${index}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1 col-span-2">
+                              <Label className="text-xs">Address</Label>
+                              <Input
+                                placeholder="Full address"
+                                value={stop.address}
+                                onChange={(e) => {
+                                  const updated = [...editMultiDropStops];
+                                  updated[index].address = e.target.value;
+                                  setEditMultiDropStops(updated);
+                                }}
+                                data-testid={`input-stop-address-${index}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Postcode</Label>
+                              <Input
+                                placeholder="e.g. EC1A 1BB"
+                                className="font-mono"
+                                value={stop.postcode}
+                                onChange={(e) => {
+                                  const updated = [...editMultiDropStops];
+                                  updated[index].postcode = e.target.value.toUpperCase();
+                                  setEditMultiDropStops(updated);
+                                }}
+                                data-testid={`input-stop-postcode-${index}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Recipient Name</Label>
+                              <Input
+                                placeholder="Recipient name"
+                                value={stop.recipientName || ''}
+                                onChange={(e) => {
+                                  const updated = [...editMultiDropStops];
+                                  updated[index].recipientName = e.target.value;
+                                  setEditMultiDropStops(updated);
+                                }}
+                                data-testid={`input-stop-recipient-${index}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Recipient Phone</Label>
+                              <Input
+                                placeholder="Phone number"
+                                value={stop.recipientPhone || ''}
+                                onChange={(e) => {
+                                  const updated = [...editMultiDropStops];
+                                  updated[index].recipientPhone = e.target.value;
+                                  setEditMultiDropStops(updated);
+                                }}
+                                data-testid={`input-stop-phone-${index}`}
+                              />
+                            </div>
+                            <div className="space-y-1 col-span-2">
+                              <Label className="text-xs">Delivery Instructions</Label>
+                              <Input
+                                placeholder="Special instructions..."
+                                value={stop.deliveryInstructions || ''}
+                                onChange={(e) => {
+                                  const updated = [...editMultiDropStops];
+                                  updated[index].deliveryInstructions = e.target.value;
+                                  setEditMultiDropStops(updated);
+                                }}
+                                data-testid={`input-stop-instructions-${index}`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
