@@ -766,22 +766,19 @@ export default function AdminJobs() {
     
     setIsRecalculating(true);
     try {
-      // Get distance from API
-      const response = await fetch(`/api/maps/optimized-route`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pickupPostcode: editPickupPostcode,
-          dropPostcodes: [editDeliveryPostcode],
-        }),
-      });
+      // Get distance from API - use GET with query params
+      const origin = encodeURIComponent(editPickupPostcode + ', UK');
+      const drops = encodeURIComponent(editDeliveryPostcode + ', UK');
+      const response = await fetch(`/api/maps/optimized-route?origin=${origin}&drops=${drops}`);
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Route API error:', errorText);
         throw new Error('Failed to calculate route');
       }
       
       const data = await response.json();
-      const distance = data.legs?.[0]?.distance || 0;
+      const distance = data.legs?.[0]?.distance || data.totalDistance || 0;
       setEditDistance(distance.toFixed(1));
       
       // Import pricing calculation
