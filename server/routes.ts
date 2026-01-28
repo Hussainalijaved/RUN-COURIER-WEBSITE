@@ -6976,15 +6976,25 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Associated job not found" });
     }
 
-    const customer = await storage.getUser(link.customerId);
-    if (!customer?.email) {
+    // Use the email stored in the payment link (works for admin-created jobs too)
+    const customerEmail = link.customerEmail;
+    if (!customerEmail) {
       return res.status(400).json({ error: "Customer email not found" });
+    }
+
+    // Try to get customer name from user record, fallback to job recipient name
+    let customerName = job.recipientName || 'Customer';
+    if (link.customerId && link.customerId !== 'admin-job') {
+      const customer = await storage.getUser(link.customerId);
+      if (customer?.fullName) {
+        customerName = customer.fullName;
+      }
     }
 
     const paymentUrl = `${BASE_URL}/pay/${link.token}`;
 
-    const emailSent = await sendPaymentLinkEmail(customer.email, {
-      customerName: customer.fullName,
+    const emailSent = await sendPaymentLinkEmail(customerEmail, {
+      customerName,
       trackingNumber: job.trackingNumber,
       paymentLink: paymentUrl,
       amount: `£${parseFloat(link.amount).toFixed(2)}`,
@@ -7006,20 +7016,20 @@ export async function registerRoutes(
     });
 
     if (emailSent) {
-      await storage.appendPaymentLinkAuditLog(link.id, "email_resent", adminId, customer.email);
-      console.log(`[PaymentLink] Resent payment link email to ${customer.email}`);
+      await storage.appendPaymentLinkAuditLog(link.id, "email_resent", adminId, customerEmail);
+      console.log(`[PaymentLink] Resent payment link email to ${customerEmail}`);
     } else {
       // Email failed - notify admin
       await sendPaymentLinkFailureNotification({
-        customerName: customer.fullName,
-        customerEmail: customer.email,
+        customerName,
+        customerEmail,
         trackingNumber: job.trackingNumber,
         amount: `£${parseFloat(link.amount).toFixed(2)}`,
         paymentLink: paymentUrl,
         jobId: link.jobId,
       });
-      await storage.appendPaymentLinkAuditLog(link.id, "email_resend_failed", adminId, customer.email);
-      console.log(`[PaymentLink] Resend email FAILED for ${customer.email}`);
+      await storage.appendPaymentLinkAuditLog(link.id, "email_resend_failed", adminId, customerEmail);
+      console.log(`[PaymentLink] Resend email FAILED for ${customerEmail}`);
     }
 
     res.json({ success: true, emailSent });
