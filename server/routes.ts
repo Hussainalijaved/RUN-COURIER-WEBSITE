@@ -7117,7 +7117,9 @@ export async function registerRoutes(
   // Public: Validate token and get booking details
   app.get("/api/payment-links/:token", asyncHandler(async (req, res) => {
     const token = req.params.token;
+    console.log('[PaymentLink] Looking up payment link with token:', token.substring(0, 20) + '...');
     const link = await storage.getPaymentLinkByToken(token);
+    console.log('[PaymentLink] Lookup result:', link ? `Found link id=${link.id}` : 'Not found');
 
     if (!link) {
       return res.status(404).json({ error: "Invalid or expired payment link" });
