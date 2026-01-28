@@ -1625,23 +1625,27 @@ export async function registerRoutes(
       // Insert new stops if multi-drop is enabled and stops are provided
       const isMultiDropEnabled = updateData.isMultiDrop !== undefined ? updateData.isMultiDrop : job.isMultiDrop;
       if (isMultiDropEnabled && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
-        console.log(`[Jobs] Updating ${multiDropStops.length} multi-drop stops for job ${jobId}`);
+        console.log(`[Jobs] Updating ${multiDropStops.length} multi-drop stops for job ${jobId} (type: ${typeof jobId})`);
         const stopsToInsert = multiDropStops.map((stop: any, index: number) => ({
-          job_id: jobId,
-          address: stop.address,
-          postcode: stop.postcode,
+          job_id: String(jobId), // Ensure job_id is a string for varchar column
+          address: stop.address || '',
+          postcode: stop.postcode || '',
           stop_order: index + 1,
           recipient_name: stop.recipientName || null,
           recipient_phone: stop.recipientPhone || null,
           instructions: stop.deliveryInstructions || null,
         }));
         
-        const { error: stopsError } = await supabaseAdmin
+        console.log('[Jobs] Inserting stops:', JSON.stringify(stopsToInsert));
+        const { data: insertedStops, error: stopsError } = await supabaseAdmin
           .from('multi_drop_stops')
-          .insert(stopsToInsert);
+          .insert(stopsToInsert)
+          .select();
         
         if (stopsError) {
           console.error('[Jobs] Failed to update multi-drop stops:', stopsError);
+        } else {
+          console.log(`[Jobs] Successfully inserted ${insertedStops?.length || 0} multi-drop stops`);
         }
       }
     }
