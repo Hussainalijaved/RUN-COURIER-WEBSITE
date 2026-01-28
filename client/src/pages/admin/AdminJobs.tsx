@@ -813,20 +813,33 @@ export default function AdminJobs() {
       }
       
       const data = await response.json();
-      const distance = data.totalDistance || data.legs?.[0]?.distance || 0;
-      setEditDistance(distance.toFixed(1));
+      
+      // Extract distances from response legs
+      const legs = data.legs || [];
+      const baseDistance = legs.length > 0 ? legs[0].distance : (data.totalDistance || 0);
+      const multiDropDistances = legs.length > 1 ? legs.slice(1).map((leg: any) => leg.distance || 0) : [];
+      const totalDistance = data.totalDistance || baseDistance;
+      
+      setEditDistance(totalDistance.toFixed(1));
+      
+      // Calculate return distance if needed (same as base distance for return trip)
+      const returnDistance = editIsReturnTrip ? baseDistance : 0;
       
       // Import pricing calculation
       const { calculateQuote } = await import('@/lib/pricing');
       const weight = parseFloat(editWeight) || 1;
       const vehicleType = editVehicleType as any;
       
-      const quote = calculateQuote(vehicleType, distance, weight, {
+      const quote = calculateQuote(vehicleType, baseDistance, weight, {
         pickupPostcode: editPickupPostcode,
         deliveryPostcode: editDeliveryPostcode,
+        allDropPostcodes: editIsMultiDrop ? allDropPostcodes : undefined,
         isMultiDrop: editIsMultiDrop,
         multiDropCount: editMultiDropStops.length,
+        multiDropDistances: editIsMultiDrop ? multiDropDistances : undefined,
         isReturnTrip: editIsReturnTrip,
+        returnDistance: editIsReturnTrip ? returnDistance : undefined,
+        returnToSameLocation: editIsReturnTrip,
       });
       
       setEditTotalPrice(quote.totalPrice.toFixed(2));
@@ -834,7 +847,7 @@ export default function AdminJobs() {
       if (editIsMultiDrop && editMultiDropStops.length > 0) extras.push(`${editMultiDropStops.length} extra stops`);
       if (editIsReturnTrip) extras.push('return trip');
       const extrasText = extras.length > 0 ? ` (includes ${extras.join(', ')})` : '';
-      toast({ title: 'Quote recalculated', description: `New price: £${quote.totalPrice.toFixed(2)} (${distance.toFixed(1)} miles)${extrasText}` });
+      toast({ title: 'Quote recalculated', description: `New price: £${quote.totalPrice.toFixed(2)} (${totalDistance.toFixed(1)} miles)${extrasText}` });
     } catch (error: any) {
       console.error('Quote recalculation error:', error);
       toast({ title: 'Failed to recalculate quote', description: error?.message || 'Please try again', variant: 'destructive' });

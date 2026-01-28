@@ -1612,19 +1612,22 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
     
-    // Handle multi-drop stops update
-    if (supabaseAdmin && updateData.isMultiDrop !== undefined) {
+    // Handle multi-drop stops update when stops are provided
+    if (supabaseAdmin && (multiDropStops !== undefined || updateData.isMultiDrop !== undefined)) {
+      const jobId = job.id; // Use the job's actual ID type (could be integer or string)
+      
       // Delete existing stops first
       await supabaseAdmin
         .from('multi_drop_stops')
         .delete()
-        .eq('job_id', parseInt(req.params.id));
+        .eq('job_id', jobId);
       
       // Insert new stops if multi-drop is enabled and stops are provided
-      if (updateData.isMultiDrop && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
-        console.log(`[Jobs] Updating ${multiDropStops.length} multi-drop stops for job ${req.params.id}`);
+      const isMultiDropEnabled = updateData.isMultiDrop !== undefined ? updateData.isMultiDrop : job.isMultiDrop;
+      if (isMultiDropEnabled && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
+        console.log(`[Jobs] Updating ${multiDropStops.length} multi-drop stops for job ${jobId}`);
         const stopsToInsert = multiDropStops.map((stop: any, index: number) => ({
-          job_id: parseInt(req.params.id),
+          job_id: jobId,
           address: stop.address,
           postcode: stop.postcode,
           stop_order: index + 1,
