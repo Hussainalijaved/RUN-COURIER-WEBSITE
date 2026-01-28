@@ -6779,19 +6779,25 @@ export async function registerRoutes(
 
     // Get customer information - try from user record first, then from provided data, then from job recipient
     let customerEmail: string | undefined;
-    let customerName: string;
-    let customerId = job.customerId;
+    let customerName: string = job.recipientName || 'Customer';
+    let customerId = job.customerId || 'admin-job';
 
-    const customer = await storage.getUser(job.customerId);
-    if (customer?.email) {
-      customerEmail = customer.email;
-      customerName = customer.fullName;
-    } else if (providedEmail) {
-      // Admin provided email directly (for admin-created jobs)
+    if (job.customerId) {
+      const customer = await storage.getUser(job.customerId);
+      if (customer?.email) {
+        customerEmail = customer.email;
+        customerName = customer.fullName;
+      }
+    }
+    
+    // Use provided email if no customer found
+    if (!customerEmail && providedEmail) {
       customerEmail = providedEmail;
       customerName = providedName || job.recipientName || 'Customer';
-    } else {
-      // No email found - ask admin to provide one
+    }
+    
+    // No email found - ask admin to provide one
+    if (!customerEmail) {
       return res.status(400).json({ 
         error: "Customer email not found. Please provide a customer email.",
         requiresEmail: true 
