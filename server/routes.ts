@@ -1633,7 +1633,7 @@ export async function registerRoutes(
           stop_order: index + 1,
           recipient_name: stop.recipientName || null,
           recipient_phone: stop.recipientPhone || null,
-          delivery_instructions: stop.deliveryInstructions || null,
+          instructions: stop.deliveryInstructions || null,
         }));
         
         const { error: stopsError } = await supabaseAdmin

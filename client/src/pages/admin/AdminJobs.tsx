@@ -772,13 +772,13 @@ export default function AdminJobs() {
     setEditMultiDropStops([]);
     if (job.isMultiDrop) {
       fetch(`/api/jobs/${job.id}/stops`)
-        .then(res => res.ok ? res.json() : [])
-        .then(stops => setEditMultiDropStops(stops.map((s: any) => ({
+        .then(res => res.ok ? res.json() : { stops: [] })
+        .then(data => setEditMultiDropStops((data.stops || []).map((s: any) => ({
           address: s.address || '',
           postcode: s.postcode || '',
           recipientName: s.recipientName || '',
           recipientPhone: s.recipientPhone || '',
-          deliveryInstructions: s.deliveryInstructions || '',
+          deliveryInstructions: s.instructions || '',
         }))))
         .catch(() => setEditMultiDropStops([]));
     }
