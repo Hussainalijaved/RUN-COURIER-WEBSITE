@@ -6902,11 +6902,13 @@ export async function registerRoutes(
   // Admin: Get payment links for a job
   app.get("/api/admin/payment-links", asyncHandler(async (req, res) => {
     const { jobId, customerId, status } = req.query;
+    console.log('[PaymentLinks] Admin fetching links with jobId:', jobId);
     const links = await storage.getPaymentLinks({
       jobId: jobId as string | undefined,
       customerId: customerId as string | undefined,
       status: status as any,
     });
+    console.log('[PaymentLinks] Found', links.length, 'payment links');
     res.json(links);
   }));
 
