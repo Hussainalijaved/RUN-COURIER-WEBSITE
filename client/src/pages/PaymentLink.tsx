@@ -241,50 +241,10 @@ export default function PaymentLink() {
         </Card>
 
         <Card className="mb-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Price Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Base Price</span>
-                <span>{formatPrice(linkData.pricing.basePrice)}</span>
-              </div>
-              {parseFloat(linkData.pricing.distancePrice || '0') > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Distance Charge</span>
-                  <span>{formatPrice(linkData.pricing.distancePrice)}</span>
-                </div>
-              )}
-              {parseFloat(linkData.pricing.weightSurcharge || '0') > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Weight Surcharge</span>
-                  <span>{formatPrice(linkData.pricing.weightSurcharge)}</span>
-                </div>
-              )}
-              {parseFloat(linkData.pricing.centralLondonCharge || '0') > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Central London Charge</span>
-                  <span>{formatPrice(linkData.pricing.centralLondonCharge)}</span>
-                </div>
-              )}
-              {parseFloat(linkData.pricing.multiDropCharge || '0') > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Multi-Drop Fee</span>
-                  <span>{formatPrice(linkData.pricing.multiDropCharge)}</span>
-                </div>
-              )}
-              {parseFloat(linkData.pricing.returnTripCharge || '0') > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Return Trip Fee</span>
-                  <span>{formatPrice(linkData.pricing.returnTripCharge)}</span>
-                </div>
-              )}
-              <Separator className="my-3" />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span className="text-primary">{formatPrice(linkData.amount)}</span>
-              </div>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-muted-foreground mb-2">Amount Due</p>
+              <p className="text-4xl font-bold text-primary">{formatPrice(linkData.amount)}</p>
             </div>
           </CardContent>
         </Card>
