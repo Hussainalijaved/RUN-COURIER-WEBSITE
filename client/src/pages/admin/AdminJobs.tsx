@@ -76,7 +76,7 @@ import { ShippingLabel } from '@/components/ShippingLabel';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
-import type { Job, Driver, JobStatus, JobAssignment, CustomerType } from '@shared/schema';
+import type { Job, Driver, JobStatus, JobAssignment, CustomerType, VehicleType } from '@shared/schema';
 import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
 
 // Type for drivers from Supabase
@@ -313,6 +313,23 @@ export default function AdminJobs() {
   const [editDriverId, setEditDriverId] = useState<string>('');
   const [editTotalPrice, setEditTotalPrice] = useState<string>('');
   const [editDriverPrice, setEditDriverPrice] = useState<string>('');
+  // Extended edit fields
+  const [editPickupAddress, setEditPickupAddress] = useState<string>('');
+  const [editPickupPostcode, setEditPickupPostcode] = useState<string>('');
+  const [editPickupBuildingName, setEditPickupBuildingName] = useState<string>('');
+  const [editPickupContactName, setEditPickupContactName] = useState<string>('');
+  const [editPickupContactPhone, setEditPickupContactPhone] = useState<string>('');
+  const [editPickupInstructions, setEditPickupInstructions] = useState<string>('');
+  const [editDeliveryAddress, setEditDeliveryAddress] = useState<string>('');
+  const [editDeliveryPostcode, setEditDeliveryPostcode] = useState<string>('');
+  const [editDeliveryBuildingName, setEditDeliveryBuildingName] = useState<string>('');
+  const [editRecipientName, setEditRecipientName] = useState<string>('');
+  const [editRecipientPhone, setEditRecipientPhone] = useState<string>('');
+  const [editDeliveryInstructions, setEditDeliveryInstructions] = useState<string>('');
+  const [editVehicleType, setEditVehicleType] = useState<string>('car');
+  const [editWeight, setEditWeight] = useState<string>('1');
+  const [editDistance, setEditDistance] = useState<string>('0');
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [jobForLabel, setJobForLabel] = useState<Job | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -721,16 +738,95 @@ export default function AdminJobs() {
     setEditDriverId(job.driverId || 'unassigned');
     setEditTotalPrice(job.totalPrice?.toString() || '0');
     setEditDriverPrice(job.driverPrice?.toString() || '');
+    // Extended fields
+    setEditPickupAddress(job.pickupAddress || '');
+    setEditPickupPostcode(job.pickupPostcode || '');
+    setEditPickupBuildingName((job as any).pickupBuildingName || '');
+    setEditPickupContactName((job as any).pickupContactName || '');
+    setEditPickupContactPhone((job as any).pickupContactPhone || '');
+    setEditPickupInstructions((job as any).pickupInstructions || '');
+    setEditDeliveryAddress(job.deliveryAddress || '');
+    setEditDeliveryPostcode(job.deliveryPostcode || '');
+    setEditDeliveryBuildingName((job as any).deliveryBuildingName || '');
+    setEditRecipientName((job as any).recipientName || '');
+    setEditRecipientPhone((job as any).recipientPhone || '');
+    setEditDeliveryInstructions((job as any).deliveryInstructions || '');
+    setEditVehicleType(job.vehicleType || 'car');
+    setEditWeight(job.weight?.toString() || '1');
+    setEditDistance(job.distance?.toString() || '0');
     setEditDialogOpen(true);
+  };
+
+  // Recalculate quote when postcodes, vehicle type, or weight change
+  const recalculateQuote = async () => {
+    if (!editPickupPostcode || !editDeliveryPostcode) {
+      toast({ title: 'Missing postcodes', description: 'Please enter both pickup and delivery postcodes.', variant: 'destructive' });
+      return;
+    }
+    
+    setIsRecalculating(true);
+    try {
+      // Get distance from API
+      const response = await fetch(`/api/maps/optimized-route`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pickupPostcode: editPickupPostcode,
+          dropPostcodes: [editDeliveryPostcode],
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to calculate route');
+      }
+      
+      const data = await response.json();
+      const distance = data.legs?.[0]?.distance || 0;
+      setEditDistance(distance.toFixed(1));
+      
+      // Import pricing calculation
+      const { calculateQuote } = await import('@/lib/pricing');
+      const weight = parseFloat(editWeight) || 1;
+      const vehicleType = editVehicleType as any;
+      
+      const quote = calculateQuote(vehicleType, distance, weight, {
+        pickupPostcode: editPickupPostcode,
+        deliveryPostcode: editDeliveryPostcode,
+      });
+      
+      setEditTotalPrice(quote.totalPrice.toFixed(2));
+      toast({ title: 'Quote recalculated', description: `New price: £${quote.totalPrice.toFixed(2)} (${distance.toFixed(1)} miles)` });
+    } catch (error: any) {
+      console.error('Quote recalculation error:', error);
+      toast({ title: 'Failed to recalculate quote', description: error?.message || 'Please try again', variant: 'destructive' });
+    } finally {
+      setIsRecalculating(false);
+    }
   };
 
   const handleSaveEdit = () => {
     if (!jobToEdit) return;
 
-    const updates: Partial<Job> = {
+    const updates: Partial<Job> & Record<string, any> = {
       status: editStatus,
       totalPrice: editTotalPrice,
       driverPrice: editDriverPrice || null,
+      // Extended fields
+      pickupAddress: editPickupAddress,
+      pickupPostcode: editPickupPostcode,
+      pickupBuildingName: editPickupBuildingName || null,
+      pickupContactName: editPickupContactName || null,
+      pickupContactPhone: editPickupContactPhone || null,
+      pickupInstructions: editPickupInstructions || null,
+      deliveryAddress: editDeliveryAddress,
+      deliveryPostcode: editDeliveryPostcode,
+      deliveryBuildingName: editDeliveryBuildingName || null,
+      recipientName: editRecipientName || null,
+      recipientPhone: editRecipientPhone || null,
+      deliveryInstructions: editDeliveryInstructions || null,
+      vehicleType: editVehicleType as VehicleType,
+      weight: editWeight,
+      distance: editDistance,
     };
 
     if (editDriverId !== 'unassigned' && editDriverId !== jobToEdit.driverId) {
@@ -1733,74 +1829,296 @@ export default function AdminJobs() {
           </DialogContent>
         </Dialog>
 
-        {/* Edit Job Dialog */}
+        {/* Edit Job Dialog - Full Edit */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Edit Job</DialogTitle>
+          <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="flex items-center gap-2">
+                <Edit3 className="h-5 w-5" />
+                Edit Job
+              </DialogTitle>
               <DialogDescription>
-                Update job {jobToEdit?.trackingNumber}
+                <span className="font-mono font-bold text-foreground">{jobToEdit?.trackingNumber}</span>
+                <span className="text-muted-foreground ml-2">(Job number will not change)</span>
               </DialogDescription>
             </DialogHeader>
             {jobToEdit && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Pickup</p>
-                    <p className="font-mono">{jobToEdit.pickupPostcode}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Delivery</p>
-                    <p className="font-mono">{jobToEdit.deliveryPostcode}</p>
+              <div className="space-y-6 overflow-y-auto flex-1 pr-2">
+                {/* Pickup Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-green-500" />
+                    Pickup Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="edit-pickup-address">Pickup Address</Label>
+                      <Input
+                        id="edit-pickup-address"
+                        value={editPickupAddress}
+                        onChange={(e) => setEditPickupAddress(e.target.value)}
+                        placeholder="Full pickup address"
+                        data-testid="input-edit-pickup-address"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-pickup-postcode">Pickup Postcode</Label>
+                      <Input
+                        id="edit-pickup-postcode"
+                        value={editPickupPostcode}
+                        onChange={(e) => setEditPickupPostcode(e.target.value.toUpperCase())}
+                        placeholder="e.g. SW1A 1AA"
+                        className="font-mono"
+                        data-testid="input-edit-pickup-postcode"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-pickup-building">Building Name</Label>
+                      <Input
+                        id="edit-pickup-building"
+                        value={editPickupBuildingName}
+                        onChange={(e) => setEditPickupBuildingName(e.target.value)}
+                        placeholder="Optional"
+                        data-testid="input-edit-pickup-building"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-pickup-contact-name">Contact Name</Label>
+                      <Input
+                        id="edit-pickup-contact-name"
+                        value={editPickupContactName}
+                        onChange={(e) => setEditPickupContactName(e.target.value)}
+                        placeholder="Sender name"
+                        data-testid="input-edit-pickup-contact-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-pickup-contact-phone">Contact Phone</Label>
+                      <Input
+                        id="edit-pickup-contact-phone"
+                        value={editPickupContactPhone}
+                        onChange={(e) => setEditPickupContactPhone(e.target.value)}
+                        placeholder="Phone number"
+                        data-testid="input-edit-pickup-contact-phone"
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="edit-pickup-instructions">Pickup Instructions</Label>
+                      <Textarea
+                        id="edit-pickup-instructions"
+                        value={editPickupInstructions}
+                        onChange={(e) => setEditPickupInstructions(e.target.value)}
+                        placeholder="Special instructions for pickup..."
+                        className="resize-none"
+                        rows={2}
+                        data-testid="input-edit-pickup-instructions"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <Separator />
 
+                {/* Delivery Section */}
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-status">Job Status</Label>
-                    <Select value={editStatus} onValueChange={(val) => setEditStatus(val as JobStatus)}>
-                      <SelectTrigger id="edit-status" data-testid="select-edit-status">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {JOB_STATUSES.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-red-500" />
+                    Delivery Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="edit-delivery-address">Delivery Address</Label>
+                      <Input
+                        id="edit-delivery-address"
+                        value={editDeliveryAddress}
+                        onChange={(e) => setEditDeliveryAddress(e.target.value)}
+                        placeholder="Full delivery address"
+                        data-testid="input-edit-delivery-address"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-delivery-postcode">Delivery Postcode</Label>
+                      <Input
+                        id="edit-delivery-postcode"
+                        value={editDeliveryPostcode}
+                        onChange={(e) => setEditDeliveryPostcode(e.target.value.toUpperCase())}
+                        placeholder="e.g. EC1A 1BB"
+                        className="font-mono"
+                        data-testid="input-edit-delivery-postcode"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-delivery-building">Building Name</Label>
+                      <Input
+                        id="edit-delivery-building"
+                        value={editDeliveryBuildingName}
+                        onChange={(e) => setEditDeliveryBuildingName(e.target.value)}
+                        placeholder="Optional"
+                        data-testid="input-edit-delivery-building"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-recipient-name">Recipient Name</Label>
+                      <Input
+                        id="edit-recipient-name"
+                        value={editRecipientName}
+                        onChange={(e) => setEditRecipientName(e.target.value)}
+                        placeholder="Recipient name"
+                        data-testid="input-edit-recipient-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-recipient-phone">Recipient Phone</Label>
+                      <Input
+                        id="edit-recipient-phone"
+                        value={editRecipientPhone}
+                        onChange={(e) => setEditRecipientPhone(e.target.value)}
+                        placeholder="Phone number"
+                        data-testid="input-edit-recipient-phone"
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="edit-delivery-instructions">Delivery Instructions</Label>
+                      <Textarea
+                        id="edit-delivery-instructions"
+                        value={editDeliveryInstructions}
+                        onChange={(e) => setEditDeliveryInstructions(e.target.value)}
+                        placeholder="Special instructions for delivery..."
+                        className="resize-none"
+                        rows={2}
+                        data-testid="input-edit-delivery-instructions"
+                      />
+                    </div>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-driver">Assigned Driver</Label>
-                    <Select value={editDriverId} onValueChange={setEditDriverId}>
-                      <SelectTrigger id="edit-driver" data-testid="select-edit-driver">
-                        <SelectValue placeholder="Select driver" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">No Driver (Unassigned)</SelectItem>
-                        {allDriversWithInfo.map((driver) => (
-                          <SelectItem key={driver.id} value={driver.id}>
-                            <div className="flex items-center gap-2">
-                              {driver.driverCode && (
-                                <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
-                              )}
-                              <span>{driver.name}</span>
-                              {driver.isAvailable && (
-                                <Badge variant="secondary" className="text-xs">Online</Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <Separator />
+
+                {/* Vehicle & Package Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Vehicle & Package
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-vehicle-type">Vehicle Type</Label>
+                      <Select value={editVehicleType} onValueChange={setEditVehicleType}>
+                        <SelectTrigger id="edit-vehicle-type" data-testid="select-edit-vehicle-type">
+                          <SelectValue placeholder="Select vehicle" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="motorbike">Motorbike</SelectItem>
+                          <SelectItem value="car">Car</SelectItem>
+                          <SelectItem value="small_van">Small Van</SelectItem>
+                          <SelectItem value="medium_van">Medium Van</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-weight">Weight (kg)</Label>
+                      <Input
+                        id="edit-weight"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={editWeight}
+                        onChange={(e) => setEditWeight(e.target.value)}
+                        data-testid="input-edit-weight"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-distance">Distance (miles)</Label>
+                      <Input
+                        id="edit-distance"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={editDistance}
+                        onChange={(e) => setEditDistance(e.target.value)}
+                        data-testid="input-edit-distance"
+                      />
+                    </div>
                   </div>
+                  
+                  {/* Recalculate Quote Button */}
+                  <Button
+                    variant="outline"
+                    onClick={recalculateQuote}
+                    disabled={isRecalculating}
+                    className="w-full"
+                    data-testid="button-recalculate-quote"
+                  >
+                    {isRecalculating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Recalculating...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Recalculate Quote from Postcodes
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Click to recalculate distance and price based on the current postcodes
+                  </p>
+                </div>
 
-                  <Separator />
+                <Separator />
 
+                {/* Status & Assignment Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Status & Assignment</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-status">Job Status</Label>
+                      <Select value={editStatus} onValueChange={(val) => setEditStatus(val as JobStatus)}>
+                        <SelectTrigger id="edit-status" data-testid="select-edit-status">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {JOB_STATUSES.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-driver">Assigned Driver</Label>
+                      <Select value={editDriverId} onValueChange={setEditDriverId}>
+                        <SelectTrigger id="edit-driver" data-testid="select-edit-driver">
+                          <SelectValue placeholder="Select driver" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">No Driver (Unassigned)</SelectItem>
+                          {allDriversWithInfo.map((driver) => (
+                            <SelectItem key={driver.id} value={driver.id}>
+                              <div className="flex items-center gap-2">
+                                {driver.driverCode && (
+                                  <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                                )}
+                                <span>{driver.name}</span>
+                                {driver.isAvailable && (
+                                  <Badge variant="secondary" className="text-xs">Online</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Pricing Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Pricing</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="edit-total-price">Customer Price (£)</Label>
@@ -1833,7 +2151,7 @@ export default function AdminJobs() {
                 </div>
               </div>
             )}
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t">
               <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
                 Cancel
               </Button>
