@@ -988,11 +988,9 @@ export default function AdminJobs() {
     if (job.isMultiDrop) {
       setLoadingStops(true);
       try {
-        const response = await fetch(`/api/jobs/${job.id}/stops`);
-        if (response.ok) {
-          const data = await response.json();
-          setMultiDropStops(data.stops || []);
-        }
+        const response = await apiRequest('GET', `/api/jobs/${job.id}/stops`);
+        const data = await response.json();
+        setMultiDropStops(data.stops || []);
       } catch (error) {
         console.error('Failed to fetch multi-drop stops:', error);
       } finally {
