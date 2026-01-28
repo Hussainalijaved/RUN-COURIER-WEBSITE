@@ -1605,8 +1605,10 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/jobs/:id", asyncHandler(async (req, res) => {
+    console.log(`[Jobs PATCH] Updating job ${req.params.id}`, JSON.stringify(req.body, null, 2));
     const previousJob = await storage.getJob(req.params.id);
     const { multiDropStops, ...updateData } = req.body;
+    console.log(`[Jobs PATCH] multiDropStops received:`, multiDropStops);
     const job = await storage.updateJob(req.params.id, updateData);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
