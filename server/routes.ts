@@ -6771,10 +6771,18 @@ export async function registerRoutes(
     // Check if there's already an active payment link
     const existingLink = await storage.getActivePaymentLinkForJob(jobId);
     if (existingLink) {
-      return res.status(400).json({ 
-        error: "An active payment link already exists for this job",
-        existingLinkId: existingLink.id 
-      });
+      // Check if the existing link is actually expired (despite status)
+      const expiresAt = existingLink.expiresAt instanceof Date ? existingLink.expiresAt : new Date(existingLink.expiresAt);
+      if (expiresAt < new Date()) {
+        // Link is expired, cancel it and allow new one
+        console.log('[PaymentLink] Existing link expired, cancelling:', existingLink.id);
+        await storage.cancelPaymentLink(existingLink.id, 'system');
+      } else {
+        return res.status(400).json({ 
+          error: "An active payment link already exists for this job",
+          existingLinkId: existingLink.id 
+        });
+      }
     }
 
     // Get customer information - try from user record first, then from provided data, then from job recipient
@@ -7128,7 +7136,9 @@ export async function registerRoutes(
     }
 
     // Check if expired
-    if (new Date(link.expiresAt) < new Date()) {
+    const expiresAt = link.expiresAt instanceof Date ? link.expiresAt : new Date(link.expiresAt);
+    console.log('[PaymentLink] Checking expiry:', expiresAt, 'vs now:', new Date(), 'expired:', expiresAt < new Date());
+    if (expiresAt < new Date()) {
       await storage.updatePaymentLink(link.id, { status: "expired" });
       await storage.appendPaymentLinkAuditLog(link.id, "expired", undefined, "Link accessed after expiry");
       return res.status(410).json({ error: "This payment link has expired" });
