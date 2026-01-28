@@ -77,6 +77,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ShippingLabel } from '@/components/ShippingLabel';
 import { MultiDropShippingLabels } from '@/components/MultiDropShippingLabels';
+import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFunctions } from '@/lib/supabaseFunctions';
@@ -1932,10 +1933,14 @@ export default function AdminJobs() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-pickup-postcode">Pickup Postcode</Label>
-                      <Input
-                        id="edit-pickup-postcode"
+                      <PostcodeAutocomplete
                         value={editPickupPostcode}
-                        onChange={(e) => setEditPickupPostcode(e.target.value.toUpperCase())}
+                        onChange={(postcode, fullAddress) => {
+                          setEditPickupPostcode(postcode.toUpperCase());
+                          if (fullAddress && !editPickupAddress) {
+                            setEditPickupAddress(fullAddress);
+                          }
+                        }}
                         placeholder="e.g. SW1A 1AA"
                         className="font-mono"
                         data-testid="input-edit-pickup-postcode"
@@ -2007,10 +2012,14 @@ export default function AdminJobs() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-delivery-postcode">Delivery Postcode</Label>
-                      <Input
-                        id="edit-delivery-postcode"
+                      <PostcodeAutocomplete
                         value={editDeliveryPostcode}
-                        onChange={(e) => setEditDeliveryPostcode(e.target.value.toUpperCase())}
+                        onChange={(postcode, fullAddress) => {
+                          setEditDeliveryPostcode(postcode.toUpperCase());
+                          if (fullAddress && !editDeliveryAddress) {
+                            setEditDeliveryAddress(fullAddress);
+                          }
+                        }}
                         placeholder="e.g. EC1A 1BB"
                         className="font-mono"
                         data-testid="input-edit-delivery-postcode"
@@ -2219,13 +2228,16 @@ export default function AdminJobs() {
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">Postcode</Label>
-                              <Input
+                              <PostcodeAutocomplete
                                 placeholder="e.g. EC1A 1BB"
                                 className="font-mono"
                                 value={stop.postcode}
-                                onChange={(e) => {
+                                onChange={(postcode, fullAddress) => {
                                   const updated = [...editMultiDropStops];
-                                  updated[index].postcode = e.target.value.toUpperCase();
+                                  updated[index].postcode = postcode.toUpperCase();
+                                  if (fullAddress && !updated[index].address) {
+                                    updated[index].address = fullAddress;
+                                  }
                                   setEditMultiDropStops(updated);
                                 }}
                                 data-testid={`input-stop-postcode-${index}`}
