@@ -996,6 +996,8 @@ export class SupabaseStorage implements IStorage {
     if (data.vehicleType !== undefined) dbData.vehicle_type = data.vehicleType;
     if (data.weight !== undefined) dbData.weight = data.weight;
     if (data.distance !== undefined) dbData.distance = data.distance;
+    if (data.isMultiDrop !== undefined) dbData.is_multi_drop = data.isMultiDrop;
+    if (data.isReturnTrip !== undefined) dbData.is_return_trip = data.isReturnTrip;
     
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
