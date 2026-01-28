@@ -984,6 +984,18 @@ export class SupabaseStorage implements IStorage {
     if (data.pickupPostcode !== undefined) dbData.pickup_postcode = data.pickupPostcode;
     if (data.driverPaymentStatus !== undefined) dbData.driver_payment_status = data.driverPaymentStatus;
     if (data.driverPaidAt !== undefined) dbData.driver_paid_at = data.driverPaidAt;
+    if (data.totalPrice !== undefined) dbData.total_price = data.totalPrice;
+    if (data.pickupBuildingName !== undefined) dbData.pickup_building_name = data.pickupBuildingName;
+    if (data.pickupContactName !== undefined) dbData.pickup_contact_name = data.pickupContactName;
+    if (data.pickupContactPhone !== undefined) dbData.pickup_contact_phone = data.pickupContactPhone;
+    if (data.pickupInstructions !== undefined) dbData.pickup_instructions = data.pickupInstructions;
+    if (data.deliveryBuildingName !== undefined) dbData.delivery_building_name = data.deliveryBuildingName;
+    if (data.recipientName !== undefined) dbData.recipient_name = data.recipientName;
+    if (data.recipientPhone !== undefined) dbData.recipient_phone = data.recipientPhone;
+    if (data.deliveryInstructions !== undefined) dbData.delivery_instructions = data.deliveryInstructions;
+    if (data.vehicleType !== undefined) dbData.vehicle_type = data.vehicleType;
+    if (data.weight !== undefined) dbData.weight = data.weight;
+    if (data.distance !== undefined) dbData.distance = data.distance;
     
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
