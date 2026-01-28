@@ -708,11 +708,14 @@ export default function AdminJobs() {
   const resendPaymentLinkMutation = useMutation({
     mutationFn: async ({ jobId }: { jobId: string }) => {
       const linksRes = await apiRequest('GET', `/api/admin/payment-links?jobId=${jobId}`);
-      const links = Array.isArray(linksRes) ? linksRes : [];
-      const activeLink = links.find((l: any) => 
+      const links = await linksRes.json();
+      const linksArray = Array.isArray(links) ? links : [];
+      console.log('[ResendPayment] Links for job', jobId, ':', linksArray);
+      const activeLink = linksArray.find((l: any) => 
         (l.status === 'pending' || l.status === 'sent' || l.status === 'opened') && 
         new Date(l.expiresAt) > new Date()
       );
+      console.log('[ResendPayment] Active link:', activeLink);
       if (!activeLink) {
         throw new Error('No active payment link found. Please send a new payment link.');
       }
