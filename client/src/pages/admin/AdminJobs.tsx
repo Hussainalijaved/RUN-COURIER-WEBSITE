@@ -70,6 +70,8 @@ import {
   Check,
   Route,
   X,
+  Upload,
+  Camera,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -372,6 +374,10 @@ export default function AdminJobs() {
     retry: 2,
     retryDelay: 1000,
   });
+  
+  // POD upload state
+  const [uploadingPod, setUploadingPod] = useState(false);
+  const podFileInputRef = useRef<HTMLInputElement>(null);
   
   // Loading timeout detection (show message if loading takes > 10 seconds)
   const [loadingTooLong, setLoadingTooLong] = useState(false);
@@ -682,6 +688,63 @@ export default function AdminJobs() {
         setEmailDialogJobId(jobId);
         setCustomerName(job?.recipientName || '');
         setEmailDialogOpen(true);
+      }
+    }
+  };
+
+  const handlePodUpload = async (event: React.ChangeEvent<HTMLInputElement>, jobId: string) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: 'Invalid file type', description: 'Please upload an image file (JPEG, PNG, GIF, or WebP)', variant: 'destructive' });
+      return;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Maximum file size is 10MB', variant: 'destructive' });
+      return;
+    }
+    
+    setUploadingPod(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Authentication required');
+      }
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`/api/jobs/${jobId}/pod/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+      
+      const result = await response.json();
+      toast({ title: 'POD uploaded', description: 'Proof of Delivery photo has been uploaded successfully' });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      
+      if (selectedJob?.id === jobId) {
+        setSelectedJob({ ...selectedJob, podPhotoUrl: result.podPhotoUrl });
+      }
+    } catch (error: any) {
+      console.error('[POD Upload] Error:', error);
+      toast({ title: 'Upload failed', description: error.message || 'Failed to upload POD photo', variant: 'destructive' });
+    } finally {
+      setUploadingPod(false);
+      if (podFileInputRef.current) {
+        podFileInputRef.current.value = '';
       }
     }
   };
@@ -1705,78 +1768,105 @@ export default function AdminJobs() {
                 <MultiDropStopsSection jobId={selectedJob.id} isMultiDrop={selectedJob.isMultiDrop ?? false} />
                 
                 {/* Proof of Delivery Section */}
-                {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl || selectedJob.podRecipientName) && (
-                  <div className="border-t pt-4">
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl) ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Camera className="h-4 w-4 text-muted-foreground" />
+                      )}
                       Proof of Delivery
                     </h4>
-                    
-                    {/* Recipient Name */}
-                    {selectedJob.podRecipientName && (
-                      <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Received By</p>
-                        <p className="font-medium text-green-700 dark:text-green-400" data-testid="text-pod-recipient">
-                          {selectedJob.podRecipientName}
-                        </p>
+                    <div>
+                      <input
+                        type="file"
+                        ref={podFileInputRef}
+                        className="hidden"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        onChange={(e) => handlePodUpload(e, selectedJob.id)}
+                        data-testid="input-pod-upload"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => podFileInputRef.current?.click()}
+                        disabled={uploadingPod}
+                        data-testid="button-upload-pod"
+                      >
+                        {uploadingPod ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-1" />
+                        )}
+                        {selectedJob.podPhotoUrl ? 'Replace Photo' : 'Upload Photo'}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl || selectedJob.podRecipientName) ? (
+                    <>
+                      {/* Recipient Name */}
+                      {selectedJob.podRecipientName && (
+                        <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Received By</p>
+                          <p className="font-medium text-green-700 dark:text-green-400" data-testid="text-pod-recipient">
+                            {selectedJob.podRecipientName}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedJob.podPhotoUrl && (
+                          <div>
+                            <p className="text-sm text-muted-foreground mb-2">Delivery Photo</p>
+                            <a 
+                              href={selectedJob.podPhotoUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="block"
+                            >
+                              <img 
+                                src={selectedJob.podPhotoUrl} 
+                                alt="Proof of Delivery" 
+                                className="rounded-lg border max-h-48 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                data-testid="img-pod-photo"
+                              />
+                            </a>
+                          </div>
+                        )}
+                        {selectedJob.podSignatureUrl && (
+                          <div>
+                            <p className="text-sm text-muted-foreground mb-2">Recipient Signature</p>
+                            <a 
+                              href={selectedJob.podSignatureUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="block"
+                            >
+                              <img 
+                                src={selectedJob.podSignatureUrl} 
+                                alt="Recipient Signature" 
+                                className="rounded-lg border bg-white p-2 max-h-32 object-contain hover:opacity-90 transition-opacity cursor-pointer"
+                                data-testid="img-pod-signature"
+                              />
+                            </a>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedJob.podPhotoUrl && (
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-2">Delivery Photo</p>
-                          <a 
-                            href={selectedJob.podPhotoUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="block"
-                          >
-                            <img 
-                              src={selectedJob.podPhotoUrl} 
-                              alt="Proof of Delivery" 
-                              className="rounded-lg border max-h-48 object-cover hover:opacity-90 transition-opacity cursor-pointer"
-                              data-testid="img-pod-photo"
-                            />
-                          </a>
-                        </div>
+                      {selectedJob.deliveredAt && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Delivered on {formatDate(selectedJob.deliveredAt)}
+                        </p>
                       )}
-                      {selectedJob.podSignatureUrl && (
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-2">Recipient Signature</p>
-                          <a 
-                            href={selectedJob.podSignatureUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="block"
-                          >
-                            <img 
-                              src={selectedJob.podSignatureUrl} 
-                              alt="Recipient Signature" 
-                              className="rounded-lg border bg-white p-2 max-h-32 object-contain hover:opacity-90 transition-opacity cursor-pointer"
-                              data-testid="img-pod-signature"
-                            />
-                          </a>
-                        </div>
-                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 p-4 rounded-lg">
+                      <Camera className="h-5 w-5" />
+                      <p className="text-sm">No proof of delivery photo uploaded yet. Click "Upload Photo" to add one.</p>
                     </div>
-                    {selectedJob.deliveredAt && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Delivered on {formatDate(selectedJob.deliveredAt)}
-                      </p>
-                    )}
-                  </div>
-                )}
-                
-                {/* No POD warning for delivered jobs */}
-                {selectedJob.status === 'delivered' && !selectedJob.podPhotoUrl && !selectedJob.podSignatureUrl && (
-                  <div className="border-t pt-4">
-                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
-                      <AlertCircle className="h-4 w-4" />
-                      <p className="text-sm">No Proof of Delivery was submitted for this job</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </DialogContent>

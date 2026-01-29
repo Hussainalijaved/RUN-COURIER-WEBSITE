@@ -250,6 +250,19 @@ const uploadDocument = multer({
   }
 });
 
+const uploadPodImage = multer({
+  storage: documentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed for POD photos.'));
+    }
+  }
+});
+
 // Sequential counter for tracking numbers within each year
 let lastJobSequence = 0;
 let lastJobYear = 0;
@@ -2021,6 +2034,99 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
     res.json(job);
+  }));
+
+  // Admin POD photo upload endpoint
+  app.post("/api/jobs/:id/pod/upload", (req, res, next) => {
+    uploadDocument.single('file')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "File size exceeds 10MB limit" });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  }, asyncHandler(async (req, res) => {
+    const jobId = req.params.id;
+    
+    // Verify admin access
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabaseAdmin!.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: "Invalid authentication token" });
+    }
+    
+    // Check if user is admin
+    const { data: adminCheck } = await supabaseAdmin!
+      .from('admins')
+      .select('email')
+      .eq('email', user.email)
+      .single();
+    
+    if (!adminCheck) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
+    // Verify job exists
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    
+    // Create POD directory for this job
+    const podDir = path.join(process.cwd(), 'uploads', 'pod', String(jobId));
+    if (!fs.existsSync(podDir)) {
+      fs.mkdirSync(podDir, { recursive: true });
+    }
+    
+    // Generate filename
+    const timestamp = Date.now();
+    const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
+    const finalFilename = `pod_${timestamp}${ext}`;
+    const finalPath = path.join(podDir, finalFilename);
+    
+    // Move file from temp to POD directory
+    fs.renameSync(req.file.path, finalPath);
+    
+    // Generate URL
+    const podPhotoUrl = `/uploads/pod/${jobId}/${finalFilename}`;
+    
+    // Update job with POD URL
+    const updatedJob = await storage.updateJobPOD(jobId, podPhotoUrl, job.podSignatureUrl || undefined);
+    
+    // Also update in Supabase if connected
+    if (supabaseAdmin) {
+      const { error: updateError } = await supabaseAdmin
+        .from('jobs')
+        .update({ pod_photo_url: podPhotoUrl })
+        .eq('id', jobId);
+      
+      if (updateError) {
+        console.error('[POD Upload] Failed to sync POD to Supabase:', updateError);
+      } else {
+        console.log(`[POD Upload] POD photo uploaded for job ${jobId}: ${podPhotoUrl}`);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      podPhotoUrl,
+      job: updatedJob 
+    });
   }));
 
   app.patch("/api/jobs/:id/decline", asyncHandler(async (req, res) => {
