@@ -137,10 +137,11 @@ export default function AdminMap() {
     return realtimeLoc?.isAvailable ?? d.isAvailable;
   });
   
-  // Show ALL jobs that are not completed (delivered/cancelled) on the map
+  // Show only jobs that are actively in progress on the map (not completed/cancelled/failed)
+  const completedStatuses = ['delivered', 'cancelled', 'failed'];
   const pendingJobs = jobs?.filter(j => j.status === 'pending') || [];
-  const activeJobs = jobs?.filter(j => !['delivered', 'cancelled', 'pending'].includes(j.status)) || [];
-  const allActiveBookings = jobs?.filter(j => !['delivered', 'cancelled'].includes(j.status)) || [];
+  const activeJobs = jobs?.filter(j => !['delivered', 'cancelled', 'failed', 'pending'].includes(j.status)) || [];
+  const allActiveBookings = jobs?.filter(j => !completedStatuses.includes(j.status)) || [];
 
   const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number } | null => {
     const realtimeLoc = realtimeLocations.get(driver.id);
