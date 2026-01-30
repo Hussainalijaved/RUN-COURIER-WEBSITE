@@ -132,6 +132,15 @@ Jobs are automatically geocoded when created or assigned:
 - **Mobile Map Display**: Driver mobile app uses coordinates to display pickup/delivery locations on map
 - **Fallback**: If geocoding fails, jobs still work but map preview will be unavailable
 
+### Driver Payment System
+Admins can record payments to drivers with saved bank details and email confirmations:
+- **Bank Details Storage**: Driver bank details (bank_name, account_holder_name, sort_code, account_number) stored in drivers table
+- **Payment Flow**: Select driver → View/Enter bank details → Enter amount/description → Record payment
+- **Bank Details Saved**: Once saved, bank details persist for future payments (just select driver and pay)
+- **Email Confirmation**: Automated email sent to driver when payment is recorded (via sendDriverPaymentConfirmation)
+- **Payment History**: All payments tracked in driver_payments table with status, amount, and reference
+- **Migration**: Run `supabase/migrations/025_add_driver_bank_details.sql` in Supabase SQL Editor
+
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.

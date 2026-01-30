@@ -85,6 +85,10 @@ function mapDbToDriver(dbDriver: any): Driver {
     rating: dbDriver.rating,
     totalJobs: dbDriver.total_jobs,
     profilePictureUrl: dbDriver.profile_picture_url,
+    bankName: dbDriver.bank_name || null,
+    accountHolderName: dbDriver.account_holder_name || null,
+    sortCode: dbDriver.sort_code || null,
+    accountNumber: dbDriver.account_number || null,
     isActive: dbDriver.is_active ?? true,
     deactivatedAt: dbDriver.deactivated_at ? new Date(dbDriver.deactivated_at) : null,
     createdAt: dbDriver.created_at ? new Date(dbDriver.created_at) : new Date(),
@@ -749,6 +753,10 @@ export class SupabaseStorage implements IStorage {
     if (data.rating !== undefined) dbData.rating = data.rating;
     if (data.totalJobs !== undefined) dbData.total_jobs = data.totalJobs;
     if (data.profilePictureUrl !== undefined) dbData.profile_picture_url = data.profilePictureUrl;
+    if (data.bankName !== undefined) dbData.bank_name = data.bankName;
+    if (data.accountHolderName !== undefined) dbData.account_holder_name = data.accountHolderName;
+    if (data.sortCode !== undefined) dbData.sort_code = data.sortCode;
+    if (data.accountNumber !== undefined) dbData.account_number = data.accountNumber;
     if (data.isActive !== undefined) dbData.is_active = data.isActive;
     if (data.deactivatedAt !== undefined) dbData.deactivated_at = data.deactivatedAt;
     

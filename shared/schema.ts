@@ -75,6 +75,11 @@ export const drivers = pgTable("drivers", {
   rating: decimal("rating", { precision: 3, scale: 2 }).default("5.00"),
   totalJobs: integer("total_jobs").default(0),
   profilePictureUrl: text("profile_picture_url"),
+  // Bank Details for payments
+  bankName: text("bank_name"),
+  accountHolderName: text("account_holder_name"),
+  sortCode: text("sort_code"),
+  accountNumber: text("account_number"),
   isActive: boolean("is_active").default(true),
   deactivatedAt: timestamp("deactivated_at"),
   createdAt: timestamp("created_at").defaultNow(),

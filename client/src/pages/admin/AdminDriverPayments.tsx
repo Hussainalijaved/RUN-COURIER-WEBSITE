@@ -98,6 +98,10 @@ const paymentFormSchema = insertDriverPaymentSchema
     ),
     reference: z.string().optional(),
     description: z.string().optional(),
+    bankName: z.string().optional(),
+    accountHolderName: z.string().optional(),
+    sortCode: z.string().optional(),
+    accountNumber: z.string().optional(),
   });
 
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
@@ -107,6 +111,8 @@ export default function AdminDriverPayments() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<string[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [showBankDetails, setShowBankDetails] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<PaymentFormValues>({
@@ -116,6 +122,10 @@ export default function AdminDriverPayments() {
       amount: '',
       reference: '',
       description: '',
+      bankName: '',
+      accountHolderName: '',
+      sortCode: '',
+      accountNumber: '',
     },
   });
 
@@ -219,6 +229,57 @@ export default function AdminDriverPayments() {
       toast({ title: 'Failed to update payments', variant: 'destructive' });
     },
   });
+
+  const saveBankDetailsMutation = useMutation({
+    mutationFn: async ({ driverId, bankDetails }: { 
+      driverId: string; 
+      bankDetails: { bankName: string; accountHolderName: string; sortCode: string; accountNumber: string } 
+    }) => {
+      return apiRequest('PATCH', `/api/drivers/${driverId}`, bankDetails);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      toast({ title: 'Bank details saved successfully' });
+      setShowBankDetails(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to save bank details', variant: 'destructive' });
+    },
+  });
+
+  const selectedDriver = drivers.find(d => d.id === selectedDriverId);
+  const hasBankDetails = selectedDriver?.bankName && selectedDriver?.sortCode && selectedDriver?.accountNumber;
+
+  const handleDriverSelect = (driverId: string) => {
+    setSelectedDriverId(driverId);
+    form.setValue('driverId', driverId);
+    
+    const driver = drivers.find(d => d.id === driverId);
+    if (driver) {
+      form.setValue('bankName', driver.bankName || '');
+      form.setValue('accountHolderName', driver.accountHolderName || '');
+      form.setValue('sortCode', driver.sortCode || '');
+      form.setValue('accountNumber', driver.accountNumber || '');
+      setShowBankDetails(!driver.bankName || !driver.sortCode || !driver.accountNumber);
+    }
+  };
+
+  const handleSaveBankDetails = () => {
+    const bankName = form.getValues('bankName');
+    const accountHolderName = form.getValues('accountHolderName');
+    const sortCode = form.getValues('sortCode');
+    const accountNumber = form.getValues('accountNumber');
+    
+    if (!bankName || !sortCode || !accountNumber) {
+      toast({ title: 'Please fill in all bank details', variant: 'destructive' });
+      return;
+    }
+    
+    saveBankDetailsMutation.mutate({
+      driverId: selectedDriverId,
+      bankDetails: { bankName, accountHolderName: accountHolderName || '', sortCode, accountNumber },
+    });
+  };
 
   const getDriverName = (driverId: string) => {
     const driver = drivers.find(d => d.id === driverId);
@@ -657,13 +718,17 @@ export default function AdminDriverPayments() {
 
       <Dialog open={paymentDialogOpen} onOpenChange={(open) => {
         setPaymentDialogOpen(open);
-        if (!open) form.reset();
+        if (!open) {
+          form.reset();
+          setSelectedDriverId('');
+          setShowBankDetails(false);
+        }
       }}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Record Driver Payment</DialogTitle>
             <DialogDescription>
-              Record a manual payment to a driver
+              Select a driver and record a payment
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -674,7 +739,7 @@ export default function AdminDriverPayments() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Driver</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={(value) => { field.onChange(value); handleDriverSelect(value); }} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-driver">
                           <SelectValue placeholder="Select a driver" />
@@ -696,6 +761,113 @@ export default function AdminDriverPayments() {
                   </FormItem>
                 )}
               />
+              
+              {selectedDriverId && (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Bank Details</span>
+                    {hasBankDetails && !showBankDetails && (
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setShowBankDetails(true)}
+                        data-testid="button-edit-bank-details"
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {hasBankDetails && !showBankDetails ? (
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Bank:</span>
+                        <span data-testid="text-bank-name">{selectedDriver?.bankName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Account Holder:</span>
+                        <span data-testid="text-account-holder">{selectedDriver?.accountHolderName || selectedDriver?.fullName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sort Code:</span>
+                        <span data-testid="text-sort-code">{selectedDriver?.sortCode}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Account:</span>
+                        <span data-testid="text-account-number">****{selectedDriver?.accountNumber?.slice(-4)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <FormField
+                        control={form.control}
+                        name="bankName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bank Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. Barclays" data-testid="input-bank-name" {...field} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="accountHolderName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Account Holder Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Name on bank account" data-testid="input-account-holder" {...field} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="sortCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sort Code</FormLabel>
+                              <FormControl>
+                                <Input placeholder="00-00-00" data-testid="input-sort-code" {...field} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="accountNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="12345678" data-testid="input-account-number" {...field} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleSaveBankDetails}
+                        disabled={saveBankDetailsMutation.isPending}
+                        className="w-full"
+                        data-testid="button-save-bank-details"
+                      >
+                        {saveBankDetailsMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : null}
+                        Save Bank Details
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
               <FormField
                 control={form.control}
                 name="amount"
@@ -750,30 +922,39 @@ export default function AdminDriverPayments() {
                   </FormItem>
                 )}
               />
-              <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    setPaymentDialogOpen(false);
-                    form.reset();
-                  }} 
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createPaymentMutation.isPending}
-                  data-testid="button-record-payment"
-                >
-                  {createPaymentMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <PoundSterling className="w-4 h-4 mr-2" />
-                  )}
-                  Record Payment
-                </Button>
+              <DialogFooter className="flex-col gap-2 sm:flex-row">
+                {selectedDriverId && !hasBankDetails && (
+                  <p className="text-sm text-muted-foreground text-center sm:text-left">
+                    Please save bank details before recording payment
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setPaymentDialogOpen(false);
+                      form.reset();
+                      setSelectedDriverId('');
+                      setShowBankDetails(false);
+                    }} 
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createPaymentMutation.isPending || !selectedDriverId || !hasBankDetails}
+                    data-testid="button-record-payment"
+                  >
+                    {createPaymentMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <PoundSterling className="w-4 h-4 mr-2" />
+                    )}
+                    Record Payment
+                  </Button>
+                </div>
               </DialogFooter>
             </form>
           </Form>

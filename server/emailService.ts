@@ -2132,3 +2132,142 @@ Run Courier - www.runcourier.co.uk`;
 
   return sendEmailNotification(customerEmail, `Delivery Failed - ${data.trackingNumber}`, htmlContent, textContent);
 }
+
+export async function sendDriverPaymentConfirmation(
+  driverEmail: string,
+  data: {
+    driverName: string;
+    amount: string;
+    description: string;
+    reference?: string;
+    bankName?: string;
+    sortCode?: string;
+    accountNumber?: string;
+    paidAt: string;
+  }
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const formattedDate = new Date(data.paidAt).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const maskedAccount = data.accountNumber 
+    ? `****${data.accountNumber.slice(-4)}`
+    : 'N/A';
+
+  const htmlContent = `
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+      <h2 style="color: #28a745; margin-bottom: 15px;">Payment Confirmation</h2>
+      <p style="color: #333; font-size: 16px; margin-bottom: 20px;">
+        Hi ${data.driverName},
+      </p>
+      <p style="color: #333; font-size: 16px; margin-bottom: 20px;">
+        We're pleased to confirm that a payment has been made to you from Run Courier.
+      </p>
+      
+      <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+              <strong style="color: #666;">Amount Paid:</strong>
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
+              <span style="color: #28a745; font-size: 20px; font-weight: bold;">£${data.amount}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+              <strong style="color: #666;">Description:</strong>
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
+              ${data.description}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+              <strong style="color: #666;">Payment Date:</strong>
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
+              ${formattedDate}
+            </td>
+          </tr>
+          ${data.reference ? `
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+              <strong style="color: #666;">Reference:</strong>
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
+              ${data.reference}
+            </td>
+          </tr>
+          ` : ''}
+          ${data.bankName ? `
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+              <strong style="color: #666;">Bank:</strong>
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
+              ${data.bankName}
+            </td>
+          </tr>
+          ` : ''}
+          ${data.sortCode ? `
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+              <strong style="color: #666;">Sort Code:</strong>
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
+              ${data.sortCode}
+            </td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding: 10px 0;">
+              <strong style="color: #666;">Account:</strong>
+            </td>
+            <td style="padding: 10px 0; text-align: right;">
+              ${maskedAccount}
+            </td>
+          </tr>
+        </table>
+      </div>
+      
+      <p style="color: #666; font-size: 14px; margin-top: 20px;">
+        This payment should appear in your bank account within 1-3 working days, depending on your bank.
+      </p>
+      
+      <p style="color: #666; font-size: 14px;">
+        If you have any questions about this payment, please contact our team.
+      </p>
+    </div>
+  `;
+
+  const textContent = `
+Payment Confirmation - Run Courier
+
+Hi ${data.driverName},
+
+We're pleased to confirm that a payment has been made to you from Run Courier.
+
+PAYMENT DETAILS
+---------------
+Amount Paid: £${data.amount}
+Description: ${data.description}
+Payment Date: ${formattedDate}
+${data.reference ? `Reference: ${data.reference}` : ''}
+${data.bankName ? `Bank: ${data.bankName}` : ''}
+${data.sortCode ? `Sort Code: ${data.sortCode}` : ''}
+Account: ${maskedAccount}
+
+This payment should appear in your bank account within 1-3 working days, depending on your bank.
+
+If you have any questions about this payment, please contact our team.
+
+Run Courier - www.runcourier.co.uk`;
+
+  return sendEmailNotification(driverEmail, `Payment Confirmation - £${data.amount} - Run Courier`, wrapEmailContent(htmlContent, 'Payment Confirmation'), textContent);
+}

@@ -2391,6 +2391,10 @@ export async function registerRoutes(
       if (safeBody.address !== undefined) updateData.address = safeBody.address;
       if (safeBody.isAvailable !== undefined) updateData.isAvailable = safeBody.isAvailable;
       if (safeBody.isVerified !== undefined) updateData.isVerified = safeBody.isVerified;
+      if (safeBody.bankName !== undefined) updateData.bankName = safeBody.bankName;
+      if (safeBody.accountHolderName !== undefined) updateData.accountHolderName = safeBody.accountHolderName;
+      if (safeBody.sortCode !== undefined) updateData.sortCode = safeBody.sortCode;
+      if (safeBody.accountNumber !== undefined) updateData.accountNumber = safeBody.accountNumber;
       
       if (Object.keys(updateData).length > 0) {
         await db.update(drivers).set(updateData).where(eq(drivers.id, req.params.id));
@@ -2410,6 +2414,10 @@ export async function registerRoutes(
           if (safeBody.isVerified !== undefined) supabaseUpdateData.is_verified = safeBody.isVerified;
           if (safeBody.address !== undefined) supabaseUpdateData.address = safeBody.address;
           if (safeBody.postcode !== undefined) supabaseUpdateData.postcode = safeBody.postcode;
+          if (safeBody.bankName !== undefined) supabaseUpdateData.bank_name = safeBody.bankName;
+          if (safeBody.accountHolderName !== undefined) supabaseUpdateData.account_holder_name = safeBody.accountHolderName;
+          if (safeBody.sortCode !== undefined) supabaseUpdateData.sort_code = safeBody.sortCode;
+          if (safeBody.accountNumber !== undefined) supabaseUpdateData.account_number = safeBody.accountNumber;
           
           if (Object.keys(supabaseUpdateData).length > 0) {
             await supabaseAdmin
@@ -4222,6 +4230,30 @@ export async function registerRoutes(
 
   app.post("/api/driver-payments", asyncHandler(async (req, res) => {
     const payment = await storage.createDriverPayment(req.body);
+    
+    // Send email confirmation if payment status is 'paid' and we have driver info
+    if (req.body.status === 'paid' && req.body.driverId) {
+      try {
+        const driver = await storage.getDriver(req.body.driverId);
+        if (driver?.email) {
+          const { sendDriverPaymentConfirmation } = await import('./emailService');
+          await sendDriverPaymentConfirmation(driver.email, {
+            driverName: driver.fullName || 'Driver',
+            amount: req.body.amount || payment.netAmount,
+            description: req.body.description || 'Driver payment',
+            reference: req.body.payoutReference || undefined,
+            bankName: driver.bankName || undefined,
+            sortCode: driver.sortCode || undefined,
+            accountNumber: driver.accountNumber || undefined,
+            paidAt: req.body.paidAt || new Date().toISOString(),
+          });
+          console.log(`[Driver Payment] Confirmation email sent to ${driver.email}`);
+        }
+      } catch (emailErr) {
+        console.error('[Driver Payment] Failed to send confirmation email:', emailErr);
+      }
+    }
+    
     res.status(201).json(payment);
   }));
 
