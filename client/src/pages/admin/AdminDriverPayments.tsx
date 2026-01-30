@@ -726,9 +726,9 @@ export default function AdminDriverPayments() {
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Record Driver Payment</DialogTitle>
+            <DialogTitle>Record Driver Payment (v2 - with Bank Details)</DialogTitle>
             <DialogDescription>
-              Select a driver and record a payment
+              Select a driver, enter bank details, and record a payment
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
