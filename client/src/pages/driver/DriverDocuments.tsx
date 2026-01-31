@@ -32,8 +32,18 @@ import {
 const baseDocumentTypes = [
   {
     type: 'driving_license',
-    label: 'Driving License',
-    description: 'Valid UK driving license (front and back)',
+    label: 'Driving License (Front)',
+    description: 'Front side of your valid UK driving license',
+    icon: CreditCard,
+    required: true,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
+    isVehiclePhoto: false,
+    requiresExpiryDate: false,
+  },
+  {
+    type: 'driving_license_back',
+    label: 'Driving License (Back)',
+    description: 'Back side of your valid UK driving license',
     icon: CreditCard,
     required: true,
     vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],

@@ -42,9 +42,7 @@ import {
   Wifi,
   WifiOff,
   Camera,
-  FileText,
   Building2,
-  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -511,41 +509,6 @@ export default function DriverProfile() {
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Documents Status
-                </CardTitle>
-                <CardDescription>Upload status of required documents</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <span>Driving Licence (Front)</span>
-                  </div>
-                  <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-licence-front-status">
-                    <XCircle className="h-3 w-3" />
-                    Failed to Upload
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <span>Driving Licence (Back)</span>
-                  </div>
-                  <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-licence-back-status">
-                    <XCircle className="h-3 w-3" />
-                    Failed to Upload
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Please upload your driving licence documents via the mobile app
-                </p>
               </CardContent>
             </Card>
 
