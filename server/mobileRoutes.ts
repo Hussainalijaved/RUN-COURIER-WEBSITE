@@ -766,23 +766,39 @@ export function registerMobileRoutes(app: Express): void {
         }
       }
 
-      // Also create a document record for tracking/approval (use normalized type for consistency)
+      // Create a document record in driver_documents table for tracking/approval
+      // This is the same table the web app reads from
       try {
+        // Try with doc_type column first (primary column name in driver_documents)
         const { error: docError } = await supabaseAdmin
-          .from('documents')
+          .from('driver_documents')
           .insert({
             driver_id: driver.id,
-            document_type: normalizedDocType,
+            doc_type: normalizedDocType,
             file_url: publicUrl,
-            file_name: file.originalname,
-            file_size: file.size,
-            mime_type: file.mimetype,
             status: 'pending',
-            uploaded_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           });
 
-        if (docError && !docError.message.includes('duplicate')) {
-          console.error('[Mobile Docs] Failed to create document record:', docError);
+        if (docError) {
+          console.error('[Mobile Docs] Failed to create document in driver_documents:', docError);
+          
+          // Fallback: try storage layer which uses 'documents' table
+          try {
+            await storage.createDocument({
+              driverId: driver.id,
+              type: normalizedDocType as any,
+              fileName: file.originalname,
+              fileUrl: publicUrl,
+              status: 'pending',
+            });
+            console.log('[Mobile Docs] Created document in storage/documents table');
+          } catch (storageErr) {
+            console.error('[Mobile Docs] Storage createDocument also failed:', storageErr);
+          }
+        } else {
+          console.log('[Mobile Docs] Created document in driver_documents table');
         }
       } catch (err) {
         console.error('[Mobile Docs] Error creating document record:', err);
