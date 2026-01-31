@@ -42,6 +42,9 @@ import {
   Wifi,
   WifiOff,
   Camera,
+  FileText,
+  Building2,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -79,6 +82,10 @@ export default function DriverProfile() {
   const [vehicleMake, setVehicleMake] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleColor, setVehicleColor] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [sortCode, setSortCode] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
 
@@ -147,6 +154,10 @@ export default function DriverProfile() {
       setVehicleModel(driver.vehicleModel || '');
       setVehicleColor(driver.vehicleColor || '');
       setIsAvailable(driver.isAvailable ?? false);
+      setBankName((driver as any).bankName || '');
+      setAccountHolderName((driver as any).accountHolderName || '');
+      setSortCode((driver as any).sortCode || '');
+      setAccountNumber((driver as any).accountNumber || '');
     }
   }, [driver]);
 
@@ -171,6 +182,10 @@ export default function DriverProfile() {
           vehicleMake,
           vehicleModel,
           vehicleColor,
+          bankName,
+          accountHolderName,
+          sortCode,
+          accountNumber,
         },
       },
       {
@@ -493,6 +508,93 @@ export default function DriverProfile() {
                       value={vehicleColor}
                       onChange={(e) => setVehicleColor(e.target.value)}
                       data-testid="input-color"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Documents Status
+                </CardTitle>
+                <CardDescription>Upload status of required documents</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <span>Driving Licence (Front)</span>
+                  </div>
+                  <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-licence-front-status">
+                    <XCircle className="h-3 w-3" />
+                    Failed to Upload
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <span>Driving Licence (Back)</span>
+                  </div>
+                  <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-licence-back-status">
+                    <XCircle className="h-3 w-3" />
+                    Failed to Upload
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Please upload your driving licence documents via the mobile app
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Bank Details
+                </CardTitle>
+                <CardDescription>Your payment details for receiving earnings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Bank Name</Label>
+                    <Input 
+                      placeholder="e.g., Barclays"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      data-testid="input-bank-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Holder Name</Label>
+                    <Input 
+                      placeholder="Name on your bank account"
+                      value={accountHolderName}
+                      onChange={(e) => setAccountHolderName(e.target.value)}
+                      data-testid="input-account-holder"
+                    />
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Sort Code</Label>
+                    <Input 
+                      placeholder="e.g., 12-34-56"
+                      value={sortCode}
+                      onChange={(e) => setSortCode(e.target.value)}
+                      data-testid="input-sort-code"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Number</Label>
+                    <Input 
+                      placeholder="e.g., 12345678"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      data-testid="input-account-number"
                     />
                   </div>
                 </div>
