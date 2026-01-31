@@ -2372,66 +2372,43 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Driver not found" });
     }
     
-    // Sync update to PostgreSQL database via Drizzle
+    // Sync to Supabase (primary data store)
     try {
-      const { db } = await import("./db");
-      const { drivers } = await import("@shared/schema");
-      const { eq } = await import("drizzle-orm");
-      
-      const updateData: Partial<typeof drivers.$inferSelect> = {};
-      if (safeBody.vehicleType !== undefined) updateData.vehicleType = safeBody.vehicleType;
-      if (safeBody.vehicleRegistration !== undefined) updateData.vehicleRegistration = safeBody.vehicleRegistration;
-      if (safeBody.vehicleMake !== undefined) updateData.vehicleMake = safeBody.vehicleMake;
-      if (safeBody.vehicleModel !== undefined) updateData.vehicleModel = safeBody.vehicleModel;
-      if (safeBody.vehicleColor !== undefined) updateData.vehicleColor = safeBody.vehicleColor;
-      if (safeBody.fullName !== undefined) updateData.fullName = safeBody.fullName;
-      if (safeBody.email !== undefined) updateData.email = safeBody.email;
-      if (safeBody.phone !== undefined) updateData.phone = safeBody.phone;
-      if (safeBody.postcode !== undefined) updateData.postcode = safeBody.postcode;
-      if (safeBody.address !== undefined) updateData.address = safeBody.address;
-      if (safeBody.isAvailable !== undefined) updateData.isAvailable = safeBody.isAvailable;
-      if (safeBody.isVerified !== undefined) updateData.isVerified = safeBody.isVerified;
-      if (safeBody.bankName !== undefined) updateData.bankName = safeBody.bankName;
-      if (safeBody.accountHolderName !== undefined) updateData.accountHolderName = safeBody.accountHolderName;
-      if (safeBody.sortCode !== undefined) updateData.sortCode = safeBody.sortCode;
-      if (safeBody.accountNumber !== undefined) updateData.accountNumber = safeBody.accountNumber;
-      
-      if (Object.keys(updateData).length > 0) {
-        await db.update(drivers).set(updateData).where(eq(drivers.id, req.params.id));
-        console.log("Driver successfully updated in PostgreSQL:", req.params.id);
-      }
-      
-      // Also sync to Supabase for Hostinger deployment
-      try {
-        const { supabaseAdmin } = await import("./supabaseAdmin");
-        if (supabaseAdmin) {
-          const supabaseUpdateData: Record<string, unknown> = {};
-          if (safeBody.fullName !== undefined) supabaseUpdateData.full_name = safeBody.fullName;
-          if (safeBody.email !== undefined) supabaseUpdateData.email = safeBody.email;
-          if (safeBody.phone !== undefined) supabaseUpdateData.phone = safeBody.phone;
-          if (safeBody.vehicleType !== undefined) supabaseUpdateData.vehicle_type = safeBody.vehicleType;
-          if (safeBody.isAvailable !== undefined) supabaseUpdateData.online_status = safeBody.isAvailable ? 'online' : 'offline';
-          if (safeBody.isVerified !== undefined) supabaseUpdateData.is_verified = safeBody.isVerified;
-          if (safeBody.address !== undefined) supabaseUpdateData.address = safeBody.address;
-          if (safeBody.postcode !== undefined) supabaseUpdateData.postcode = safeBody.postcode;
-          if (safeBody.bankName !== undefined) supabaseUpdateData.bank_name = safeBody.bankName;
-          if (safeBody.accountHolderName !== undefined) supabaseUpdateData.account_holder_name = safeBody.accountHolderName;
-          if (safeBody.sortCode !== undefined) supabaseUpdateData.sort_code = safeBody.sortCode;
-          if (safeBody.accountNumber !== undefined) supabaseUpdateData.account_number = safeBody.accountNumber;
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        const supabaseUpdateData: Record<string, unknown> = {};
+        if (safeBody.fullName !== undefined) supabaseUpdateData.full_name = safeBody.fullName;
+        if (safeBody.email !== undefined) supabaseUpdateData.email = safeBody.email;
+        if (safeBody.phone !== undefined) supabaseUpdateData.phone = safeBody.phone;
+        if (safeBody.vehicleType !== undefined) supabaseUpdateData.vehicle_type = safeBody.vehicleType;
+        if (safeBody.vehicleRegistration !== undefined) supabaseUpdateData.vehicle_registration = safeBody.vehicleRegistration;
+        if (safeBody.vehicleMake !== undefined) supabaseUpdateData.vehicle_make = safeBody.vehicleMake;
+        if (safeBody.vehicleModel !== undefined) supabaseUpdateData.vehicle_model = safeBody.vehicleModel;
+        if (safeBody.vehicleColor !== undefined) supabaseUpdateData.vehicle_color = safeBody.vehicleColor;
+        if (safeBody.isAvailable !== undefined) supabaseUpdateData.online_status = safeBody.isAvailable ? 'online' : 'offline';
+        if (safeBody.isVerified !== undefined) supabaseUpdateData.is_verified = safeBody.isVerified;
+        if (safeBody.address !== undefined) supabaseUpdateData.address = safeBody.address;
+        if (safeBody.postcode !== undefined) supabaseUpdateData.postcode = safeBody.postcode;
+        if (safeBody.bankName !== undefined) supabaseUpdateData.bank_name = safeBody.bankName;
+        if (safeBody.accountHolderName !== undefined) supabaseUpdateData.account_holder_name = safeBody.accountHolderName;
+        if (safeBody.sortCode !== undefined) supabaseUpdateData.sort_code = safeBody.sortCode;
+        if (safeBody.accountNumber !== undefined) supabaseUpdateData.account_number = safeBody.accountNumber;
+        
+        if (Object.keys(supabaseUpdateData).length > 0) {
+          const { error } = await supabaseAdmin
+            .from('drivers')
+            .update(supabaseUpdateData)
+            .eq('id', req.params.id);
           
-          if (Object.keys(supabaseUpdateData).length > 0) {
-            await supabaseAdmin
-              .from('drivers')
-              .update(supabaseUpdateData)
-              .eq('id', req.params.id);
-            console.log("Driver successfully synced to Supabase:", req.params.id);
+          if (error) {
+            console.error("Failed to update driver in Supabase:", error);
+          } else {
+            console.log("Driver successfully updated in Supabase:", req.params.id);
           }
         }
-      } catch (syncErr) {
-        console.error("Failed to sync driver to Supabase:", syncErr);
       }
-    } catch (e) {
-      console.error("Failed to update driver in PostgreSQL:", e);
+    } catch (syncErr) {
+      console.error("Failed to sync driver to Supabase:", syncErr);
     }
     
     res.json(driver);
