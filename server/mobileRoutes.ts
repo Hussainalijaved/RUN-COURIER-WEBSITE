@@ -648,14 +648,27 @@ export function registerMobileRoutes(app: Express): void {
         return res.status(400).json({ error: "No file uploaded", code: "NO_FILE" });
       }
 
-      // Valid document types that drivers can upload
+      // Valid document types that drivers can upload - support both mobile and web naming conventions
       const validDocumentTypes = [
         'profile_picture',
+        // Driving license - support both spellings (licence/license) and naming conventions
         'driving_licence_front',
         'driving_licence_back',
+        'driving_license',       // Web uses this for front
+        'driving_license_back',  // Web uses this for back
+        // Other documents
         'dbs_certificate',
         'goods_in_transit_insurance',
         'hire_reward_insurance',
+        'hire_and_reward_insurance',  // Web uses this
+        'proof_of_identity',
+        'proof_of_address',
+        // Vehicle photos
+        'vehicle_photo_front',
+        'vehicle_photo_back',
+        'vehicle_photo_left',
+        'vehicle_photo_right',
+        'vehicle_photo_load_space',
       ];
 
       if (!documentType || !validDocumentTypes.includes(documentType)) {
@@ -666,13 +679,19 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      console.log(`[Mobile Docs] Driver ${driver.driverCode || driver.id} uploading ${documentType}`);
+      // Normalize document type to standard format for storage
+      let normalizedDocType = documentType;
+      if (documentType === 'driving_licence_front') normalizedDocType = 'driving_license';
+      if (documentType === 'driving_licence_back') normalizedDocType = 'driving_license_back';
+      if (documentType === 'hire_reward_insurance') normalizedDocType = 'hire_and_reward_insurance';
+
+      console.log(`[Mobile Docs] Driver ${driver.driverCode || driver.id} uploading ${documentType} (normalized: ${normalizedDocType})`);
 
       // Upload to Supabase Storage
       const bucket = 'driver-documents';
       const timestamp = Date.now();
       const ext = path.extname(file.originalname) || '.jpg';
-      const filename = `${driver.id}/${documentType}_${timestamp}${ext}`;
+      const filename = `${driver.id}/${normalizedDocType}_${timestamp}${ext}`;
 
       if (!supabaseAdmin) {
         return res.status(500).json({ error: "Storage not available", code: "STORAGE_ERROR" });
@@ -710,40 +729,50 @@ export function registerMobileRoutes(app: Express): void {
 
       const publicUrl = urlData.publicUrl;
 
-      // Map document type to driver field
-      const documentFieldMap: Record<string, string> = {
+      // Map normalized document type to driver field (for documents stored on driver record)
+      const documentFieldMap: Record<string, string | null> = {
         'profile_picture': 'profilePictureUrl',
-        'driving_licence_front': 'drivingLicenceFrontUrl',
-        'driving_licence_back': 'drivingLicenceBackUrl',
+        'driving_license': 'drivingLicenceFrontUrl',
+        'driving_license_back': 'drivingLicenceBackUrl',
         'dbs_certificate': 'dbsCertificateUrl',
         'goods_in_transit_insurance': 'goodsInTransitInsuranceUrl',
-        'hire_reward_insurance': 'hireRewardInsuranceUrl',
+        'hire_and_reward_insurance': 'hireRewardInsuranceUrl',
+        // These don't map to driver fields - only stored as documents
+        'proof_of_identity': null,
+        'proof_of_address': null,
+        'vehicle_photo_front': null,
+        'vehicle_photo_back': null,
+        'vehicle_photo_left': null,
+        'vehicle_photo_right': null,
+        'vehicle_photo_load_space': null,
       };
 
-      const fieldName = documentFieldMap[documentType];
+      const fieldName = documentFieldMap[normalizedDocType];
 
-      // Update driver with document URL
-      const updateData: Record<string, any> = { [fieldName]: publicUrl };
-      await storage.updateDriver(driver.id, updateData);
+      // Update driver with document URL only if it maps to a driver field
+      if (fieldName) {
+        const updateData: Record<string, any> = { [fieldName]: publicUrl };
+        await storage.updateDriver(driver.id, updateData);
 
-      // Sync to Supabase drivers table
-      const snakeFieldName = fieldName.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-      const { error: dbError } = await supabaseAdmin
-        .from('drivers')
-        .update({ [snakeFieldName]: publicUrl, updated_at: new Date().toISOString() })
-        .eq('id', driver.id);
+        // Sync to Supabase drivers table
+        const snakeFieldName = fieldName.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        const { error: dbError } = await supabaseAdmin
+          .from('drivers')
+          .update({ [snakeFieldName]: publicUrl, updated_at: new Date().toISOString() })
+          .eq('id', driver.id);
 
-      if (dbError) {
-        console.error('[Mobile Docs] Failed to update driver record:', dbError);
+        if (dbError) {
+          console.error('[Mobile Docs] Failed to update driver record:', dbError);
+        }
       }
 
-      // Also create a document record for tracking/approval
+      // Also create a document record for tracking/approval (use normalized type for consistency)
       try {
         const { error: docError } = await supabaseAdmin
           .from('documents')
           .insert({
             driver_id: driver.id,
-            document_type: documentType,
+            document_type: normalizedDocType,
             file_url: publicUrl,
             file_name: file.originalname,
             file_size: file.size,
