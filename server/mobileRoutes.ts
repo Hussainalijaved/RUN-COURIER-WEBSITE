@@ -152,6 +152,7 @@ const VALID_JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   on_the_way_delivery: ["delivered", "cancelled"],
   delivered: [],
   cancelled: [],
+  failed: [],
 };
 
 export function registerMobileRoutes(app: Express): void {
@@ -416,11 +417,34 @@ export function registerMobileRoutes(app: Express): void {
     requireSupabaseAuth, 
     requireDriverRole,
     asyncHandler(async (req, res) => {
-      const driver = req.driver!;
+      const driver = req.driver! as any;
+      
+      // Fetch full driver data from Supabase for document URLs
+      let fullDriverData: any = driver;
+      if (supabaseAdmin) {
+        const { data } = await supabaseAdmin
+          .from('drivers')
+          .select('*')
+          .eq('id', driver.id)
+          .single();
+        if (data) {
+          fullDriverData = data;
+        }
+      }
       
       res.json({
         id: driver.id,
         userId: driver.userId,
+        driverCode: driver.driverCode,
+        fullName: driver.fullName,
+        email: driver.email,
+        phone: driver.phone,
+        postcode: driver.postcode,
+        address: driver.address || fullDriverData.full_address,
+        nationality: driver.nationality,
+        isBritish: driver.isBritish,
+        nationalInsuranceNumber: driver.nationalInsuranceNumber,
+        rightToWorkShareCode: driver.rightToWorkShareCode,
         vehicleType: driver.vehicleType,
         vehicleRegistration: driver.vehicleRegistration,
         vehicleMake: driver.vehicleMake,
@@ -433,6 +457,297 @@ export function registerMobileRoutes(app: Express): void {
         currentLatitude: driver.currentLatitude,
         currentLongitude: driver.currentLongitude,
         lastLocationUpdate: driver.lastLocationUpdate,
+        profilePictureUrl: driver.profilePictureUrl || fullDriverData.profile_picture_url,
+        drivingLicenceFrontUrl: fullDriverData.driving_licence_front_url,
+        drivingLicenceBackUrl: fullDriverData.driving_licence_back_url,
+        dbsCertificateUrl: driver.dbsCertificateUrl || fullDriverData.dbs_certificate_url,
+        goodsInTransitInsuranceUrl: fullDriverData.goods_in_transit_insurance_url,
+        hireRewardInsuranceUrl: fullDriverData.hire_reward_insurance_url,
+      });
+    })
+  );
+
+  // Update driver profile - allows drivers to update their own details
+  app.patch("/api/mobile/v1/driver/profile",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+
+      // Fields that drivers are allowed to update
+      // Note: 'address' is the field name in local storage, mobile may send 'fullAddress'
+      const allowedFields = [
+        'fullName',
+        'phone',
+        'postcode',
+        'address',
+        'nationality',
+        'isBritish',
+        'nationalInsuranceNumber',
+        'rightToWorkShareCode',
+        'vehicleType',
+        'vehicleRegistration',
+        'vehicleMake',
+        'vehicleModel',
+        'vehicleColor',
+      ];
+
+      // Filter to only allowed fields
+      const updateData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
+      
+      // Handle fullAddress alias (mobile app may send fullAddress instead of address)
+      if (req.body.fullAddress !== undefined && updateData.address === undefined) {
+        updateData.address = req.body.fullAddress;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({
+          error: "No valid fields to update",
+          code: "NO_FIELDS_TO_UPDATE",
+          allowedFields
+        });
+      }
+
+      console.log(`[Mobile Profile] Driver ${driver.driverCode || driver.id} updating:`, Object.keys(updateData));
+
+      // Update in memory storage
+      const updatedDriver = await storage.updateDriver(driver.id, updateData);
+
+      if (!updatedDriver) {
+        return res.status(404).json({
+          error: "Driver not found",
+          code: "DRIVER_NOT_FOUND"
+        });
+      }
+
+      // Sync to Supabase
+      if (supabaseAdmin) {
+        try {
+          // Convert camelCase to snake_case for Supabase
+          const snakeCaseData: Record<string, any> = {};
+          for (const [key, value] of Object.entries(updateData)) {
+            const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            snakeCaseData[snakeKey] = value;
+          }
+          snakeCaseData.updated_at = new Date().toISOString();
+
+          const { error } = await supabaseAdmin
+            .from('drivers')
+            .update(snakeCaseData)
+            .eq('id', driver.id);
+
+          if (error) {
+            console.error(`[Mobile Profile] Failed to sync to Supabase:`, error.message);
+          } else {
+            console.log(`[Mobile Profile] Synced driver ${driver.driverCode || driver.id} to Supabase`);
+          }
+        } catch (err) {
+          console.error(`[Mobile Profile] Error syncing to Supabase:`, err);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: "Profile updated successfully",
+        updatedFields: Object.keys(updateData),
+        driver: {
+          id: updatedDriver.id,
+          driverCode: updatedDriver.driverCode,
+          fullName: updatedDriver.fullName,
+          phone: updatedDriver.phone,
+          postcode: updatedDriver.postcode,
+          address: updatedDriver.address,
+          vehicleType: updatedDriver.vehicleType,
+          vehicleRegistration: updatedDriver.vehicleRegistration,
+          vehicleMake: updatedDriver.vehicleMake,
+          vehicleModel: updatedDriver.vehicleModel,
+          vehicleColor: updatedDriver.vehicleColor,
+        }
+      });
+    })
+  );
+
+  // Document upload for drivers - allows drivers to upload their documents
+  const uploadDriverDocument = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only images and PDFs are allowed.'));
+      }
+    }
+  });
+
+  app.post("/api/mobile/v1/driver/documents/upload",
+    requireSupabaseAuth,
+    requireDriverRole,
+    (req, res, next) => {
+      uploadDriverDocument.single('file')(req, res, (err) => {
+        if (err) {
+          if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              return res.status(400).json({ error: "File size exceeds 10MB limit", code: "FILE_TOO_LARGE" });
+            }
+            return res.status(400).json({ error: err.message, code: "UPLOAD_ERROR" });
+          }
+          return res.status(400).json({ error: err.message || "Invalid file", code: "INVALID_FILE" });
+        }
+        next();
+      });
+    },
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const file = req.file;
+      const { documentType } = req.body;
+
+      // Check if driver is active
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+
+      if (!file) {
+        return res.status(400).json({ error: "No file uploaded", code: "NO_FILE" });
+      }
+
+      // Valid document types that drivers can upload
+      const validDocumentTypes = [
+        'profile_picture',
+        'driving_licence_front',
+        'driving_licence_back',
+        'dbs_certificate',
+        'goods_in_transit_insurance',
+        'hire_reward_insurance',
+      ];
+
+      if (!documentType || !validDocumentTypes.includes(documentType)) {
+        return res.status(400).json({
+          error: "Invalid document type",
+          code: "INVALID_DOCUMENT_TYPE",
+          validTypes: validDocumentTypes
+        });
+      }
+
+      console.log(`[Mobile Docs] Driver ${driver.driverCode || driver.id} uploading ${documentType}`);
+
+      // Upload to Supabase Storage
+      const bucket = 'driver-documents';
+      const timestamp = Date.now();
+      const ext = path.extname(file.originalname) || '.jpg';
+      const filename = `${driver.id}/${documentType}_${timestamp}${ext}`;
+
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Storage not available", code: "STORAGE_ERROR" });
+      }
+
+      // Ensure bucket exists
+      const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+      if (!buckets?.find(b => b.name === bucket)) {
+        const { error: createError } = await supabaseAdmin.storage.createBucket(bucket, {
+          public: true,
+          fileSizeLimit: 10 * 1024 * 1024,
+        });
+        if (createError && !createError.message.includes('already exists')) {
+          console.error('[Mobile Docs] Failed to create bucket:', createError);
+        }
+      }
+
+      // Upload file
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(filename, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('[Mobile Docs] Upload error:', uploadError);
+        return res.status(500).json({ error: "Failed to upload file", code: "UPLOAD_FAILED" });
+      }
+
+      // Get public URL
+      const { data: urlData } = supabaseAdmin.storage
+        .from(bucket)
+        .getPublicUrl(filename);
+
+      const publicUrl = urlData.publicUrl;
+
+      // Map document type to driver field
+      const documentFieldMap: Record<string, string> = {
+        'profile_picture': 'profilePictureUrl',
+        'driving_licence_front': 'drivingLicenceFrontUrl',
+        'driving_licence_back': 'drivingLicenceBackUrl',
+        'dbs_certificate': 'dbsCertificateUrl',
+        'goods_in_transit_insurance': 'goodsInTransitInsuranceUrl',
+        'hire_reward_insurance': 'hireRewardInsuranceUrl',
+      };
+
+      const fieldName = documentFieldMap[documentType];
+
+      // Update driver with document URL
+      const updateData: Record<string, any> = { [fieldName]: publicUrl };
+      await storage.updateDriver(driver.id, updateData);
+
+      // Sync to Supabase drivers table
+      const snakeFieldName = fieldName.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      const { error: dbError } = await supabaseAdmin
+        .from('drivers')
+        .update({ [snakeFieldName]: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', driver.id);
+
+      if (dbError) {
+        console.error('[Mobile Docs] Failed to update driver record:', dbError);
+      }
+
+      // Also create a document record for tracking/approval
+      try {
+        const { error: docError } = await supabaseAdmin
+          .from('documents')
+          .insert({
+            driver_id: driver.id,
+            document_type: documentType,
+            file_url: publicUrl,
+            file_name: file.originalname,
+            file_size: file.size,
+            mime_type: file.mimetype,
+            status: 'pending',
+            uploaded_at: new Date().toISOString(),
+          });
+
+        if (docError && !docError.message.includes('duplicate')) {
+          console.error('[Mobile Docs] Failed to create document record:', docError);
+        }
+      } catch (err) {
+        console.error('[Mobile Docs] Error creating document record:', err);
+      }
+
+      console.log(`[Mobile Docs] Successfully uploaded ${documentType} for driver ${driver.driverCode || driver.id}`);
+
+      res.json({
+        success: true,
+        message: "Document uploaded successfully",
+        documentType,
+        url: publicUrl,
+        fileName: file.originalname,
+        fileSize: file.size,
       });
     })
   );

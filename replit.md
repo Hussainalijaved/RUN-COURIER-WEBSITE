@@ -48,6 +48,16 @@ A multi-step application process allows prospective drivers to submit details fo
 ### Mobile API
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities including profile management, location updates, job management, and proof of delivery uploads, authenticated via Supabase JWT. It supports admin-to-driver job assignments, with drivers receiving offers in their mobile app.
 
+**Mobile API Endpoints:**
+- `GET /api/mobile/v1/driver/profile` - Get driver profile with all details including document URLs
+- `PATCH /api/mobile/v1/driver/profile` - Update driver profile (fullName, phone, postcode, address, nationality, vehicleType, etc.)
+- `POST /api/mobile/v1/driver/documents/upload` - Upload driver documents (profile_picture, driving_licence_front, driving_licence_back, dbs_certificate, goods_in_transit_insurance, hire_reward_insurance)
+- `PATCH /api/mobile/v1/driver/location` - Update driver location
+- `PATCH /api/mobile/v1/driver/availability` - Toggle driver online/offline status
+- `POST /api/mobile/v1/driver/push-token` - Register Expo push notification token
+- `GET /api/mobile/v1/driver/jobs` - Get assigned jobs
+- `POST /api/mobile/v1/driver/jobs/:jobId/pod` - Upload proof of delivery
+
 ### Push Notifications
 Real-time push notifications alert drivers instantly when jobs are assigned:
 - **Device Registration**: Drivers register their Expo push tokens via `/api/mobile/v1/driver/push-token`
