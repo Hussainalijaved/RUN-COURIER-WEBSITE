@@ -31,26 +31,6 @@ import {
 
 const baseDocumentTypes = [
   {
-    type: 'driving_license',
-    label: 'Driving License (Front)',
-    description: 'Front side of your valid UK driving license',
-    icon: CreditCard,
-    required: true,
-    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
-    isVehiclePhoto: false,
-    requiresExpiryDate: false,
-  },
-  {
-    type: 'driving_license_back',
-    label: 'Driving License (Back)',
-    description: 'Back side of your valid UK driving license',
-    icon: CreditCard,
-    required: true,
-    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
-    isVehiclePhoto: false,
-    requiresExpiryDate: false,
-  },
-  {
     type: 'hire_and_reward_insurance',
     label: 'Hire and Reward Insurance',
     description: 'Motor insurance for courier/delivery work (Hire & Reward cover)',
@@ -273,7 +253,7 @@ export default function DriverDocuments() {
   }, [handleFileSelect]);
 
   const approvedCount = documents?.filter((d) => d.status === 'approved').length || 0;
-  const totalRequired = documentTypes.length + vehiclePhotos.length;
+  const totalRequired = documentTypes.length + vehiclePhotos.length + 2; // +2 for driving license front and back
   const progressPercent = (approvedCount / totalRequired) * 100;
 
   const isLoading = driverLoading || docsLoading;
@@ -321,6 +301,87 @@ export default function DriverDocuments() {
             </>
           ) : (
             <>
+              <Card data-testid="document-driving-license">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-lg bg-muted">
+                      <CreditCard className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        Driving License
+                        <Badge variant="outline" className="text-xs">Required</Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        Upload both front and back of your valid UK driving license
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { type: 'driving_license', label: 'Front', description: 'Front side' },
+                      { type: 'driving_license_back', label: 'Back', description: 'Back side' },
+                    ].map((side) => {
+                      const status = getDocumentStatus(side.type);
+                      const doc = getDocument(side.type);
+                      
+                      return (
+                        <div 
+                          key={side.type} 
+                          className={`border-2 border-dashed rounded-lg p-4 text-center ${
+                            status === 'approved' ? 'border-green-500 bg-green-50' :
+                            status === 'rejected' ? 'border-red-500 bg-red-50' :
+                            status === 'pending' ? 'border-yellow-500 bg-yellow-50' :
+                            'border-muted-foreground/25 hover:border-primary/50'
+                          }`}
+                          data-testid={`license-upload-${side.type}`}
+                        >
+                          <div className="flex flex-col items-center gap-2">
+                            {status === 'approved' ? (
+                              <CheckCircle className="h-8 w-8 text-green-500" />
+                            ) : status === 'rejected' ? (
+                              <XCircle className="h-8 w-8 text-red-500" />
+                            ) : status === 'pending' ? (
+                              <Clock className="h-8 w-8 text-yellow-500" />
+                            ) : (
+                              <Upload className="h-8 w-8 text-muted-foreground" />
+                            )}
+                            <span className="font-medium text-sm">{side.label}</span>
+                            <span className="text-xs text-muted-foreground">{side.description}</span>
+                            {doc?.reviewNotes && status === 'rejected' && (
+                              <span className="text-xs text-destructive">{doc.reviewNotes}</span>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="hidden"
+                              ref={(el) => { fileInputRefs.current[side.type] = el; }}
+                              onChange={(e) => handleFileChange(e, side.type)}
+                              data-testid={`input-file-${side.type}`}
+                            />
+                            <Button 
+                              variant={status === 'approved' ? 'outline' : 'default'}
+                              size="sm"
+                              className="mt-2"
+                              onClick={() => handleUploadClick(side.type)}
+                              disabled={uploadDocumentMutation.isPending}
+                              data-testid={`button-upload-${side.type}`}
+                            >
+                              {uploadDocumentMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : null}
+                              {status ? 'Re-upload' : 'Upload'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
               {documentTypes.map((docType) => {
                 const status = getDocumentStatus(docType.type);
                 const doc = getDocument(docType.type);
