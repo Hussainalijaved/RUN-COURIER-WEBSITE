@@ -503,6 +503,13 @@ export function registerMobileRoutes(app: Express): void {
         'accountHolderName',
         'sortCode',
         'accountNumber',
+        // Document URLs (for mobile app uploads via Supabase Storage)
+        'profilePictureUrl',
+        'drivingLicenceFrontUrl',
+        'drivingLicenceBackUrl',
+        'dbsCertificateUrl',
+        'goodsInTransitInsuranceUrl',
+        'hireRewardInsuranceUrl',
       ];
 
       // Filter to only allowed fields
@@ -596,6 +603,120 @@ export function registerMobileRoutes(app: Express): void {
           vehicleModel: updatedDriver.vehicleModel,
           vehicleColor: updatedDriver.vehicleColor,
         }
+      });
+    })
+  );
+
+  // Alternative endpoint for mobile apps that upload directly to Supabase Storage
+  // This accepts a document URL instead of a file upload
+  app.post("/api/mobile/v1/driver/documents/register",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { documentType, fileUrl, fileName } = req.body;
+
+      if (driver.isActive === false) {
+        return res.status(403).json({ 
+          error: "Your account has been deactivated. Please contact support.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+
+      if (!documentType || !fileUrl) {
+        return res.status(400).json({ 
+          error: "documentType and fileUrl are required",
+          code: "MISSING_FIELDS"
+        });
+      }
+
+      console.log(`[Mobile Docs Register] Driver ${driver.driverCode || driver.id} registering ${documentType}: ${fileUrl}`);
+
+      // Normalize document type
+      let normalizedDocType = documentType;
+      if (documentType === 'driving_licence_front') normalizedDocType = 'driving_license';
+      if (documentType === 'driving_licence_back') normalizedDocType = 'driving_license_back';
+      if (documentType === 'hire_reward_insurance') normalizedDocType = 'hire_and_reward_insurance';
+
+      // Map normalized document type to driver field
+      const documentFieldMap: Record<string, string | null> = {
+        'profile_picture': 'profilePictureUrl',
+        'driving_license': 'drivingLicenceFrontUrl',
+        'driving_license_back': 'drivingLicenceBackUrl',
+        'dbs_certificate': 'dbsCertificateUrl',
+        'goods_in_transit_insurance': 'goodsInTransitInsuranceUrl',
+        'hire_and_reward_insurance': 'hireRewardInsuranceUrl',
+        'proof_of_identity': null,
+        'proof_of_address': null,
+        'vehicle_photo_front': null,
+        'vehicle_photo_back': null,
+        'vehicle_photo_left': null,
+        'vehicle_photo_right': null,
+        'vehicle_photo_load_space': null,
+      };
+
+      const fieldName = documentFieldMap[normalizedDocType];
+
+      // Update driver with document URL if it maps to a driver field
+      if (fieldName) {
+        const updateData: Record<string, any> = { [fieldName]: fileUrl };
+        await storage.updateDriver(driver.id, updateData);
+
+        // Sync to Supabase drivers table
+        if (supabaseAdmin) {
+          const snakeFieldName = fieldName.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+          const { error: dbError } = await supabaseAdmin
+            .from('drivers')
+            .update({ [snakeFieldName]: fileUrl, updated_at: new Date().toISOString() })
+            .eq('id', driver.id);
+
+          if (dbError) {
+            console.error('[Mobile Docs Register] Failed to update driver record:', dbError);
+          }
+        }
+      }
+
+      // Create a document record for tracking/approval
+      try {
+        const { error: docError } = await supabaseAdmin!
+          .from('driver_documents')
+          .insert({
+            driver_id: driver.id,
+            doc_type: normalizedDocType,
+            file_url: fileUrl,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (docError) {
+          console.error('[Mobile Docs Register] Failed to create document in driver_documents:', docError);
+          
+          // Fallback to storage layer
+          try {
+            await storage.createDocument({
+              driverId: driver.id,
+              type: normalizedDocType as any,
+              fileName: fileName || 'document',
+              fileUrl: fileUrl,
+              status: 'pending',
+            });
+            console.log('[Mobile Docs Register] Created document in storage/documents table');
+          } catch (storageErr) {
+            console.error('[Mobile Docs Register] Storage createDocument also failed:', storageErr);
+          }
+        } else {
+          console.log('[Mobile Docs Register] Created document in driver_documents table');
+        }
+      } catch (err) {
+        console.error('[Mobile Docs Register] Error creating document record:', err);
+      }
+
+      res.json({
+        success: true,
+        message: "Document registered successfully",
+        documentType: normalizedDocType,
+        url: fileUrl,
       });
     })
   );
