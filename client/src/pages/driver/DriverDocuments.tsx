@@ -349,7 +349,15 @@ export default function DriverDocuments() {
                               <Upload className="h-8 w-8 text-muted-foreground" />
                             )}
                             <span className="font-medium text-sm">{side.label}</span>
-                            <span className="text-xs text-muted-foreground">{side.description}</span>
+                            {status === 'approved' ? (
+                              <Badge className="bg-green-500 text-xs"><CheckCircle className="mr-1 h-3 w-3" />Approved</Badge>
+                            ) : status === 'rejected' ? (
+                              <Badge variant="destructive" className="text-xs"><XCircle className="mr-1 h-3 w-3" />Rejected</Badge>
+                            ) : status === 'pending' ? (
+                              <Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3" />Pending Review</Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{side.description}</span>
+                            )}
                             {doc?.reviewNotes && status === 'rejected' && (
                               <span className="text-xs text-destructive">{doc.reviewNotes}</span>
                             )}
