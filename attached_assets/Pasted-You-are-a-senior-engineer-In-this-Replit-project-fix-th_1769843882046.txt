@@ -1,0 +1,192 @@
+You are a senior engineer. In this Replit project, fix the driver profile update bug in the mobile app connected to Supabase. Do not change UI design, styling, navigation, pricing logic, or any unrelated features. Only fix profile saving + profile picture saving.
+
+Bug
+
+In the mobile app:
+
+Driver can edit profile fields but changes do not persist
+
+Profile picture upload does not persist / disappears
+
+After logout/login, old data returns
+
+Website + mobile must reflect the same Supabase data (single source of truth)
+
+What you must do (step-by-step, using the real code)
+1) Identify where profile data is loaded and saved
+
+Search the codebase for:
+
+profiles, drivers, updateProfile, saveProfile, avatar, upload, supabase.from(
+
+the Profile screen/component
+
+any insert() used for profile saving
+
+Report back the exact files and functions you will modify, then implement fixes.
+
+2) Fix the save logic (use UPSERT by user_id)
+
+Profile saving must be:
+
+tied to auth.users.id (Supabase session user id)
+
+saved to a single table (either profiles or drivers) using:
+
+upsert({...}, { onConflict: 'user_id' })
+
+never use plain insert() for updates
+
+never rely on email as key
+
+must await the save and handle errors
+
+Implementation requirements:
+
+Get user id from session:
+
+const { data: { session } } = await supabase.auth.getSession()
+
+const userId = session?.user?.id
+
+If no session → show error and stop
+
+On Save:
+
+validate fields
+
+await supabase.from('<TABLE>').upsert(payload, { onConflict: 'user_id' })
+
+if error: show error + log it
+
+on success: refetch profile from DB and update state
+
+3) Fix the profile load logic (no stale cache)
+
+On profile screen mount and on app startup after login:
+
+always fetch latest data from Supabase:
+
+select('*').eq('user_id', userId).single()
+
+do not keep outdated local state as source of truth
+
+after saving, immediately refetch and re-render
+
+4) Fix avatar upload (Supabase Storage correctly)
+
+Use Supabase Storage properly:
+
+Bucket: profile-images (create if not exists)
+
+Rules:
+
+upload path must be stable and unique:
+
+${userId}/avatar.jpg (or avatar.png)
+
+upload must overwrite:
+
+upsert: true
+
+after upload, get a URL and persist it in DB:
+
+save to column avatar_url in the same profile row
+
+then refetch profile and display updated avatar
+
+Implementation details (Expo/React Native safe):
+
+Convert image to blob/arrayBuffer properly (don’t use Node fs APIs)
+
+Use:
+
+supabase.storage.from('profile-images').upload(path, fileBody, { contentType, upsert: true })
+
+Get public url:
+
+const { data } = supabase.storage.from('profile-images').getPublicUrl(path)
+
+const avatarUrl = data.publicUrl
+
+Then:
+
+await supabase.from('<TABLE>').upsert({ user_id: userId, avatar_url: avatarUrl }, { onConflict: 'user_id' })
+
+5) Fix Supabase RLS policies (must work on mobile)
+
+Check RLS on the profile table and the storage bucket.
+
+Required policies on <TABLE>:
+
+SELECT: auth.uid() = user_id
+
+INSERT: auth.uid() = user_id
+
+UPDATE: auth.uid() = user_id
+
+Required storage policies for bucket profile-images:
+
+Allow authenticated users to insert/update objects where the folder matches their uid:
+
+object name starts with ${auth.uid()}/
+
+Allow authenticated users to read their own objects
+(If the project uses public avatars, allow public read; otherwise keep private and use signed URLs.)
+
+6) Prevent duplicates
+
+Ensure the table has:
+
+user_id UNIQUE constraint
+If missing, add migration/SQL instructions.
+
+7) Add targeted debug logs
+
+Add temporary logs (remove later):
+
+userId value
+
+payload on save
+
+Supabase responses + errors for:
+
+upsert
+
+select
+
+storage upload
+
+getPublicUrl/signedUrl
+
+8) Verification checklist (must pass)
+
+Provide steps and confirm in code:
+
+Edit profile → Save → close app → reopen → data remains
+
+Logout/login → data remains
+
+Upload avatar → remains after restart
+
+No duplicates in profile table
+
+Works in iOS TestFlight build (not only local)
+
+Output format
+
+List files changed
+
+Explain root cause found (e.g., insert used, wrong key, RLS blocked, storage path)
+
+Show final code diffs for:
+
+profile fetch
+
+profile save
+
+avatar upload
+
+Provide Supabase SQL/policies you applied
+
+Do not change anything else.

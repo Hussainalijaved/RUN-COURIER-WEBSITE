@@ -522,6 +522,8 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       console.log(`[Mobile Profile] Driver ${driver.driverCode || driver.id} updating:`, Object.keys(updateData));
+      console.log(`[Mobile Profile] Update payload:`, JSON.stringify(updateData));
+      console.log(`[Mobile Profile] Driver ID for update:`, driver.id);
 
       // Update in memory storage
       const updatedDriver = await storage.updateDriver(driver.id, updateData);
@@ -533,7 +535,7 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      // Sync to Supabase
+      // Sync to Supabase (primary source of truth)
       if (supabaseAdmin) {
         try {
           // Convert camelCase to snake_case for Supabase
@@ -544,19 +546,32 @@ export function registerMobileRoutes(app: Express): void {
           }
           snakeCaseData.updated_at = new Date().toISOString();
 
-          const { error } = await supabaseAdmin
+          console.log(`[Mobile Profile] Supabase update payload:`, JSON.stringify(snakeCaseData));
+
+          const { data: supabaseUpdated, error } = await supabaseAdmin
             .from('drivers')
             .update(snakeCaseData)
-            .eq('id', driver.id);
+            .eq('id', driver.id)
+            .select()
+            .single();
 
           if (error) {
-            console.error(`[Mobile Profile] Failed to sync to Supabase:`, error.message);
+            console.error(`[Mobile Profile] Supabase sync FAILED:`, error.message, error.code, error.details);
           } else {
-            console.log(`[Mobile Profile] Synced driver ${driver.driverCode || driver.id} to Supabase`);
+            console.log(`[Mobile Profile] Supabase sync SUCCESS for driver ${driver.driverCode || driver.id}`);
+            console.log(`[Mobile Profile] Updated values in Supabase:`, JSON.stringify({
+              full_name: supabaseUpdated?.full_name,
+              phone: supabaseUpdated?.phone,
+              address: supabaseUpdated?.address,
+              postcode: supabaseUpdated?.postcode,
+              updated_at: supabaseUpdated?.updated_at,
+            }));
           }
         } catch (err) {
-          console.error(`[Mobile Profile] Error syncing to Supabase:`, err);
+          console.error(`[Mobile Profile] Exception syncing to Supabase:`, err);
         }
+      } else {
+        console.error(`[Mobile Profile] supabaseAdmin not available - cannot sync to Supabase!`);
       }
 
       res.json({
