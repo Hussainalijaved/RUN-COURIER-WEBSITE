@@ -1140,14 +1140,49 @@ export class SupabaseStorage implements IStorage {
     const supabase = this.checkSupabase();
     const id = randomUUID();
     
-    const dbDoc = {
+    // Try inserting into driver_documents table first (primary table for driver docs)
+    const ddDoc: Record<string, any> = {
+      driver_id: insertDoc.driverId,
+      doc_type: insertDoc.type,
+      file_url: insertDoc.fileUrl,
+      status: insertDoc.status || 'pending',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data: ddData, error: ddError } = await supabase
+      .from('driver_documents')
+      .insert(ddDoc)
+      .select()
+      .single();
+    
+    if (!ddError && ddData) {
+      console.log('[SupabaseStorage] Created document in driver_documents table');
+      return {
+        id: ddData.id?.toString() || id,
+        driverId: ddData.driver_id,
+        type: ddData.doc_type || insertDoc.type,
+        fileName: insertDoc.fileName,
+        fileUrl: ddData.file_url,
+        status: ddData.status || 'pending',
+        expiryDate: null,
+        reviewedBy: null,
+        reviewNotes: null,
+        uploadedAt: ddData.created_at ? new Date(ddData.created_at) : new Date(),
+        reviewedAt: null,
+      } as Document;
+    }
+    
+    console.log('[SupabaseStorage] driver_documents insert failed, trying documents table:', ddError?.message);
+    
+    // Fallback to documents table - build object without expiry_date by default
+    const dbDoc: Record<string, any> = {
       id,
       driver_id: insertDoc.driverId,
       type: insertDoc.type,
       file_name: insertDoc.fileName,
       file_url: insertDoc.fileUrl,
       status: insertDoc.status || 'pending',
-      expiry_date: insertDoc.expiryDate || null,
     };
     
     const { data, error } = await supabase
@@ -1156,7 +1191,10 @@ export class SupabaseStorage implements IStorage {
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('[SupabaseStorage] documents table insert also failed:', error.message);
+      throw error;
+    }
     return mapDbToDocument(data);
   }
 
