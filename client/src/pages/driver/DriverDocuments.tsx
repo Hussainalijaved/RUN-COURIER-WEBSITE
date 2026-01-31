@@ -90,6 +90,16 @@ const baseDocumentTypes = [
     isVehiclePhoto: false,
     requiresExpiryDate: false,
   },
+  {
+    type: 'dbs_certificate',
+    label: 'DBS Certificate',
+    description: 'Disclosure and Barring Service certificate',
+    icon: Shield,
+    required: false,
+    vehicleTypes: ['motorbike', 'car', 'small_van', 'medium_van'],
+    isVehiclePhoto: false,
+    requiresExpiryDate: false,
+  },
 ];
 
 const vehiclePhotoTypes = [

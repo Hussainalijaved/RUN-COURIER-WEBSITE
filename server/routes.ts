@@ -2393,6 +2393,8 @@ export async function registerRoutes(
         if (safeBody.accountHolderName !== undefined) supabaseUpdateData.account_holder_name = safeBody.accountHolderName;
         if (safeBody.sortCode !== undefined) supabaseUpdateData.sort_code = safeBody.sortCode;
         if (safeBody.accountNumber !== undefined) supabaseUpdateData.account_number = safeBody.accountNumber;
+        if (safeBody.nationalInsuranceNumber !== undefined) supabaseUpdateData.national_insurance_number = safeBody.nationalInsuranceNumber;
+        if (safeBody.rightToWorkShareCode !== undefined) supabaseUpdateData.right_to_work_share_code = safeBody.rightToWorkShareCode;
         
         if (Object.keys(supabaseUpdateData).length > 0) {
           const { error } = await supabaseAdmin

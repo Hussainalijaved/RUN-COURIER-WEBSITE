@@ -43,6 +43,7 @@ import {
   WifiOff,
   Camera,
   Building2,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -84,6 +85,8 @@ export default function DriverProfile() {
   const [accountHolderName, setAccountHolderName] = useState('');
   const [sortCode, setSortCode] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [nationalInsuranceNumber, setNationalInsuranceNumber] = useState('');
+  const [rightToWorkShareCode, setRightToWorkShareCode] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
 
@@ -156,6 +159,8 @@ export default function DriverProfile() {
       setAccountHolderName((driver as any).accountHolderName || '');
       setSortCode((driver as any).sortCode || '');
       setAccountNumber((driver as any).accountNumber || '');
+      setNationalInsuranceNumber((driver as any).nationalInsuranceNumber || '');
+      setRightToWorkShareCode((driver as any).rightToWorkShareCode || '');
     }
   }, [driver]);
 
@@ -184,6 +189,8 @@ export default function DriverProfile() {
           accountHolderName,
           sortCode,
           accountNumber,
+          nationalInsuranceNumber,
+          rightToWorkShareCode,
         },
       },
       {
@@ -559,6 +566,41 @@ export default function DriverProfile() {
                       onChange={(e) => setAccountNumber(e.target.value)}
                       data-testid="input-account-number"
                     />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Right to Work Information
+                </CardTitle>
+                <CardDescription>Your employment eligibility details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>National Insurance Number</Label>
+                    <Input 
+                      placeholder="e.g., AB123456C"
+                      value={nationalInsuranceNumber}
+                      onChange={(e) => setNationalInsuranceNumber(e.target.value.toUpperCase())}
+                      data-testid="input-ni-number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Right to Work Share Code</Label>
+                    <Input 
+                      placeholder="e.g., ABC123XYZ"
+                      value={rightToWorkShareCode}
+                      onChange={(e) => setRightToWorkShareCode(e.target.value.toUpperCase())}
+                      data-testid="input-rtw-share-code"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Get your share code from <a href="https://www.gov.uk/prove-right-to-work" target="_blank" rel="noopener noreferrer" className="text-primary underline">gov.uk</a>
+                    </p>
                   </div>
                 </div>
                 <div className="pt-4">
