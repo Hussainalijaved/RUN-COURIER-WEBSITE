@@ -1,0 +1,43 @@
+| column_name                    | data_type                |
+| ------------------------------ | ------------------------ |
+| id                             | uuid                     |
+| user_id                        | uuid                     |
+| full_name                      | text                     |
+| phone                          | text                     |
+| address_line_1                 | text                     |
+| address_line_2                 | text                     |
+| city                           | text                     |
+| postcode                       | text                     |
+| vehicle_type                   | text                     |
+| vehicle_reg                    | text                     |
+| status                         | text                     |
+| status_reason                  | text                     |
+| created_at                     | timestamp with time zone |
+| updated_at                     | timestamp with time zone |
+| driver_code                    | text                     |
+| bank_name                      | text                     |
+| account_holder_name            | text                     |
+| sort_code                      | text                     |
+| account_number                 | text                     |
+| profile_picture_url            | text                     |
+| driving_licence_front_url      | text                     |
+| driving_licence_back_url       | text                     |
+| dbs_certificate_url            | text                     |
+| goods_in_transit_insurance_url | text                     |
+| hire_reward_insurance_url      | text                     |
+| address                        | text                     |
+| nationality                    | text                     |
+| is_british                     | boolean                  |
+| national_insurance_number      | text                     |
+| right_to_work_share_code       | text                     |
+| vehicle_registration           | text                     |
+| vehicle_make                   | text                     |
+| vehicle_model                  | text                     |
+| vehicle_color                  | text                     |
+| online_status                  | text                     |
+| current_latitude               | numeric                  |
+| current_longitude              | numeric                  |
+| last_location_update           | timestamp with time zone |
+| dbs_check_date                 | date                     |
+| dbs_checked                    | boolean                  |
+| email                          | text                     |
