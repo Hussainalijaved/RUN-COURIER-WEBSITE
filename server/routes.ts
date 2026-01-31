@@ -3785,12 +3785,12 @@ export async function registerRoutes(
     const docId = isUuidId ? req.params.id : parseInt(req.params.id, 10);
     
     // First try to update in Supabase driver_documents (where mobile app uploads)
-    // Supabase driver_documents uses bigint IDs, so only try for numeric IDs
+    // Try both UUID and numeric IDs since mobile uploads can use either
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       
-      // Only try Supabase driver_documents for numeric IDs (not UUIDs)
-      if (supabaseAdmin && !isUuidId) {
+      // Try Supabase driver_documents for both UUID and numeric IDs
+      if (supabaseAdmin) {
         // The Supabase driver_documents table only has: status, updated_at
         // It does NOT have: reviewed_by, review_notes columns
         const updateData: Record<string, any> = {
@@ -3798,11 +3798,11 @@ export async function registerRoutes(
           updated_at: reviewedAt.toISOString(),
         };
         
-        // Use numeric ID for Supabase query
+        // Use the ID as-is (UUID or numeric)
         const { data: updatedDoc, error } = await supabaseAdmin
           .from('driver_documents')
           .update(updateData)
-          .eq('id', docId)
+          .eq('id', req.params.id)
           .select()
           .single();
         
