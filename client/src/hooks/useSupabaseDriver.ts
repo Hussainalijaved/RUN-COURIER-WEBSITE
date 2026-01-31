@@ -62,6 +62,10 @@ export function useDriver() {
         rating: data.rating,
         totalJobs: data.total_jobs,
         profilePictureUrl: data.profile_picture_url,
+        bankName: data.bank_name,
+        accountHolderName: data.account_holder_name,
+        sortCode: data.sort_code,
+        accountNumber: data.account_number,
         createdAt: data.created_at,
       } as Driver;
     },
