@@ -599,7 +599,7 @@ export default function DriverProfile() {
                       data-testid="input-rtw-share-code"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Get your share code from <a href="https://www.gov.uk/prove-right-to-work" target="_blank" rel="noopener noreferrer" className="text-primary underline">gov.uk</a>
+                      Get your share code from <a href="https://www.gov.uk/prove-right-to-work/get-a-share-code-online" target="_blank" rel="noopener noreferrer" className="text-primary underline">gov.uk</a>
                     </p>
                   </div>
                 </div>

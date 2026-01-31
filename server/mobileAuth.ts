@@ -40,6 +40,10 @@ function mapSupabaseDriverToLocal(supabaseDriver: any): Driver {
     profilePictureUrl: supabaseDriver.profile_picture_url || null,
     createdAt: supabaseDriver.created_at ? new Date(supabaseDriver.created_at) : null,
     deactivatedAt: null,
+    bankName: supabaseDriver.bank_name || null,
+    accountHolderName: supabaseDriver.account_holder_name || null,
+    sortCode: supabaseDriver.sort_code || null,
+    accountNumber: supabaseDriver.account_number || null,
   };
 }
 
