@@ -498,6 +498,11 @@ export function registerMobileRoutes(app: Express): void {
         'vehicleMake',
         'vehicleModel',
         'vehicleColor',
+        // Bank details fields
+        'bankName',
+        'accountHolderName',
+        'sortCode',
+        'accountNumber',
       ];
 
       // Filter to only allowed fields
