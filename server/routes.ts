@@ -5558,8 +5558,16 @@ export async function registerRoutes(
     
     const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
     
-    const invoice = await storage.getInvoice(req.params.id);
-    if (!invoice) {
+    // Query invoice_payment_tokens table directly (where invoices are actually stored)
+    // The id from frontend is the 'token' column
+    const { data: invoice, error: fetchError } = await supabaseAdmin!
+      .from('invoice_payment_tokens')
+      .select('*')
+      .eq('token', req.params.id)
+      .single();
+    
+    if (fetchError || !invoice) {
+      console.log(`[Invoice Resend] Invoice not found: ${req.params.id}`, fetchError);
       return res.status(404).json({ error: "Invoice not found" });
     }
     
@@ -5571,49 +5579,51 @@ export async function registerRoutes(
       });
     };
     
-    // Build payment URL if token exists (use snake_case from database)
+    // Build payment URL using the token
     let paymentUrl = '';
-    const storedToken = (invoice as any).payment_token || (invoice as any).paymentToken;
+    const storedToken = invoice.token;
     if (storedToken) {
       const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
       const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
       paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${storedToken}`;
     }
     
-    // Parse job details from stored JSON (use snake_case from database)
-    const storedJobDetails = (invoice as any).job_details || (invoice as any).jobDetails;
+    // Parse job details from stored JSON
+    const storedJobDetails = invoice.job_details;
     const jobDetails = storedJobDetails 
       ? (typeof storedJobDetails === 'string' 
           ? JSON.parse(storedJobDetails) 
           : storedJobDetails)
       : [];
     
-    // Convert total to number for the function (try 'amount' first, then 'total')
-    const rawAmount = (invoice as any).amount ?? invoice.total ?? 0;
+    // Convert amount to number (invoice_payment_tokens uses 'amount' column)
+    const rawAmount = invoice.amount ?? 0;
     const totalAmount = typeof rawAmount === 'string' 
       ? parseFloat(rawAmount) 
       : (rawAmount || 0);
     
+    console.log(`[Invoice Resend] Sending invoice ${invoice.invoice_number} to ${invoice.customer_email}`);
+    
     const success = await sendInvoiceToCustomerWithPaymentLink(
-      invoice.customerEmail,
-      invoice.customerName,
-      invoice.invoiceNumber,
+      invoice.customer_email,
+      invoice.customer_name,
+      invoice.invoice_number,
       totalAmount,
-      formatDate(invoice.dueDate),
-      formatDate(invoice.periodStart),
-      formatDate(invoice.periodEnd),
+      formatDate(invoice.due_date),
+      formatDate(invoice.period_start),
+      formatDate(invoice.period_end),
       invoice.notes,
       paymentUrl,
-      (invoice as any).companyName,
-      (invoice as any).businessAddress,
+      invoice.company_name,
+      invoice.business_address,
       jobDetails
     );
     
     if (success) {
       res.json({ 
         success: true, 
-        message: `Invoice resent to ${invoice.customerEmail}`,
-        customerEmail: invoice.customerEmail 
+        message: `Invoice resent to ${invoice.customer_email}`,
+        customerEmail: invoice.customer_email 
       });
     } else {
       res.status(500).json({ error: "Failed to resend invoice email" });
