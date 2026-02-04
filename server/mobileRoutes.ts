@@ -585,9 +585,11 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
-      console.log(`[Mobile Profile] Driver ${driver.driverCode || driver.id} updating:`, Object.keys(updateData));
+      console.log(`[Mobile Profile] Request body received:`, JSON.stringify(req.body));
+      console.log(`[Mobile Profile] Driver ${driver.driverCode || driver.id} updating fields:`, Object.keys(updateData));
       console.log(`[Mobile Profile] Update payload:`, JSON.stringify(updateData));
       console.log(`[Mobile Profile] Driver ID for update:`, driver.id);
+      console.log(`[Mobile Profile] fullName in body:`, req.body.fullName, '| fullName in updateData:', updateData.fullName);
 
       // Update in memory storage
       const updatedDriver = await storage.updateDriver(driver.id, updateData);
