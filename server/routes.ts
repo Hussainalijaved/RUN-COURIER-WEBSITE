@@ -5605,10 +5605,12 @@ export async function registerRoutes(
 
   // Bulk send invoices by email
   app.post("/api/invoices/bulk-send", asyncHandler(async (req, res) => {
+    console.log('[Bulk Send] Starting bulk send request');
     // ADMIN REQUIRED: Bulk sending invoices is an admin-only operation
     if (!enforceAdminAccess(req, res)) return;
     
     const { invoiceIds, overrideEmail } = req.body;
+    console.log('[Bulk Send] Invoice IDs:', invoiceIds, 'Override email:', overrideEmail);
     
     if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
       return res.status(400).json({ error: "Invoice IDs array is required" });
