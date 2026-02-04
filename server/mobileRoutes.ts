@@ -508,8 +508,9 @@ export function registerMobileRoutes(app: Express): void {
         accountHolderName: driver.accountHolderName || fullDriverData.account_holder_name,
         sortCode: driver.sortCode || fullDriverData.sort_code,
         accountNumber: driver.accountNumber || fullDriverData.account_number,
-        // Document URLs
+        // Document URLs (include both camelCase and snake_case for mobile app compatibility)
         profilePictureUrl: driver.profilePictureUrl || fullDriverData.profile_picture_url,
+        profile_picture_url: driver.profilePictureUrl || fullDriverData.profile_picture_url,
         drivingLicenceFrontUrl: fullDriverData.driving_licence_front_url,
         drivingLicenceBackUrl: fullDriverData.driving_licence_back_url,
         dbsCertificateUrl: driver.dbsCertificateUrl || fullDriverData.dbs_certificate_url,
@@ -674,7 +675,64 @@ export function registerMobileRoutes(app: Express): void {
           vehicleModel: updatedDriver.vehicleModel,
           vehicleColor: updatedDriver.vehicleColor,
           profilePictureUrl: updatedDriver.profilePictureUrl,
+          profile_picture_url: updatedDriver.profilePictureUrl,
         }
+      });
+    })
+  );
+
+  // Dedicated endpoint for profile picture updates
+  // Mobile app should call this after uploading to Supabase Storage
+  app.post("/api/mobile/v1/driver/profile-picture",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { url, profile_picture_url, profilePictureUrl } = req.body;
+      
+      // Accept any of these field names
+      const pictureUrl = url || profile_picture_url || profilePictureUrl;
+
+      if (!pictureUrl) {
+        return res.status(400).json({ 
+          error: "Profile picture URL is required (url, profile_picture_url, or profilePictureUrl)",
+          code: "MISSING_URL"
+        });
+      }
+
+      console.log(`[Mobile Profile Picture] Driver ${driver.driverCode || driver.id} updating profile picture: ${pictureUrl}`);
+
+      // Update memory storage
+      await storage.updateDriver(driver.id, { profilePictureUrl: pictureUrl });
+
+      // Sync to Supabase using admin client (bypasses RLS)
+      if (supabaseAdmin) {
+        const { error: dbError, data: updatedData } = await supabaseAdmin
+          .from('drivers')
+          .update({ 
+            profile_picture_url: pictureUrl, 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', driver.id)
+          .select('profile_picture_url')
+          .single();
+
+        if (dbError) {
+          console.error('[Mobile Profile Picture] Supabase update failed:', dbError);
+          return res.status(500).json({
+            error: "Failed to save profile picture",
+            code: "DB_ERROR"
+          });
+        }
+        
+        console.log(`[Mobile Profile Picture] Supabase update SUCCESS:`, updatedData);
+      }
+
+      res.json({
+        success: true,
+        message: "Profile picture updated successfully",
+        profilePictureUrl: pictureUrl,
+        profile_picture_url: pictureUrl,
       });
     })
   );
