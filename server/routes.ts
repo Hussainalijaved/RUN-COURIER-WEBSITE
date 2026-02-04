@@ -3132,8 +3132,12 @@ export async function registerRoutes(
 
   // Delete customer (admin only)
   app.delete("/api/users/:id", asyncHandler(async (req, res) => {
+    console.log(`[Users DELETE] Route hit for id: ${req.params.id}, isAdmin: ${(req as any).isAdmin}`);
     // ADMIN REQUIRED: Deleting users is an admin-only operation
-    if (!enforceAdminAccess(req, res)) return;
+    if (!enforceAdminAccess(req, res)) {
+      console.log(`[Users DELETE] Admin access denied`);
+      return;
+    }
     
     const userId = req.params.id;
     console.log(`[Users] Attempting to delete customer: ${userId}`);
