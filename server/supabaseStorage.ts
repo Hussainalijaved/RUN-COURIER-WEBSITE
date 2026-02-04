@@ -59,7 +59,7 @@ function mapDbToDriver(dbDriver: any): Driver {
   return {
     id: dbDriver.id,
     userId: dbDriver.user_id || dbDriver.id,
-    driverCode: dbDriver.driver_id,
+    driverCode: dbDriver.driver_code || dbDriver.driver_id, // Use driver_code (actual column name)
     fullName: dbDriver.full_name,
     email: dbDriver.email,
     phone: dbDriver.phone,
@@ -78,7 +78,7 @@ function mapDbToDriver(dbDriver: any): Driver {
     vehicleModel: dbDriver.vehicle_model,
     vehicleColor: dbDriver.vehicle_color,
     isAvailable: dbDriver.online_status === 'online',
-    isVerified: dbDriver.is_verified,
+    isVerified: dbDriver.status === 'approved', // Use 'status' column - 'approved' means verified
     currentLatitude: dbDriver.current_latitude,
     currentLongitude: dbDriver.current_longitude,
     lastLocationUpdate: dbDriver.last_location_update ? new Date(dbDriver.last_location_update) : null,
@@ -745,8 +745,7 @@ export class SupabaseStorage implements IStorage {
     if (data.vehicleModel !== undefined) dbData.vehicle_model = data.vehicleModel;
     if (data.vehicleColor !== undefined) dbData.vehicle_color = data.vehicleColor;
     if (data.isAvailable !== undefined) dbData.online_status = data.isAvailable ? 'online' : 'offline';
-    if (data.isVerified !== undefined) dbData.is_verified = data.isVerified;
-    if ((data as any).approvalStatus !== undefined) dbData.approval_status = (data as any).approvalStatus;
+    if (data.isVerified !== undefined) dbData.status = data.isVerified ? 'approved' : 'applicant'; // Use 'status' column
     if (data.currentLatitude !== undefined) dbData.current_latitude = data.currentLatitude;
     if (data.currentLongitude !== undefined) dbData.current_longitude = data.currentLongitude;
     if (data.lastLocationUpdate !== undefined) dbData.last_location_update = data.lastLocationUpdate;
