@@ -424,6 +424,9 @@ export function registerMobileRoutes(app: Express): void {
       let totalJobs = 0;
       let totalEarnings = 0;
       let totalMiles = 0;
+      let weeklyJobs = 0;
+      let weeklyEarnings = 0;
+      let weeklyMiles = 0;
       
       if (supabaseAdmin) {
         // Get driver data
@@ -439,7 +442,7 @@ export function registerMobileRoutes(app: Express): void {
         // Calculate stats from completed jobs
         const { data: completedJobs } = await supabaseAdmin
           .from('jobs')
-          .select('id, driver_price, distance')
+          .select('id, driver_price, distance, delivered_at, updated_at')
           .eq('driver_id', driver.id)
           .eq('status', 'delivered');
         
@@ -447,7 +450,25 @@ export function registerMobileRoutes(app: Express): void {
           totalJobs = completedJobs.length;
           totalEarnings = completedJobs.reduce((sum, job) => sum + (parseFloat(job.driver_price) || 0), 0);
           totalMiles = completedJobs.reduce((sum, job) => sum + (parseFloat(job.distance) || 0), 0);
-          console.log(`[Driver Profile] Driver ${driver.id}: ${totalJobs} completed jobs, £${totalEarnings.toFixed(2)} earned, ${totalMiles.toFixed(1)} miles`);
+          
+          // Calculate this week's stats (Monday to Sunday)
+          const now = new Date();
+          const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+          const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - daysSinceMonday);
+          weekStart.setHours(0, 0, 0, 0);
+          
+          const thisWeekJobs = completedJobs.filter(job => {
+            const deliveredDate = new Date(job.delivered_at || job.updated_at);
+            return deliveredDate >= weekStart;
+          });
+          
+          weeklyJobs = thisWeekJobs.length;
+          weeklyEarnings = thisWeekJobs.reduce((sum, job) => sum + (parseFloat(job.driver_price) || 0), 0);
+          weeklyMiles = thisWeekJobs.reduce((sum, job) => sum + (parseFloat(job.distance) || 0), 0);
+          
+          console.log(`[Driver Profile] Driver ${driver.id}: Total: ${totalJobs} jobs, £${totalEarnings.toFixed(2)}, ${totalMiles.toFixed(1)} miles | This Week: ${weeklyJobs} jobs, £${weeklyEarnings.toFixed(2)}, ${weeklyMiles.toFixed(1)} miles`);
         }
       }
       
@@ -475,6 +496,10 @@ export function registerMobileRoutes(app: Express): void {
         totalJobs: totalJobs,
         totalEarnings: totalEarnings,
         totalMiles: Math.round(totalMiles * 10) / 10,
+        // Weekly stats (this week, Monday to Sunday)
+        weeklyJobs: weeklyJobs,
+        weeklyEarnings: weeklyEarnings,
+        weeklyMiles: Math.round(weeklyMiles * 10) / 10,
         currentLatitude: driver.currentLatitude,
         currentLongitude: driver.currentLongitude,
         lastLocationUpdate: driver.lastLocationUpdate,
