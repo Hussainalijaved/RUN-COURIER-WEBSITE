@@ -183,13 +183,10 @@ export async function requireDriverRole(
       return;
     }
 
+    // Allow unverified drivers to login so they can complete registration and upload documents
+    // The mobile app can still show verification status and limit certain features if needed
     if (!driver.isVerified) {
-      console.log("[Mobile Auth] Driver not verified. approval_status check failed for:", driver.driverCode);
-      res.status(403).json({ 
-        error: "Driver account is pending verification",
-        code: "DRIVER_NOT_VERIFIED"
-      });
-      return;
+      console.log("[Mobile Auth] Driver not yet verified, but allowing access for registration completion:", driver.driverCode);
     }
 
     console.log("[Mobile Auth] Driver authenticated successfully:", driver.driverCode, "verified:", driver.isVerified);
