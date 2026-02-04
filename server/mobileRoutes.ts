@@ -583,6 +583,15 @@ export function registerMobileRoutes(app: Express): void {
       if (req.body.name !== undefined && updateData.fullName === undefined) {
         updateData.fullName = req.body.name;
       }
+      
+      // Handle profile_picture_url alias (mobile app may send snake_case)
+      if (req.body.profile_picture_url !== undefined && updateData.profilePictureUrl === undefined) {
+        updateData.profilePictureUrl = req.body.profile_picture_url;
+      }
+      // Handle profile_picture alias (mobile app may send this variant)
+      if (req.body.profile_picture !== undefined && updateData.profilePictureUrl === undefined) {
+        updateData.profilePictureUrl = req.body.profile_picture;
+      }
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({
@@ -637,6 +646,7 @@ export function registerMobileRoutes(app: Express): void {
               phone: supabaseUpdated?.phone,
               address: supabaseUpdated?.address,
               postcode: supabaseUpdated?.postcode,
+              profile_picture_url: supabaseUpdated?.profile_picture_url,
               updated_at: supabaseUpdated?.updated_at,
             }));
           }
@@ -663,6 +673,7 @@ export function registerMobileRoutes(app: Express): void {
           vehicleMake: updatedDriver.vehicleMake,
           vehicleModel: updatedDriver.vehicleModel,
           vehicleColor: updatedDriver.vehicleColor,
+          profilePictureUrl: updatedDriver.profilePictureUrl,
         }
       });
     })
