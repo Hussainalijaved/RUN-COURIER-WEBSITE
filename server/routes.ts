@@ -5648,10 +5648,11 @@ export async function registerRoutes(
     for (const invoiceId of invoiceIds) {
       try {
         // Fetch invoice from invoice_payment_tokens table (where invoices are actually stored)
+        // The invoiceId from frontend is actually the 'token' column (see GET /api/invoices mapping)
         const { data: invoice, error: fetchError } = await supabaseAdmin
           .from('invoice_payment_tokens')
           .select('*')
-          .eq('id', invoiceId)
+          .eq('token', invoiceId)
           .single();
         
         if (fetchError || !invoice) {
