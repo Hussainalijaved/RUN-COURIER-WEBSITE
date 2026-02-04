@@ -85,7 +85,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- 7. FIX STORAGE POLICIES FOR PROFILE PICTURES
 -- ============================================
 
--- Drop existing storage policies to recreate them
+-- Drop ALL existing storage policies to recreate them cleanly
 DROP POLICY IF EXISTS "driver_docs_upload_own" ON storage.objects;
 DROP POLICY IF EXISTS "driver_docs_read_own" ON storage.objects;
 DROP POLICY IF EXISTS "driver_docs_read_admin" ON storage.objects;
@@ -94,33 +94,29 @@ DROP POLICY IF EXISTS "driver_docs_delete_own" ON storage.objects;
 DROP POLICY IF EXISTS "driver_docs_public_read" ON storage.objects;
 DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
 DROP POLICY IF EXISTS "Allow public read" ON storage.objects;
+DROP POLICY IF EXISTS "driver_documents_insert" ON storage.objects;
+DROP POLICY IF EXISTS "driver_documents_update" ON storage.objects;
+DROP POLICY IF EXISTS "driver_documents_delete" ON storage.objects;
+DROP POLICY IF EXISTS "driver_documents_select" ON storage.objects;
 
--- Policy: Drivers can upload their own documents (folder = their auth.uid())
-CREATE POLICY "driver_docs_upload_own" ON storage.objects
-  FOR INSERT WITH CHECK (
-    bucket_id = 'driver-documents' AND
-    (storage.foldername(name))[1] = auth.uid()::text
-  );
+-- Policy: Any authenticated user can upload to driver-documents bucket
+CREATE POLICY "driver_documents_insert" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'driver-documents');
 
--- Policy: Drivers can update/overwrite their own documents
-CREATE POLICY "driver_docs_update_own" ON storage.objects
-  FOR UPDATE USING (
-    bucket_id = 'driver-documents' AND
-    (storage.foldername(name))[1] = auth.uid()::text
-  );
+-- Policy: Any authenticated user can update files in driver-documents bucket  
+CREATE POLICY "driver_documents_update" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'driver-documents');
 
--- Policy: Drivers can delete their own documents  
-CREATE POLICY "driver_docs_delete_own" ON storage.objects
-  FOR DELETE USING (
-    bucket_id = 'driver-documents' AND
-    (storage.foldername(name))[1] = auth.uid()::text
-  );
+-- Policy: Any authenticated user can delete files in driver-documents bucket
+CREATE POLICY "driver_documents_delete" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'driver-documents');
 
 -- Policy: Public read access for driver documents (bucket is public for profile pictures)
-CREATE POLICY "driver_docs_public_read" ON storage.objects
-  FOR SELECT USING (
-    bucket_id = 'driver-documents'
-  );
+CREATE POLICY "driver_documents_select" ON storage.objects
+  FOR SELECT USING (bucket_id = 'driver-documents');
 
 -- ============================================
 -- VERIFICATION (run these queries to verify)
