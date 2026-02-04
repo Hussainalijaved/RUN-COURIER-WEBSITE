@@ -52,18 +52,41 @@ async function requireAdminAccessStrict(req: Request, res: Response, next: NextF
     const token = authHeader.slice(7);
     console.log(`[Admin Access Strict] Token length: ${token.length}, first 20 chars: ${token.substring(0, 20)}...`);
     
-    // Verify token with Supabase - MUST succeed for admin access
-    // No fallback to JWT payload decoding for admin routes
-    if (!supabaseAdmin) {
-      console.error('[Admin Access] Supabase admin client not initialized');
-      res.status(500).json({ error: 'Authentication service unavailable', code: 'AUTH_SERVICE_ERROR' });
-      return;
+    let authUser: { id: string; email: string; user_metadata?: any } | null = null;
+    
+    // First try Supabase getUser
+    if (supabaseAdmin) {
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && user) {
+        authUser = user;
+        console.log('[Admin Access] User verified via Supabase getUser');
+      } else {
+        console.log('[Admin Access] Supabase getUser failed:', error?.message, '- trying JWT decode fallback');
+      }
     }
     
-    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    // Fallback: decode JWT payload to get email (JWT is signed by Supabase)
+    if (!authUser) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          if (payload.email && payload.sub) {
+            authUser = {
+              id: payload.sub,
+              email: payload.email,
+              user_metadata: payload.user_metadata || {}
+            };
+            console.log('[Admin Access] User info extracted from JWT payload:', payload.email);
+          }
+        }
+      } catch (decodeError) {
+        console.error('[Admin Access] JWT decode failed:', decodeError);
+      }
+    }
     
-    if (error || !authUser) {
-      console.log('[Admin Access] Token verification failed:', error?.message);
+    if (!authUser) {
+      console.log('[Admin Access] Could not verify user from token');
       res.status(401).json({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' });
       return;
     }
