@@ -615,6 +615,38 @@ export class SupabaseStorage implements IStorage {
     return this.updateUser(id, { isActive: true, deactivatedAt: null });
   }
 
+  async deleteUser(id: string): Promise<boolean> {
+    const supabase = this.checkSupabase();
+    
+    // Try to delete by auth_id first (Supabase Auth UUID)
+    const { error: authIdError } = await supabase
+      .from('users')
+      .delete()
+      .eq('auth_id', id);
+    
+    if (!authIdError) {
+      console.log(`[SupabaseStorage] Deleted user by auth_id ${id}`);
+      return true;
+    }
+    
+    // Fallback: try by numeric id
+    const numericId = parseInt(id, 10);
+    if (!isNaN(numericId)) {
+      const { error: idError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', numericId);
+      
+      if (!idError) {
+        console.log(`[SupabaseStorage] Deleted user by id ${id}`);
+        return true;
+      }
+    }
+    
+    console.error(`[SupabaseStorage] Error deleting user ${id}:`, authIdError);
+    return false;
+  }
+
   async getDriver(id: string): Promise<Driver | undefined> {
     const supabase = this.checkSupabase();
     const { data, error } = await supabase
