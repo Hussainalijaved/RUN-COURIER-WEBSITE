@@ -5639,20 +5639,35 @@ export async function registerRoutes(
     // Use override email if provided, otherwise use original customer email
     const targetEmail = overrideEmail?.trim() || null;
     
+    // Get Supabase client to fetch from invoice_payment_tokens table
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Database not available" });
+    }
+    
     for (const invoiceId of invoiceIds) {
       try {
-        const invoice = await storage.getInvoice(invoiceId);
-        if (!invoice) {
+        // Fetch invoice from invoice_payment_tokens table (where invoices are actually stored)
+        const { data: invoice, error: fetchError } = await supabaseAdmin
+          .from('invoice_payment_tokens')
+          .select('*')
+          .eq('id', invoiceId)
+          .single();
+        
+        if (fetchError || !invoice) {
+          console.log(`[Bulk Send] Invoice not found: ${invoiceId}`, fetchError);
           results.push({ invoiceId, success: false, error: "Invoice not found" });
           continue;
         }
         
+        console.log(`[Bulk Send] Found invoice: ${invoice.invoice_number}`);
+        
         // Determine which email to use
-        const emailToUse = targetEmail || invoice.customerEmail;
+        const emailToUse = targetEmail || invoice.customer_email;
         
         // Build payment URL if token exists
         let paymentUrl = '';
-        const storedToken = (invoice as any).payment_token || (invoice as any).paymentToken;
+        const storedToken = invoice.token;
         if (storedToken) {
           const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
           const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
@@ -5660,7 +5675,7 @@ export async function registerRoutes(
         }
         
         // Parse job details from stored JSON
-        const storedJobDetails = (invoice as any).job_details || (invoice as any).jobDetails;
+        const storedJobDetails = invoice.job_details;
         const jobDetails = storedJobDetails 
           ? (typeof storedJobDetails === 'string' 
               ? JSON.parse(storedJobDetails) 
@@ -5671,24 +5686,28 @@ export async function registerRoutes(
           ? parseFloat(invoice.total) 
           : invoice.total;
         
+        console.log(`[Bulk Send] Sending invoice ${invoice.invoice_number} to ${emailToUse}`);
+        
         const success = await sendInvoiceToCustomerWithPaymentLink(
           emailToUse,
-          invoice.customerName,
-          invoice.invoiceNumber,
+          invoice.customer_name,
+          invoice.invoice_number,
           totalAmount,
-          formatDate(invoice.dueDate),
-          formatDate(invoice.periodStart),
-          formatDate(invoice.periodEnd),
+          formatDate(invoice.due_date),
+          formatDate(invoice.period_start),
+          formatDate(invoice.period_end),
           invoice.notes,
           paymentUrl,
-          (invoice as any).companyName,
-          (invoice as any).businessAddress,
+          invoice.company_name,
+          invoice.business_address,
           jobDetails
         );
         
         if (success) {
+          console.log(`[Bulk Send] Successfully sent invoice ${invoice.invoice_number} to ${emailToUse}`);
           results.push({ invoiceId, success: true, email: emailToUse });
         } else {
+          console.log(`[Bulk Send] Failed to send invoice ${invoice.invoice_number}`);
           results.push({ invoiceId, success: false, error: "Failed to send email" });
         }
       } catch (err: any) {
