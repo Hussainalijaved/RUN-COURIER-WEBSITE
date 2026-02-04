@@ -421,7 +421,12 @@ export function registerMobileRoutes(app: Express): void {
       
       // Fetch full driver data from Supabase for document URLs
       let fullDriverData: any = driver;
+      let totalJobs = 0;
+      let totalEarnings = 0;
+      let totalMiles = 0;
+      
       if (supabaseAdmin) {
+        // Get driver data
         const { data } = await supabaseAdmin
           .from('drivers')
           .select('*')
@@ -429,6 +434,20 @@ export function registerMobileRoutes(app: Express): void {
           .single();
         if (data) {
           fullDriverData = data;
+        }
+        
+        // Calculate stats from completed jobs
+        const { data: completedJobs } = await supabaseAdmin
+          .from('jobs')
+          .select('id, driver_price, distance')
+          .eq('driver_id', driver.id)
+          .eq('status', 'delivered');
+        
+        if (completedJobs && completedJobs.length > 0) {
+          totalJobs = completedJobs.length;
+          totalEarnings = completedJobs.reduce((sum, job) => sum + (parseFloat(job.driver_price) || 0), 0);
+          totalMiles = completedJobs.reduce((sum, job) => sum + (parseFloat(job.distance) || 0), 0);
+          console.log(`[Driver Profile] Driver ${driver.id}: ${totalJobs} completed jobs, £${totalEarnings.toFixed(2)} earned, ${totalMiles.toFixed(1)} miles`);
         }
       }
       
@@ -453,7 +472,9 @@ export function registerMobileRoutes(app: Express): void {
         isAvailable: driver.isAvailable,
         isVerified: driver.isVerified,
         rating: driver.rating,
-        totalJobs: driver.totalJobs,
+        totalJobs: totalJobs,
+        totalEarnings: totalEarnings,
+        totalMiles: Math.round(totalMiles * 10) / 10,
         currentLatitude: driver.currentLatitude,
         currentLongitude: driver.currentLongitude,
         lastLocationUpdate: driver.lastLocationUpdate,
