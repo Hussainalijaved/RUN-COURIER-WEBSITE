@@ -382,9 +382,6 @@ export async function registerRoutes(
     res.json({ success: true, message: "Invoice deleted successfully" });
   }));
   app.use('/api/job-assignments', requireAdminAccessStrict);
-  
-  // Protect user DELETE route (must have requireAdminAccess middleware to set isAdmin)
-  app.use('/api/users/:id', requireAdminAccess);
 
   app.get("/api/health", (req, res) => {
     const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
@@ -3130,14 +3127,11 @@ export async function registerRoutes(
     res.json(updatedUser);
   }));
 
-  // Delete customer (admin only)
-  app.delete("/api/users/:id", asyncHandler(async (req, res) => {
-    console.log(`[Users DELETE] Route hit for id: ${req.params.id}, isAdmin: ${(req as any).isAdmin}`);
-    // ADMIN REQUIRED: Deleting users is an admin-only operation
-    if (!enforceAdminAccess(req, res)) {
-      console.log(`[Users DELETE] Admin access denied`);
-      return;
-    }
+  // Delete customer (admin only) - using requireAdminAccessStrict middleware directly
+  app.delete("/api/users/:id", requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    console.log(`[Users DELETE] Route hit for id: ${req.params.id}, admin verified`);
+    
+    // Admin already verified by middleware
     
     const userId = req.params.id;
     console.log(`[Users] Attempting to delete customer: ${userId}`);
