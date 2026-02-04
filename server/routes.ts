@@ -5579,13 +5579,12 @@ export async function registerRoutes(
       });
     };
     
-    // Build payment URL using the token
+    // Build payment URL using the token - use APP_URL for production
     let paymentUrl = '';
     const storedToken = invoice.token;
     if (storedToken) {
-      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
-      paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${storedToken}`;
+      const appUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+      paymentUrl = `${appUrl}/invoice-pay/${storedToken}`;
     }
     
     // Parse job details from stored JSON
@@ -5700,13 +5699,12 @@ export async function registerRoutes(
         // Determine which email to use
         const emailToUse = targetEmail || invoice.customer_email;
         
-        // Build payment URL if token exists
+        // Build payment URL if token exists - use APP_URL for production
         let paymentUrl = '';
         const storedToken = invoice.token;
         if (storedToken) {
-          const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-          const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
-          paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${storedToken}`;
+          const appUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+          paymentUrl = `${appUrl}/invoice-pay/${storedToken}`;
         }
         
         // Parse job details from stored JSON
