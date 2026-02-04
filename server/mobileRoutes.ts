@@ -536,8 +536,10 @@ export function registerMobileRoutes(app: Express): void {
 
       // Fields that drivers are allowed to update
       // Note: 'address' is the field name in local storage, mobile may send 'fullAddress'
+      // Note: 'fullName' is the field name, mobile may send 'name' as alias
       const allowedFields = [
         'fullName',
+        'name', // alias for fullName
         'phone',
         'postcode',
         'address',
@@ -575,6 +577,11 @@ export function registerMobileRoutes(app: Express): void {
       // Handle fullAddress alias (mobile app may send fullAddress instead of address)
       if (req.body.fullAddress !== undefined && updateData.address === undefined) {
         updateData.address = req.body.fullAddress;
+      }
+      
+      // Handle name alias (mobile app may send name instead of fullName)
+      if (req.body.name !== undefined && updateData.fullName === undefined) {
+        updateData.fullName = req.body.name;
       }
 
       if (Object.keys(updateData).length === 0) {
