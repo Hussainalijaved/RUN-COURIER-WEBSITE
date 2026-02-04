@@ -34,7 +34,7 @@ function getEmailFooter(): string {
       <img src="${LOGO_URL}" alt="Run Courier" style="max-width: 60px; height: auto; margin-bottom: 10px;" />
       <p style="color: #999; font-size: 12px; margin: 0;">
         Run Courier - Same Day Delivery Across the UK<br>
-        <a href="https://runcourier.co.uk" style="color: #007BFF;">runcourier.co.uk</a> | 
+        <a href="https://runcourier.co.uk" style="color: #007BFF; text-decoration: underline; font-weight: bold;">Visit Our Website</a> | 
         <a href="tel:+442046346100" style="color: #007BFF;">+44 20 4634 6100</a>
       </p>
     </div>
@@ -230,7 +230,7 @@ export async function sendWelcomeEmail(
   `;
 
   const htmlContent = wrapEmailContent(content, 'Welcome to Run Courier!');
-  const textContent = `Welcome to Run Courier!\n\nHello ${name}!\n\nThank you for registering with Run Courier. Your ${roleText} has been successfully created.\n\nWhat you can do now:\n- Book same-day deliveries across the UK\n- Track your parcels in real-time\n- View your booking history\n- Get 24/7 customer support\n\nVisit https://runcourier.co.uk/book to book your first delivery.\n\nRun Courier - runcourier.co.uk`;
+  const textContent = `Welcome to Run Courier!\n\nHello ${name}!\n\nThank you for registering with Run Courier. Your ${roleText} has been successfully created.\n\nWhat you can do now:\n- Book same-day deliveries across the UK\n- Track your parcels in real-time\n- View your booking history\n- Get 24/7 customer support\n\nVisit https://runcourier.co.uk/book to book your first delivery.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Welcome to Run Courier!', htmlContent, textContent);
 }
@@ -594,7 +594,7 @@ Job Status: ${(jobDetails.status || 'pending').toUpperCase()}
 ${jobDetails.customerEmail ? `Customer Email: ${jobDetails.customerEmail}\n` : ''}
 
 Please log in to the admin dashboard to manage this booking.
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification('sales@runcourier.co.uk', `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
 }
@@ -1245,7 +1245,7 @@ export async function sendEmailVerification(
   `;
 
   const htmlContent = wrapEmailContent(content, 'Verify Your Email');
-  const textContent = `Welcome to Run Courier!\n\nHi ${fullName},\n\nThank you for registering. Please verify your email address by clicking this link:\n\n${verificationLink}\n\nIf you didn't create an account, you can safely ignore this email.\n\nThis link will expire in 24 hours.\n\nRun Courier - runcourier.co.uk`;
+  const textContent = `Welcome to Run Courier!\n\nHi ${fullName},\n\nThank you for registering. Please verify your email address by clicking this link:\n\n${verificationLink}\n\nIf you didn't create an account, you can safely ignore this email.\n\nThis link will expire in 24 hours.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Verify Your Email - Run Courier', htmlContent, textContent);
 }
@@ -1273,7 +1273,7 @@ export async function sendPasswordResetEmail(
   `;
 
   const htmlContent = wrapEmailContent(content, 'Password Reset');
-  const textContent = `Reset Your Password\n\nYou requested to reset your password. Click this link to create a new password:\n\n${resetLink}\n\nIf you didn't request this, you can safely ignore this email.\n\nThis link will expire in 1 hour.\n\nRun Courier - runcourier.co.uk`;
+  const textContent = `Reset Your Password\n\nYou requested to reset your password. Click this link to create a new password:\n\n${resetLink}\n\nIf you didn't request this, you can safely ignore this email.\n\nThis link will expire in 1 hour.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Reset Your Password - Run Courier', htmlContent, textContent);
 }
@@ -1466,7 +1466,7 @@ Pay now: ${data.paymentLink}
 
 This payment link expires on ${data.expiresAt}.
 
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(customerEmail, `Payment Required - Booking ${data.trackingNumber}`, htmlContent, textContent);
 }
@@ -1554,7 +1554,7 @@ Booking Details:
 
 Track your delivery: ${BASE_URL}/track/${data.trackingNumber}
 
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(customerEmail, `Payment Confirmed - ${data.trackingNumber}`, htmlContent, textContent);
 }
@@ -1636,7 +1636,7 @@ ${data.paymentLink}
 
 Please contact the customer manually or resend the link from the admin panel.
 
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification('info@runcourier.co.uk', `Payment Link Email Failed - ${data.trackingNumber}`, htmlContent, textContent);
 }
@@ -1823,7 +1823,7 @@ Ready to book? Contact us to confirm your delivery:
 
 This quote is valid for 7 days. Prices may vary based on actual pickup time and conditions.
 
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(
     customerEmail, 
@@ -1927,7 +1927,7 @@ If you have already made a payment for this booking, a refund will be processed 
 
 If you have any questions or would like to rebook, please contact us at +44 20 4634 6100.
 
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(customerEmail, `Booking Cancelled - ${data.trackingNumber}`, htmlContent, textContent);
 }
@@ -2126,7 +2126,7 @@ Our team will be in touch shortly to arrange a redelivery or discuss alternative
 
 If you'd like to speak with us immediately, please contact our customer service team at +44 20 4634 6100.
 
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(customerEmail, `Delivery Failed - ${data.trackingNumber}`, htmlContent, textContent);
 }
@@ -2265,7 +2265,7 @@ This payment should appear in your bank account within 1-3 working days, dependi
 
 If you have any questions about this payment, please contact our team.
 
-Run Courier - runcourier.co.uk`;
+Run Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(driverEmail, `Payment Confirmation - £${data.amount} - Run Courier`, wrapEmailContent(htmlContent, 'Payment Confirmation'), textContent);
 }
