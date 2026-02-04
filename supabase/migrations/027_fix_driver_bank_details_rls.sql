@@ -1,4 +1,4 @@
--- Migration: Fix RLS policy for driver bank details updates from mobile app
+-- Migration: Fix RLS policy for driver profile updates (bank details + profile picture) from mobile app
 -- Run this in Supabase SQL Editor
 
 -- ============================================
@@ -15,7 +15,7 @@ DROP POLICY IF EXISTS "drivers_update_own_profile" ON public.drivers;
 -- 2. CREATE COMPREHENSIVE UPDATE POLICY FOR DRIVERS
 -- ============================================
 
--- Drivers can update their own profile (all columns including bank details)
+-- Drivers can update their own profile (all columns including bank details and profile picture)
 CREATE POLICY "drivers_update_own" ON public.drivers
   FOR UPDATE 
   USING (auth.uid() = id)
@@ -44,7 +44,7 @@ GRANT SELECT, INSERT, UPDATE ON public.drivers TO authenticated;
 GRANT ALL ON public.drivers TO service_role;
 
 -- ============================================
--- 5. VERIFY BANK DETAILS COLUMNS EXIST
+-- 5. VERIFY ALL PROFILE COLUMNS EXIST
 -- ============================================
 
 DO $$
@@ -64,10 +64,67 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'drivers' AND column_name = 'account_number') THEN
         ALTER TABLE public.drivers ADD COLUMN account_number TEXT;
     END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'drivers' AND column_name = 'profile_picture_url') THEN
+        ALTER TABLE public.drivers ADD COLUMN profile_picture_url TEXT;
+    END IF;
 END $$;
+
+-- ============================================
+-- 6. FIX STORAGE BUCKET FOR DRIVER DOCUMENTS
+-- ============================================
+
+-- Create or update the driver-documents bucket
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('driver-documents', 'driver-documents', true, 10485760)
+ON CONFLICT (id) DO UPDATE SET 
+  public = true,
+  file_size_limit = 10485760;
+
+-- ============================================
+-- 7. FIX STORAGE POLICIES FOR PROFILE PICTURES
+-- ============================================
+
+-- Drop existing storage policies to recreate them
+DROP POLICY IF EXISTS "driver_docs_upload_own" ON storage.objects;
+DROP POLICY IF EXISTS "driver_docs_read_own" ON storage.objects;
+DROP POLICY IF EXISTS "driver_docs_read_admin" ON storage.objects;
+DROP POLICY IF EXISTS "driver_docs_update_own" ON storage.objects;
+DROP POLICY IF EXISTS "driver_docs_delete_own" ON storage.objects;
+DROP POLICY IF EXISTS "driver_docs_public_read" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public read" ON storage.objects;
+
+-- Policy: Drivers can upload their own documents (folder = their auth.uid())
+CREATE POLICY "driver_docs_upload_own" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'driver-documents' AND
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Policy: Drivers can update/overwrite their own documents
+CREATE POLICY "driver_docs_update_own" ON storage.objects
+  FOR UPDATE USING (
+    bucket_id = 'driver-documents' AND
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Policy: Drivers can delete their own documents  
+CREATE POLICY "driver_docs_delete_own" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'driver-documents' AND
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Policy: Public read access for driver documents (bucket is public for profile pictures)
+CREATE POLICY "driver_docs_public_read" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'driver-documents'
+  );
 
 -- ============================================
 -- VERIFICATION (run these queries to verify)
 -- ============================================
 -- SELECT * FROM pg_policies WHERE tablename = 'drivers' AND policyname LIKE 'drivers_update%';
--- SELECT column_name FROM information_schema.columns WHERE table_name = 'drivers' AND column_name IN ('bank_name', 'account_holder_name', 'sort_code', 'account_number');
+-- SELECT * FROM pg_policies WHERE tablename = 'objects' AND policyname LIKE 'driver_docs%';
+-- SELECT * FROM storage.buckets WHERE id = 'driver-documents';
