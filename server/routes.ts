@@ -3547,6 +3547,22 @@ export async function registerRoutes(
     const relativePath = `/uploads/documents/${safeDriverId}/${finalFilename}`;
     const fileUrl = relativePath;
 
+    // For pending applications, skip database operations entirely
+    // Files are stored locally and will be associated with the driver after approval
+    const isPendingApplication = rawDriverId === 'application-pending';
+    
+    if (isPendingApplication) {
+      // Return success with just the file URL for pending applications
+      console.log(`[Documents] Uploaded document for pending application: ${safeDocumentType}`);
+      return res.status(201).json({
+        success: true,
+        fileUrl,
+        fileName: file.originalname,
+        type: safeDocumentType,
+        message: "Document uploaded successfully for application"
+      });
+    }
+
     // Check for existing documents in both memory and database
     let existingDocId: string | null = null;
     
