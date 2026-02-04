@@ -550,7 +550,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
     </div>
     
     <p style="color: #666; font-size: 14px; margin-top: 20px; text-align: center;">
-      Please log in to the <a href="https://runcourier.co.uk/admin" style="color: #007BFF;">admin dashboard</a> to manage this booking.
+      Please log in to the <a href="https://runcourier.co.uk/admin/jobs" style="color: #007BFF;">admin dashboard</a> to manage this booking.
     </p>
   `;
 
@@ -825,11 +825,11 @@ export async function sendDriverApplicationNotification(
         </tr>
       </table>
     </div>
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the admin dashboard to review pending driver applications.</p>
+    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the <a href="https://runcourier.co.uk/admin/applications" style="color: #007BFF;">admin dashboard</a> to review pending driver applications.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Driver Application');
-  const textContent = `Driver Application Update\n\nApplicant: ${applicantName}\nStatus: ${status}\n\nPlease log in to the admin dashboard to review.`;
+  const textContent = `Driver Application Update\n\nApplicant: ${applicantName}\nStatus: ${status}\n\nPlease log in to the admin dashboard to review: https://runcourier.co.uk/admin/applications`;
 
   return sendAdminNotification('Driver Application Update', htmlContent, textContent);
 }
@@ -852,11 +852,11 @@ export async function sendDocumentUploadNotification(
         </tr>
       </table>
     </div>
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the admin dashboard to review and approve the document.</p>
+    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the <a href="https://runcourier.co.uk/admin/documents" style="color: #007BFF;">admin dashboard</a> to review and approve the document.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Document Upload');
-  const textContent = `New Document Upload\n\nDriver: ${driverName}\nDocument Type: ${documentType}\n\nPlease log in to the admin dashboard to review and approve.`;
+  const textContent = `New Document Upload\n\nDriver: ${driverName}\nDocument Type: ${documentType}\n\nPlease log in to the admin dashboard to review and approve: https://runcourier.co.uk/admin/documents`;
 
   return sendAdminNotification('New Document Upload', htmlContent, textContent);
 }
