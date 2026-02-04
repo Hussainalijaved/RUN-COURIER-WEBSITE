@@ -5821,12 +5821,17 @@ export async function registerRoutes(
       return res.status(410).json({ error: "This invoice has already been paid" });
     }
     
-    // Check if expired (7 days)
+    // Check if expired (90 days - 3 months to allow for payment)
     const expiryTime = new Date(invoiceData.created_at);
-    expiryTime.setDate(expiryTime.getDate() + 7);
+    expiryTime.setDate(expiryTime.getDate() + 90);
     if (new Date() > expiryTime) {
       await updateInvoicePaymentToken(token, { status: 'expired' });
       return res.status(410).json({ error: "This payment link has expired" });
+    }
+    
+    // If invoice was previously marked expired but is now within the new 90-day window, reset it
+    if (invoiceData.status === 'expired') {
+      await updateInvoicePaymentToken(token, { status: 'pending' });
     }
     
     res.json({
@@ -5853,12 +5858,17 @@ export async function registerRoutes(
       return res.status(410).json({ error: "This invoice has already been paid" });
     }
     
-    // Check if expired
+    // Check if expired (90 days)
     const expiryTime = new Date(invoiceData.created_at);
-    expiryTime.setDate(expiryTime.getDate() + 7);
+    expiryTime.setDate(expiryTime.getDate() + 90);
     if (new Date() > expiryTime) {
       await updateInvoicePaymentToken(token, { status: 'expired' });
       return res.status(410).json({ error: "This payment link has expired" });
+    }
+    
+    // If invoice was previously marked expired but is now within the new 90-day window, reset it
+    if (invoiceData.status === 'expired') {
+      await updateInvoicePaymentToken(token, { status: 'pending' });
     }
     
     // Return existing PaymentIntent if already created
