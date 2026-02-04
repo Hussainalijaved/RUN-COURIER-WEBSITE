@@ -5662,7 +5662,14 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Database not available" });
     }
     
-    for (const invoiceId of invoiceIds) {
+    for (let i = 0; i < invoiceIds.length; i++) {
+      const invoiceId = invoiceIds[i];
+      
+      // Add delay between emails to avoid rate limiting (Resend allows 2 requests/second)
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+      
       try {
         // Fetch invoice from invoice_payment_tokens table (where invoices are actually stored)
         // The invoiceId from frontend is actually the 'token' column (see GET /api/invoices mapping)
