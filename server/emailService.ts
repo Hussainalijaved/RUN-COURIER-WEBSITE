@@ -1124,10 +1124,17 @@ export async function sendInvoiceToCustomerWithPaymentLink(
     
     ${jobsTableHtml}
     
-    ${notes ? `<div style="background-color: #fff3cd; border-radius: 8px; padding: 15px; margin-bottom: 20px; border-left: 4px solid #ffc107;"><p style="color: #856404; margin: 0;"><strong>Notes:</strong> ${notes}</p></div>` : ''}
+    <div style="background-color: #e8f5e9; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <p style="color: #2e7d32; font-size: 18px; font-weight: bold; margin-top: 0;">Pay Now with Card</p>
+      <p style="color: #666; margin-bottom: 15px;">Click the button below to pay securely with your card via Stripe:</p>
+      <a href="${paymentUrl}" style="background-color: #007BFF; color: white; padding: 15px 40px; text-decoration: none; border-radius: 5px; font-size: 18px; font-weight: bold; display: inline-block;">
+        Pay £${typeof amount === 'number' ? amount.toFixed(2) : amount} Now
+      </a>
+      <p style="color: #888; font-size: 12px; margin-top: 15px; margin-bottom: 0;">Apple Pay, Google Pay & all major cards accepted</p>
+    </div>
     
     <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Pay by Bank Transfer</p>
+      <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Or Pay by Bank Transfer</p>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 5px 0; color: #666;"><strong>Account Name:</strong></td>
@@ -1159,7 +1166,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       `- ${job.trackingNumber}: ${job.pickupAddress.substring(0, 30)}... to ${job.deliveryAddress ? job.deliveryAddress.substring(0, 30) + '...' : job.recipientName || 'N/A'} (${job.scheduledDate}) - £${job.price.toFixed(2)}`
     ).join('\n')}\n` : '';
   
-  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\n${notes ? `Notes: ${notes}\n\n` : ''}PAY BY BANK TRANSFER\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\nPAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
