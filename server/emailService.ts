@@ -960,7 +960,7 @@ export async function sendInvoiceToCustomer(
       <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Option 2: Pay by Card (Stripe)</p>
       <p style="color: #666; margin: 0;">Pay securely online via Stripe at <a href="https://runcourier.co.uk/pay" style="color: #0066cc; text-decoration: underline;">runcourier.co.uk/pay</a></p>
     </div>
-    <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at info@runcourier.co.uk</p>
+    <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
     <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
@@ -1155,7 +1155,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       </table>
     </div>
     
-    <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at info@runcourier.co.uk</p>
+    <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
     <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
@@ -1208,7 +1208,7 @@ export async function sendPaymentReceivedConfirmation(
     </div>
     
     <p style="color: #666; font-size: 14px;">This email serves as your payment receipt. Please keep it for your records.</p>
-    <p style="color: #666; font-size: 14px;">If you have any questions, please contact us at info@runcourier.co.uk</p>
+    <p style="color: #666; font-size: 14px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
     <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
