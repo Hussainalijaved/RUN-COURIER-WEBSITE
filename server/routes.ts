@@ -5588,10 +5588,11 @@ export async function registerRoutes(
           : storedJobDetails)
       : [];
     
-    // Convert total to number for the function
-    const totalAmount = typeof invoice.total === 'string' 
-      ? parseFloat(invoice.total) 
-      : invoice.total;
+    // Convert total to number for the function (try 'amount' first, then 'total')
+    const rawAmount = (invoice as any).amount ?? invoice.total ?? 0;
+    const totalAmount = typeof rawAmount === 'string' 
+      ? parseFloat(rawAmount) 
+      : (rawAmount || 0);
     
     const success = await sendInvoiceToCustomerWithPaymentLink(
       invoice.customerEmail,
@@ -5699,9 +5700,11 @@ export async function registerRoutes(
               : storedJobDetails)
           : [];
         
-        const totalAmount = typeof invoice.total === 'string' 
-          ? parseFloat(invoice.total) 
-          : invoice.total;
+        // invoice_payment_tokens uses 'amount' column, not 'total'
+        const rawAmount = invoice.amount ?? invoice.total ?? 0;
+        const totalAmount = typeof rawAmount === 'string' 
+          ? parseFloat(rawAmount) 
+          : (rawAmount || 0);
         
         console.log(`[Bulk Send] Sending invoice ${invoice.invoice_number} to ${emailToUse}`);
         
