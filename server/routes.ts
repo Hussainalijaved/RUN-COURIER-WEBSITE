@@ -5608,10 +5608,18 @@ export async function registerRoutes(
     // ADMIN REQUIRED: Bulk sending invoices is an admin-only operation
     if (!enforceAdminAccess(req, res)) return;
     
-    const { invoiceIds } = req.body;
+    const { invoiceIds, overrideEmail } = req.body;
     
     if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
       return res.status(400).json({ error: "Invoice IDs array is required" });
+    }
+    
+    // Validate override email if provided
+    if (overrideEmail && typeof overrideEmail === 'string' && overrideEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(overrideEmail.trim())) {
+        return res.status(400).json({ error: "Invalid override email address" });
+      }
     }
     
     const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
@@ -5626,6 +5634,9 @@ export async function registerRoutes(
     
     const results: { invoiceId: string; success: boolean; email?: string; error?: string }[] = [];
     
+    // Use override email if provided, otherwise use original customer email
+    const targetEmail = overrideEmail?.trim() || null;
+    
     for (const invoiceId of invoiceIds) {
       try {
         const invoice = await storage.getInvoice(invoiceId);
@@ -5633,6 +5644,9 @@ export async function registerRoutes(
           results.push({ invoiceId, success: false, error: "Invoice not found" });
           continue;
         }
+        
+        // Determine which email to use
+        const emailToUse = targetEmail || invoice.customerEmail;
         
         // Build payment URL if token exists
         let paymentUrl = '';
@@ -5656,7 +5670,7 @@ export async function registerRoutes(
           : invoice.total;
         
         const success = await sendInvoiceToCustomerWithPaymentLink(
-          invoice.customerEmail,
+          emailToUse,
           invoice.customerName,
           invoice.invoiceNumber,
           totalAmount,
@@ -5671,7 +5685,7 @@ export async function registerRoutes(
         );
         
         if (success) {
-          results.push({ invoiceId, success: true, email: invoice.customerEmail });
+          results.push({ invoiceId, success: true, email: emailToUse });
         } else {
           results.push({ invoiceId, success: false, error: "Failed to send email" });
         }

@@ -163,6 +163,8 @@ export default function AdminInvoices() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteInvoice, setDeleteInvoice] = useState<SavedInvoice | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkSendDialogOpen, setBulkSendDialogOpen] = useState(false);
+  const [overrideEmail, setOverrideEmail] = useState('');
   const { toast } = useToast();
 
   const form = useForm<CreateInvoiceFormData>({
@@ -308,8 +310,11 @@ export default function AdminInvoices() {
 
   // Bulk send invoices mutation
   const bulkSendInvoicesMutation = useMutation({
-    mutationFn: async (invoiceIds: string[]) => {
-      const response = await apiRequest('POST', '/api/invoices/bulk-send', { invoiceIds });
+    mutationFn: async ({ invoiceIds, overrideEmail }: { invoiceIds: string[]; overrideEmail?: string }) => {
+      const response = await apiRequest('POST', '/api/invoices/bulk-send', { 
+        invoiceIds,
+        overrideEmail: overrideEmail || undefined
+      });
       return response.json();
     },
     onSuccess: (result: any) => {
@@ -318,6 +323,8 @@ export default function AdminInvoices() {
         description: result.message
       });
       setSelectedInvoiceIds([]);
+      setBulkSendDialogOpen(false);
+      setOverrideEmail('');
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
     },
     onError: (error: any) => {
@@ -842,7 +849,7 @@ export default function AdminInvoices() {
                 {selectedInvoiceIds.length > 0 && (
                   <Button 
                     size="sm" 
-                    onClick={() => bulkSendInvoicesMutation.mutate(selectedInvoiceIds)}
+                    onClick={() => setBulkSendDialogOpen(true)}
                     disabled={bulkSendInvoicesMutation.isPending}
                     data-testid="button-bulk-send-invoices"
                   >
@@ -1679,6 +1686,70 @@ export default function AdminInvoices() {
                 </DialogFooter>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk Send Confirmation Dialog */}
+        <Dialog 
+          open={bulkSendDialogOpen} 
+          onOpenChange={(open) => {
+            setBulkSendDialogOpen(open);
+            if (!open) setOverrideEmail('');
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send {selectedInvoiceIds.length} Invoice{selectedInvoiceIds.length !== 1 ? 's' : ''}</DialogTitle>
+              <DialogDescription>
+                You can optionally send all selected invoices to a different email address.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="override-email">Send to different email (optional)</Label>
+                <Input
+                  id="override-email"
+                  type="email"
+                  placeholder="Leave empty to use original emails"
+                  value={overrideEmail}
+                  onChange={(e) => setOverrideEmail(e.target.value)}
+                  data-testid="input-override-email"
+                />
+                {overrideEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(overrideEmail.trim()) && (
+                  <p className="text-sm text-destructive">Please enter a valid email address</p>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  If provided, all {selectedInvoiceIds.length} invoice{selectedInvoiceIds.length !== 1 ? 's' : ''} will be sent to this email instead of the original customer emails.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setBulkSendDialogOpen(false);
+                  setOverrideEmail('');
+                }}
+                disabled={bulkSendInvoicesMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => bulkSendInvoicesMutation.mutate({ 
+                  invoiceIds: selectedInvoiceIds, 
+                  overrideEmail: overrideEmail.trim() || undefined 
+                })}
+                disabled={bulkSendInvoicesMutation.isPending || (overrideEmail.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(overrideEmail.trim()))}
+                data-testid="button-confirm-bulk-send"
+              >
+                {bulkSendInvoicesMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Send Invoice{selectedInvoiceIds.length !== 1 ? 's' : ''}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
