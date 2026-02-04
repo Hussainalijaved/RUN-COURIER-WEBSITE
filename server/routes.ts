@@ -382,6 +382,9 @@ export async function registerRoutes(
     res.json({ success: true, message: "Invoice deleted successfully" });
   }));
   app.use('/api/job-assignments', requireAdminAccessStrict);
+  
+  // Protect user DELETE route (must have requireAdminAccess middleware to set isAdmin)
+  app.use('/api/users/:id', requireAdminAccess);
 
   app.get("/api/health", (req, res) => {
     const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
