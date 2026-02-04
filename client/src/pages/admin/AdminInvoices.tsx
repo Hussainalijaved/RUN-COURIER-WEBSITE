@@ -155,6 +155,7 @@ interface SavedInvoice {
 export default function AdminInvoices() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [sentInvoices, setSentInvoices] = useState<SentInvoice[]>([]);
   const [viewInvoice, setViewInvoice] = useState<SavedInvoice | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -299,6 +300,29 @@ export default function AdminInvoices() {
     onError: (error: any) => {
       toast({ 
         title: 'Failed to resend invoice', 
+        description: error?.message || 'Please try again',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  // Bulk send invoices mutation
+  const bulkSendInvoicesMutation = useMutation({
+    mutationFn: async (invoiceIds: string[]) => {
+      const response = await apiRequest('POST', '/api/invoices/bulk-send', { invoiceIds });
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      toast({ 
+        title: 'Invoices sent', 
+        description: result.message
+      });
+      setSelectedInvoiceIds([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to send invoices', 
         description: error?.message || 'Please try again',
         variant: 'destructive' 
       });
@@ -804,7 +828,7 @@ export default function AdminInvoices() {
         {/* Saved Invoices from Database */}
         <Card>
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -814,10 +838,27 @@ export default function AdminInvoices() {
                   All invoices stored in the database with full history
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => refetchInvoices()} data-testid="button-refresh-invoices">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+              <div className="flex items-center gap-2">
+                {selectedInvoiceIds.length > 0 && (
+                  <Button 
+                    size="sm" 
+                    onClick={() => bulkSendInvoicesMutation.mutate(selectedInvoiceIds)}
+                    disabled={bulkSendInvoicesMutation.isPending}
+                    data-testid="button-bulk-send-invoices"
+                  >
+                    {bulkSendInvoicesMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    Send {selectedInvoiceIds.length} Selected
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => refetchInvoices()} data-testid="button-refresh-invoices">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -838,6 +879,19 @@ export default function AdminInvoices() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={savedInvoices.length > 0 && selectedInvoiceIds.length === savedInvoices.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedInvoiceIds(savedInvoices.map(inv => inv.id));
+                            } else {
+                              setSelectedInvoiceIds([]);
+                            }
+                          }}
+                          data-testid="checkbox-select-all-invoices"
+                        />
+                      </TableHead>
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Email</TableHead>
@@ -850,6 +904,19 @@ export default function AdminInvoices() {
                   <TableBody>
                     {savedInvoices.map((invoice) => (
                       <TableRow key={invoice.id} data-testid={`row-saved-invoice-${invoice.id}`}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedInvoiceIds.includes(invoice.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedInvoiceIds(prev => [...prev, invoice.id]);
+                              } else {
+                                setSelectedInvoiceIds(prev => prev.filter(id => id !== invoice.id));
+                              }
+                            }}
+                            data-testid={`checkbox-invoice-${invoice.id}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
                         <TableCell className="font-medium">{invoice.customer_name}</TableCell>
                         <TableCell className="text-muted-foreground">{invoice.customer_email}</TableCell>

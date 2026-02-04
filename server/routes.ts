@@ -356,6 +356,7 @@ export async function registerRoutes(
   app.use('/api/documents/:id/review', requireAdminAccessStrict);
   app.use('/api/invoices/:id/send', requireAdminAccessStrict);
   app.use('/api/invoices/:id/resend', requireAdminAccessStrict);
+  app.use('/api/invoices/bulk-send', requireAdminAccessStrict);
   // Protect DELETE invoice route (must be registered before the route)
   app.delete('/api/invoices/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
     const invoiceId = req.params.id;
@@ -5600,6 +5601,94 @@ export async function registerRoutes(
     } else {
       res.status(500).json({ error: "Failed to resend invoice email" });
     }
+  }));
+
+  // Bulk send invoices by email
+  app.post("/api/invoices/bulk-send", asyncHandler(async (req, res) => {
+    // ADMIN REQUIRED: Bulk sending invoices is an admin-only operation
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const { invoiceIds } = req.body;
+    
+    if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+      return res.status(400).json({ error: "Invoice IDs array is required" });
+    }
+    
+    const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
+    
+    const formatDate = (date: Date | string) => {
+      return new Date(date).toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
+    };
+    
+    const results: { invoiceId: string; success: boolean; email?: string; error?: string }[] = [];
+    
+    for (const invoiceId of invoiceIds) {
+      try {
+        const invoice = await storage.getInvoice(invoiceId);
+        if (!invoice) {
+          results.push({ invoiceId, success: false, error: "Invoice not found" });
+          continue;
+        }
+        
+        // Build payment URL if token exists
+        let paymentUrl = '';
+        const storedToken = (invoice as any).payment_token || (invoice as any).paymentToken;
+        if (storedToken) {
+          const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+          const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+          paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${storedToken}`;
+        }
+        
+        // Parse job details from stored JSON
+        const storedJobDetails = (invoice as any).job_details || (invoice as any).jobDetails;
+        const jobDetails = storedJobDetails 
+          ? (typeof storedJobDetails === 'string' 
+              ? JSON.parse(storedJobDetails) 
+              : storedJobDetails)
+          : [];
+        
+        const totalAmount = typeof invoice.total === 'string' 
+          ? parseFloat(invoice.total) 
+          : invoice.total;
+        
+        const success = await sendInvoiceToCustomerWithPaymentLink(
+          invoice.customerEmail,
+          invoice.customerName,
+          invoice.invoiceNumber,
+          totalAmount,
+          formatDate(invoice.dueDate),
+          formatDate(invoice.periodStart),
+          formatDate(invoice.periodEnd),
+          invoice.notes,
+          paymentUrl,
+          (invoice as any).companyName,
+          (invoice as any).businessAddress,
+          jobDetails
+        );
+        
+        if (success) {
+          results.push({ invoiceId, success: true, email: invoice.customerEmail });
+        } else {
+          results.push({ invoiceId, success: false, error: "Failed to send email" });
+        }
+      } catch (err: any) {
+        console.error(`[Bulk Send] Error sending invoice ${invoiceId}:`, err);
+        results.push({ invoiceId, success: false, error: err.message || "Unknown error" });
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+    
+    res.json({
+      success: failCount === 0,
+      message: `Sent ${successCount} invoice(s)${failCount > 0 ? `, ${failCount} failed` : ''}`,
+      results
+    });
   }));
 
   // Update invoice status
