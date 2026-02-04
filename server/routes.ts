@@ -40,14 +40,17 @@ import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmi
  */
 async function requireAdminAccessStrict(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
+  console.log(`[Admin Access Strict] Path: ${req.path}, Method: ${req.method}, Has Auth Header: ${!!authHeader}`);
   
   if (!authHeader?.startsWith('Bearer ')) {
+    console.log(`[Admin Access Strict] No Bearer token found`);
     res.status(401).json({ error: 'Authentication required', code: 'NO_TOKEN' });
     return;
   }
 
   try {
     const token = authHeader.slice(7);
+    console.log(`[Admin Access Strict] Token length: ${token.length}, first 20 chars: ${token.substring(0, 20)}...`);
     
     // Verify token with Supabase - MUST succeed for admin access
     // No fallback to JWT payload decoding for admin routes
