@@ -3135,49 +3135,77 @@ export async function registerRoutes(
     const userId = req.params.id;
     console.log(`[Users] Attempting to delete customer: ${userId}`);
     
-    // 1. Get user info first
+    // 1. Get user info first to find auth_id
     const user = await storage.getUser(userId);
     const userEmail = user?.email;
+    const authId = (user as any)?.authId || (user as any)?.auth_id;
     
-    // 2. Delete from Supabase users table
+    console.log(`[Users] Found user: email=${userEmail}, authId=${authId}`);
+    
+    // 2. Delete from Supabase users table (try numeric ID first, then auth_id)
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       if (supabaseAdmin) {
-        const { error } = await supabaseAdmin
-          .from('users')
-          .delete()
-          .eq('id', userId);
-        if (error) {
-          console.error(`Failed to delete user from Supabase users table:`, error);
-        } else {
-          console.log(`[Users] Deleted from Supabase users table`);
+        const numericId = parseInt(userId, 10);
+        let deleteError = null;
+        
+        // Try deleting by numeric ID first
+        if (!isNaN(numericId)) {
+          const { error } = await supabaseAdmin
+            .from('users')
+            .delete()
+            .eq('id', numericId);
+          deleteError = error;
+          if (!error) {
+            console.log(`[Users] Deleted from Supabase users table by id ${numericId}`);
+          }
+        }
+        
+        // If that failed and we have authId, try by auth_id
+        if (deleteError && authId) {
+          const { error } = await supabaseAdmin
+            .from('users')
+            .delete()
+            .eq('auth_id', authId);
+          if (!error) {
+            console.log(`[Users] Deleted from Supabase users table by auth_id ${authId}`);
+            deleteError = null;
+          }
+        }
+        
+        if (deleteError) {
+          console.error(`Failed to delete user from Supabase users table:`, deleteError);
         }
       }
     } catch (e) {
       console.error("Failed to delete from Supabase users table:", e);
     }
     
-    // 3. Delete from Supabase Auth
-    try {
-      const { supabaseAdmin } = await import("./supabaseAdmin");
-      if (supabaseAdmin) {
-        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-        if (error) {
-          console.error(`Failed to delete auth user:`, error);
-        } else {
-          console.log(`[Users] Deleted from Supabase Auth`);
+    // 3. Delete from Supabase Auth (requires UUID auth_id)
+    if (authId) {
+      try {
+        const { supabaseAdmin } = await import("./supabaseAdmin");
+        if (supabaseAdmin) {
+          const { error } = await supabaseAdmin.auth.admin.deleteUser(authId);
+          if (error) {
+            console.error(`Failed to delete auth user:`, error);
+          } else {
+            console.log(`[Users] Deleted from Supabase Auth`);
+          }
         }
+      } catch (e) {
+        console.error("Failed to delete from Supabase Auth:", e);
       }
-    } catch (e) {
-      console.error("Failed to delete from Supabase Auth:", e);
+    } else {
+      console.log(`[Users] No auth_id found, skipping Supabase Auth deletion`);
     }
     
-    // 4. Delete from in-memory storage
+    // 4. Delete from storage
     try {
       await storage.deleteUser(userId);
-      console.log(`[Users] Deleted from in-memory storage`);
+      console.log(`[Users] Deleted from storage`);
     } catch (e) {
-      console.error("Failed to delete from in-memory storage:", e);
+      console.error("Failed to delete from storage:", e);
     }
     
     console.log(`[Users] DELETED customer ${userEmail || userId} from all systems`);
