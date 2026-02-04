@@ -73,6 +73,7 @@ export default function DriverProfile() {
   const { data: driver, isLoading } = useDriver();
   const updateProfileMutation = useUpdateDriverProfile();
 
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
@@ -146,6 +147,7 @@ export default function DriverProfile() {
 
   useEffect(() => {
     if (driver) {
+      setFullName(driver.fullName || '');
       setPhone(driver.phone || '');
       setPostcode(driver.postcode || '');
       setAddress(driver.address || '');
@@ -177,6 +179,7 @@ export default function DriverProfile() {
       {
         driverId: driver.id,
         data: {
+          fullName,
           phone,
           postcode,
           address,
@@ -400,8 +403,12 @@ export default function DriverProfile() {
                       <User className="h-4 w-4" />
                       Full Name
                     </Label>
-                    <Input value={driver?.fullName || user?.fullName || ''} disabled data-testid="input-fullname" />
-                    <p className="text-xs text-muted-foreground">Name cannot be changed</p>
+                    <Input 
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Enter your full name"
+                      data-testid="input-fullname" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
