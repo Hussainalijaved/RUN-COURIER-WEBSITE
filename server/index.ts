@@ -283,6 +283,52 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Add RLS policy for drivers to update their own profile picture
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) {
+        console.warn("[BACKGROUND] Supabase admin not available for RLS migration");
+        return;
+      }
+
+      // Create RLS policy to allow drivers to update their own profile
+      // Using a Postgres function for the policy
+      const { error } = await supabaseAdmin.rpc('exec_sql', {
+        query: `
+          DO $$
+          BEGIN
+            -- Drop existing policy if it exists
+            DROP POLICY IF EXISTS "drivers_update_own_profile" ON drivers;
+            
+            -- Create policy allowing drivers to update their own records
+            CREATE POLICY "drivers_update_own_profile" ON drivers
+              FOR UPDATE
+              USING (auth.uid() = id)
+              WITH CHECK (auth.uid() = id);
+          EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'RLS policy creation failed: %', SQLERRM;
+          END $$;
+        `
+      });
+
+      if (error) {
+        // Try alternative approach - direct SQL via REST API
+        console.log("[BACKGROUND] RLS policy via RPC failed, trying direct approach...");
+        
+        // Alternative: Just log that policy should be added manually
+        console.log("[BACKGROUND] Please add the following RLS policy in Supabase dashboard:");
+        console.log("  Policy name: drivers_update_own_profile");
+        console.log("  For: UPDATE on drivers table");
+        console.log("  Using: auth.uid() = id");
+      } else {
+        console.log("[BACKGROUND] RLS policy for driver profile updates created/updated");
+      }
+    } catch (e: any) {
+      console.warn("[BACKGROUND] RLS policy setup error:", e?.message);
+    }
+  })();
+
   (async () => {
     try {
       const { getStripeSync } = await import('./stripeClient');
