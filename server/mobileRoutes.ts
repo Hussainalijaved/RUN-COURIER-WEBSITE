@@ -514,15 +514,19 @@ export function registerMobileRoutes(app: Express): void {
         currentLatitude: driver.currentLatitude,
         currentLongitude: driver.currentLongitude,
         lastLocationUpdate: driver.lastLocationUpdate,
-        // Bank details (include both camelCase and snake_case for mobile app compatibility)
+        // Bank details (include ALL variants for mobile app compatibility)
         bankName: driver.bankName || fullDriverData.bank_name,
         bank_name: driver.bankName || fullDriverData.bank_name,
         accountHolderName: driver.accountHolderName || fullDriverData.account_holder_name,
         account_holder_name: driver.accountHolderName || fullDriverData.account_holder_name,
+        // Mobile app BankDetailsScreen expects these field names:
+        bank_account_name: driver.accountHolderName || fullDriverData.account_holder_name,
         sortCode: driver.sortCode || fullDriverData.sort_code,
         sort_code: driver.sortCode || fullDriverData.sort_code,
+        bank_sort_code: driver.sortCode || fullDriverData.sort_code,
         accountNumber: driver.accountNumber || fullDriverData.account_number,
         account_number: driver.accountNumber || fullDriverData.account_number,
+        bank_account_number: driver.accountNumber || fullDriverData.account_number,
         // Document URLs (include both camelCase and snake_case for mobile app compatibility)
         profilePictureUrl: driver.profilePictureUrl || fullDriverData.profile_picture_url,
         profile_picture_url: driver.profilePictureUrl || fullDriverData.profile_picture_url,
@@ -621,6 +625,17 @@ export function registerMobileRoutes(app: Express): void {
       }
       if (req.body.account_number !== undefined && updateData.accountNumber === undefined) {
         updateData.accountNumber = req.body.account_number;
+      }
+      
+      // Handle mobile app BankDetailsScreen field names (bank_account_name, bank_sort_code, bank_account_number)
+      if (req.body.bank_account_name !== undefined && updateData.accountHolderName === undefined) {
+        updateData.accountHolderName = req.body.bank_account_name;
+      }
+      if (req.body.bank_sort_code !== undefined && updateData.sortCode === undefined) {
+        updateData.sortCode = req.body.bank_sort_code;
+      }
+      if (req.body.bank_account_number !== undefined && updateData.accountNumber === undefined) {
+        updateData.accountNumber = req.body.bank_account_number;
       }
 
       if (Object.keys(updateData).length === 0) {
