@@ -333,18 +333,18 @@ export default function AdminMap() {
 
       const existingMarker = driverMarkersRef.current.get(driver.id);
       
-      // SVG path for a van icon (delivery van shape)
+      // SVG path for a van icon (delivery van shape) - larger and more visible
       const vanIconPath = 'M -10,-6 L 6,-6 L 6,-2 L 10,-2 L 10,4 L 8,4 L 8,6 L 4,6 L 4,4 L -6,4 L -6,6 L -10,6 L -10,-6 Z M -8,-4 L -8,0 L -2,0 L -2,-4 Z M 0,-4 L 0,0 L 4,0 L 4,-4 Z';
       
       if (existingMarker) {
         existingMarker.setPosition(location);
         existingMarker.setIcon({
           path: vanIconPath,
-          scale: 1.2,
+          scale: 2.0,
           fillColor,
           fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 1.5,
+          strokeColor: '#1a1a1a',
+          strokeWeight: 2.5,
           anchor: new google.maps.Point(0, 0),
         });
       } else {
@@ -357,11 +357,11 @@ export default function AdminMap() {
           title: driverLabel,
           icon: {
             path: vanIconPath,
-            scale: 1.2,
+            scale: 2.0,
             fillColor,
             fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 1.5,
+            strokeColor: '#1a1a1a',
+            strokeWeight: 2.5,
             anchor: new google.maps.Point(0, 0),
           },
         });
