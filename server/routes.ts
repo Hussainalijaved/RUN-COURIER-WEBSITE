@@ -3833,12 +3833,12 @@ export async function registerRoutes(
       fs.unlinkSync(file.path);
     }
     
-    // Use full URL so mobile app can access the picture
-    const baseUrl = process.env.APP_URL || process.env.BASE_URL || 'https://runcourier.co.uk';
+    // Use relative path for website (works on any domain)
+    // Mobile app will prepend its base URL when needed
     const relativePath = `/uploads/documents/${safeDriverId}/${finalFilename}`;
-    const profilePictureUrl = `${baseUrl}${relativePath}`;
+    const profilePictureUrl = relativePath;
     
-    console.log(`[Profile Picture] Saving URL: ${profilePictureUrl}`);
+    console.log(`[Profile Picture] Saving relative URL: ${profilePictureUrl}`);
 
     // Update driver profile with profile picture URL in storage
     await storage.updateDriver(driverId, { profilePictureUrl });
