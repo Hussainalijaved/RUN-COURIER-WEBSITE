@@ -379,6 +379,11 @@ async function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string)
     }
     driverConnections.set(driverId, client);
     log(`Driver ${driverId} (${verifiedUser.email}) authenticated via database role`, 'realtime');
+    
+    // Broadcast driver connection immediately so they appear on live map instantly
+    broadcastDriverAvailability(driverId, true).catch(err => {
+      log(`Error broadcasting driver availability on connect: ${err}`, 'realtime');
+    });
   } else if (['admin', 'dispatcher'].includes(authorizedRole)) {
     observerConnections.set(clientId, client);
     log(`Observer ${authorizedRole}:${verifiedUser.email} authenticated via database role`, 'realtime');
