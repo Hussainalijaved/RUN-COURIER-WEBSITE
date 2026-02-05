@@ -5173,7 +5173,7 @@ export async function registerRoutes(
 
                 const existingCode = existingDriver?.driver_code;
                 let driverCode = existingCode;
-                if (!driverCode) {
+                if (!driverCode || !/^RC\d{2}[A-Z]$/.test(driverCode)) {
                   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
                   const num1 = Math.floor(Math.random() * 10);
                   const num2 = Math.floor(Math.random() * 10);
