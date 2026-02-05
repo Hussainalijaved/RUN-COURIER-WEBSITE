@@ -1278,6 +1278,139 @@ export async function sendPasswordResetEmail(
   return sendEmailNotification(email, 'Reset Your Password - Run Courier', htmlContent, textContent);
 }
 
+export async function sendDriverApprovalEmail(
+  email: string,
+  fullName: string,
+  driverCode: string,
+  tempPassword: string
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #333;">Congratulations ${fullName}!</h2>
+    <p style="color: #666; font-size: 16px;">
+      Your driver application has been <strong style="color: #28a745;">approved</strong>. Welcome to the Run Courier team!
+    </p>
+    <p style="color: #666; font-size: 16px;">
+      Your Driver ID is: <strong style="color: #007BFF; font-size: 18px;">${driverCode}</strong>
+    </p>
+
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 2px solid #007BFF;">
+      <h3 style="color: #333; margin-top: 0;">Your Login Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 120px;"><strong>Email:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-size: 16px;">${email}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #666;"><strong>Password:</strong></td>
+          <td style="padding: 10px 0; color: #333; font-size: 16px; font-family: monospace; letter-spacing: 1px;">${tempPassword}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background-color: #fff3cd; border-radius: 8px; padding: 15px; margin: 15px 0;">
+      <p style="color: #856404; font-size: 14px; margin: 0;">
+        <strong>Important:</strong> Please change your password after your first login for security.
+      </p>
+    </div>
+
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0;">How to Log In</h3>
+      
+      <div style="margin-bottom: 20px;">
+        <h4 style="color: #007BFF; margin-bottom: 8px;">Mobile App (Recommended for Drivers)</h4>
+        <ol style="color: #666; line-height: 1.8; margin: 0;">
+          <li>Download the <strong>Run Courier</strong> app from the App Store or Google Play</li>
+          <li>Open the app and tap <strong>"Sign In"</strong></li>
+          <li>Enter your email: <strong>${email}</strong></li>
+          <li>Enter your password shown above</li>
+          <li>Start accepting delivery jobs!</li>
+        </ol>
+      </div>
+
+      <div>
+        <h4 style="color: #007BFF; margin-bottom: 8px;">Website</h4>
+        <ol style="color: #666; line-height: 1.8; margin: 0;">
+          <li>Go to <a href="https://runcourier.co.uk/driver-login" style="color: #007BFF;">runcourier.co.uk/driver-login</a></li>
+          <li>Enter your email: <strong>${email}</strong></li>
+          <li>Enter your password shown above</li>
+        </ol>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="https://runcourier.co.uk/driver-login" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+        Log In Now
+      </a>
+    </div>
+
+    <p style="color: #666; font-size: 14px;">
+      If you have any questions, contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call <a href="tel:+442046346100" style="color: #007BFF;">+44 20 4634 6100</a>.
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Application Approved!');
+  const textContent = `Congratulations ${fullName}!\n\nYour driver application has been APPROVED. Welcome to the Run Courier team!\n\nYour Driver ID: ${driverCode}\n\nYOUR LOGIN DETAILS\n==================\nEmail: ${email}\nPassword: ${tempPassword}\n\nIMPORTANT: Please change your password after your first login.\n\nHOW TO LOG IN\n=============\n\nMobile App (Recommended):\n1. Download the Run Courier app from the App Store or Google Play\n2. Open the app and tap "Sign In"\n3. Enter your email: ${email}\n4. Enter your password\n5. Start accepting delivery jobs!\n\nWebsite:\n1. Go to runcourier.co.uk/driver-login\n2. Enter your email: ${email}\n3. Enter your password\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+
+  return sendEmailNotification(email, 'Application Approved - Welcome to Run Courier!', htmlContent, textContent);
+}
+
+export async function sendDriverApprovalEmailExisting(
+  email: string,
+  fullName: string,
+  driverCode: string
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #333;">Congratulations ${fullName}!</h2>
+    <p style="color: #666; font-size: 16px;">
+      Your driver application has been <strong style="color: #28a745;">approved</strong>. Welcome to the Run Courier team!
+    </p>
+    <p style="color: #666; font-size: 16px;">
+      Your Driver ID is: <strong style="color: #007BFF; font-size: 18px;">${driverCode}</strong>
+    </p>
+
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #333; margin-top: 0;">How to Log In</h3>
+      <p style="color: #666; font-size: 15px;">
+        Use your existing email <strong>${email}</strong> and password to log in.
+      </p>
+      
+      <div style="margin-bottom: 20px;">
+        <h4 style="color: #007BFF; margin-bottom: 8px;">Mobile App (Recommended for Drivers)</h4>
+        <ol style="color: #666; line-height: 1.8; margin: 0;">
+          <li>Download the <strong>Run Courier</strong> app from the App Store or Google Play</li>
+          <li>Open the app and tap <strong>"Sign In"</strong></li>
+          <li>Enter your email: <strong>${email}</strong></li>
+          <li>Enter your password</li>
+          <li>Start accepting delivery jobs!</li>
+        </ol>
+      </div>
+
+      <div>
+        <h4 style="color: #007BFF; margin-bottom: 8px;">Website</h4>
+        <ol style="color: #666; line-height: 1.8; margin: 0;">
+          <li>Go to <a href="https://runcourier.co.uk/driver-login" style="color: #007BFF;">runcourier.co.uk/driver-login</a></li>
+          <li>Enter your email and password</li>
+        </ol>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="https://runcourier.co.uk/driver-login" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+        Log In Now
+      </a>
+    </div>
+
+    <p style="color: #666; font-size: 14px;">
+      If you have any questions, contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call <a href="tel:+442046346100" style="color: #007BFF;">+44 20 4634 6100</a>.
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Application Approved!');
+  const textContent = `Congratulations ${fullName}!\n\nYour driver application has been APPROVED. Welcome to the Run Courier team!\n\nYour Driver ID: ${driverCode}\n\nHOW TO LOG IN\n=============\nUse your existing email ${email} and password to log in.\n\nMobile App (Recommended):\n1. Download the Run Courier app from the App Store or Google Play\n2. Open the app and tap "Sign In"\n3. Enter your email: ${email}\n4. Enter your password\n5. Start accepting delivery jobs!\n\nWebsite:\n1. Go to runcourier.co.uk/driver-login\n2. Enter your email and password\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+
+  return sendEmailNotification(email, 'Application Approved - Welcome to Run Courier!', htmlContent, textContent);
+}
+
 export async function sendContactFormSubmission(
   name: string,
   email: string,

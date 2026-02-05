@@ -5141,6 +5141,13 @@ export async function registerRoutes(
                 await storage.updateDriver(driver.id, { profilePictureUrl: application.profilePictureUrl });
                 console.log(`[Driver Application] Profile picture synced for driver ${driver.driver_code}: ${application.profilePictureUrl}`);
               }
+
+              const { sendDriverApprovalEmailExisting } = await import('./emailService');
+              sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code)
+                .then(sent => {
+                  if (sent) console.log(`[Driver Application] Approval email sent to existing driver ${application.email}`);
+                })
+                .catch(err => console.error('[Driver Application] Error sending approval email to existing driver:', err));
             }
           } else if (findError) {
             console.error(`[Driver Application] Error finding driver by email ${application.email}:`, findError);
@@ -5245,9 +5252,13 @@ export async function registerRoutes(
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email}`);
 
-                  const { sendPasswordResetEmail } = await import('./emailService');
-                  sendPasswordResetEmail(application.email, application.fullName)
-                    .catch(err => console.error('[Driver Application] Failed to send password reset email:', err));
+                  const { sendDriverApprovalEmail } = await import('./emailService');
+                  sendDriverApprovalEmail(application.email, application.fullName, driverCode, tempPassword)
+                    .then(sent => {
+                      if (sent) console.log(`[Driver Application] Approval email with credentials sent to ${application.email}`);
+                      else console.error(`[Driver Application] Failed to send approval email to ${application.email}`);
+                    })
+                    .catch(err => console.error('[Driver Application] Error sending approval email:', err));
                 }
               }
             } catch (createErr) {
