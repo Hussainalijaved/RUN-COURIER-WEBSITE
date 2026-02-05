@@ -37,8 +37,8 @@ export default function ApplicationSuccess() {
             <div className="text-sm text-muted-foreground">
               <p>
                 If you have any questions about your application, please contact us at{" "}
-                <a href="mailto:drivers@runcourier.co.uk" className="text-primary hover:underline">
-                  drivers@runcourier.co.uk
+                <a href="mailto:info@runcourier.co.uk" className="text-primary hover:underline">
+                  info@runcourier.co.uk
                 </a>
               </p>
             </div>

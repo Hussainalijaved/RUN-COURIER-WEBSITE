@@ -5042,6 +5042,14 @@ export async function registerRoutes(
 
     const data = insertDriverApplicationSchema.parse(req.body);
     const application = await storage.createDriverApplication(data);
+
+    sendDriverApplicationNotification(data.fullName, 'New Application Submitted')
+      .then(sent => {
+        if (sent) console.log(`[Driver Application] Admin notified of new application from ${data.fullName}`);
+        else console.error(`[Driver Application] Failed to send admin notification for ${data.fullName}`);
+      })
+      .catch(err => console.error('[Driver Application] Error sending admin notification:', err));
+
     res.status(201).json(application);
   }));
 
