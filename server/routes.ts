@@ -3857,6 +3857,29 @@ export async function registerRoutes(
       console.error("Failed to update profile picture in PostgreSQL:", e);
     }
 
+    // Update Supabase (primary data store for mobile app)
+    try {
+      if (supabaseAdmin) {
+        const { error: supabaseError, data: supabaseData } = await supabaseAdmin
+          .from('drivers')
+          .update({ 
+            profile_picture_url: profilePictureUrl,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', driverId)
+          .select('profile_picture_url')
+          .single();
+        
+        if (supabaseError) {
+          console.error("[Profile Picture] Supabase update failed:", supabaseError);
+        } else {
+          console.log("[Profile Picture] Supabase updated successfully:", supabaseData?.profile_picture_url);
+        }
+      }
+    } catch (e) {
+      console.error("[Profile Picture] Exception updating Supabase:", e);
+    }
+
     // Broadcast profile picture update to mobile app for real-time sync
     broadcastProfileUpdate(driverId, {
       profilePictureUrl,
