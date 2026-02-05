@@ -443,7 +443,7 @@ export async function registerRoutes(
     if (job?.driver_id) {
       const { data: driverData } = await supabaseAdmin
         .from('drivers')
-        .select('id, driver_id, full_name, email')
+        .select('id, driver_code, full_name, email')
         .eq('id', job.driver_id)
         .single();
       driver = driverData;
@@ -492,7 +492,7 @@ export async function registerRoutes(
     // Get driver info
     const { data: driver, error: driverError } = await supabaseAdmin
       .from('drivers')
-      .select('id, driver_id, full_name, email, online_status, is_verified')
+      .select('id, driver_code, full_name, email, online_status, status')
       .eq('id', driverId)
       .single();
     
@@ -527,7 +527,7 @@ export async function registerRoutes(
       activeJobs: activeJobs || [],
       summary: {
         driverExists: !!driver,
-        driverVerified: driver?.is_verified || false,
+        driverVerified: driver?.status === 'approved',
         onlineStatus: driver?.online_status || 'unknown',
         pushDevicesCount: (devices || []).length,
         canReceivePushNotifications: (devices || []).length > 0,
@@ -538,7 +538,7 @@ export async function registerRoutes(
         noDevices: (devices || []).length === 0 
           ? "Mobile app needs to call POST /api/mobile/v1/driver/push-token on startup"
           : null,
-        notVerified: !driver?.is_verified
+        notVerified: driver?.status !== 'approved'
           ? "Driver account needs admin verification to receive jobs"
           : null,
         offline: driver?.online_status !== 'online'
@@ -624,7 +624,7 @@ export async function registerRoutes(
     if (driverIds.length > 0) {
       const { data: driverData } = await supabaseAdmin
         .from('drivers')
-        .select('id, driver_id, full_name')
+        .select('id, driver_code, full_name')
         .in('id', driverIds);
       drivers = driverData || [];
     }
@@ -633,7 +633,7 @@ export async function registerRoutes(
     
     const enrichedDevices = (devices || []).map(d => ({
       ...d,
-      driverCode: driverMap.get(d.driver_id)?.driver_id || 'unknown',
+      driverCode: driverMap.get(d.driver_id)?.driver_code || 'unknown',
       driverName: driverMap.get(d.driver_id)?.full_name || 'unknown'
     }));
     
@@ -1418,7 +1418,7 @@ export async function registerRoutes(
           // Look up driver in Supabase by email to get their id (which is auth.uid)
           const { data: supabaseDriver, error } = await supabaseAdmin
             .from('drivers')
-            .select('id, email, driver_id')
+            .select('id, email, driver_code')
             .eq('email', localDriver.email)
             .single();
           
@@ -2406,9 +2406,7 @@ export async function registerRoutes(
                 phone: driver.phone,
                 vehicle_type: driver.vehicleType,
                 online_status: driver.isAvailable ? 'online' : 'offline',
-                is_verified: driver.isVerified ?? false,
-                rating: driver.rating ?? "5.00",
-                total_jobs: driver.totalJobs ?? 0,
+                status: driver.isVerified ? 'approved' : 'applicant',
               };
               if (driver.profilePictureUrl) {
                 const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
@@ -2474,7 +2472,7 @@ export async function registerRoutes(
         if (safeBody.vehicleModel !== undefined) supabaseUpdateData.vehicle_model = safeBody.vehicleModel;
         if (safeBody.vehicleColor !== undefined) supabaseUpdateData.vehicle_color = safeBody.vehicleColor;
         if (safeBody.isAvailable !== undefined) supabaseUpdateData.online_status = safeBody.isAvailable ? 'online' : 'offline';
-        if (safeBody.isVerified !== undefined) supabaseUpdateData.is_verified = safeBody.isVerified;
+        if (safeBody.isVerified !== undefined) supabaseUpdateData.status = safeBody.isVerified ? 'approved' : 'applicant';
         if (safeBody.address !== undefined) supabaseUpdateData.address = safeBody.address;
         if (safeBody.postcode !== undefined) supabaseUpdateData.postcode = safeBody.postcode;
         if (safeBody.bankName !== undefined) supabaseUpdateData.bank_name = safeBody.bankName;
@@ -2509,7 +2507,7 @@ export async function registerRoutes(
               sort_code: safeBody.sortCode,
               account_number: safeBody.accountNumber,
               profile_picture_url: safeBody.profilePictureUrl,
-              is_verified: safeBody.isVerified,
+              status: safeBody.isVerified ? 'approved' : 'applicant',
             });
           }
         }
@@ -2677,8 +2675,7 @@ export async function registerRoutes(
         const { error: supabaseError } = await supabaseAdmin
           .from('drivers')
           .update({ 
-            is_verified: isVerified,
-            approval_status: isVerified ? 'approved' : 'pending',
+            status: isVerified ? 'approved' : 'applicant',
             updated_at: new Date().toISOString()
           })
           .eq('id', driverId);
@@ -2686,7 +2683,7 @@ export async function registerRoutes(
         if (supabaseError) {
           console.error("Failed to sync driver verification to Supabase:", supabaseError.message);
         } else {
-          console.log(`[Drivers] Verification synced to Supabase: ${driverId} -> is_verified=${isVerified}`);
+          console.log(`[Drivers] Verification synced to Supabase: ${driverId} -> status=${isVerified ? 'approved' : 'applicant'}`);
         }
       }
     } catch (e) {
@@ -3008,16 +3005,16 @@ export async function registerRoutes(
       }
 
       // Get existing drivers from Supabase database (for permanent driver IDs and full names)
-      // Note: Supabase uses 'driver_id' column for what we call 'driverCode' internally
+      // Note: Supabase uses 'driver_code' column for what we call 'driverCode' internally
       const { data: supabaseDrivers } = await supabaseAdmin
         .from('drivers')
-        .select('id, driver_id, full_name, email, phone, vehicle_type, approval_status, online_status');
+        .select('id, driver_code, full_name, email, phone, vehicle_type, status, online_status');
       
       // Build maps: by id and email for flexible lookup
-      // IMPORTANT: driver_id from Supabase is the PERMANENT Driver ID (e.g., RC02C)
+      // IMPORTANT: driver_code from Supabase is the PERMANENT Driver ID (e.g., RC02C)
       type SupabaseDriverData = { 
         id: string; 
-        driver_id: string | null;  // This is the PERMANENT Driver ID from Supabase
+        driver_code: string | null;  // This is the PERMANENT Driver ID from Supabase
         full_name: string | null;
         email: string | null;
         phone: string | null;
@@ -3031,12 +3028,12 @@ export async function registerRoutes(
       for (const d of (supabaseDrivers || [])) {
         const driverData: SupabaseDriverData = { 
           id: d.id, 
-          driver_id: d.driver_id,  // PERMANENT Driver ID from Supabase
+          driver_code: d.driver_code,  // PERMANENT Driver ID from Supabase
           full_name: d.full_name,
           email: d.email,
           phone: d.phone,
           vehicle_type: d.vehicle_type,
-          is_verified: d.approval_status === 'approved',
+          is_verified: d.status === 'approved',
           is_available: d.online_status === 'online',
         };
         
@@ -3066,9 +3063,9 @@ export async function registerRoutes(
       for (const user of driverUsersList) {
         const supabaseDriver = findSupabaseDriver(user.id, user.email);
         
-        // IMPORTANT: driver_id from Supabase is the PERMANENT Driver ID - NEVER regenerate it
+        // IMPORTANT: driver_code from Supabase is the PERMANENT Driver ID - NEVER regenerate it
         // This is the authoritative source of driver IDs
-        const permanentDriverId = supabaseDriver?.driver_id || null;
+        const permanentDriverId = supabaseDriver?.driver_code || null;
         
         // Check if driver exists locally
         let localDriver = localDriverMap.get(user.id);
@@ -5089,14 +5086,13 @@ export async function registerRoutes(
           // Find driver by email
           const { data: driver, error: findError } = await supabaseAdmin
             .from('drivers')
-            .select('id, driver_id, is_verified')
+            .select('id, driver_code, status')
             .ilike('email', application.email)
             .maybeSingle();
           
           if (driver) {
             const updateData: Record<string, any> = { 
-              is_verified: true,
-              approval_status: 'approved',
+              status: 'approved',
               updated_at: new Date().toISOString()
             };
 
@@ -5135,21 +5131,128 @@ export async function registerRoutes(
               .eq('id', driver.id);
             
             if (updateError) {
-              console.error(`[Driver Application] Failed to update driver ${driver.driver_id}:`, updateError);
+              console.error(`[Driver Application] Failed to update driver ${driver.driver_code}:`, updateError);
             } else {
-              console.log(`[Driver Application] Driver ${driver.driver_id} verified and profile synced after application approval`);
+              console.log(`[Driver Application] Driver ${driver.driver_code} verified and profile synced after application approval`);
               
               await storage.verifyDriver(driver.id, true);
 
               if (application.profilePictureUrl) {
                 await storage.updateDriver(driver.id, { profilePictureUrl: application.profilePictureUrl });
-                console.log(`[Driver Application] Profile picture synced for driver ${driver.driver_id}: ${application.profilePictureUrl}`);
+                console.log(`[Driver Application] Profile picture synced for driver ${driver.driver_code}: ${application.profilePictureUrl}`);
               }
             }
           } else if (findError) {
             console.error(`[Driver Application] Error finding driver by email ${application.email}:`, findError);
           } else if (!driver) {
-            console.log(`[Driver Application] No driver found for email ${application.email} - they may need to register first`);
+            console.log(`[Driver Application] No driver found for email ${application.email} - creating account automatically`);
+            try {
+              const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
+              const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+                email: application.email,
+                password: tempPassword,
+                email_confirm: true,
+                user_metadata: {
+                  fullName: application.fullName,
+                  role: 'driver',
+                  phone: application.phone
+                }
+              });
+
+              if (authError) {
+                console.error(`[Driver Application] Failed to create auth user for ${application.email}:`, authError);
+              } else if (authUser?.user) {
+                const userId = authUser.user.id;
+                console.log(`[Driver Application] Auth user created: ${userId}`);
+
+                const { data: existingDriver } = await supabaseAdmin
+                  .from('drivers')
+                  .select('id, driver_code')
+                  .eq('id', userId)
+                  .maybeSingle();
+
+                const existingCode = existingDriver?.driver_code;
+                let driverCode = existingCode;
+                if (!driverCode) {
+                  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                  const num1 = Math.floor(Math.random() * 10);
+                  const num2 = Math.floor(Math.random() * 10);
+                  const letter = letters[Math.floor(Math.random() * letters.length)];
+                  driverCode = `RC${num1}${num2}${letter}`;
+                }
+
+                const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+                const driverData: Record<string, any> = {
+                  id: userId,
+                  user_id: userId,
+                  driver_code: driverCode,
+                  full_name: application.fullName,
+                  email: application.email,
+                  phone: application.phone,
+                  postcode: application.postcode || null,
+                  address: application.fullAddress || null,
+                  nationality: application.nationality || null,
+                  is_british: application.isBritish ?? true,
+                  national_insurance_number: application.nationalInsuranceNumber || null,
+                  right_to_work_share_code: application.rightToWorkShareCode || null,
+                  vehicle_type: application.vehicleType || 'car',
+                  online_status: 'offline',
+                  status: 'approved',
+                  is_active: true,
+                  bank_name: application.bankName || null,
+                  account_holder_name: application.accountHolderName || null,
+                  sort_code: application.sortCode || null,
+                  account_number: application.accountNumber || null,
+                };
+
+                if (application.profilePictureUrl) {
+                  driverData.profile_picture_url = application.profilePictureUrl.startsWith('http')
+                    ? application.profilePictureUrl
+                    : `${baseUrl}${application.profilePictureUrl}`;
+                }
+                if (application.drivingLicenceFrontUrl) {
+                  driverData.driving_licence_front_url = application.drivingLicenceFrontUrl.startsWith('http')
+                    ? application.drivingLicenceFrontUrl
+                    : `${baseUrl}${application.drivingLicenceFrontUrl}`;
+                }
+                if (application.drivingLicenceBackUrl) {
+                  driverData.driving_licence_back_url = application.drivingLicenceBackUrl.startsWith('http')
+                    ? application.drivingLicenceBackUrl
+                    : `${baseUrl}${application.drivingLicenceBackUrl}`;
+                }
+                if (application.dbsCertificateUrl) {
+                  driverData.dbs_certificate_url = application.dbsCertificateUrl.startsWith('http')
+                    ? application.dbsCertificateUrl
+                    : `${baseUrl}${application.dbsCertificateUrl}`;
+                }
+                if (application.goodsInTransitInsuranceUrl) {
+                  driverData.goods_in_transit_insurance_url = application.goodsInTransitInsuranceUrl.startsWith('http')
+                    ? application.goodsInTransitInsuranceUrl
+                    : `${baseUrl}${application.goodsInTransitInsuranceUrl}`;
+                }
+                if (application.hireAndRewardUrl) {
+                  driverData.hire_reward_insurance_url = application.hireAndRewardUrl.startsWith('http')
+                    ? application.hireAndRewardUrl
+                    : `${baseUrl}${application.hireAndRewardUrl}`;
+                }
+
+                const { error: insertError } = await supabaseAdmin
+                  .from('drivers')
+                  .upsert(driverData, { onConflict: 'id' });
+
+                if (insertError) {
+                  console.error(`[Driver Application] Failed to create driver record:`, insertError);
+                } else {
+                  console.log(`[Driver Application] Driver ${driverCode} created for ${application.email}`);
+
+                  const { sendPasswordResetEmail } = await import('./emailService');
+                  sendPasswordResetEmail(application.email, application.fullName)
+                    .catch(err => console.error('[Driver Application] Failed to send password reset email:', err));
+                }
+              }
+            } catch (createErr) {
+              console.error(`[Driver Application] Error creating driver account:`, createErr);
+            }
           }
         }
       } catch (verifyErr) {
@@ -8177,16 +8280,13 @@ export async function registerRoutes(
           full_name: fullName || 'Test Driver',
           vehicle_type: 'car',
           online_status: 'offline',
-          is_verified: true, // Pre-verified for testing
-          rating: 5.0,
-          total_jobs: 0,
+          status: 'approved',
         })
         .select()
         .single();
       
       if (driverError) {
         console.error('[TestDriver] Driver insert error:', driverError);
-        // Still return success if auth user was created
       }
       
       // Also create in local PostgreSQL
@@ -8197,7 +8297,7 @@ export async function registerRoutes(
         await db.insert(drivers).values({
           id: crypto.randomUUID(),
           userId: userId,
-          driverCode: driverData?.driver_id || null,
+          driverCode: driverData?.driver_code || null,
           fullName: fullName || 'Test Driver',
           email,
           vehicleType: 'car',
@@ -8218,7 +8318,7 @@ export async function registerRoutes(
         success: true, 
         message: `Test driver created with email: ${email}`,
         userId,
-        driverId: driverData?.driver_id || userId
+        driverId: driverData?.driver_code || userId
       });
     } catch (error: any) {
       console.error('[TestDriver] Error:', error);
@@ -8276,9 +8376,7 @@ export async function registerRoutes(
           full_name: user.user_metadata?.fullName || user.user_metadata?.full_name || 'Test Driver',
           vehicle_type: 'car',
           online_status: 'offline',
-          is_verified: true,
-          rating: 5.0,
-          total_jobs: 0,
+          status: 'approved',
         }, { onConflict: 'id' })
         .select()
         .single();
@@ -8288,7 +8386,7 @@ export async function registerRoutes(
         success: true, 
         message: `Password reset for ${email}`,
         userId: user.id,
-        driverId: driverData?.driver_id || user.id
+        driverId: driverData?.driver_code || user.id
       });
     } catch (error: any) {
       console.error('[TestDriver] Reset error:', error);
@@ -8310,7 +8408,7 @@ export async function registerRoutes(
     // Broadcast verification update to mobile app for real-time sync
     broadcastProfileUpdate(driverId, {
       isVerified: true,
-      is_verified: true,
+      status: 'approved',
     });
     
     console.log(`[Admin] Force verified driver ${driver.driverCode || driverId}`);

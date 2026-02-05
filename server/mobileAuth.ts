@@ -147,7 +147,7 @@ export async function requireDriverRole(
       if (supabaseError) {
         console.log("[Mobile Auth] Supabase query error:", supabaseError.message);
       } else if (supabaseDriver) {
-        console.log("[Mobile Auth] Driver found in Supabase:", supabaseDriver.driver_id, "approval:", supabaseDriver.approval_status);
+        console.log("[Mobile Auth] Driver found in Supabase:", supabaseDriver.driver_code, "status:", supabaseDriver.status);
         driver = mapSupabaseDriverToLocal(supabaseDriver);
       }
     }

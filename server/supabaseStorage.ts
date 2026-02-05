@@ -82,8 +82,8 @@ function mapDbToDriver(dbDriver: any): Driver {
     currentLatitude: dbDriver.current_latitude,
     currentLongitude: dbDriver.current_longitude,
     lastLocationUpdate: dbDriver.last_location_update ? new Date(dbDriver.last_location_update) : null,
-    rating: dbDriver.rating,
-    totalJobs: dbDriver.total_jobs,
+    rating: dbDriver.rating || "5.00",
+    totalJobs: dbDriver.total_jobs || 0,
     profilePictureUrl: dbDriver.profile_picture_url,
     bankName: dbDriver.bank_name || null,
     accountHolderName: dbDriver.account_holder_name || null,
@@ -671,7 +671,7 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('drivers')
       .select('*')
-      .eq('driver_id', normalizedCode)
+      .eq('driver_code', normalizedCode)
       .single();
     
     if (error) {
@@ -679,7 +679,7 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     if (!data) return undefined;
-    console.log(`[SupabaseStorage] getDriverByDriverCode: Found driver ${data.driver_id} (id: ${data.id})`);
+    console.log(`[SupabaseStorage] getDriverByDriverCode: Found driver ${data.driver_code} (id: ${data.id})`);
     return mapDbToDriver(data);
   }
 
@@ -694,7 +694,7 @@ export class SupabaseStorage implements IStorage {
       query = query.eq('online_status', filters.isAvailable ? 'online' : 'offline');
     }
     if (filters?.isVerified !== undefined) {
-      query = query.eq('is_verified', filters.isVerified);
+      query = query.eq('status', filters.isVerified ? 'approved' : 'applicant');
     }
     if (filters?.vehicleType) {
       query = query.eq('vehicle_type', filters.vehicleType);
@@ -711,7 +711,7 @@ export class SupabaseStorage implements IStorage {
     
     const dbDriver = {
       id,
-      driver_id: insertDriver.driverCode,
+      driver_code: insertDriver.driverCode,
       full_name: insertDriver.fullName || null,
       email: insertDriver.email || null,
       phone: insertDriver.phone || null,
@@ -730,12 +730,10 @@ export class SupabaseStorage implements IStorage {
       vehicle_model: insertDriver.vehicleModel || null,
       vehicle_color: insertDriver.vehicleColor || null,
       online_status: insertDriver.isAvailable ? 'online' : 'offline',
-      is_verified: insertDriver.isVerified || false,
+      status: insertDriver.isVerified ? 'approved' : 'applicant',
       current_latitude: insertDriver.currentLatitude || null,
       current_longitude: insertDriver.currentLongitude || null,
       last_location_update: insertDriver.lastLocationUpdate || null,
-      rating: insertDriver.rating || "5.00",
-      total_jobs: insertDriver.totalJobs || 0,
       profile_picture_url: insertDriver.profilePictureUrl || null,
       is_active: true,
     };
@@ -781,8 +779,6 @@ export class SupabaseStorage implements IStorage {
     if (data.currentLatitude !== undefined) dbData.current_latitude = data.currentLatitude;
     if (data.currentLongitude !== undefined) dbData.current_longitude = data.currentLongitude;
     if (data.lastLocationUpdate !== undefined) dbData.last_location_update = data.lastLocationUpdate;
-    if (data.rating !== undefined) dbData.rating = data.rating;
-    if (data.totalJobs !== undefined) dbData.total_jobs = data.totalJobs;
     if (data.profilePictureUrl !== undefined) dbData.profile_picture_url = data.profilePictureUrl;
     if (data.bankName !== undefined) dbData.bank_name = data.bankName;
     if (data.accountHolderName !== undefined) dbData.account_holder_name = data.accountHolderName;
