@@ -123,8 +123,11 @@ export default function DriverProfile() {
       }
 
       toast({ title: 'Profile picture updated successfully' });
+      // Force immediate cache refresh with timestamp to bust browser cache
       await queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });
       await queryClient.refetchQueries({ queryKey: ['supabase', 'driver', user?.id] });
+      // Force page reload to ensure image cache is cleared
+      window.location.reload();
     } catch (error) {
       toast({ 
         title: error instanceof Error ? error.message : 'Failed to upload profile picture', 
