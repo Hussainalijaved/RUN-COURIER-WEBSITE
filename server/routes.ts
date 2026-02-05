@@ -8034,6 +8034,179 @@ export async function registerRoutes(
     res.json({ success: true, driver });
   }));
 
+  // TEMPORARY: Create test driver account (internal use only - uses secret auth)
+  app.post("/api/internal/create-test-driver", asyncHandler(async (req, res) => {
+    // Allow with secret key for server-side creation
+    const { email, password, fullName, secret } = req.body;
+    
+    // Check secret key (first 20 chars of service role key)
+    const INTERNAL_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 20);
+    if (!secret || secret !== INTERNAL_SECRET) {
+      return res.status(401).json({ error: "Invalid secret" });
+    }
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+    
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Authentication service not configured" });
+      }
+      
+      // Create user via Supabase Admin with email confirmed
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Skip email verification for test account
+        user_metadata: {
+          fullName: fullName || 'Test Driver',
+          full_name: fullName || 'Test Driver',
+          role: 'driver',
+        }
+      });
+      
+      if (authError) {
+        console.error('[TestDriver] Supabase auth error:', authError);
+        return res.status(400).json({ error: authError.message });
+      }
+      
+      if (!authData?.user) {
+        return res.status(500).json({ error: "Failed to create auth user" });
+      }
+      
+      const userId = authData.user.id;
+      
+      // Create driver record in Supabase
+      const { data: driverData, error: driverError } = await supabaseAdmin
+        .from('drivers')
+        .insert({
+          id: userId,
+          email,
+          full_name: fullName || 'Test Driver',
+          vehicle_type: 'car',
+          online_status: 'offline',
+          is_verified: true, // Pre-verified for testing
+          rating: 5.0,
+          total_jobs: 0,
+        })
+        .select()
+        .single();
+      
+      if (driverError) {
+        console.error('[TestDriver] Driver insert error:', driverError);
+        // Still return success if auth user was created
+      }
+      
+      // Also create in local PostgreSQL
+      try {
+        const { db } = await import("./db");
+        const { drivers } = await import("@shared/schema");
+        
+        await db.insert(drivers).values({
+          id: crypto.randomUUID(),
+          userId: userId,
+          driverCode: driverData?.driver_id || null,
+          fullName: fullName || 'Test Driver',
+          email,
+          vehicleType: 'car',
+          isAvailable: false,
+          isVerified: true,
+          rating: "5.00",
+          totalJobs: 0,
+          createdAt: new Date(),
+        }).onConflictDoNothing();
+        
+        console.log('[TestDriver] Driver created in PostgreSQL');
+      } catch (dbErr) {
+        console.error('[TestDriver] PostgreSQL insert error:', dbErr);
+      }
+      
+      console.log(`[TestDriver] Test driver created: ${email}`);
+      res.status(201).json({ 
+        success: true, 
+        message: `Test driver created with email: ${email}`,
+        userId,
+        driverId: driverData?.driver_id || userId
+      });
+    } catch (error: any) {
+      console.error('[TestDriver] Error:', error);
+      res.status(500).json({ error: error.message || "Failed to create test driver" });
+    }
+  }));
+
+  // TEMPORARY: Reset password for existing test user
+  app.post("/api/internal/reset-test-password", asyncHandler(async (req, res) => {
+    const { email, newPassword, secret } = req.body;
+    
+    const INTERNAL_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 20);
+    if (!secret || secret !== INTERNAL_SECRET) {
+      return res.status(401).json({ error: "Invalid secret" });
+    }
+    
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: "Email and newPassword are required" });
+    }
+    
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Authentication service not configured" });
+      }
+      
+      // Find user by email
+      const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+      if (listErr) {
+        return res.status(500).json({ error: "Failed to list users" });
+      }
+      
+      const user = users?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Update password
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        password: newPassword,
+        email_confirm: true, // Ensure email is confirmed
+      });
+      
+      if (updateErr) {
+        return res.status(400).json({ error: updateErr.message });
+      }
+      
+      // Also ensure driver record exists and is verified
+      const { data: driverData, error: driverErr } = await supabaseAdmin
+        .from('drivers')
+        .upsert({
+          id: user.id,
+          email,
+          full_name: user.user_metadata?.fullName || user.user_metadata?.full_name || 'Test Driver',
+          vehicle_type: 'car',
+          online_status: 'offline',
+          is_verified: true,
+          rating: 5.0,
+          total_jobs: 0,
+        }, { onConflict: 'id' })
+        .select()
+        .single();
+      
+      console.log(`[TestDriver] Password reset for ${email}`);
+      res.json({ 
+        success: true, 
+        message: `Password reset for ${email}`,
+        userId: user.id,
+        driverId: driverData?.driver_id || user.id
+      });
+    } catch (error: any) {
+      console.error('[TestDriver] Reset error:', error);
+      res.status(500).json({ error: error.message || "Failed to reset password" });
+    }
+  }));
+
   // TEMPORARY: Force verify a driver (for debugging)
   app.post("/api/admin/force-verify-driver/:id", asyncHandler(async (req, res) => {
     if (!enforceAdminAccess(req, res)) return;
