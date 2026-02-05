@@ -3833,12 +3833,15 @@ export async function registerRoutes(
       fs.unlinkSync(file.path);
     }
     
-    // Use relative path for website (works on any domain)
-    // Mobile app will prepend its base URL when needed
+    // Use relative path for website internal storage
+    // Use full URL for Supabase (mobile app needs absolute URLs)
     const relativePath = `/uploads/documents/${safeDriverId}/${finalFilename}`;
+    const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+    const fullUrl = `${baseUrl}${relativePath}`;
+    // Website uses relative path, mobile gets full URL from Supabase
     const profilePictureUrl = relativePath;
     
-    console.log(`[Profile Picture] Saving relative URL: ${profilePictureUrl}`);
+    console.log(`[Profile Picture] Relative: ${relativePath}, Full: ${fullUrl}`);
 
     // Update driver profile with profile picture URL in storage
     await storage.updateDriver(driverId, { profilePictureUrl });
@@ -3857,13 +3860,13 @@ export async function registerRoutes(
       console.error("Failed to update profile picture in PostgreSQL:", e);
     }
 
-    // Update Supabase (primary data store for mobile app)
+    // Update Supabase with FULL URL (mobile app needs absolute URLs)
     try {
       if (supabaseAdmin) {
         const { error: supabaseError, data: supabaseData } = await supabaseAdmin
           .from('drivers')
           .update({ 
-            profile_picture_url: profilePictureUrl,
+            profile_picture_url: fullUrl,
             updated_at: new Date().toISOString()
           })
           .eq('id', driverId)
@@ -3882,8 +3885,8 @@ export async function registerRoutes(
 
     // Broadcast profile picture update to mobile app for real-time sync
     broadcastProfileUpdate(driverId, {
-      profilePictureUrl,
-      profile_picture_url: profilePictureUrl,
+      profilePictureUrl: fullUrl,
+      profile_picture_url: fullUrl,
     });
 
     res.status(200).json({ 
