@@ -251,7 +251,7 @@ export default function DriverApplication() {
       }
 
       setPhoneVerified(true);
-      setPhoneVerificationToken(data.token);
+      setPhoneVerificationToken(data.verificationToken);
       setShowVerificationInput(false);
       
       toast({
