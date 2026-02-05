@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import { MapPin, Phone } from 'lucide-react';
-import runCourierLogo from '@assets/LOGO APP 1_1764513632490.jpg';
+import runCourierLogo from '@assets/run_courier_logo.jpeg';
 import type { Job } from '@shared/schema';
 
 interface ShippingLabelProps {

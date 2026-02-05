@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
+import logoImage from '@assets/run_courier_logo.jpeg';
 import {
   Sidebar,
   SidebarContent,

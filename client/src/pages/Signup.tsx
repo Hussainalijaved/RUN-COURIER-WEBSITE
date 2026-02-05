@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Building2, CheckCircle2, Phone } from 'lucide-react';
-import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
+import logoImage from '@assets/run_courier_logo.jpeg';
 import type { UserRole } from '@shared/schema';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { apiRequest } from '@/lib/queryClient';

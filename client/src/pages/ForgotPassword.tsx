@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
-import logoImage from '@assets/LOGO APP 1_1764513632490.jpg';
+import logoImage from '@assets/run_courier_logo.jpeg';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
