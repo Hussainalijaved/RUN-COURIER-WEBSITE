@@ -364,19 +364,20 @@ export default function AdminMap() {
 
       const existingMarker = driverMarkersRef.current.get(driver.id);
       
-      // SVG path for a van icon (delivery van shape) - larger and more visible
-      const vanIconPath = 'M -10,-6 L 6,-6 L 6,-2 L 10,-2 L 10,4 L 8,4 L 8,6 L 4,6 L 4,4 L -6,4 L -6,6 L -10,6 L -10,-6 Z M -8,-4 L -8,0 L -2,0 L -2,-4 Z M 0,-4 L 0,0 L 4,0 L 4,-4 Z';
+      // Professional delivery truck/van icon - clean and modern
+      // This creates a recognizable delivery van silhouette
+      const vanIconPath = 'M 24 20 L 24 10 C 24 9 23 8 22 8 L 18 8 L 18 6 C 18 5 17 4 16 4 L 4 4 C 3 4 2 5 2 6 L 2 18 C 2 19 3 20 4 20 L 5 20 C 5 21.7 6.3 23 8 23 C 9.7 23 11 21.7 11 20 L 15 20 C 15 21.7 16.3 23 18 23 C 19.7 23 21 21.7 21 20 L 22 20 C 23 20 24 19 24 18 L 24 20 Z M 8 21 C 7.4 21 7 20.6 7 20 C 7 19.4 7.4 19 8 19 C 8.6 19 9 19.4 9 20 C 9 20.6 8.6 21 8 21 Z M 18 21 C 17.4 21 17 20.6 17 20 C 17 19.4 17.4 19 18 19 C 18.6 19 19 19.4 19 20 C 19 20.6 18.6 21 18 21 Z M 22 14 L 18 14 L 18 10 L 20 10 L 22 12 L 22 14 Z';
       
       if (existingMarker) {
         existingMarker.setPosition(displayLocation);
         existingMarker.setIcon({
           path: vanIconPath,
-          scale: 2.0,
+          scale: 1.5,
           fillColor,
           fillOpacity: 1,
           strokeColor: isOnlineNoGps ? '#F97316' : '#1a1a1a',
-          strokeWeight: 2.5,
-          anchor: new google.maps.Point(0, 0),
+          strokeWeight: 1.5,
+          anchor: new google.maps.Point(13, 13),
         });
       } else {
         const driverLabel = driver.driverCode 
@@ -388,12 +389,12 @@ export default function AdminMap() {
           title: driverLabel,
           icon: {
             path: vanIconPath,
-            scale: 2.0,
+            scale: 1.5,
             fillColor,
             fillOpacity: 1,
             strokeColor: isOnlineNoGps ? '#F97316' : '#1a1a1a',
-            strokeWeight: 2.5,
-            anchor: new google.maps.Point(0, 0),
+            strokeWeight: 1.5,
+            anchor: new google.maps.Point(13, 13),
           },
         });
 
