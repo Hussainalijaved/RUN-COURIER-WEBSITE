@@ -316,11 +316,18 @@ export default function AdminMap() {
 
     activeDrivers.forEach((driver) => {
       const location = getDriverLocation(driver);
-      if (!location) return;
+      
+      // For online drivers without GPS, show them at a default UK location (London area)
+      // with an orange color to indicate missing GPS
+      const isOnlineNoGps = driver.isAvailable && !location;
+      const displayLocation = location || (isOnlineNoGps ? { lat: 51.5074, lng: -0.1278 } : null);
+      
+      if (!displayLocation) return;
 
       currentMarkerIds.add(driver.id);
       const status = getDriverStatus(driver);
-      const fillColor = status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF';
+      // Orange for online but no GPS, otherwise normal status colors
+      const fillColor = isOnlineNoGps ? '#F97316' : (status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF');
 
       const existingMarker = driverMarkersRef.current.get(driver.id);
       
@@ -328,22 +335,22 @@ export default function AdminMap() {
       const vanIconPath = 'M -10,-6 L 6,-6 L 6,-2 L 10,-2 L 10,4 L 8,4 L 8,6 L 4,6 L 4,4 L -6,4 L -6,6 L -10,6 L -10,-6 Z M -8,-4 L -8,0 L -2,0 L -2,-4 Z M 0,-4 L 0,0 L 4,0 L 4,-4 Z';
       
       if (existingMarker) {
-        existingMarker.setPosition(location);
+        existingMarker.setPosition(displayLocation);
         existingMarker.setIcon({
           path: vanIconPath,
           scale: 2.0,
           fillColor,
           fillOpacity: 1,
-          strokeColor: '#1a1a1a',
+          strokeColor: isOnlineNoGps ? '#F97316' : '#1a1a1a',
           strokeWeight: 2.5,
           anchor: new google.maps.Point(0, 0),
         });
       } else {
         const driverLabel = driver.driverCode 
-          ? `${driver.driverCode} · ${driver.fullName || 'Driver'}` 
-          : driver.fullName || driver.vehicleRegistration || 'Driver';
+          ? `${driver.driverCode} · ${driver.fullName || 'Driver'}${isOnlineNoGps ? ' (NO GPS)' : ''}` 
+          : (driver.fullName || driver.vehicleRegistration || 'Driver') + (isOnlineNoGps ? ' (NO GPS)' : '');
         const marker = new google.maps.Marker({
-          position: location,
+          position: displayLocation,
           map,
           title: driverLabel,
           icon: {
@@ -351,7 +358,7 @@ export default function AdminMap() {
             scale: 2.0,
             fillColor,
             fillOpacity: 1,
-            strokeColor: '#1a1a1a',
+            strokeColor: isOnlineNoGps ? '#F97316' : '#1a1a1a',
             strokeWeight: 2.5,
             anchor: new google.maps.Point(0, 0),
           },
@@ -360,7 +367,7 @@ export default function AdminMap() {
         marker.addListener('click', () => {
           setSelectedDriver(driver);
           setSelectedJob(null);
-          map.panTo(location);
+          map.panTo(displayLocation);
           map.setZoom(15);
         });
 
@@ -372,10 +379,14 @@ export default function AdminMap() {
           const driverDisplay = driver.driverCode 
             ? `${driver.driverCode} · ${driver.fullName || 'Driver'}` 
             : driver.fullName || 'Driver';
+          const noGpsWarning = isOnlineNoGps 
+            ? '<div style="font-size: 11px; color: #F97316; font-weight: 600; margin-top: 4px;">⚠ NO GPS - Location unknown</div>' 
+            : '';
           infoWindowRef.current.setContent(`
             <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
               <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${driverDisplay}</div>
               <div style="font-size: 12px; color: #666; text-transform: capitalize;">Vehicle: ${vehicleType}</div>
+              ${noGpsWarning}
             </div>
           `);
           infoWindowRef.current.open(map, marker);
