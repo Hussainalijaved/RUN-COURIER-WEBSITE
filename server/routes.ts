@@ -6813,11 +6813,43 @@ export async function registerRoutes(
       // Update job status to "accepted" - driver has confirmed they will take the job
       await storage.updateJobStatus(assignment.jobId, "accepted" as any);
       console.log(`[Job Assignment] Driver accepted - Job ${assignment.jobId} status updated to 'accepted'`);
+      
+      // Get job details for broadcast
+      const job = await storage.getJob(assignment.jobId);
+      if (job) {
+        // Broadcast job update instantly to all connected clients
+        broadcastJobUpdate({
+          id: job.id,
+          trackingNumber: job.trackingNumber || '',
+          status: 'accepted',
+          previousStatus: 'assigned',
+          customerId: job.customerId || '',
+          driverId: assignment.driverId,
+          updatedAt: new Date(),
+        });
+        console.log(`[Job Assignment] Broadcasted job accepted update for ${job.trackingNumber}`);
+      }
     } else if (!accepted) {
       // Driver declined - reset job status to "pending" so it can be reassigned
       await storage.updateJob(assignment.jobId, { status: "pending", driverId: null });
       const reasonText = rejectionReason ? ` Reason: ${rejectionReason}` : '';
       console.log(`[Job Assignment] Driver declined - Job ${assignment.jobId} status reset to 'pending'.${reasonText}`);
+      
+      // Get job details for broadcast
+      const job = await storage.getJob(assignment.jobId);
+      if (job) {
+        // Broadcast job update instantly to all connected clients
+        broadcastJobUpdate({
+          id: job.id,
+          trackingNumber: job.trackingNumber || '',
+          status: 'pending',
+          previousStatus: 'assigned',
+          customerId: job.customerId || '',
+          driverId: null,
+          updatedAt: new Date(),
+        });
+        console.log(`[Job Assignment] Broadcasted job declined update for ${job.trackingNumber}`);
+      }
     }
 
     // Notify admin of response with rejection reason if applicable
@@ -6850,6 +6882,21 @@ export async function registerRoutes(
     // Reset job status to "pending" so it can be reassigned
     await storage.updateJob(assignment.jobId, { status: "pending", driverId: null });
     console.log(`[Job Assignment] Assignment cancelled - Job ${assignment.jobId} status reset to 'pending'`);
+
+    // Broadcast job update instantly to all connected clients
+    const job = await storage.getJob(assignment.jobId);
+    if (job) {
+      broadcastJobUpdate({
+        id: job.id,
+        trackingNumber: job.trackingNumber || '',
+        status: 'pending',
+        previousStatus: job.status || 'assigned',
+        customerId: job.customerId || '',
+        driverId: null,
+        updatedAt: new Date(),
+      });
+      console.log(`[Job Assignment] Broadcasted assignment cancelled update for ${job.trackingNumber}`);
+    }
 
     // Notify driver of cancellation
     const driver = await storage.getDriver(assignment.driverId);
@@ -7010,6 +7057,21 @@ export async function registerRoutes(
       driverHiddenBy: null,
     });
     console.log(`[Job Assignment] Admin cleaned - Job ${assignment.jobId} fully reset for reassignment`);
+
+    // Broadcast job update instantly to all connected clients
+    const job = await storage.getJob(assignment.jobId);
+    if (job) {
+      broadcastJobUpdate({
+        id: job.id,
+        trackingNumber: job.trackingNumber || '',
+        status: 'pending',
+        previousStatus: job.status || 'assigned',
+        customerId: job.customerId || '',
+        driverId: null,
+        updatedAt: new Date(),
+      });
+      console.log(`[Job Assignment] Broadcasted job cleaned update for ${job.trackingNumber}`);
+    }
 
     // Notify driver that the assignment was cleaned/reset
     const driver = await storage.getDriver(assignment.driverId);
