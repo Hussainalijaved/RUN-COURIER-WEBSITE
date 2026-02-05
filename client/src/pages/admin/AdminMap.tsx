@@ -119,18 +119,9 @@ export default function AdminMap() {
     },
   });
 
-  // Show all online drivers in the list (not just verified ones)
-  // This helps admin see drivers who are online but missing GPS or verification
-  // Include drivers from real-time WebSocket who are online (instant status updates)
-  const activeDrivers = drivers?.filter(d => {
-    // Check real-time status first (instant updates from mobile app)
-    const realtimeLoc = realtimeLocations.get(d.id);
-    if (realtimeLoc?.isAvailable !== undefined) {
-      return realtimeLoc.isAvailable || d.isVerified;
-    }
-    // Fallback to API data
-    return d.isVerified || d.isAvailable;
-  }) || [];
+  // Show ALL drivers on the map regardless of status
+  // Admin needs visibility of all drivers for management purposes
+  const activeDrivers = drivers || [];
   
   const availableDrivers = activeDrivers.filter(d => {
     const realtimeLoc = realtimeLocations.get(d.id);
