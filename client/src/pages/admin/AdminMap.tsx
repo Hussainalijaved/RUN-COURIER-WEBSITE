@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { MapFallback } from '@/components/ui/map-fallback';
 import { getMapCenter, geocodePostcode } from '@/lib/maps';
 import { useGoogleMaps } from '@/hooks/useGoogleMaps';
-import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User } from 'lucide-react';
+import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User, Maximize2 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useDriverLocations } from '@/hooks/useDriverLocations';
 import { useToast } from '@/hooks/use-toast';
@@ -66,6 +66,7 @@ export default function AdminMap() {
   const [assigningJobId, setAssigningJobId] = useState<string | null>(null);
   const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
   const [driverPriceForAssign, setDriverPriceForAssign] = useState<string>('');
+  const [hasInitialFit, setHasInitialFit] = useState(false);
   const { toast } = useToast();
 
   const { 
@@ -150,6 +151,38 @@ export default function AdminMap() {
     
     return null;
   }, [realtimeLocations]);
+
+  // Function to fit map to show all drivers
+  const fitAllDrivers = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !activeDrivers.length) return;
+    
+    const bounds = new google.maps.LatLngBounds();
+    let hasValidBounds = false;
+    
+    activeDrivers.forEach((driver) => {
+      const location = getDriverLocation(driver);
+      if (location) {
+        bounds.extend(location);
+        hasValidBounds = true;
+      } else if (driver.isAvailable) {
+        // Include default London location for online drivers without GPS
+        bounds.extend({ lat: 51.5074, lng: -0.1278 });
+        hasValidBounds = true;
+      }
+    });
+    
+    if (hasValidBounds) {
+      map.fitBounds(bounds, 50);
+      // Don't zoom in too far if there's only one driver
+      const listener = google.maps.event.addListener(map, 'idle', () => {
+        if (map.getZoom() && map.getZoom()! > 14) {
+          map.setZoom(14);
+        }
+        google.maps.event.removeListener(listener);
+      });
+    }
+  }, [activeDrivers, getDriverLocation]);
 
   const getDriverCurrentJob = (driverId: string) => {
     return jobs?.find(j => 
@@ -408,7 +441,13 @@ export default function AdminMap() {
         driverMarkersRef.current.delete(driverId);
       }
     });
-  }, [activeDrivers, mapLoaded, jobs, realtimeLocations, getDriverLocation]);
+    
+    // Automatically fit all drivers on first load
+    if (!hasInitialFit && activeDrivers.length > 0 && driverMarkersRef.current.size > 0) {
+      fitAllDrivers();
+      setHasInitialFit(true);
+    }
+  }, [activeDrivers, mapLoaded, jobs, realtimeLocations, getDriverLocation, hasInitialFit, fitAllDrivers]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -764,6 +803,15 @@ export default function AdminMap() {
                     <span>Active Job/Driver</span>
                   </div>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={fitAllDrivers}
+                  data-testid="button-fit-all-drivers"
+                >
+                  <Maximize2 className="h-4 w-4 mr-2" />
+                  Fit All
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
