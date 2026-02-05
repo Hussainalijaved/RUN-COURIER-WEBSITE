@@ -25,7 +25,7 @@ import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
-import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability } from "./realtime";
+import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
 import { geocodeAddress } from "./geocoding";
 import { sendJobOfferNotification } from "./pushNotifications";
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
@@ -2433,6 +2433,23 @@ export async function registerRoutes(
             console.error("Failed to update driver in Supabase:", error);
           } else {
             console.log("Driver successfully updated in Supabase:", req.params.id);
+            // Broadcast profile update to mobile app for real-time sync
+            broadcastProfileUpdate(req.params.id, {
+              ...safeBody,
+              // Include snake_case versions for mobile app compatibility
+              full_name: safeBody.fullName,
+              vehicle_type: safeBody.vehicleType,
+              vehicle_registration: safeBody.vehicleRegistration,
+              vehicle_make: safeBody.vehicleMake,
+              vehicle_model: safeBody.vehicleModel,
+              vehicle_color: safeBody.vehicleColor,
+              bank_name: safeBody.bankName,
+              account_holder_name: safeBody.accountHolderName,
+              sort_code: safeBody.sortCode,
+              account_number: safeBody.accountNumber,
+              profile_picture_url: safeBody.profilePictureUrl,
+              is_verified: safeBody.isVerified,
+            });
           }
         }
       }
@@ -3834,6 +3851,12 @@ export async function registerRoutes(
     } catch (e) {
       console.error("Failed to update profile picture in PostgreSQL:", e);
     }
+
+    // Broadcast profile picture update to mobile app for real-time sync
+    broadcastProfileUpdate(driverId, {
+      profilePictureUrl,
+      profile_picture_url: profilePictureUrl,
+    });
 
     res.status(200).json({ 
       success: true, 
@@ -7883,6 +7906,13 @@ export async function registerRoutes(
     // Broadcast availability change for instant map updates
     await broadcastDriverAvailability(driverId, isAvailable);
     
+    // Broadcast profile update to mobile app for real-time sync
+    broadcastProfileUpdate(driverId, {
+      isAvailable,
+      is_available: isAvailable,
+      online_status: isAvailable ? 'online' : 'offline',
+    });
+    
     console.log(`[Admin] Set driver ${driver.driverCode || driverId} availability to ${isAvailable}`);
     res.json({ success: true, driver });
   }));
@@ -7897,6 +7927,12 @@ export async function registerRoutes(
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
+    
+    // Broadcast verification update to mobile app for real-time sync
+    broadcastProfileUpdate(driverId, {
+      isVerified: true,
+      is_verified: true,
+    });
     
     console.log(`[Admin] Force verified driver ${driver.driverCode || driverId}`);
     res.json({ success: true, driver });

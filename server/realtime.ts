@@ -749,6 +749,37 @@ export function broadcastDocumentPending(document: {
   log(`Broadcasted document pending for ${document.id} (${document.type}) to ${sentCount} admin clients`, 'realtime');
 }
 
+// Broadcast profile updates to a specific driver (for real-time sync between web and mobile)
+export function broadcastProfileUpdate(driverId: string, profileData: Record<string, any>): void {
+  const message = {
+    type: 'driver:profile_update',
+    payload: {
+      driverId,
+      ...profileData,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+
+  let sentCount = 0;
+
+  // Send to the specific driver if connected
+  const driverClient = driverConnections.get(driverId);
+  if (driverClient && driverClient.ws.readyState === WebSocket.OPEN) {
+    sendMessage(driverClient.ws, message);
+    sentCount++;
+  }
+
+  // Also send to admins/dispatchers for monitoring
+  observerConnections.forEach((client) => {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+      sendMessage(client.ws, message);
+      sentCount++;
+    }
+  });
+
+  log(`Broadcasted profile update for driver ${driverId} to ${sentCount} clients`, 'realtime');
+}
+
 function broadcastLocation(location: DriverLocation): void {
   const message: OutgoingLocationMessage = {
     type: 'driver:location',
