@@ -72,6 +72,9 @@ export default function AdminDocuments() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      // Also invalidate Supabase queries used by dashboard
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'documents'] });
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'drivers'] });
       toast({ title: 'Document reviewed successfully' });
     },
     onError: () => {

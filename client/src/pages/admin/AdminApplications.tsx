@@ -87,6 +87,9 @@ export default function AdminApplications() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
+      // Also invalidate Supabase queries used by dashboard
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'driver-applications'] });
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'drivers'] });
       toast({ 
         title: variables.status === 'approved' ? 'Application Approved' : 'Application Rejected',
         description: variables.status === 'approved' 

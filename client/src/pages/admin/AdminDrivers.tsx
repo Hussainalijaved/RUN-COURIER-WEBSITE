@@ -231,6 +231,8 @@ export default function AdminDrivers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/supabase-drivers'] });
+      // Also invalidate Supabase queries used by dashboard
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'drivers'] });
       toast({ title: 'Driver status updated successfully' });
     },
     onError: (error: Error) => {
@@ -251,6 +253,8 @@ export default function AdminDrivers() {
     onSuccess: (updatedDriver: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/supabase-drivers'] });
+      // Also invalidate Supabase queries used by dashboard
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'drivers'] });
       if (selectedDriver && updatedDriver) {
         setSelectedDriver({ ...selectedDriver, ...updatedDriver });
       }
