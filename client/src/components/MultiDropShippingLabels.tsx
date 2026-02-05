@@ -152,6 +152,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
                   height: '40px',
                   width: 'auto',
                   objectFit: 'contain',
+                  borderRadius: '6px',
                 }}
               />
               <div style={{ lineHeight: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

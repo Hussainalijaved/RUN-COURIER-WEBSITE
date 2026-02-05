@@ -137,7 +137,7 @@ export default function ForgotPassword() {
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-16 w-auto object-contain"
+                className="h-16 w-auto object-contain rounded-lg"
                 data-testid="forgot-password-logo"
               />
             </div>

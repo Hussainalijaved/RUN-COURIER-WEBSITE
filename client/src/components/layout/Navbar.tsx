@@ -65,7 +65,7 @@ export function Navbar() {
           <SmoothImage 
             src={logoImage} 
             alt="Run Courier" 
-            className="h-7 sm:h-10 w-auto object-contain flex-shrink-0"
+            className="h-7 sm:h-10 w-auto object-contain flex-shrink-0 rounded-lg"
             wrapperClassName="h-7 sm:h-10 flex-shrink-0"
             data-testid="logo-image"
           />

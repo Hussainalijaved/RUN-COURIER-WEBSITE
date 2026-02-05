@@ -136,7 +136,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-8 w-auto object-contain"
+                className="h-8 w-auto object-contain rounded-lg"
                 data-testid="sidebar-logo-image"
               />
               <div className="flex flex-col">

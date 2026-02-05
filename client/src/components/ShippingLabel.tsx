@@ -61,6 +61,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                   height: '50px',
                   width: 'auto',
                   objectFit: 'contain',
+                  borderRadius: '8px',
                 }}
               />
               <div style={{ lineHeight: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

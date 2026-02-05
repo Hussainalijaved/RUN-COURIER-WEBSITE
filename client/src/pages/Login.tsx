@@ -109,7 +109,7 @@ export default function Login({ role = 'customer' }: LoginProps) {
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-16 w-auto object-contain"
+                className="h-16 w-auto object-contain rounded-lg"
                 data-testid="login-logo-image"
               />
             </div>

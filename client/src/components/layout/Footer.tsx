@@ -40,7 +40,7 @@ export function Footer() {
               <SmoothImage 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-12 w-auto object-contain"
+                className="h-12 w-auto object-contain rounded-lg"
                 wrapperClassName="h-12 flex-shrink-0"
                 data-testid="footer-logo-image"
               />
