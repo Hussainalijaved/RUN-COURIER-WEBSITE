@@ -514,11 +514,15 @@ export function registerMobileRoutes(app: Express): void {
         currentLatitude: driver.currentLatitude,
         currentLongitude: driver.currentLongitude,
         lastLocationUpdate: driver.lastLocationUpdate,
-        // Bank details
+        // Bank details (include both camelCase and snake_case for mobile app compatibility)
         bankName: driver.bankName || fullDriverData.bank_name,
+        bank_name: driver.bankName || fullDriverData.bank_name,
         accountHolderName: driver.accountHolderName || fullDriverData.account_holder_name,
+        account_holder_name: driver.accountHolderName || fullDriverData.account_holder_name,
         sortCode: driver.sortCode || fullDriverData.sort_code,
+        sort_code: driver.sortCode || fullDriverData.sort_code,
         accountNumber: driver.accountNumber || fullDriverData.account_number,
+        account_number: driver.accountNumber || fullDriverData.account_number,
         // Document URLs (include both camelCase and snake_case for mobile app compatibility)
         profilePictureUrl: driver.profilePictureUrl || fullDriverData.profile_picture_url,
         profile_picture_url: driver.profilePictureUrl || fullDriverData.profile_picture_url,
@@ -603,6 +607,20 @@ export function registerMobileRoutes(app: Express): void {
       // Handle profile_picture alias (mobile app may send this variant)
       if (req.body.profile_picture !== undefined && updateData.profilePictureUrl === undefined) {
         updateData.profilePictureUrl = req.body.profile_picture;
+      }
+      
+      // Handle bank details snake_case aliases
+      if (req.body.bank_name !== undefined && updateData.bankName === undefined) {
+        updateData.bankName = req.body.bank_name;
+      }
+      if (req.body.account_holder_name !== undefined && updateData.accountHolderName === undefined) {
+        updateData.accountHolderName = req.body.account_holder_name;
+      }
+      if (req.body.sort_code !== undefined && updateData.sortCode === undefined) {
+        updateData.sortCode = req.body.sort_code;
+      }
+      if (req.body.account_number !== undefined && updateData.accountNumber === undefined) {
+        updateData.accountNumber = req.body.account_number;
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -694,6 +712,14 @@ export function registerMobileRoutes(app: Express): void {
           vehicle_color: updatedDriver.vehicleColor,
           profilePictureUrl: updatedDriver.profilePictureUrl,
           profile_picture_url: updatedDriver.profilePictureUrl,
+          bankName: updatedDriver.bankName,
+          bank_name: updatedDriver.bankName,
+          accountHolderName: updatedDriver.accountHolderName,
+          account_holder_name: updatedDriver.accountHolderName,
+          sortCode: updatedDriver.sortCode,
+          sort_code: updatedDriver.sortCode,
+          accountNumber: updatedDriver.accountNumber,
+          account_number: updatedDriver.accountNumber,
         }
       });
     })
