@@ -269,13 +269,11 @@ export default function DriverProfile() {
               <CardHeader className="pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                   <div className="relative group">
-                    <Avatar className="h-20 w-20">
-                      {driver?.profilePictureUrl && (
-                        <AvatarImage 
-                          src={driver.profilePictureUrl} 
-                          alt={driver?.fullName || 'Driver'} 
-                        />
-                      )}
+                    <Avatar className="h-20 w-20" key={driver?.profilePictureUrl || 'no-picture'}>
+                      <AvatarImage 
+                        src={driver?.profilePictureUrl || ''} 
+                        alt={driver?.fullName || 'Driver'} 
+                      />
                       <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                         {driver?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || user?.fullName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'D'}
                       </AvatarFallback>
