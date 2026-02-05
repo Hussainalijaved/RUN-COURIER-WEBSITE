@@ -29,6 +29,7 @@ import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcas
 import { geocodeAddress } from "./geocoding";
 import { sendJobOfferNotification } from "./pushNotifications";
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
+import { cache, CACHE_TTL } from "./cache";
 
 /**
  * Middleware to verify admin access using email-based recognition
@@ -2253,12 +2254,25 @@ export async function registerRoutes(
 
   app.get("/api/drivers", asyncHandler(async (req, res) => {
     const { isAvailable, isVerified, vehicleType, includeInactive } = req.query;
+    
+    // Build cache key from query params
+    const cacheKey = `drivers:${isAvailable || 'all'}:${isVerified || 'all'}:${vehicleType || 'all'}:${includeInactive || 'false'}`;
+    
+    // Check cache first for faster response
+    const cached = cache.get<any[]>(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+    
     const drivers = await storage.getDrivers({
       isAvailable: isAvailable === "true" ? true : isAvailable === "false" ? false : undefined,
       isVerified: isVerified === "true" ? true : isVerified === "false" ? false : undefined,
       vehicleType: vehicleType as VehicleType | undefined,
       includeInactive: includeInactive === "true",
     });
+    
+    // Cache for 2 seconds - fast enough for real-time feel while reducing DB load
+    cache.set(cacheKey, drivers, CACHE_TTL.DRIVERS_LIST);
     res.json(drivers);
   }));
 
@@ -2457,6 +2471,9 @@ export async function registerRoutes(
       console.error("Failed to sync driver to Supabase:", syncErr);
     }
     
+    // Invalidate driver cache for instant updates
+    cache.invalidatePattern('^drivers:');
+    
     res.json(driver);
   }));
 
@@ -2479,6 +2496,9 @@ export async function registerRoutes(
       console.error("Failed to sync driver availability to PostgreSQL:", e);
     }
     
+    // Invalidate driver cache for instant updates
+    cache.invalidatePattern('^drivers:');
+    
     res.json(driver);
   }));
 
@@ -2488,6 +2508,10 @@ export async function registerRoutes(
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
+    
+    // Invalidate driver cache for instant location updates
+    cache.invalidatePattern('^drivers:');
+    
     res.json(driver);
   }));
 

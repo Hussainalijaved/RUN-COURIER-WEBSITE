@@ -316,3 +316,73 @@
     inset: -1px;
   }
 }
+
+/* ============================================
+   PERFORMANCE & SMOOTH TRANSITIONS
+   ============================================ */
+
+/* Global font smoothing for crisp text */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Opt-in smooth transition utility class */
+.smooth-transition {
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+
+/* Smooth opacity transitions for loading states */
+.fade-in {
+  animation: fadeIn 200ms ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Skeleton loading animation */
+.skeleton-pulse {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Smooth page transitions - opt-in only */
+.page-transition {
+  animation: pageSlideIn 200ms ease-out forwards;
+}
+
+@keyframes pageSlideIn {
+  from { 
+    opacity: 0; 
+    transform: translateX(-8px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0); 
+  }
+}
+
+/* Fast badge/status updates - opt-in utility */
+.status-badge {
+  transition: background-color 100ms ease-out, color 100ms ease-out;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in, .page-transition, .skeleton-pulse, .smooth-transition {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Hardware acceleration for animated elements */
+.animate-spin, .animate-pulse {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
