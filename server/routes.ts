@@ -2690,6 +2690,121 @@ export async function registerRoutes(
       console.error("Failed to sync driver verification to Supabase:", e);
     }
     
+    // When approving a driver, migrate their application documents to Supabase Storage
+    // and create driver_documents records so the mobile app can see them
+    if (isVerified === true) {
+      try {
+        const { supabaseAdmin } = await import("./supabaseAdmin");
+        if (supabaseAdmin) {
+          const { data: driverData } = await supabaseAdmin
+            .from('drivers')
+            .select('profile_picture_url, driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url')
+            .eq('id', driverId)
+            .single();
+          
+          if (driverData) {
+            const fs = await import("fs");
+            const path = await import("path");
+            const BUCKET = 'driver-documents';
+            
+            const docMappings = [
+              { dbColumn: 'profile_picture_url', url: driverData.profile_picture_url, storageName: 'profile_picture', docType: null },
+              { dbColumn: 'driving_licence_front_url', url: driverData.driving_licence_front_url, storageName: 'driving_licence_front', docType: 'driving_licence_front' },
+              { dbColumn: 'driving_licence_back_url', url: driverData.driving_licence_back_url, storageName: 'driving_licence_back', docType: 'driving_licence_back' },
+              { dbColumn: 'dbs_certificate_url', url: driverData.dbs_certificate_url, storageName: 'dbs_certificate', docType: 'dbs_certificate' },
+              { dbColumn: 'goods_in_transit_insurance_url', url: driverData.goods_in_transit_insurance_url, storageName: 'goods_in_transit', docType: 'goods_in_transit' },
+              { dbColumn: 'hire_reward_insurance_url', url: driverData.hire_reward_insurance_url, storageName: 'hire_and_reward', docType: 'hire_and_reward' },
+            ];
+            
+            const updateData: Record<string, string> = {};
+            
+            const getContentType = (filePath: string) => {
+              const ext = path.extname(filePath).toLowerCase();
+              if (ext === '.png') return 'image/png';
+              if (ext === '.pdf') return 'application/pdf';
+              if (ext === '.gif') return 'image/gif';
+              if (ext === '.webp') return 'image/webp';
+              return 'image/jpeg';
+            };
+            
+            for (const mapping of docMappings) {
+              if (!mapping.url) continue;
+              
+              let finalUrl = mapping.url;
+              
+              // If not already a Supabase Storage URL, try to upload
+              if (!mapping.url.includes('supabase.co/storage/')) {
+                const urlPath = mapping.url.replace(/^https?:\/\/[^/]+/, '');
+                const localPath = urlPath.startsWith('/') ? urlPath.substring(1) : urlPath;
+                
+                if (fs.existsSync(localPath)) {
+                  const fileBuffer = fs.readFileSync(localPath);
+                  const ext = path.extname(localPath) || '.jpeg';
+                  const storagePath = `${driverId}/${mapping.storageName}${ext}`;
+                  
+                  const { error: uploadErr } = await supabaseAdmin.storage
+                    .from(BUCKET)
+                    .upload(storagePath, fileBuffer, {
+                      contentType: getContentType(localPath),
+                      upsert: true
+                    });
+                  
+                  if (!uploadErr) {
+                    const { data: urlData } = supabaseAdmin.storage
+                      .from(BUCKET)
+                      .getPublicUrl(storagePath);
+                    
+                    finalUrl = urlData.publicUrl;
+                    updateData[mapping.dbColumn] = finalUrl;
+                    console.log(`[Drivers] Uploaded ${mapping.storageName} to Supabase Storage`);
+                  } else {
+                    console.error(`[Drivers] Failed to upload ${mapping.storageName}:`, uploadErr.message);
+                  }
+                }
+              }
+              
+              // Always ensure a driver_documents record exists for document types
+              if (mapping.docType) {
+                // Upsert: delete existing record for this doc_type, then insert
+                await supabaseAdmin
+                  .from('driver_documents')
+                  .delete()
+                  .eq('driver_id', driverId)
+                  .eq('doc_type', mapping.docType);
+                
+                const { error: insertErr } = await supabaseAdmin
+                  .from('driver_documents')
+                  .insert({
+                    driver_id: driverId,
+                    doc_type: mapping.docType,
+                    file_url: finalUrl,
+                    status: 'approved',
+                    uploaded_at: new Date().toISOString(),
+                  });
+                
+                if (insertErr) {
+                  console.error(`[Drivers] Failed to create driver_documents record for ${mapping.docType}:`, insertErr.message);
+                } else {
+                  console.log(`[Drivers] Ensured driver_documents record for ${mapping.docType}`);
+                }
+              }
+            }
+            
+            // Update drivers table with new Supabase Storage URLs
+            if (Object.keys(updateData).length > 0) {
+              await supabaseAdmin
+                .from('drivers')
+                .update(updateData)
+                .eq('id', driverId);
+              console.log(`[Drivers] Updated ${Object.keys(updateData).length} document URLs to Supabase Storage for driver ${driverId}`);
+            }
+          }
+        }
+      } catch (docMigrationErr: any) {
+        console.error("[Drivers] Document migration error (non-critical):", docMigrationErr.message);
+      }
+    }
+    
     res.json(driver);
   }));
 

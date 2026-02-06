@@ -527,14 +527,22 @@ export function registerMobileRoutes(app: Express): void {
         accountNumber: driver.accountNumber || fullDriverData.account_number,
         account_number: driver.accountNumber || fullDriverData.account_number,
         bank_account_number: driver.accountNumber || fullDriverData.account_number,
-        // Document URLs (include both camelCase and snake_case for mobile app compatibility)
         profilePictureUrl: driver.profilePictureUrl || fullDriverData.profile_picture_url,
         profile_picture_url: driver.profilePictureUrl || fullDriverData.profile_picture_url,
         drivingLicenceFrontUrl: fullDriverData.driving_licence_front_url,
+        driving_licence_front_url: fullDriverData.driving_licence_front_url,
         drivingLicenceBackUrl: fullDriverData.driving_licence_back_url,
+        driving_licence_back_url: fullDriverData.driving_licence_back_url,
         dbsCertificateUrl: driver.dbsCertificateUrl || fullDriverData.dbs_certificate_url,
+        dbs_certificate_url: driver.dbsCertificateUrl || fullDriverData.dbs_certificate_url,
         goodsInTransitInsuranceUrl: fullDriverData.goods_in_transit_insurance_url,
+        goods_in_transit_insurance_url: fullDriverData.goods_in_transit_insurance_url,
+        goods_in_transit_url: fullDriverData.goods_in_transit_insurance_url,
         hireRewardInsuranceUrl: fullDriverData.hire_reward_insurance_url,
+        hire_reward_insurance_url: fullDriverData.hire_reward_insurance_url,
+        hire_and_reward_url: fullDriverData.hire_reward_insurance_url,
+        license_url: fullDriverData.driving_licence_front_url,
+        insurance_url: fullDriverData.hire_reward_insurance_url,
       });
     })
   );
