@@ -974,11 +974,23 @@ export class SupabaseStorage implements IStorage {
       parcel_weight: 0,
     };
     
-    const { data, error } = await supabase
+    let data: any;
+    let error: any;
+    
+    ({ data, error } = await supabase
       .from('jobs')
       .insert(dbJob)
       .select()
-      .single();
+      .single());
+    
+    if (error && error.message?.includes('job_number')) {
+      const { job_number, ...dbJobWithoutJobNumber } = dbJob;
+      ({ data, error } = await supabase
+        .from('jobs')
+        .insert(dbJobWithoutJobNumber)
+        .select()
+        .single());
+    }
     
     if (error) {
       console.error('[SupabaseStorage] Error creating job:', error);

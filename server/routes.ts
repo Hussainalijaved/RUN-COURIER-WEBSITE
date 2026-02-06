@@ -1262,7 +1262,6 @@ export async function registerRoutes(
         .select(`
           id,
           tracking_number,
-          job_number,
           status,
           vehicle_type,
           pickup_address,
@@ -6076,7 +6075,7 @@ export async function registerRoutes(
       // Handle both numeric and UUID job IDs
       const { data: jobs, error } = await supabaseAdmin
         .from('jobs')
-        .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
         .in('id', data.jobIds);
       
       if (!error && jobs) {
