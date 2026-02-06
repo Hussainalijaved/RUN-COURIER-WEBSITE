@@ -436,51 +436,11 @@ function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => P
   };
 }
 
-async function migrateJobNumberColumn() {
-  try {
-    const { db } = await import("./db");
-    const { sql } = await import("drizzle-orm");
-    
-    await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_number TEXT UNIQUE`);
-    console.log('[Migration] job_number column ensured on local DB');
-    
-    await db.execute(sql`
-      WITH numbered AS (
-        SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn
-        FROM jobs
-      )
-      UPDATE jobs SET job_number = 'JOB-' || LPAD(numbered.rn::text, 4, '0')
-      FROM numbered
-      WHERE jobs.id = numbered.id AND jobs.job_number IS NULL
-    `);
-    console.log('[Migration] Existing jobs backfilled with job numbers');
-  } catch (error) {
-    console.error('[Migration] Error migrating job_number column:', error);
-  }
-  
-  try {
-    const { supabaseAdmin } = await import("./supabaseAdmin");
-    if (supabaseAdmin) {
-      const { error } = await supabaseAdmin.rpc('exec_sql', {
-        query: "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_number TEXT UNIQUE"
-      });
-      if (error) {
-        console.log('[Migration] Supabase job_number migration via RPC failed (may need manual migration):', error.message);
-      } else {
-        console.log('[Migration] job_number column ensured on Supabase');
-      }
-    }
-  } catch (error) {
-    console.log('[Migration] Supabase migration skipped:', error);
-  }
-}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-
-  migrateJobNumberColumn().catch(err => console.error('[Migration] Background migration failed:', err));
 
   // Apply STRICT admin access middleware to all admin-only routes
   // These routes will REJECT requests without valid admin credentials
