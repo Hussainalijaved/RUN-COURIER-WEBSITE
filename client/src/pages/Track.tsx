@@ -229,7 +229,7 @@ export default function Track() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <CardTitle className="text-lg">Tracking Number</CardTitle>
+                        <CardTitle className="text-lg">Delivery Details</CardTitle>
                         {isLive && (
                           <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 gap-1" data-testid="badge-live">
                             <Radio className="h-3 w-3 animate-pulse" />
@@ -237,9 +237,20 @@ export default function Track() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-2xl font-mono font-bold text-primary">
-                        {job.trackingNumber}
-                      </p>
+                      {(job as any).jobNumber && (
+                        <div className="mt-1">
+                          <span className="text-xs text-muted-foreground">Job No. </span>
+                          <span className="text-lg font-mono font-bold text-primary" data-testid="text-job-number">
+                            {(job as any).jobNumber}
+                          </span>
+                        </div>
+                      )}
+                      <div className="mt-1">
+                        <span className="text-xs text-muted-foreground">Tracking: </span>
+                        <span className="text-sm font-mono text-muted-foreground">
+                          {job.trackingNumber}
+                        </span>
+                      </div>
                       {lastUpdate && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Last updated: {lastUpdate.toLocaleTimeString('en-GB')}

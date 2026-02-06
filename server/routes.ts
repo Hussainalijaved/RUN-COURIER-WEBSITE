@@ -294,6 +294,20 @@ const uploadPodImage = multer({
 const stableJobNumberCache = new Map<string, string>();
 let jobNumberCacheInitialized = false;
 
+function ensureJobNumber(job: any): any {
+  if (!job) return job;
+  if (job.jobNumber) return job;
+  const cached = stableJobNumberCache.get(String(job.id));
+  if (cached) return { ...job, jobNumber: cached };
+  let newJobNumber: string;
+  const usedNumbers = new Set(stableJobNumberCache.values());
+  do {
+    newJobNumber = String(Math.floor(100000 + Math.random() * 900000));
+  } while (usedNumbers.has(newJobNumber));
+  stableJobNumberCache.set(String(job.id), newJobNumber);
+  return { ...job, jobNumber: newJobNumber };
+}
+
 function assignStableJobNumbers(jobs: any[]): any[] {
   if (!jobNumberCacheInitialized && jobs.length > 0) {
     const sorted = [...jobs].sort((a, b) => Number(a.id) - Number(b.id));
@@ -1248,6 +1262,7 @@ export async function registerRoutes(
         .select(`
           id,
           tracking_number,
+          job_number,
           status,
           vehicle_type,
           pickup_address,
@@ -1284,9 +1299,10 @@ export async function registerRoutes(
       }
       
       // Map snake_case to camelCase for frontend
-      return res.json({
+      const trackResult: any = {
         id: job.id,
         trackingNumber: job.tracking_number,
+        jobNumber: (job as any).job_number || null,
         status: job.status,
         vehicleType: job.vehicle_type,
         pickupAddress: job.pickup_address,
@@ -1298,7 +1314,8 @@ export async function registerRoutes(
         createdAt: job.created_at,
         driverName,
         driverPhone,
-      });
+      };
+      return res.json(ensureJobNumber(trackResult));
     }
     
     // Fallback to Drizzle if Supabase not available
@@ -1353,11 +1370,11 @@ export async function registerRoutes(
     }
     
     if (isAdmin || isOwner) {
-      return res.json(job);
+      return res.json(ensureJobNumber(job));
     }
     
     // CRITICAL: Everyone else gets NO customer pricing
-    return res.json(stripCustomerPricing(job));
+    return res.json(ensureJobNumber(stripCustomerPricing(job)));
   }));
 
   // Get multi-drop stops for a job (admin only - contains POD and recipient data)
@@ -1820,7 +1837,7 @@ export async function registerRoutes(
         updatedAt: job.updatedAt,
       });
     }
-    res.json(job);
+    res.json(ensureJobNumber(job));
   }));
 
   app.patch("/api/jobs/:id/status", asyncHandler(async (req, res) => {
@@ -1889,7 +1906,7 @@ export async function registerRoutes(
       driverId: job.driverId,
       updatedAt: job.updatedAt,
     });
-    res.json(job);
+    res.json(ensureJobNumber(job));
   }));
 
   // Update driver payment status
@@ -1918,7 +1935,7 @@ export async function registerRoutes(
     
     const updatedJob = await storage.updateJob(req.params.id, updates);
     console.log(`[Jobs] Driver payment status updated for job ${req.params.id}: ${driverPaymentStatus}`);
-    res.json(updatedJob);
+    res.json(ensureJobNumber(updatedJob));
   }));
 
   app.post("/api/jobs/:id/geocode", asyncHandler(async (req, res) => {
@@ -1949,9 +1966,9 @@ export async function registerRoutes(
 
     if (Object.keys(updates).length > 0) {
       const updatedJob = await storage.updateJob(req.params.id, updates);
-      res.json({ success: true, job: updatedJob, geocoded: updates });
+      res.json({ success: true, job: ensureJobNumber(updatedJob), geocoded: updates });
     } else {
-      res.json({ success: true, job, message: "No geocoding needed or addresses missing" });
+      res.json({ success: true, job: ensureJobNumber(job), message: "No geocoding needed or addresses missing" });
     }
   }));
 
@@ -2167,7 +2184,7 @@ export async function registerRoutes(
     
     // Return the updated job with correct driver price
     const updatedJob = await storage.getJob(req.params.id);
-    res.json(updatedJob || job);
+    res.json(ensureJobNumber(updatedJob || job));
   }));
 
   app.patch("/api/jobs/:id/pod", asyncHandler(async (req, res) => {
@@ -2176,7 +2193,7 @@ export async function registerRoutes(
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    res.json(job);
+    res.json(ensureJobNumber(job));
   }));
 
   // Admin POD photo upload endpoint
@@ -2306,7 +2323,7 @@ export async function registerRoutes(
       });
     }
     
-    res.json(updatedJob);
+    res.json(ensureJobNumber(updatedJob));
   }));
 
   app.delete("/api/jobs/:id", asyncHandler(async (req, res) => {
@@ -2364,7 +2381,7 @@ export async function registerRoutes(
       });
     }
     
-    res.json(updatedJob);
+    res.json(ensureJobNumber(updatedJob));
   }));
 
   app.get("/api/drivers", asyncHandler(async (req, res) => {
@@ -5221,6 +5238,7 @@ export async function registerRoutes(
     res.json({ 
       success: true, 
       trackingNumber: job.trackingNumber,
+      jobNumber: job.jobNumber || jobNumber,
       jobId: job.id,
       payLater: true
     });
