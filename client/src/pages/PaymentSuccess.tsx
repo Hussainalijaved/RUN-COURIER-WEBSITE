@@ -11,6 +11,7 @@ export default function PaymentSuccess() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
+  const [jobNumber, setJobNumber] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPayLater, setIsPayLater] = useState(false);
@@ -21,13 +22,15 @@ export default function PaymentSuccess() {
     const sessionId = params.get('session_id');
     const tracking = params.get('tracking');
     const payLater = params.get('payLater');
+    const jn = params.get('jobNumber');
+    
+    if (jn) setJobNumber(jn);
     
     if (payLater === 'true' && tracking) {
       setIsPayLater(true);
       setTrackingNumber(tracking);
       setIsLoading(false);
     } else if (tracking) {
-      // Embedded payment already confirmed - just show success
       setTrackingNumber(tracking);
       setIsLoading(false);
     } else if (sessionId) {
@@ -73,6 +76,7 @@ export default function PaymentSuccess() {
       }
 
       setTrackingNumber(result.trackingNumber);
+      if (result.jobNumber) setJobNumber(result.jobNumber);
       setIsLoading(false);
     } catch (err: any) {
       console.error('Payment confirmation error:', err);
@@ -115,15 +119,30 @@ export default function PaymentSuccess() {
           <CardContent className="space-y-6">
             {!isLoading && !error && (
               <>
-                {trackingNumber && (
-                  <div className="bg-primary/10 rounded-lg p-6 text-center">
-                    <p className="text-sm text-muted-foreground mb-2">Your Tracking Number</p>
-                    <p className="text-2xl font-bold text-primary font-mono" data-testid="text-tracking-number">
-                      {trackingNumber}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Save this number to track your delivery
-                    </p>
+                {(jobNumber || trackingNumber) && (
+                  <div className="bg-primary/10 rounded-lg p-6 text-center space-y-4">
+                    {jobNumber && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Your Job Number</p>
+                        <p className="text-3xl font-bold text-primary font-mono" data-testid="text-job-number">
+                          {jobNumber}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Use this number when contacting us about your delivery
+                        </p>
+                      </div>
+                    )}
+                    {trackingNumber && (
+                      <div className={jobNumber ? "pt-3 border-t border-primary/20" : ""}>
+                        <p className="text-sm text-muted-foreground mb-1">Tracking Number</p>
+                        <p className="text-lg font-medium text-primary font-mono" data-testid="text-tracking-number">
+                          {trackingNumber}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Use this to track your delivery status online
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

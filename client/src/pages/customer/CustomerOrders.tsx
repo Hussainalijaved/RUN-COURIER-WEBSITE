@@ -217,7 +217,7 @@ export default function CustomerOrders() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Order ID</TableHead>
+                      <TableHead>Job No.</TableHead>
                       <TableHead>Route</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
@@ -228,7 +228,10 @@ export default function CustomerOrders() {
                   <TableBody>
                     {filteredJobs.map((job) => (
                       <TableRow key={job.id} data-testid={`row-order-${job.id}`}>
-                        <TableCell className="font-mono font-medium">{job.trackingNumber}</TableCell>
+                        <TableCell>
+                          <div className="font-mono font-medium">{(job as any).jobNumber || '—'}</div>
+                          <div className="text-xs text-muted-foreground">{job.trackingNumber}</div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-sm">
                             <MapPin className="h-3 w-3 text-muted-foreground" />

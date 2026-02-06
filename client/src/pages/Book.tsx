@@ -1561,7 +1561,7 @@ export default function Book() {
                           });
                           
                           clearBooking();
-                          setLocation(`/payment/success?tracking=${result.trackingNumber}&payLater=true`);
+                          setLocation(`/payment/success?tracking=${result.trackingNumber}&jobNumber=${result.jobNumber || ''}&payLater=true`);
                         } else {
                           // Prefetch payment intent for faster loading
                           try {
@@ -1632,15 +1632,15 @@ export default function Book() {
                   bookingData={pendingBookingData}
                   prefetchedClientSecret={prefetchedClientSecret || undefined}
                   prefetchedPaymentIntentId={prefetchedPaymentIntentId || undefined}
-                  onSuccess={(trackingNumber, jobId) => {
+                  onSuccess={(trackingNumber, jobId, jobNumber) => {
                     toast({
                       title: 'Payment Successful!',
-                      description: `Your booking has been confirmed. Tracking number: ${trackingNumber}`,
+                      description: `Your booking has been confirmed. Job number: ${jobNumber || trackingNumber}`,
                     });
                     clearBooking();
                     setPrefetchedClientSecret(null);
                     setPrefetchedPaymentIntentId(null);
-                    setLocation(`/payment/success?tracking=${trackingNumber}`);
+                    setLocation(`/payment/success?tracking=${trackingNumber}&jobNumber=${jobNumber || ''}`);
                   }}
                   onCancel={() => {
                     setShowEmbeddedPayment(false);

@@ -1356,7 +1356,7 @@ export default function AdminJobs() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by Job #, tracking, or postcode..."
+                  placeholder="Search by job number, tracking, or postcode..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -1425,7 +1425,7 @@ export default function AdminJobs() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead>Job #</TableHead>
+                    <TableHead>Job No.</TableHead>
                     <TableHead>Tracking #</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Route</TableHead>

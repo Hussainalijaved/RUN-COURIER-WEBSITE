@@ -88,7 +88,7 @@ interface BookingData {
 
 interface EmbeddedPaymentProps {
   bookingData: BookingData;
-  onSuccess: (trackingNumber: string, jobId: string) => void;
+  onSuccess: (trackingNumber: string, jobId: string, jobNumber?: string) => void;
   onCancel: () => void;
   prefetchedClientSecret?: string;
   prefetchedPaymentIntentId?: string;
@@ -127,7 +127,7 @@ function PaymentForm({
       const result = await response.json();
       
       if (response.ok && result.success) {
-        onSuccess(result.trackingNumber, result.jobId);
+        onSuccess(result.trackingNumber, result.jobId, result.jobNumber);
       } else {
         console.error('[Payment] Booking creation failed:', result);
         setBookingError(result.error || 'Failed to create booking. Your payment was successful - please contact support with your payment reference.');

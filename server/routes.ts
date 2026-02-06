@@ -290,16 +290,22 @@ const uploadPodImage = multer({
   }
 });
 
-// Stable job number cache: maps job ID to a stable JOB-XXXX number
+// Stable job number cache: maps job ID to a stable random 6-digit number
 const stableJobNumberCache = new Map<string, string>();
 let jobNumberCacheInitialized = false;
 
 function assignStableJobNumbers(jobs: any[]): any[] {
   if (!jobNumberCacheInitialized && jobs.length > 0) {
     const sorted = [...jobs].sort((a, b) => Number(a.id) - Number(b.id));
-    sorted.forEach((job, i) => {
+    const usedNumbers = new Set<string>();
+    sorted.forEach((job) => {
       if (!job.jobNumber && !stableJobNumberCache.has(String(job.id))) {
-        stableJobNumberCache.set(String(job.id), `JOB-${String(i + 1).padStart(4, '0')}`);
+        let num: string;
+        do {
+          num = String(Math.floor(100000 + Math.random() * 900000));
+        } while (usedNumbers.has(num));
+        usedNumbers.add(num);
+        stableJobNumberCache.set(String(job.id), num);
       }
     });
     jobNumberCacheInitialized = true;
@@ -309,8 +315,11 @@ function assignStableJobNumbers(jobs: any[]): any[] {
     if (job.jobNumber) return job;
     const cached = stableJobNumberCache.get(String(job.id));
     if (cached) return { ...job, jobNumber: cached };
-    const newNum = stableJobNumberCache.size + 1;
-    const newJobNumber = `JOB-${String(newNum).padStart(4, '0')}`;
+    let newJobNumber: string;
+    const usedNumbers = new Set(stableJobNumberCache.values());
+    do {
+      newJobNumber = String(Math.floor(100000 + Math.random() * 900000));
+    } while (usedNumbers.has(newJobNumber));
     stableJobNumberCache.set(String(job.id), newJobNumber);
     return { ...job, jobNumber: newJobNumber };
   });
@@ -389,48 +398,22 @@ async function generateTrackingNumber(): Promise<string> {
   return `${prefix}${currentYear}${sequenceStr}${randomSuffix}`;
 }
 
-let lastJobNumber = 0;
-let jobNumberInitialized = false;
-let jobNumberInitPromise: Promise<void> | null = null;
-
 async function generateJobNumber(): Promise<string> {
-  if (!jobNumberInitialized) {
-    if (jobNumberInitPromise) {
-      await jobNumberInitPromise;
-    }
-    if (!jobNumberInitialized) {
-      jobNumberInitPromise = (async () => {
-        try {
-          const { db } = await import("./db");
-          const { jobs } = await import("@shared/schema");
-          const { desc, like } = await import("drizzle-orm");
-
-          const latestJobs = await db.select({ jobNumber: jobs.jobNumber })
-            .from(jobs)
-            .where(like(jobs.jobNumber, 'JOB-%'))
-            .orderBy(desc(jobs.jobNumber))
-            .limit(1);
-
-          if (latestJobs.length > 0 && latestJobs[0].jobNumber) {
-            const match = latestJobs[0].jobNumber.match(/JOB-(\d+)/);
-            if (match) {
-              lastJobNumber = parseInt(match[1], 10);
-            }
-          }
-          jobNumberInitialized = true;
-        } catch (error) {
-          console.error('[JobNumber] Error fetching last job number:', error);
-          jobNumberInitialized = true;
-        }
-      })();
-      await jobNumberInitPromise;
-      jobNumberInitPromise = null;
-    }
+  const usedNumbers = new Set<string>();
+  for (const num of stableJobNumberCache.values()) {
+    usedNumbers.add(num);
   }
-
-  lastJobNumber++;
-  const paddedNumber = lastJobNumber.toString().padStart(4, '0');
-  return `JOB-${paddedNumber}`;
+  
+  let jobNumber: string;
+  let attempts = 0;
+  do {
+    const num = Math.floor(100000 + Math.random() * 900000);
+    jobNumber = String(num);
+    attempts++;
+    if (attempts > 100) break;
+  } while (usedNumbers.has(jobNumber));
+  
+  return jobNumber;
 }
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
@@ -5130,6 +5113,7 @@ export async function registerRoutes(
     res.json({ 
       success: true, 
       trackingNumber: job.trackingNumber,
+      jobNumber: job.jobNumber || jobNumber,
       jobId: job.id
     });
   }));
@@ -5330,6 +5314,7 @@ export async function registerRoutes(
     res.json({ 
       success: true, 
       trackingNumber: job.trackingNumber,
+      jobNumber: job.jobNumber || jobNumber,
       jobId: job.id 
     });
   }));
