@@ -121,6 +121,7 @@ export const pricingSettings = pgTable("pricing_settings", {
 export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey(),
   trackingNumber: text("tracking_number").notNull().unique(),
+  jobNumber: text("job_number").unique(),
   customerId: varchar("customer_id", { length: 36 }).notNull(),
   customerType: text("customer_type").$type<CustomerType>().default("individual"),
   driverId: varchar("driver_id", { length: 36 }),

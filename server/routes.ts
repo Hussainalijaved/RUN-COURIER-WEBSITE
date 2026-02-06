@@ -290,6 +290,32 @@ const uploadPodImage = multer({
   }
 });
 
+// Stable job number cache: maps job ID to a stable JOB-XXXX number
+const stableJobNumberCache = new Map<string, string>();
+let jobNumberCacheInitialized = false;
+
+function assignStableJobNumbers(jobs: any[]): any[] {
+  if (!jobNumberCacheInitialized && jobs.length > 0) {
+    const sorted = [...jobs].sort((a, b) => Number(a.id) - Number(b.id));
+    sorted.forEach((job, i) => {
+      if (!job.jobNumber && !stableJobNumberCache.has(String(job.id))) {
+        stableJobNumberCache.set(String(job.id), `JOB-${String(i + 1).padStart(4, '0')}`);
+      }
+    });
+    jobNumberCacheInitialized = true;
+  }
+  
+  return jobs.map(job => {
+    if (job.jobNumber) return job;
+    const cached = stableJobNumberCache.get(String(job.id));
+    if (cached) return { ...job, jobNumber: cached };
+    const newNum = stableJobNumberCache.size + 1;
+    const newJobNumber = `JOB-${String(newNum).padStart(4, '0')}`;
+    stableJobNumberCache.set(String(job.id), newJobNumber);
+    return { ...job, jobNumber: newJobNumber };
+  });
+}
+
 // Sequential counter for tracking numbers within each year
 let lastJobSequence = 0;
 let lastJobYear = 0;
@@ -363,16 +389,101 @@ async function generateTrackingNumber(): Promise<string> {
   return `${prefix}${currentYear}${sequenceStr}${randomSuffix}`;
 }
 
+let lastJobNumber = 0;
+let jobNumberInitialized = false;
+let jobNumberInitPromise: Promise<void> | null = null;
+
+async function generateJobNumber(): Promise<string> {
+  if (!jobNumberInitialized) {
+    if (jobNumberInitPromise) {
+      await jobNumberInitPromise;
+    }
+    if (!jobNumberInitialized) {
+      jobNumberInitPromise = (async () => {
+        try {
+          const { db } = await import("./db");
+          const { jobs } = await import("@shared/schema");
+          const { desc, like } = await import("drizzle-orm");
+
+          const latestJobs = await db.select({ jobNumber: jobs.jobNumber })
+            .from(jobs)
+            .where(like(jobs.jobNumber, 'JOB-%'))
+            .orderBy(desc(jobs.jobNumber))
+            .limit(1);
+
+          if (latestJobs.length > 0 && latestJobs[0].jobNumber) {
+            const match = latestJobs[0].jobNumber.match(/JOB-(\d+)/);
+            if (match) {
+              lastJobNumber = parseInt(match[1], 10);
+            }
+          }
+          jobNumberInitialized = true;
+        } catch (error) {
+          console.error('[JobNumber] Error fetching last job number:', error);
+          jobNumberInitialized = true;
+        }
+      })();
+      await jobNumberInitPromise;
+      jobNumberInitPromise = null;
+    }
+  }
+
+  lastJobNumber++;
+  const paddedNumber = lastJobNumber.toString().padStart(4, '0');
+  return `JOB-${paddedNumber}`;
+}
+
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
 
+async function migrateJobNumberColumn() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    
+    await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_number TEXT UNIQUE`);
+    console.log('[Migration] job_number column ensured on local DB');
+    
+    await db.execute(sql`
+      WITH numbered AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn
+        FROM jobs
+      )
+      UPDATE jobs SET job_number = 'JOB-' || LPAD(numbered.rn::text, 4, '0')
+      FROM numbered
+      WHERE jobs.id = numbered.id AND jobs.job_number IS NULL
+    `);
+    console.log('[Migration] Existing jobs backfilled with job numbers');
+  } catch (error) {
+    console.error('[Migration] Error migrating job_number column:', error);
+  }
+  
+  try {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (supabaseAdmin) {
+      const { error } = await supabaseAdmin.rpc('exec_sql', {
+        query: "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_number TEXT UNIQUE"
+      });
+      if (error) {
+        console.log('[Migration] Supabase job_number migration via RPC failed (may need manual migration):', error.message);
+      } else {
+        console.log('[Migration] job_number column ensured on Supabase');
+      }
+    }
+  } catch (error) {
+    console.log('[Migration] Supabase migration skipped:', error);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  migrateJobNumberColumn().catch(err => console.error('[Migration] Background migration failed:', err));
 
   // Apply STRICT admin access middleware to all admin-only routes
   // These routes will REJECT requests without valid admin credentials
@@ -998,6 +1109,9 @@ export async function registerRoutes(
     });
     console.log(`[API Jobs] Found ${jobs.length} jobs for customerId: ${customerId}`);
     
+    // Auto-assign stable job numbers to jobs that don't have one
+    const numberedJobs = assignStableJobNumbers(jobs);
+    
     // SECURITY: Check user role and identity
     let isAdmin = false;
     let isCustomerViewingOwn = false;
@@ -1018,12 +1132,10 @@ export async function registerRoutes(
     }
     
     if (isAdmin || isCustomerViewingOwn) {
-      // Admin/dispatcher OR customer viewing their own jobs see full pricing
-      return res.json(jobs);
+      return res.json(numberedJobs);
     }
     
-    // CRITICAL: Drivers and unauthenticated users get NO customer pricing
-    const safeJobs = jobs.map(job => stripCustomerPricing(job));
+    const safeJobs = numberedJobs.map(job => stripCustomerPricing(job));
     return res.json(safeJobs);
   }));
 
@@ -1400,6 +1512,7 @@ export async function registerRoutes(
     
     // Generate tracking number first
     const trackingNumber = await generateTrackingNumber();
+    const jobNumber = await generateJobNumber();
     
     // CRITICAL: If driverId is provided, we need to convert it to Supabase auth.uid for RLS compatibility
     // The mobile app uses RLS policy: auth.uid() = driver_id
@@ -1449,6 +1562,7 @@ export async function registerRoutes(
     const preprocessedBody = {
       ...req.body,
       trackingNumber,
+      jobNumber,
       driverId: resolvedDriverId,
       pickupAddress,
       pickupPostcode,
@@ -1513,6 +1627,7 @@ export async function registerRoutes(
         const supabaseJobData = {
           // Required tracking
           tracking_number: finalJob.trackingNumber,
+          job_number: finalJob.jobNumber || jobNumber,
           // Driver/customer IDs - CRITICAL: Use Supabase auth.uid, NOT local driver UUID
           driver_id: supabaseDriverId, // Must be Supabase auth.uid for RLS
           customer_id: finalJob.customerId !== 'admin-created' ? finalJob.customerId : null,
@@ -1561,16 +1676,33 @@ export async function registerRoutes(
         
         console.log('[Jobs] Supabase job data:', JSON.stringify(supabaseJobData, null, 2));
         
-        const { data: insertedJob, error: supabaseError } = await supabaseAdmin
+        let insertedJob: any = null;
+        const { data: insertResult, error: supabaseError } = await supabaseAdmin
           .from('jobs')
           .insert(supabaseJobData)
           .select('id, tracking_number')
           .single();
         
         if (supabaseError) {
-          console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
+          if (supabaseError.message?.includes('job_number')) {
+            const { job_number, ...dataWithoutJobNumber } = supabaseJobData;
+            const { data: retryResult, error: retryError } = await supabaseAdmin
+              .from('jobs')
+              .insert(dataWithoutJobNumber)
+              .select('id, tracking_number')
+              .single();
+            if (retryError) {
+              console.error('[Jobs] Failed to sync job to Supabase (retry):', retryError);
+            } else {
+              insertedJob = retryResult;
+              console.log(`[Jobs] Job synced to Supabase (without job_number) id ${retryResult?.id}`);
+            }
+          } else {
+            console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
+          }
         } else {
-          console.log(`[Jobs] Job synced to Supabase with id ${insertedJob?.id}, tracking: ${insertedJob?.tracking_number}`);
+          insertedJob = insertResult;
+          console.log(`[Jobs] Job synced to Supabase with id ${insertResult?.id}, tracking: ${insertResult?.tracking_number}`);
         }
         
         // Save multi-drop stops to Supabase if present (independent of job sync)
@@ -4834,10 +4966,12 @@ export async function registerRoutes(
 
     const metadata = paymentIntent.metadata || bookingData || {};
     const trackingNumber = await generateTrackingNumber();
+    const jobNumber = await generateJobNumber();
     const totalPrice = parseFloat(metadata.totalPrice) || (paymentIntent.amount / 100);
 
     const jobData = {
       trackingNumber,
+      jobNumber,
       pickupPostcode: metadata.pickupPostcode || '',
       pickupAddress: metadata.pickupAddress || '',
       pickupBuildingName: metadata.pickupBuildingName || '',
@@ -5041,9 +5175,11 @@ export async function registerRoutes(
     }
 
     const trackingNumber = await generateTrackingNumber();
+    const jobNumber = await generateJobNumber();
     
     const jobData = {
       trackingNumber,
+      jobNumber,
       pickupPostcode: bookingData.pickupPostcode,
       pickupAddress: bookingData.pickupAddress || '',
       pickupBuildingName: bookingData.pickupBuildingName || '',
@@ -5126,10 +5262,12 @@ export async function registerRoutes(
     }
 
     const trackingNumber = await generateTrackingNumber();
+    const jobNumber = await generateJobNumber();
     const totalPrice = parseFloat(metadata.totalPrice || '0');
     
     const jobData = {
       trackingNumber,
+      jobNumber,
       pickupPostcode: metadata.pickupPostcode || '',
       pickupAddress: metadata.pickupAddress || '',
       pickupBuildingName: metadata.pickupBuildingName || '',

@@ -99,6 +99,7 @@ function mapDbToJob(dbJob: any): Job {
   return {
     id: dbJob.id,
     trackingNumber: dbJob.tracking_number,
+    jobNumber: dbJob.job_number || null,
     customerId: dbJob.customer_id,
     customerType: dbJob.customer_type || null,
     driverId: dbJob.driver_id,
@@ -919,6 +920,7 @@ export class SupabaseStorage implements IStorage {
     // Let the database auto-generate the id (bigint)
     const dbJob = {
       tracking_number: insertJob.trackingNumber,
+      job_number: insertJob.jobNumber || null,
       customer_id: isValidUUID(insertJob.customerId) ? insertJob.customerId : null,
       customer_type: insertJob.customerType || 'individual',
       driver_id: insertJob.driverId || null,

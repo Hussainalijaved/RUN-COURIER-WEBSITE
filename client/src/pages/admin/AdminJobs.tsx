@@ -985,6 +985,7 @@ export default function AdminJobs() {
 
   const filteredJobs = jobs?.filter((job) => {
     const matchesSearch =
+      ((job as any).jobNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.trackingNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.pickupPostcode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.deliveryPostcode.toLowerCase().includes(searchQuery.toLowerCase());
@@ -1355,7 +1356,7 @@ export default function AdminJobs() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by tracking number or postcode..."
+                  placeholder="Search by Job #, tracking, or postcode..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -1424,6 +1425,7 @@ export default function AdminJobs() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
+                    <TableHead>Job #</TableHead>
                     <TableHead>Tracking #</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Route</TableHead>
@@ -1450,7 +1452,8 @@ export default function AdminJobs() {
                           data-testid={`checkbox-job-${job.id}`}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{job.trackingNumber}</TableCell>
+                      <TableCell className="font-mono text-sm font-semibold">{(job as any).jobNumber || '—'}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{job.trackingNumber}</TableCell>
                       <TableCell>
                         {(job as any).customerType === 'business' ? (
                           <Badge variant="outline" className="gap-1">
@@ -1640,7 +1643,7 @@ export default function AdminJobs() {
         <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="flex-shrink-0">
-              <DialogTitle>Job Details - {selectedJob?.trackingNumber}</DialogTitle>
+              <DialogTitle>Job Details - {(selectedJob as any)?.jobNumber || selectedJob?.trackingNumber}</DialogTitle>
               <DialogDescription>
                 Created on {selectedJob && formatDate(selectedJob.createdAt)}
               </DialogDescription>
@@ -2018,8 +2021,9 @@ export default function AdminJobs() {
                 Edit Job
               </DialogTitle>
               <DialogDescription>
-                <span className="font-mono font-bold text-foreground">{jobToEdit?.trackingNumber}</span>
-                <span className="text-muted-foreground ml-2">(Job number will not change)</span>
+                <span className="font-mono font-bold text-foreground">{(jobToEdit as any)?.jobNumber || ''}</span>
+                {(jobToEdit as any)?.jobNumber && <span className="text-xs text-muted-foreground ml-2">({jobToEdit?.trackingNumber})</span>}
+                {!(jobToEdit as any)?.jobNumber && <span className="font-mono font-bold text-foreground">{jobToEdit?.trackingNumber}</span>}
               </DialogDescription>
             </DialogHeader>
             {jobToEdit && (
