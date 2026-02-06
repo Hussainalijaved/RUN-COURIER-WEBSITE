@@ -74,10 +74,17 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             </div>
           </div>
 
+          {(job as any).jobNumber && (
+            <div className="text-center mb-1">
+              <span style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>Job No.</span>
+              <p className="font-mono text-lg font-bold" style={{ margin: '0' }}>{(job as any).jobNumber}</p>
+            </div>
+          )}
+
           <div className="flex justify-center items-center mb-1">
             <div className="flex">{generateBarcode(job.trackingNumber)}</div>
           </div>
-          <p className="text-center font-mono text-base font-bold tracking-widest mb-2">
+          <p className="text-center font-mono text-sm font-bold tracking-widest mb-2">
             {job.trackingNumber}
           </p>
 

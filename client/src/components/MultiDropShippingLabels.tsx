@@ -179,10 +179,17 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             </div>
           </div>
 
+          {(job as any).jobNumber && (
+            <div className="text-center mb-1">
+              <span style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>Job No.</span>
+              <p className="font-mono text-base font-bold" style={{ margin: '0' }}>{(job as any).jobNumber}</p>
+            </div>
+          )}
+
           <div className="flex justify-center items-center mb-1">
             <div className="flex">{generateBarcode(job.trackingNumber, label.stopNumber)}</div>
           </div>
-          <p className="text-center font-mono text-sm font-bold tracking-widest mb-2">
+          <p className="text-center font-mono text-xs font-bold tracking-widest mb-2">
             {job.trackingNumber}-{label.stopNumber}
           </p>
 
