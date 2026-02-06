@@ -53,6 +53,7 @@ const getStatusColor = (status: JobStatus): string => {
 interface MockJob {
   id: string;
   trackingNumber: string;
+  jobNumber?: string;
   status: JobStatus;
   pickupAddress: string;
   deliveryAddress: string;
@@ -106,6 +107,7 @@ export default function Track() {
         setJob({
           id: data.id,
           trackingNumber: data.trackingNumber,
+          jobNumber: data.jobNumber || undefined,
           status: newStatus,
           pickupAddress: `${data.pickupAddress}, ${data.pickupPostcode}`,
           deliveryAddress: `${data.deliveryAddress}, ${data.deliveryPostcode}`,
@@ -237,11 +239,11 @@ export default function Track() {
                           </Badge>
                         )}
                       </div>
-                      {(job as any).jobNumber && (
+                      {job.jobNumber && (
                         <div className="mt-1">
                           <span className="text-xs text-muted-foreground">Job No. </span>
                           <span className="text-lg font-mono font-bold text-primary" data-testid="text-job-number">
-                            {(job as any).jobNumber}
+                            {job.jobNumber}
                           </span>
                         </div>
                       )}
