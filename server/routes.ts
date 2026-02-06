@@ -1626,7 +1626,6 @@ export async function registerRoutes(
         const supabaseJobData = {
           // Required tracking
           tracking_number: finalJob.trackingNumber,
-          job_number: finalJob.jobNumber || jobNumber,
           // Driver/customer IDs - CRITICAL: Use Supabase auth.uid, NOT local driver UUID
           driver_id: supabaseDriverId, // Must be Supabase auth.uid for RLS
           customer_id: finalJob.customerId !== 'admin-created' ? finalJob.customerId : null,
@@ -1683,22 +1682,7 @@ export async function registerRoutes(
           .single();
         
         if (supabaseError) {
-          if (supabaseError.message?.includes('job_number')) {
-            const { job_number, ...dataWithoutJobNumber } = supabaseJobData;
-            const { data: retryResult, error: retryError } = await supabaseAdmin
-              .from('jobs')
-              .insert(dataWithoutJobNumber)
-              .select('id, tracking_number')
-              .single();
-            if (retryError) {
-              console.error('[Jobs] Failed to sync job to Supabase (retry):', retryError);
-            } else {
-              insertedJob = retryResult;
-              console.log(`[Jobs] Job synced to Supabase (without job_number) id ${retryResult?.id}`);
-            }
-          } else {
-            console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
-          }
+          console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
         } else {
           insertedJob = insertResult;
           console.log(`[Jobs] Job synced to Supabase with id ${insertResult?.id}, tracking: ${insertResult?.tracking_number}`);
