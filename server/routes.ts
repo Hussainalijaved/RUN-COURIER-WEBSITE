@@ -2746,50 +2746,66 @@ export async function registerRoutes(
             };
             const photoLabels = vehiclePhotoTypes[vehicleType] || ['front', 'back'];
             
+            const searchDirs = [
+              `uploads/documents/${driverId}`,
+              `uploads/documents/application-pending`,
+            ];
+            
             for (const label of photoLabels) {
-              const searchPattern = `vehicle_photo_${label}`;
-              const driverUploadDir = `uploads/documents/${driverId}`;
+              const searchPatterns = [`vehicle_photo_${label}`, `vehicle_${label}`, `vehiclePhoto_${label}`];
               
               try {
-                if (fs.existsSync(driverUploadDir)) {
-                  const files = fs.readdirSync(driverUploadDir);
-                  const vehicleFile = files.find((f: string) => f.startsWith(searchPattern));
-                  
-                  if (vehicleFile) {
-                    const localPath = `${driverUploadDir}/${vehicleFile}`;
-                    const fileBuffer = fs.readFileSync(localPath);
-                    const ext = path.extname(localPath) || '.jpeg';
-                    const storagePath = `${driverId}/vehicle_photos_${label}${ext}`;
-                    
-                    const { error: uploadErr } = await supabaseAdmin.storage
-                      .from(BUCKET)
-                      .upload(storagePath, fileBuffer, {
-                        contentType: ext === '.png' ? 'image/png' : ext === '.pdf' ? 'application/pdf' : 'image/jpeg',
-                        upsert: true
-                      });
-                    
-                    if (!uploadErr) {
-                      const { data: urlData } = supabaseAdmin.storage
-                        .from(BUCKET)
-                        .getPublicUrl(storagePath);
-                      
-                      await supabaseAdmin
-                        .from('driver_documents')
-                        .delete()
-                        .eq('driver_id', driverId)
-                        .eq('doc_type', `vehicle_photos_${label}`);
-                      
-                      await supabaseAdmin
-                        .from('driver_documents')
-                        .insert({
-                          driver_id: driverId,
-                          doc_type: `vehicle_photos_${label}`,
-                          file_url: urlData.publicUrl,
-                          status: 'approved',
-                          uploaded_at: new Date().toISOString(),
-                        });
-                      console.log(`[Drivers] Uploaded and created record for vehicle_photos_${label}`);
+                let foundFile: string | null = null;
+                let foundDir: string | null = null;
+                
+                for (const dir of searchDirs) {
+                  if (!fs.existsSync(dir)) continue;
+                  const files = fs.readdirSync(dir);
+                  for (const pattern of searchPatterns) {
+                    const match = files.find((f: string) => f.toLowerCase().startsWith(pattern.toLowerCase()));
+                    if (match) {
+                      foundFile = match;
+                      foundDir = dir;
+                      break;
                     }
+                  }
+                  if (foundFile) break;
+                }
+                
+                if (foundFile && foundDir) {
+                  const localPath = `${foundDir}/${foundFile}`;
+                  const fileBuffer = fs.readFileSync(localPath);
+                  const ext = path.extname(localPath) || '.jpeg';
+                  const contentType = ext === '.png' ? 'image/png' : ext === '.pdf' ? 'application/pdf' : 'image/jpeg';
+                  const storagePath = `${driverId}/vehicle_photos_${label}${ext}`;
+                  
+                  const { error: uploadErr } = await supabaseAdmin.storage
+                    .from(BUCKET)
+                    .upload(storagePath, fileBuffer, { contentType, upsert: true });
+                  
+                  if (!uploadErr) {
+                    const { data: urlData } = supabaseAdmin.storage
+                      .from(BUCKET)
+                      .getPublicUrl(storagePath);
+                    
+                    await supabaseAdmin
+                      .from('driver_documents')
+                      .delete()
+                      .eq('driver_id', driverId)
+                      .eq('doc_type', `vehicle_photos_${label}`);
+                    
+                    await supabaseAdmin
+                      .from('driver_documents')
+                      .insert({
+                        driver_id: driverId,
+                        doc_type: `vehicle_photos_${label}`,
+                        file_url: urlData.publicUrl,
+                        status: 'approved',
+                        uploaded_at: new Date().toISOString(),
+                      });
+                    console.log(`[Drivers] Uploaded vehicle_photos_${label} from ${foundDir}`);
+                  } else {
+                    console.error(`[Drivers] Failed to upload vehicle_photos_${label}:`, uploadErr.message);
                   }
                 }
               } catch (vpErr: any) {
