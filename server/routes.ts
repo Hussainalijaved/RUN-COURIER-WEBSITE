@@ -2698,7 +2698,7 @@ export async function registerRoutes(
         if (supabaseAdmin) {
           const { data: driverData } = await supabaseAdmin
             .from('drivers')
-            .select('profile_picture_url, driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url')
+            .select('profile_picture_url, driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url, right_to_work_share_code, vehicle_type')
             .eq('id', driverId)
             .single();
           
@@ -2715,6 +2715,87 @@ export async function registerRoutes(
               { dbColumn: 'goods_in_transit_insurance_url', url: driverData.goods_in_transit_insurance_url, storageName: 'goods_in_transit', docType: 'goods_in_transit' },
               { dbColumn: 'hire_reward_insurance_url', url: driverData.hire_reward_insurance_url, storageName: 'hire_and_reward', docType: 'hire_and_reward' },
             ];
+            
+            // Handle share code (right to work) - text code, not a file
+            if (driverData.right_to_work_share_code) {
+              await supabaseAdmin
+                .from('driver_documents')
+                .delete()
+                .eq('driver_id', driverId)
+                .eq('doc_type', 'share_code');
+              
+              await supabaseAdmin
+                .from('driver_documents')
+                .insert({
+                  driver_id: driverId,
+                  doc_type: 'share_code',
+                  file_url: `text:${driverData.right_to_work_share_code}`,
+                  status: 'approved',
+                  uploaded_at: new Date().toISOString(),
+                });
+              console.log(`[Drivers] Created share_code driver_documents record for driver ${driverId}`);
+            }
+            
+            // Handle vehicle photos from local uploads
+            const vehicleType = driverData.vehicle_type || 'car';
+            const vehiclePhotoTypes: Record<string, string[]> = {
+              'motorbike': ['front', 'back'],
+              'car': ['front', 'back'],
+              'small_van': ['front', 'back', 'left', 'right', 'load_space'],
+              'medium_van': ['front', 'back', 'left', 'right', 'load_space'],
+            };
+            const photoLabels = vehiclePhotoTypes[vehicleType] || ['front', 'back'];
+            
+            for (const label of photoLabels) {
+              const searchPattern = `vehicle_photo_${label}`;
+              const driverUploadDir = `uploads/documents/${driverId}`;
+              
+              try {
+                if (fs.existsSync(driverUploadDir)) {
+                  const files = fs.readdirSync(driverUploadDir);
+                  const vehicleFile = files.find((f: string) => f.startsWith(searchPattern));
+                  
+                  if (vehicleFile) {
+                    const localPath = `${driverUploadDir}/${vehicleFile}`;
+                    const fileBuffer = fs.readFileSync(localPath);
+                    const ext = path.extname(localPath) || '.jpeg';
+                    const storagePath = `${driverId}/vehicle_photos_${label}${ext}`;
+                    
+                    const { error: uploadErr } = await supabaseAdmin.storage
+                      .from(BUCKET)
+                      .upload(storagePath, fileBuffer, {
+                        contentType: ext === '.png' ? 'image/png' : ext === '.pdf' ? 'application/pdf' : 'image/jpeg',
+                        upsert: true
+                      });
+                    
+                    if (!uploadErr) {
+                      const { data: urlData } = supabaseAdmin.storage
+                        .from(BUCKET)
+                        .getPublicUrl(storagePath);
+                      
+                      await supabaseAdmin
+                        .from('driver_documents')
+                        .delete()
+                        .eq('driver_id', driverId)
+                        .eq('doc_type', `vehicle_photos_${label}`);
+                      
+                      await supabaseAdmin
+                        .from('driver_documents')
+                        .insert({
+                          driver_id: driverId,
+                          doc_type: `vehicle_photos_${label}`,
+                          file_url: urlData.publicUrl,
+                          status: 'approved',
+                          uploaded_at: new Date().toISOString(),
+                        });
+                      console.log(`[Drivers] Uploaded and created record for vehicle_photos_${label}`);
+                    }
+                  }
+                }
+              } catch (vpErr: any) {
+                console.error(`[Drivers] Error handling vehicle photo ${label}:`, vpErr.message);
+              }
+            }
             
             const updateData: Record<string, string> = {};
             
