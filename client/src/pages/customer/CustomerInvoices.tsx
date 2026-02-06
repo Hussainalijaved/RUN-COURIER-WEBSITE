@@ -250,7 +250,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
         <table className="w-full mb-6">
           <thead>
             <tr className="bg-primary text-white">
-              <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Tracking #</th>
+              <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Job No.</th>
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Date</th>
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase">Description</th>
               <th className="text-right py-3 px-4 text-xs font-semibold uppercase">Amount</th>
@@ -259,7 +259,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
           <tbody>
             {jobs.length > 0 ? jobs.map((job) => (
               <tr key={job.id} className="border-b">
-                <td className="py-3 px-4 font-mono text-xs">{job.trackingNumber}</td>
+                <td className="py-3 px-4 font-mono text-xs">{(job as any).jobNumber || job.trackingNumber}</td>
                 <td className="py-3 px-4 text-gray-600 text-xs">{formatDate(job.createdAt)}</td>
                 <td className="py-3 px-4 text-gray-600 text-xs">
                   Courier Service: {job.pickupPostcode} → {job.deliveryPostcode}

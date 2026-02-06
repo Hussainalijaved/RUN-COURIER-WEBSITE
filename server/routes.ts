@@ -6076,7 +6076,7 @@ export async function registerRoutes(
       // Handle both numeric and UUID job IDs
       const { data: jobs, error } = await supabaseAdmin
         .from('jobs')
-        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+        .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
         .in('id', data.jobIds);
       
       if (!error && jobs) {
@@ -6109,17 +6109,21 @@ export async function registerRoutes(
           }
         }
         
-        jobDetails = jobs.map(job => ({
-          trackingNumber: job.tracking_number || `JOB-${job.id}`,
-          pickupAddress: job.pickup_address || 'N/A',
-          deliveryAddress: job.delivery_address,
-          recipientName: job.recipient_name,
-          scheduledDate: formatShortDate(job.scheduled_pickup_time),
-          vehicleType: job.vehicle_type || 'car',
-          price: parseFloat(job.total_price) || 0,
-          isMultiDrop: job.is_multi_drop || false,
-          multiDropStops: multiDropStopsMap[job.id] || [],
-        }));
+        jobDetails = jobs.map(job => {
+          const enriched = ensureJobNumber({ id: job.id, jobNumber: (job as any).job_number || null });
+          return {
+            jobNumber: enriched.jobNumber,
+            trackingNumber: job.tracking_number || 'N/A',
+            pickupAddress: job.pickup_address || 'N/A',
+            deliveryAddress: job.delivery_address,
+            recipientName: job.recipient_name,
+            scheduledDate: formatShortDate(job.scheduled_pickup_time),
+            vehicleType: job.vehicle_type || 'car',
+            price: parseFloat(job.total_price) || 0,
+            isMultiDrop: job.is_multi_drop || false,
+            multiDropStops: multiDropStopsMap[job.id] || [],
+          };
+        });
       }
     }
     

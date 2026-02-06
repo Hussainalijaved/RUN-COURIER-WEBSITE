@@ -444,7 +444,7 @@ export default function AdminInvoices() {
       <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
         <thead>
           <tr style="background: #f8f9fa;">
-            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Tracking</th>
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Job No.</th>
             <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Pickup</th>
             <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Delivery</th>
             <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Date</th>
@@ -454,7 +454,7 @@ export default function AdminInvoices() {
         <tbody>
           ${jobDetails.map((job: any) => `
             <tr>
-              <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.trackingNumber || 'N/A'}</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.jobNumber || job.trackingNumber || 'N/A'}</td>
               <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 200px;">${job.pickupAddress || 'N/A'}</td>
               <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 200px;">${job.deliveryAddress || job.recipientName || 'N/A'}</td>
               <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.scheduledDate || 'N/A'}</td>
@@ -1081,7 +1081,7 @@ export default function AdminInvoices() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Tracking</TableHead>
+                            <TableHead>Job No.</TableHead>
                             <TableHead>Pickup</TableHead>
                             <TableHead>Delivery</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
@@ -1090,7 +1090,7 @@ export default function AdminInvoices() {
                         <TableBody>
                           {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => (
                             <TableRow key={idx}>
-                              <TableCell className="font-mono text-sm">{job.trackingNumber || 'N/A'}</TableCell>
+                              <TableCell className="font-mono text-sm">{job.jobNumber || job.trackingNumber || 'N/A'}</TableCell>
                               <TableCell className="text-sm max-w-[200px] break-words">{job.pickupAddress || 'N/A'}</TableCell>
                               <TableCell className="text-sm max-w-[200px] break-words">{job.deliveryAddress || job.recipientName || 'N/A'}</TableCell>
                               <TableCell className="text-right font-medium">{formatPrice(job.price)}</TableCell>
@@ -1613,7 +1613,7 @@ export default function AdminInvoices() {
                                 onClick={(e) => e.stopPropagation()}
                               />
                               <div>
-                                <p className="font-mono text-sm">{job.trackingNumber}</p>
+                                <p className="font-mono text-sm">{(job as any).jobNumber || job.trackingNumber}</p>
                                 <p className="text-xs text-muted-foreground truncate max-w-[300px]">
                                   {job.pickupAddress || `${job.pickupPostcode} → ${job.deliveryPostcode}`}
                                 </p>
