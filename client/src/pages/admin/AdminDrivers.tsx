@@ -361,6 +361,38 @@ export default function AdminDrivers() {
     return documents?.filter((d) => d.driverId === driverId) || [];
   };
 
+  const normalizeDocType = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      'driving_license': 'driving_license',
+      'driving_licence_front': 'driving_license',
+      'driving_licence_back': 'driving_license',
+      'driving_license_front': 'driving_license',
+      'driving_license_back': 'driving_license',
+      'drivingLicenceFront': 'driving_license',
+      'drivingLicenceBack': 'driving_license',
+      'hire_and_reward_insurance': 'hire_and_reward_insurance',
+      'hire_and_reward': 'hire_and_reward_insurance',
+      'hireAndReward': 'hire_and_reward_insurance',
+      'goods_in_transit_insurance': 'goods_in_transit_insurance',
+      'goods_in_transit': 'goods_in_transit_insurance',
+      'goodsInTransitInsurance': 'goods_in_transit_insurance',
+      'proof_of_identity': 'proof_of_identity',
+      'proof_of_address': 'proof_of_address',
+      'vehicle_photo_front': 'vehicle_photo_front',
+      'vehicle_photos_front': 'vehicle_photo_front',
+      'vehicle_photo_back': 'vehicle_photo_back',
+      'vehicle_photos_back': 'vehicle_photo_back',
+      'vehicle_photo_left': 'vehicle_photo_left',
+      'vehicle_photos_left': 'vehicle_photo_left',
+      'vehicle_photo_right': 'vehicle_photo_right',
+      'vehicle_photos_right': 'vehicle_photo_right',
+      'vehicle_photo_load_space': 'vehicle_photo_load_space',
+      'vehicle_photos_load space': 'vehicle_photo_load_space',
+      'vehicle_photos_load_space': 'vehicle_photo_load_space',
+    };
+    return typeMap[type] || type;
+  };
+
   const getDocumentStatusSummary = (driver: Driver) => {
     const driverDocs = getDriverDocuments(driver.id);
     const vehicleType = driver.vehicleType || 'car';
@@ -389,7 +421,7 @@ export default function AdminDrivers() {
     let missing = 0;
     
     for (const docType of allRequiredDocs) {
-      const doc = driverDocs.find(d => d.type === docType);
+      const doc = driverDocs.find(d => normalizeDocType(d.type) === docType);
       if (!doc) {
         missing++;
       } else if (doc.status === 'approved') {
