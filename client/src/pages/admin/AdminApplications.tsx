@@ -580,17 +580,13 @@ export default function AdminApplications() {
                         const docStatus = documentStatuses[doc.key] || 'pending';
                         const isPending = selectedApplication.status === 'pending';
 
-                        if (!isPending) {
-                          return <DocumentLink key={doc.key} url={url} label={doc.label} />;
-                        }
-
                         return (
                           <div key={doc.key} className="flex items-center gap-2">
                             <div className="flex-1 min-w-0">
                               <DocumentLink url={url} label={doc.label} />
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              {url && (
+                              {isPending && url && (
                                 <>
                                   <Badge
                                     variant="outline"
