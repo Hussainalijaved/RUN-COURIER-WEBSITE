@@ -5355,7 +5355,7 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/driver-applications/:id/review", asyncHandler(async (req, res) => {
-    const { status, reviewedBy, reviewNotes, rejectionReason } = req.body;
+    const { status, reviewedBy, reviewNotes, rejectionReason, documentStatuses } = req.body;
     
     if (!status || !reviewedBy) {
       return res.status(400).json({ error: "Status and reviewedBy are required" });
@@ -5565,6 +5565,70 @@ export async function registerRoutes(
       } catch (verifyErr) {
         console.error(`[Driver Application] Error verifying driver after approval:`, verifyErr);
         // Don't fail the request - application was already reviewed
+      }
+    }
+
+    // Create document records in driver_documents table when approved
+    if (status === 'approved') {
+      try {
+        const { supabaseAdmin } = await import('./supabaseAdmin');
+        if (supabaseAdmin) {
+          const { data: driver } = await supabaseAdmin
+            .from('drivers')
+            .select('id')
+            .ilike('email', application.email)
+            .maybeSingle();
+
+          if (driver) {
+            const docMappings = [
+              { field: 'drivingLicenceFrontUrl', type: 'driving_license', url: application.drivingLicenceFrontUrl },
+              { field: 'drivingLicenceBackUrl', type: 'driving_license_back', url: application.drivingLicenceBackUrl },
+              { field: 'dbsCertificateUrl', type: 'dbs_certificate', url: application.dbsCertificateUrl },
+              { field: 'goodsInTransitInsuranceUrl', type: 'goods_in_transit_insurance', url: application.goodsInTransitInsuranceUrl },
+              { field: 'hireAndRewardUrl', type: 'hire_and_reward_insurance', url: application.hireAndRewardUrl },
+              { field: 'profilePictureUrl', type: 'profile_picture', url: application.profilePictureUrl },
+            ];
+
+            const docRecords = docMappings
+              .filter(d => d.url)
+              .map(d => {
+                const docStatus = documentStatuses?.[d.field] || 'pending';
+                return {
+                  driver_id: driver.id,
+                  type: d.type,
+                  file_name: d.url!.split('/').pop() || d.type,
+                  file_url: d.url,
+                  status: docStatus,
+                  uploaded_at: new Date().toISOString(),
+                  reviewed_at: new Date().toISOString(),
+                  reviewed_by: reviewedBy,
+                };
+              });
+
+            if (docRecords.length > 0) {
+              const { error: docError } = await supabaseAdmin
+                .from('driver_documents')
+                .upsert(docRecords, { onConflict: 'driver_id,type', ignoreDuplicates: false });
+
+              if (docError) {
+                console.error('[Driver Application] Failed to create document records:', docError);
+                // Try inserting one by one as fallback
+                for (const record of docRecords) {
+                  const { error: singleError } = await supabaseAdmin
+                    .from('driver_documents')
+                    .insert(record);
+                  if (singleError && !singleError.message?.includes('duplicate')) {
+                    console.error(`[Driver Application] Failed to create doc ${record.type}:`, singleError);
+                  }
+                }
+              } else {
+                console.log(`[Driver Application] Created ${docRecords.length} document records for driver ${driver.id}`);
+              }
+            }
+          }
+        }
+      } catch (docErr) {
+        console.error('[Driver Application] Error creating document records:', docErr);
       }
     }
 

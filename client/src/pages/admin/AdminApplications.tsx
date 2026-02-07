@@ -44,6 +44,7 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -58,6 +59,7 @@ export default function AdminApplications() {
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
+  const [documentStatuses, setDocumentStatuses] = useState<Record<string, 'approved' | 'rejected' | 'pending'>>({});
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -70,18 +72,21 @@ export default function AdminApplications() {
       id, 
       status, 
       reviewNotes, 
-      rejectionReason 
+      rejectionReason,
+      documentStatuses,
     }: { 
       id: string; 
       status: 'approved' | 'rejected'; 
       reviewNotes?: string;
       rejectionReason?: string;
+      documentStatuses?: Record<string, 'approved' | 'rejected'>;
     }) => {
       const response = await apiRequest("PATCH", `/api/driver-applications/${id}/review`, {
         status,
         reviewedBy: user?.id || 'admin',
         reviewNotes,
         rejectionReason,
+        documentStatuses,
       });
       return response.json();
     },
@@ -100,6 +105,7 @@ export default function AdminApplications() {
       setSelectedApplication(null);
       setReviewNotes('');
       setRejectionReason('');
+      setDocumentStatuses({});
     },
     onError: () => {
       toast({ title: 'Failed to update application', variant: 'destructive' });
@@ -127,12 +133,53 @@ export default function AdminApplications() {
     );
   };
 
+  const documentFields = [
+    { key: 'profilePictureUrl', label: 'Profile Picture' },
+    { key: 'drivingLicenceFrontUrl', label: 'Driving Licence (Front)' },
+    { key: 'drivingLicenceBackUrl', label: 'Driving Licence (Back)' },
+    { key: 'dbsCertificateUrl', label: 'DBS Certificate' },
+    { key: 'goodsInTransitInsuranceUrl', label: 'Goods in Transit Insurance' },
+    { key: 'hireAndRewardUrl', label: 'Hire & Reward Insurance' },
+  ];
+
+  const initializeDocumentStatuses = () => {
+    const statuses: Record<string, 'approved' | 'rejected' | 'pending'> = {};
+    documentFields.forEach(doc => {
+      statuses[doc.key] = 'pending';
+    });
+    setDocumentStatuses(statuses);
+  };
+
+  const allDocsReviewed = () => {
+    const providedDocs = documentFields.filter(
+      d => selectedApplication && (selectedApplication as any)[d.key]
+    );
+    return providedDocs.length > 0 && providedDocs.every(
+      d => documentStatuses[d.key] === 'approved' || documentStatuses[d.key] === 'rejected'
+    );
+  };
+
   const handleApprove = () => {
     if (!selectedApplication) return;
+    if (!allDocsReviewed()) {
+      toast({
+        title: 'Review all documents first',
+        description: 'Please approve or reject each document before approving the application.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const finalDocStatuses: Record<string, 'approved' | 'rejected'> = {};
+    Object.entries(documentStatuses).forEach(([key, value]) => {
+      if (value === 'approved' || value === 'rejected') {
+        finalDocStatuses[key] = value;
+      }
+    });
     reviewApplicationMutation.mutate({
       id: selectedApplication.id,
       status: 'approved',
       reviewNotes,
+      documentStatuses: finalDocStatuses,
     });
   };
 
@@ -223,6 +270,13 @@ export default function AdminApplications() {
           onClick={() => {
             setSelectedApplication(application);
             setIsReviewDialogOpen(true);
+            if (application.status === 'pending') {
+              const statuses: Record<string, 'approved' | 'rejected' | 'pending'> = {};
+              documentFields.forEach(doc => {
+                statuses[doc.key] = 'pending';
+              });
+              setDocumentStatuses(statuses);
+            }
           }}
           data-testid={`button-view-application-${application.id}`}
         >
@@ -444,14 +498,88 @@ export default function AdminApplications() {
                     <h3 className="font-semibold flex items-center gap-2 mb-3">
                       <FileText className="h-4 w-4" />
                       Documents
+                      {selectedApplication.status === 'pending' && Object.values(documentStatuses).length > 0 && Object.values(documentStatuses).every(s => s === 'approved') ? (
+                        <Badge variant="outline" className="border-green-500 text-green-600 ml-auto">
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          All Approved
+                        </Badge>
+                      ) : selectedApplication.status === 'pending' ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-auto text-green-600"
+                          onClick={() => {
+                            const updated: Record<string, 'approved' | 'rejected' | 'pending'> = {};
+                            documentFields.forEach(d => {
+                              if ((selectedApplication as any)[d.key]) {
+                                updated[d.key] = 'approved';
+                              }
+                            });
+                            setDocumentStatuses(prev => ({ ...prev, ...updated }));
+                          }}
+                          data-testid="button-approve-all-docs"
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Approve All
+                        </Button>
+                      ) : null}
                     </h3>
-                    <div className="space-y-2">
-                      <DocumentLink url={selectedApplication.profilePictureUrl} label="Profile Picture" />
-                      <DocumentLink url={selectedApplication.drivingLicenceFrontUrl} label="Driving Licence (Front)" />
-                      <DocumentLink url={selectedApplication.drivingLicenceBackUrl} label="Driving Licence (Back)" />
-                      <DocumentLink url={selectedApplication.dbsCertificateUrl} label="DBS Certificate" />
-                      <DocumentLink url={selectedApplication.goodsInTransitInsuranceUrl} label="Goods in Transit Insurance" />
-                      <DocumentLink url={selectedApplication.hireAndRewardUrl} label="Hire & Reward Insurance" />
+                    <div className="space-y-3">
+                      {documentFields.map((doc, index) => {
+                        const url = selectedApplication[doc.key as keyof DriverApplication] as string | null;
+                        const docStatus = documentStatuses[doc.key] || 'pending';
+                        const isPending = selectedApplication.status === 'pending';
+
+                        if (!isPending) {
+                          return <DocumentLink key={doc.key} url={url} label={doc.label} />;
+                        }
+
+                        return (
+                          <div key={doc.key} className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <DocumentLink url={url} label={doc.label} />
+                            </div>
+                            {url && (
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    docStatus === 'approved'
+                                      ? 'border-green-500 text-green-600'
+                                      : docStatus === 'rejected'
+                                        ? 'border-red-500 text-red-600'
+                                        : 'border-yellow-500 text-yellow-600'
+                                  }
+                                  data-testid={`badge-doc-status-${index}`}
+                                >
+                                  {docStatus === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                  {docStatus === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                                  {docStatus === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                                  {docStatus.charAt(0).toUpperCase() + docStatus.slice(1)}
+                                </Badge>
+                                <Button
+                                  size="icon"
+                                  variant={docStatus === 'approved' ? 'default' : 'outline'}
+                                  className={docStatus === 'approved' ? 'bg-green-600 text-white' : 'text-green-600'}
+                                  onClick={() => setDocumentStatuses(prev => ({ ...prev, [doc.key]: 'approved' }))}
+                                  data-testid={`button-doc-approve-${index}`}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant={docStatus === 'rejected' ? 'default' : 'outline'}
+                                  className={docStatus === 'rejected' ? 'bg-red-600 text-white' : 'text-red-600'}
+                                  onClick={() => setDocumentStatuses(prev => ({ ...prev, [doc.key]: 'rejected' }))}
+                                  data-testid={`button-doc-reject-${index}`}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
