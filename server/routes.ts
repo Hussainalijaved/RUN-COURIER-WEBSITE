@@ -5354,6 +5354,104 @@ export async function registerRoutes(
     res.json(application);
   }));
 
+  app.post("/api/driver-applications/:id/upload-document", requireAdminAccessStrict, (req, res, next) => {
+    uploadDocument.single('file')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "File size exceeds 10MB limit" });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: err.message || "Invalid file" });
+      }
+      next();
+    });
+  }, asyncHandler(async (req, res) => {
+    const applicationId = req.params.id;
+    const { documentField } = req.body;
+    const file = req.file;
+
+    const cleanupTemp = () => {
+      if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+    };
+
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const allowedFields = [
+      'profilePictureUrl', 'drivingLicenceFrontUrl', 'drivingLicenceBackUrl',
+      'dbsCertificateUrl', 'goodsInTransitInsuranceUrl', 'hireAndRewardUrl'
+    ];
+    if (!documentField || !allowedFields.includes(documentField)) {
+      cleanupTemp();
+      return res.status(400).json({ error: "Invalid document field" });
+    }
+
+    const fieldToColumn: Record<string, string> = {
+      'profilePictureUrl': 'profile_picture_url',
+      'drivingLicenceFrontUrl': 'driving_licence_front_url',
+      'drivingLicenceBackUrl': 'driving_licence_back_url',
+      'dbsCertificateUrl': 'dbs_certificate_url',
+      'goodsInTransitInsuranceUrl': 'goods_in_transit_insurance_url',
+      'hireAndRewardUrl': 'hire_and_reward_url',
+    };
+
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      cleanupTemp();
+      return res.status(500).json({ error: "Database unavailable" });
+    }
+
+    const { data: appExists, error: checkErr } = await supabaseAdmin
+      .from('driver_applications')
+      .select('id')
+      .eq('id', applicationId)
+      .maybeSingle();
+
+    if (checkErr || !appExists) {
+      cleanupTemp();
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const safeId = sanitizePath(applicationId);
+    const appDir = path.join(uploadsDir, `application-${safeId}`);
+    if (!fs.existsSync(appDir)) {
+      fs.mkdirSync(appDir, { recursive: true });
+    }
+
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
+    const safeField = sanitizePath(documentField);
+    const finalFilename = `${safeField}_${timestamp}${ext}`;
+    const finalPath = path.join(appDir, finalFilename);
+
+    try {
+      fs.renameSync(file.path, finalPath);
+    } catch (moveError) {
+      fs.copyFileSync(file.path, finalPath);
+      fs.unlinkSync(file.path);
+    }
+
+    const fileUrl = `/uploads/documents/application-${safeId}/${finalFilename}`;
+
+    const columnName = fieldToColumn[documentField];
+    const { error: updateErr } = await supabaseAdmin
+      .from('driver_applications')
+      .update({ [columnName]: fileUrl })
+      .eq('id', applicationId);
+
+    if (updateErr) {
+      console.error('[Admin Doc Upload] Failed to update application:', updateErr);
+      try { fs.unlinkSync(finalPath); } catch {}
+      return res.status(500).json({ error: "Failed to update application record" });
+    }
+
+    console.log(`[Admin Doc Upload] Updated ${documentField} for application ${applicationId}`);
+    res.json({ success: true, fileUrl, documentField });
+  }));
+
   app.patch("/api/driver-applications/:id/review", asyncHandler(async (req, res) => {
     const { status, reviewedBy, reviewNotes, rejectionReason, documentStatuses } = req.body;
     

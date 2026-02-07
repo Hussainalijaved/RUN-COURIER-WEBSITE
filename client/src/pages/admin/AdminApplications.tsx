@@ -45,11 +45,13 @@ import {
   Loader2,
   AlertCircle,
   ShieldCheck,
+  Upload,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 import type { DriverApplication } from '@shared/schema';
 import { format } from 'date-fns';
 
@@ -60,6 +62,7 @@ export default function AdminApplications() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [documentStatuses, setDocumentStatuses] = useState<Record<string, 'approved' | 'rejected' | 'pending'>>({});
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -111,6 +114,53 @@ export default function AdminApplications() {
       toast({ title: 'Failed to update application', variant: 'destructive' });
     },
   });
+
+  const handleDocumentUpload = async (documentField: string, file: File) => {
+    if (!selectedApplication) return;
+    setUploadingDoc(documentField);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('documentField', documentField);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
+      const response = await fetch(`/api/driver-applications/${selectedApplication.id}/upload-document`, {
+        method: 'POST',
+        body: formData,
+        headers,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+      
+      const result = await response.json();
+      
+      setSelectedApplication(prev => prev ? { ...prev, [documentField]: result.fileUrl } : null);
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
+      
+      toast({
+        title: 'Document uploaded',
+        description: `${documentFields.find(d => d.key === documentField)?.label || 'Document'} has been replaced successfully.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Upload failed',
+        description: err.message || 'Failed to upload document',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
 
   const pendingApplications = applications?.filter(a => a.status === 'pending') || [];
   const approvedApplications = applications?.filter(a => a.status === 'approved') || [];
@@ -539,44 +589,72 @@ export default function AdminApplications() {
                             <div className="flex-1 min-w-0">
                               <DocumentLink url={url} label={doc.label} />
                             </div>
-                            {url && (
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    docStatus === 'approved'
-                                      ? 'border-green-500 text-green-600'
-                                      : docStatus === 'rejected'
-                                        ? 'border-red-500 text-red-600'
-                                        : 'border-yellow-500 text-yellow-600'
-                                  }
-                                  data-testid={`badge-doc-status-${index}`}
-                                >
-                                  {docStatus === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
-                                  {docStatus === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                                  {docStatus === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                                  {docStatus.charAt(0).toUpperCase() + docStatus.slice(1)}
-                                </Badge>
-                                <Button
-                                  size="icon"
-                                  variant={docStatus === 'approved' ? 'default' : 'outline'}
-                                  className={docStatus === 'approved' ? 'bg-green-600 text-white' : 'text-green-600'}
-                                  onClick={() => setDocumentStatuses(prev => ({ ...prev, [doc.key]: 'approved' }))}
-                                  data-testid={`button-doc-approve-${index}`}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant={docStatus === 'rejected' ? 'default' : 'outline'}
-                                  className={docStatus === 'rejected' ? 'bg-red-600 text-white' : 'text-red-600'}
-                                  onClick={() => setDocumentStatuses(prev => ({ ...prev, [doc.key]: 'rejected' }))}
-                                  data-testid={`button-doc-reject-${index}`}
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {url && (
+                                <>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      docStatus === 'approved'
+                                        ? 'border-green-500 text-green-600'
+                                        : docStatus === 'rejected'
+                                          ? 'border-red-500 text-red-600'
+                                          : 'border-yellow-500 text-yellow-600'
+                                    }
+                                    data-testid={`badge-doc-status-${index}`}
+                                  >
+                                    {docStatus === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                    {docStatus === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                                    {docStatus === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                                    {docStatus.charAt(0).toUpperCase() + docStatus.slice(1)}
+                                  </Badge>
+                                  <Button
+                                    size="icon"
+                                    variant={docStatus === 'approved' ? 'default' : 'outline'}
+                                    className={docStatus === 'approved' ? 'bg-green-600 text-white' : 'text-green-600'}
+                                    onClick={() => setDocumentStatuses(prev => ({ ...prev, [doc.key]: 'approved' }))}
+                                    data-testid={`button-doc-approve-${index}`}
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant={docStatus === 'rejected' ? 'default' : 'outline'}
+                                    className={docStatus === 'rejected' ? 'bg-red-600 text-white' : 'text-red-600'}
+                                    onClick={() => setDocumentStatuses(prev => ({ ...prev, [doc.key]: 'rejected' }))}
+                                    data-testid={`button-doc-reject-${index}`}
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                id={`doc-upload-${doc.key}`}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleDocumentUpload(doc.key, file);
+                                  e.target.value = '';
+                                }}
+                                data-testid={`input-doc-upload-${index}`}
+                              />
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                disabled={uploadingDoc === doc.key}
+                                onClick={() => document.getElementById(`doc-upload-${doc.key}`)?.click()}
+                                data-testid={`button-doc-upload-${index}`}
+                                title={url ? 'Replace document' : 'Upload document'}
+                              >
+                                {uploadingDoc === doc.key ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Upload className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
                         );
                       })}
