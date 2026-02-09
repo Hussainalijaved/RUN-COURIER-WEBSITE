@@ -273,6 +273,16 @@ export default function AdminApplications() {
         </div>
       );
     }
+    const isSupabaseUrl = url.includes('supabase.co/storage/');
+    const isLocalPath = !isSupabaseUrl && (url.startsWith('/uploads/') || url.includes('/uploads/'));
+    if (isLocalPath) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-amber-600">
+          <AlertCircle className="h-4 w-4" />
+          {label}: Needs re-upload
+        </div>
+      );
+    }
     return (
       <a 
         href={url} 

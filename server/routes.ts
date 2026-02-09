@@ -3950,36 +3950,65 @@ export async function registerRoutes(
     const safeDriverId = sanitizePath(rawDriverId);
     const safeDocumentType = sanitizePath(rawDocumentType);
     
-    // Create driver-specific directory and move file from temp
-    const driverDir = path.join(uploadsDir, safeDriverId);
-    if (!fs.existsSync(driverDir)) {
-      fs.mkdirSync(driverDir, { recursive: true });
-    }
-    
-    // Generate final filename
     const timestamp = Date.now();
     const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `${safeDocumentType}_${timestamp}${ext}`;
-    const finalPath = path.join(driverDir, finalFilename);
-    
-    // Move file from temp to final location
+
+    const isPendingApplication = rawDriverId === 'application-pending';
+    let fileUrl = '';
+
+    const BUCKET = 'driver-documents';
+    const storagePath = isPendingApplication
+      ? `applications/pending/${finalFilename}`
+      : `applications/${safeDriverId}/${finalFilename}`;
+
+    let supabaseUploadSuccess = false;
     try {
-      fs.renameSync(file.path, finalPath);
-    } catch (moveError) {
-      // If rename fails (cross-device), copy and delete
-      fs.copyFileSync(file.path, finalPath);
-      fs.unlinkSync(file.path);
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        const fileBuffer = fs.readFileSync(file.path);
+        const contentType = file.mimetype || 'application/octet-stream';
+
+        const { error: uploadErr } = await supabaseAdmin.storage
+          .from(BUCKET)
+          .upload(storagePath, fileBuffer, { contentType, upsert: true });
+
+        if (!uploadErr) {
+          const { data: urlData } = supabaseAdmin.storage
+            .from(BUCKET)
+            .getPublicUrl(storagePath);
+          fileUrl = urlData.publicUrl;
+          supabaseUploadSuccess = true;
+          console.log(`[Documents] Uploaded to Supabase Storage: ${storagePath}`);
+        } else {
+          console.error('[Documents] Supabase Storage upload error:', uploadErr.message);
+        }
+      }
+    } catch (supaErr) {
+      console.error('[Documents] Supabase Storage upload failed:', supaErr);
+    }
+
+    if (!supabaseUploadSuccess) {
+      const driverDir = path.join(uploadsDir, safeDriverId);
+      if (!fs.existsSync(driverDir)) {
+        fs.mkdirSync(driverDir, { recursive: true });
+      }
+      const finalPath = path.join(driverDir, finalFilename);
+      try {
+        fs.renameSync(file.path, finalPath);
+      } catch (moveError) {
+        fs.copyFileSync(file.path, finalPath);
+        fs.unlinkSync(file.path);
+      }
+      fileUrl = `/uploads/documents/${safeDriverId}/${finalFilename}`;
+      console.log(`[Documents] Fell back to local storage: ${fileUrl}`);
+    } else {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
     }
     
-    const relativePath = `/uploads/documents/${safeDriverId}/${finalFilename}`;
-    const fileUrl = relativePath;
-
-    // For pending applications, skip database operations entirely
-    // Files are stored locally and will be associated with the driver after approval
-    const isPendingApplication = rawDriverId === 'application-pending';
-    
     if (isPendingApplication) {
-      // Return success with just the file URL for pending applications
       console.log(`[Documents] Uploaded document for pending application: ${safeDocumentType}`);
       return res.status(201).json({
         success: true,
@@ -5416,25 +5445,57 @@ export async function registerRoutes(
     }
 
     const safeId = sanitizePath(applicationId);
-    const appDir = path.join(uploadsDir, `application-${safeId}`);
-    if (!fs.existsSync(appDir)) {
-      fs.mkdirSync(appDir, { recursive: true });
-    }
-
     const timestamp = Date.now();
     const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const safeField = sanitizePath(documentField);
     const finalFilename = `${safeField}_${timestamp}${ext}`;
-    const finalPath = path.join(appDir, finalFilename);
 
+    let fileUrl = '';
+    const BUCKET = 'driver-documents';
+    const storagePath = `applications/${safeId}/${finalFilename}`;
+
+    let supabaseUploadSuccess = false;
     try {
-      fs.renameSync(file.path, finalPath);
-    } catch (moveError) {
-      fs.copyFileSync(file.path, finalPath);
-      fs.unlinkSync(file.path);
+      const fileBuffer = fs.readFileSync(file.path);
+      const contentType = file.mimetype || 'application/octet-stream';
+
+      const { error: uploadErr } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(storagePath, fileBuffer, { contentType, upsert: true });
+
+      if (!uploadErr) {
+        const { data: urlData } = supabaseAdmin.storage
+          .from(BUCKET)
+          .getPublicUrl(storagePath);
+        fileUrl = urlData.publicUrl;
+        supabaseUploadSuccess = true;
+        console.log(`[Admin Doc Upload] Uploaded to Supabase Storage: ${storagePath}`);
+      } else {
+        console.error('[Admin Doc Upload] Supabase Storage upload error:', uploadErr.message);
+      }
+    } catch (supaErr) {
+      console.error('[Admin Doc Upload] Supabase Storage upload failed:', supaErr);
     }
 
-    const fileUrl = `/uploads/documents/application-${safeId}/${finalFilename}`;
+    if (!supabaseUploadSuccess) {
+      const appDir = path.join(uploadsDir, `application-${safeId}`);
+      if (!fs.existsSync(appDir)) {
+        fs.mkdirSync(appDir, { recursive: true });
+      }
+      const finalPath = path.join(appDir, finalFilename);
+      try {
+        fs.renameSync(file.path, finalPath);
+      } catch (moveError) {
+        fs.copyFileSync(file.path, finalPath);
+        fs.unlinkSync(file.path);
+      }
+      fileUrl = `/uploads/documents/application-${safeId}/${finalFilename}`;
+      console.log(`[Admin Doc Upload] Fell back to local storage: ${fileUrl}`);
+    } else {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    }
 
     const columnName = fieldToColumn[documentField];
     const { error: updateErr } = await supabaseAdmin
