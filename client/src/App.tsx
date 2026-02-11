@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { useEffect, lazy, Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -149,6 +149,9 @@ function Router() {
           <PublicOnlyRoute>
             <AdminLogin />
           </PublicOnlyRoute>
+        </Route>
+        <Route path="/driver-login">
+          <Redirect to="/driver/login" />
         </Route>
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
