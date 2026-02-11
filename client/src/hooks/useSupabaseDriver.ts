@@ -73,123 +73,28 @@ export function useDriver() {
   });
 }
 
-// Use select('*') to avoid column name mismatches with Supabase schema
-// Security is enforced in the mapping below - we only expose driver-safe fields
-const DRIVER_JOB_SELECT = '*';
-
 export function useDriverJobs(driverId: string | undefined) {
   return useQuery({
     queryKey: ['supabase', 'jobs', { driverId }],
     queryFn: async () => {
       if (!driverId) return [];
       
-      // STEP 1: Get job_assignments for this driver (only sent/accepted - not expired/rejected/cancelled)
-      const { data: assignments } = await supabase
-        .from('job_assignments')
-        .select('job_id, driver_price, status')
-        .eq('driver_id', driverId)
-        .in('status', ['sent', 'accepted', 'pending']);
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // Create map of job_id -> driver_price from assignments
-      const assignmentPriceMap = new Map<string, number | null>();
-      const assignmentJobIds: string[] = [];
-      for (const a of assignments || []) {
-        assignmentJobIds.push(a.job_id);
-        // Prefer accepted assignments, then sent, then pending
-        const existing = assignmentPriceMap.get(String(a.job_id));
-        if (existing === undefined || a.status === 'accepted') {
-          assignmentPriceMap.set(String(a.job_id), a.driver_price);
-        }
-      }
-      console.log(`[useDriverJobs] Found ${assignmentJobIds.length} job assignments for driver ${driverId}`);
+      const response = await fetch(`/api/driver/${driverId}/jobs`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+      });
       
-      // STEP 2: Fetch jobs where driver_id is set directly
-      const { data: directJobs, error: directError } = await supabase
-        .from('jobs')
-        .select(DRIVER_JOB_SELECT)
-        .eq('driver_id', driverId)
-        .or('driver_hidden.is.null,driver_hidden.eq.false')
-        .order('created_at', { ascending: false });
-
-      if (directError) {
-        console.error('[useDriverJobs] Error fetching direct jobs:', directError);
+      if (!response.ok) {
+        console.error('[useDriverJobs] API error:', response.status, await response.text());
+        return [];
       }
       
-      let allJobs = directJobs || [];
-      console.log(`[useDriverJobs] Found ${allJobs.length} directly assigned jobs`);
-      
-      // STEP 3: Fetch jobs from assignments (not already in directJobs)
-      if (assignmentJobIds.length > 0) {
-        const existingIds = new Set(allJobs.map(j => String(j.id)));
-        const missingJobIds = assignmentJobIds.filter(id => !existingIds.has(String(id)));
-        
-        if (missingJobIds.length > 0) {
-          const { data: assignedJobs, error: assignedError } = await supabase
-            .from('jobs')
-            .select(DRIVER_JOB_SELECT)
-            .in('id', missingJobIds)
-            .or('driver_hidden.is.null,driver_hidden.eq.false')
-            .order('created_at', { ascending: false });
-          
-          if (assignedError) {
-            console.error('[useDriverJobs] Error fetching assigned jobs:', assignedError);
-          } else if (assignedJobs) {
-            allJobs = [...allJobs, ...assignedJobs];
-            console.log(`[useDriverJobs] Added ${assignedJobs.length} jobs from assignments, total: ${allJobs.length}`);
-          }
-        }
-      }
-      
-      const data = allJobs;
-      const error = directError;
-
-      // SECURITY: Return DriverJob type - never cast to Job which includes customer pricing fields
-      // IMPORTANT: Use driver_price from assignments when available (more reliable than jobs.driver_price)
-      return (data || []).map(job => {
-        // Get driver_price from assignment if available, fallback to job.driver_price
-        const assignmentPrice = assignmentPriceMap.get(String(job.id));
-        const driverPrice = assignmentPrice !== undefined ? assignmentPrice : job.driver_price;
-        
-        return {
-          id: job.id,
-          trackingNumber: job.tracking_number,
-          customerId: job.customer_id,
-          driverId: job.driver_id,
-          dispatcherId: job.dispatcher_id,
-          vendorId: job.vendor_id,
-          status: job.status,
-          vehicleType: job.vehicle_type,
-          pickupAddress: job.pickup_address,
-          pickupPostcode: job.pickup_postcode,
-          pickupLatitude: job.pickup_latitude,
-          pickupLongitude: job.pickup_longitude,
-          pickupInstructions: job.pickup_instructions,
-          pickupContactName: job.pickup_contact_name,
-          pickupContactPhone: job.pickup_contact_phone,
-          deliveryAddress: job.delivery_address,
-          deliveryPostcode: job.delivery_postcode,
-          deliveryLatitude: job.delivery_latitude,
-          deliveryLongitude: job.delivery_longitude,
-          deliveryInstructions: job.delivery_instructions,
-          recipientName: job.recipient_name,
-          recipientPhone: job.recipient_phone,
-          weight: job.weight,
-          distance: job.distance,
-          isMultiDrop: job.is_multi_drop,
-          isReturnTrip: job.is_return_trip,
-          // CRITICAL: Use driver_price from assignment or job - never expose customer pricing
-          driverPrice: driverPrice,
-          scheduledPickupTime: job.scheduled_pickup_time,
-          estimatedDeliveryTime: job.estimated_delivery_time,
-          actualPickupTime: job.actual_pickup_time,
-          actualDeliveryTime: job.actual_delivery_time,
-          podSignatureUrl: job.pod_signature_url,
-          podPhotoUrl: job.pod_photo_url,
-          podNotes: job.pod_notes,
-          createdAt: job.created_at,
-          updatedAt: job.updated_at,
-        };
-      }) as DriverJob[];
+      const jobs = await response.json();
+      console.log(`[useDriverJobs] Fetched ${jobs.length} jobs from API for driver ${driverId}`);
+      return jobs as DriverJob[];
     },
     enabled: !!driverId,
   });

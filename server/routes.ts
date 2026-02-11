@@ -7549,6 +7549,115 @@ export async function registerRoutes(
     }
   }));
 
+  app.get("/api/driver/:driverId/jobs", asyncHandler(async (req, res) => {
+    const { driverId } = req.params;
+    
+    // Authenticate the request
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Auth service unavailable" });
+      }
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      if (authError || !user) {
+        return res.status(401).json({ error: "Invalid authentication" });
+      }
+      
+      // Verify the user is either this driver or an admin
+      const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'runcourier1@gmail.com';
+      const isDriver = user.id === driverId || user.user_metadata?.role === 'driver';
+      
+      // For drivers, verify they can only access their own jobs
+      if (!isAdmin && !isDriver) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      if (!isAdmin && user.id !== driverId) {
+        // Check if the driver's user_id maps to this driverId
+        const driver = await storage.getDriver(driverId);
+        if (!driver || (driver.userId !== user.id && driver.id !== user.id)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+    } catch (authErr) {
+      console.error('[Driver Jobs API] Auth error:', authErr);
+      return res.status(401).json({ error: "Authentication failed" });
+    }
+    
+    const assignments = await storage.getJobAssignments({ driverId, status: undefined });
+    const activeAssignments = (assignments || []).filter(a => 
+      ['sent', 'accepted', 'pending'].includes(a.status)
+    );
+    
+    const assignmentPriceMap = new Map();
+    const assignmentJobIds: string[] = [];
+    for (const a of activeAssignments) {
+      assignmentJobIds.push(String(a.jobId));
+      if (!assignmentPriceMap.has(String(a.jobId)) || a.status === 'accepted') {
+        assignmentPriceMap.set(String(a.jobId), a.driverPrice);
+      }
+    }
+    console.log(`[Driver Jobs API] Active assignments: ${activeAssignments.length}, jobIds: [${assignmentJobIds.join(', ')}]`);
+    
+    const allJobs = await storage.getJobs();
+    const driverJobs = allJobs.filter(j => 
+      String(j.driverId) === String(driverId) || assignmentJobIds.includes(String(j.id))
+    );
+    
+    const safeJobs = driverJobs
+      .filter(j => !j.driverHidden)
+      .map(j => {
+        const assignmentPrice = assignmentPriceMap.get(String(j.id));
+        return {
+          id: j.id,
+          trackingNumber: j.trackingNumber,
+          customerId: j.customerId,
+          driverId: j.driverId,
+          dispatcherId: j.dispatcherId,
+          vendorId: j.vendorId,
+          status: j.status,
+          vehicleType: j.vehicleType,
+          pickupAddress: j.pickupAddress,
+          pickupPostcode: j.pickupPostcode,
+          pickupLatitude: j.pickupLatitude,
+          pickupLongitude: j.pickupLongitude,
+          pickupInstructions: j.pickupInstructions,
+          pickupContactName: j.pickupContactName,
+          pickupContactPhone: j.pickupContactPhone,
+          deliveryAddress: j.deliveryAddress,
+          deliveryPostcode: j.deliveryPostcode,
+          deliveryLatitude: j.deliveryLatitude,
+          deliveryLongitude: j.deliveryLongitude,
+          deliveryInstructions: j.deliveryInstructions,
+          recipientName: j.recipientName,
+          recipientPhone: j.recipientPhone,
+          weight: j.weight,
+          distance: j.distance,
+          isMultiDrop: j.isMultiDrop,
+          isReturnTrip: j.isReturnTrip,
+          driverPrice: assignmentPrice !== undefined ? assignmentPrice : j.driverPrice,
+          scheduledPickupTime: j.scheduledPickupTime,
+          estimatedDeliveryTime: j.estimatedDeliveryTime,
+          actualPickupTime: j.actualPickupTime,
+          actualDeliveryTime: j.actualDeliveryTime,
+          podSignatureUrl: j.podSignatureUrl,
+          podPhotoUrl: j.podPhotoUrl,
+          podNotes: j.podNotes,
+          createdAt: j.createdAt,
+          updatedAt: j.updatedAt,
+        };
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    console.log(`[Driver Jobs API] Found ${safeJobs.length} jobs for driver ${driverId}`);
+    res.json(safeJobs);
+  }));
+
   // Job Assignment Routes - Admin assigns jobs to drivers
   app.get("/api/job-assignments", asyncHandler(async (req, res) => {
     const { jobId, driverId, status } = req.query;
