@@ -1732,13 +1732,19 @@ export async function registerRoutes(
     
     // Handle multi-drop stops update when stops are provided
     if (supabaseAdmin && (multiDropStops !== undefined || updateData.isMultiDrop !== undefined)) {
-      const jobId = job.id; // Use the job's actual ID type (could be integer or string)
+      const jobId = String(job.id); // Ensure string for varchar column
       
       // Delete existing stops first
-      await supabaseAdmin
+      const { error: deleteError } = await supabaseAdmin
         .from('multi_drop_stops')
         .delete()
         .eq('job_id', jobId);
+      
+      if (deleteError) {
+        console.error('[Jobs] Failed to delete existing multi-drop stops:', deleteError);
+      } else {
+        console.log(`[Jobs] Deleted existing stops for job ${jobId}`);
+      }
       
       // Insert new stops if multi-drop is enabled and stops are provided
       const isMultiDropEnabled = updateData.isMultiDrop !== undefined ? updateData.isMultiDrop : job.isMultiDrop;
