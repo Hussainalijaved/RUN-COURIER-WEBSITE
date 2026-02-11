@@ -62,6 +62,7 @@ const driverApplicationFormSchema = z.object({
   nationalInsuranceNumber: z.string().min(9, "Valid National Insurance number is required"),
   rightToWorkShareCode: z.string().optional(),
   vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van"]),
+  vehicleRegistration: z.string().min(2, "Vehicle registration number is required"),
   bankName: z.string().min(2, "Bank name is required"),
   accountHolderName: z.string().min(2, "Account holder name is required"),
   sortCode: z.string().regex(/^\d{2}-?\d{2}-?\d{2}$/, "Valid sort code is required (e.g., 12-34-56)"),
@@ -122,6 +123,7 @@ export default function DriverApplication() {
       nationalInsuranceNumber: "",
       rightToWorkShareCode: "",
       vehicleType: "car",
+      vehicleRegistration: "",
       bankName: "",
       accountHolderName: "",
       sortCode: "",
@@ -381,7 +383,7 @@ export default function DriverApplication() {
         }
         return true;
       case 3:
-        return form.trigger(["vehicleType", "bankName", "accountHolderName", "sortCode", "accountNumber"]);
+        return form.trigger(["vehicleType", "vehicleRegistration", "bankName", "accountHolderName", "sortCode", "accountNumber"]);
       default:
         return true;
     }
@@ -905,6 +907,28 @@ export default function DriverApplication() {
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="vehicleRegistration"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Vehicle Registration Number *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g. AB12 CDE" 
+                            {...field} 
+                            className="uppercase"
+                            data-testid="input-vehicle-registration"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Enter your vehicle registration number (number plate)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="border-t pt-6 mt-6">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
@@ -1063,9 +1087,16 @@ export default function DriverApplication() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <h4 className="font-medium text-foreground mb-3">Vehicle</h4>
-                        <p className="text-sm capitalize" data-testid="text-review-vehicle">
-                          {form.getValues("vehicleType").replace("_", " ")}
-                        </p>
+                        <dl className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Type:</dt>
+                            <dd className="font-medium capitalize" data-testid="text-review-vehicle">{form.getValues("vehicleType").replace("_", " ")}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Registration:</dt>
+                            <dd className="font-medium uppercase" data-testid="text-review-registration">{form.getValues("vehicleRegistration")}</dd>
+                          </div>
+                        </dl>
                       </div>
                       <div>
                         <h4 className="font-medium text-foreground mb-3">Bank Details</h4>

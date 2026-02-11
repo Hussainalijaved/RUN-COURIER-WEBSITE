@@ -240,7 +240,8 @@ function mapDbToDriverApplication(dbApp: any): DriverApplication {
     dbsCertificateUrl: dbApp.dbs_certificate_url,
     goodsInTransitInsuranceUrl: dbApp.goods_in_transit_insurance_url,
     hireAndRewardUrl: dbApp.hire_and_reward_url,
-    vehicleType: dbApp.vehicle_type as VehicleType,
+    vehicleType: (dbApp.vehicle_type?.split('|')[0] || dbApp.vehicle_type) as VehicleType,
+    vehicleRegistration: dbApp.vehicle_type?.includes('|') ? dbApp.vehicle_type.split('|')[1] : null,
     bankName: dbApp.bank_name,
     accountHolderName: dbApp.account_holder_name,
     sortCode: dbApp.sort_code,
@@ -1590,7 +1591,9 @@ export class SupabaseStorage implements IStorage {
       dbs_certificate_url: application.dbsCertificateUrl || null,
       goods_in_transit_insurance_url: application.goodsInTransitInsuranceUrl || null,
       hire_and_reward_url: application.hireAndRewardUrl || null,
-      vehicle_type: application.vehicleType,
+      vehicle_type: application.vehicleRegistration 
+        ? `${application.vehicleType}|${application.vehicleRegistration}` 
+        : application.vehicleType,
       bank_name: application.bankName,
       account_holder_name: application.accountHolderName,
       sort_code: application.sortCode,
@@ -1611,6 +1614,11 @@ export class SupabaseStorage implements IStorage {
     if (data.reviewNotes !== undefined) dbData.review_notes = data.reviewNotes;
     if (data.rejectionReason !== undefined) dbData.rejection_reason = data.rejectionReason;
     if (data.reviewedAt !== undefined) dbData.reviewed_at = data.reviewedAt;
+    if (data.vehicleType !== undefined) {
+      dbData.vehicle_type = data.vehicleRegistration 
+        ? `${data.vehicleType}|${data.vehicleRegistration}` 
+        : data.vehicleType;
+    }
     
     const { data: updated, error } = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
     if (error || !updated) {

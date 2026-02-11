@@ -462,6 +462,9 @@ export default function AdminApplications() {
       <TableCell>{application.phone}</TableCell>
       <TableCell>
         <span className="capitalize">{application.vehicleType.replace('_', ' ')}</span>
+        {application.vehicleRegistration && (
+          <span className="text-muted-foreground ml-1">({application.vehicleRegistration})</span>
+        )}
       </TableCell>
       <TableCell>
         {application.submittedAt && format(new Date(application.submittedAt), 'dd MMM yyyy')}
@@ -865,7 +868,18 @@ export default function AdminApplications() {
                       <Truck className="h-4 w-4" />
                       Vehicle
                     </h3>
-                    <p className="capitalize">{selectedApplication.vehicleType.replace('_', ' ')}</p>
+                    <dl className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Type:</dt>
+                        <dd className="font-medium capitalize">{selectedApplication.vehicleType.replace('_', ' ')}</dd>
+                      </div>
+                      {selectedApplication.vehicleRegistration && (
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Registration:</dt>
+                          <dd className="font-medium uppercase">{selectedApplication.vehicleRegistration}</dd>
+                        </div>
+                      )}
+                    </dl>
                   </div>
 
                   <div>

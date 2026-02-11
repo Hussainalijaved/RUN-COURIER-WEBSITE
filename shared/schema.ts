@@ -297,6 +297,7 @@ export const driverApplications = pgTable("driver_applications", {
   
   // Vehicle Information
   vehicleType: text("vehicle_type").$type<VehicleType>().notNull(),
+  vehicleRegistration: text("vehicle_registration"),
   
   // Bank Details
   bankName: text("bank_name").notNull(),
