@@ -74,6 +74,7 @@ export function useDriver() {
 }
 
 // CRITICAL SECURITY: Only select driver-safe columns - NEVER include total_price or customer pricing
+// NOTE: Only include columns that exist in the Supabase jobs table
 const DRIVER_SAFE_JOB_COLUMNS = `
   id,
   tracking_number,
@@ -99,12 +100,8 @@ const DRIVER_SAFE_JOB_COLUMNS = `
   recipient_phone,
   sender_name,
   sender_phone,
-  parcel_description,
-  parcel_weight,
-  parcel_dimensions,
   weight,
   distance,
-  distance_miles,
   is_multi_drop,
   is_return_trip,
   is_urgent,
@@ -221,12 +218,8 @@ export function useDriverJobs(driverId: string | undefined) {
           recipientPhone: job.recipient_phone,
           senderName: job.sender_name,
           senderPhone: job.sender_phone,
-          parcelDescription: job.parcel_description,
-          parcelWeight: job.parcel_weight,
-          parcelDimensions: job.parcel_dimensions,
           weight: job.weight,
           distance: job.distance,
-          distanceMiles: job.distance_miles,
           isMultiDrop: job.is_multi_drop,
           isReturnTrip: job.is_return_trip,
           isUrgent: job.is_urgent,

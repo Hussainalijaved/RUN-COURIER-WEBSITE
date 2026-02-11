@@ -103,12 +103,12 @@ export type DriverJob = {
   recipientPhone: string | null;
   senderName: string | null;
   senderPhone: string | null;
-  parcelDescription: string | null;
-  parcelWeight: string | null;
-  parcelDimensions: string | null;
+  parcelDescription?: string | null;
+  parcelWeight?: string | null;
+  parcelDimensions?: string | null;
   weight: string | null;
   distance: string | null;
-  distanceMiles: string | null;
+  distanceMiles?: string | null;
   isMultiDrop: boolean;
   isReturnTrip: boolean;
   isUrgent: boolean;
