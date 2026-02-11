@@ -342,27 +342,37 @@ export default function AdminApplications() {
         </div>
       );
     }
-    const isSupabaseUrl = url.includes('supabase.co/storage/');
-    const isLocalPath = !isSupabaseUrl && (url.startsWith('/uploads/') || url.includes('/uploads/'));
-    if (isLocalPath) {
-      return (
-        <div className="flex items-center gap-2 text-sm text-amber-600">
-          <AlertCircle className="h-4 w-4" />
-          {label}: Needs re-upload
-        </div>
-      );
-    }
+    const isPdf = url.toLowerCase().endsWith('.pdf');
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
     return (
-      <a 
-        href={url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 text-sm text-primary hover:underline"
-      >
-        <FileText className="h-4 w-4" />
-        {label}
-        <ExternalLink className="h-3 w-3" />
-      </a>
+      <div className="flex flex-col gap-1">
+        <a 
+          href={url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-sm text-primary hover:underline"
+          data-testid={`link-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+        >
+          <FileText className="h-4 w-4" />
+          {label}
+          <ExternalLink className="h-3 w-3" />
+        </a>
+        {isImage && (
+          <img 
+            src={url} 
+            alt={label} 
+            className="mt-1 max-h-32 max-w-48 rounded-md border object-cover cursor-pointer"
+            onClick={() => window.open(url, '_blank')}
+            data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+          />
+        )}
+        {isPdf && (
+          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <FileText className="h-3 w-3" />
+            PDF document - click to view
+          </div>
+        )}
+      </div>
     );
   };
 
