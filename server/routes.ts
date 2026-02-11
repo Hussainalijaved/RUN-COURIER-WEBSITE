@@ -5413,6 +5413,45 @@ export async function registerRoutes(
     res.json(application);
   }));
 
+  app.head("/api/uploads/*", asyncHandler(async (req, res) => {
+    const filePath = req.params[0];
+    if (!filePath || filePath.includes('..')) {
+      return res.status(400).end();
+    }
+    const fullPath = path.join(process.cwd(), 'uploads', filePath);
+    if (fs.existsSync(fullPath)) {
+      return res.status(200).end();
+    }
+
+    const fileName = path.basename(filePath);
+    const BUCKET = 'driver-documents';
+    const possiblePaths = [
+      `applications/pending/${fileName}`,
+      `applications/${filePath.replace('documents/', '')}`,
+      filePath,
+    ];
+
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        for (const storagePath of possiblePaths) {
+          const dir = path.dirname(storagePath);
+          const name = path.basename(storagePath);
+          const { data } = await supabaseAdmin.storage
+            .from(BUCKET)
+            .list(dir, { search: name, limit: 1 });
+          if (data && data.length > 0 && data.some(f => f.name === name)) {
+            return res.status(200).end();
+          }
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+
+    return res.status(404).end();
+  }));
+
   app.get("/api/uploads/*", asyncHandler(async (req, res) => {
     const filePath = req.params[0];
     if (!filePath || filePath.includes('..')) {
@@ -5581,7 +5620,7 @@ export async function registerRoutes(
 
     if (updateErr) {
       console.error('[Admin Doc Upload] Failed to update application:', updateErr);
-      try { fs.unlinkSync(finalPath); } catch {}
+      try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch {}
       return res.status(500).json({ error: "Failed to update application record" });
     }
 

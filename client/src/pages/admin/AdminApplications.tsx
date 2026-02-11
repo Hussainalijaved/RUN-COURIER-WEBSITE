@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -341,7 +341,23 @@ export default function AdminApplications() {
   };
 
   const DocumentLink = ({ url, label }: { url: string | null; label: string }) => {
-    const [loadError, setLoadError] = useState(false);
+    const [fileStatus, setFileStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
+
+    useEffect(() => {
+      if (!url) {
+        setFileStatus('unavailable');
+        return;
+      }
+      const resolvedUrl = resolveDocUrl(url);
+      setFileStatus('checking');
+      fetch(resolvedUrl, { method: 'HEAD' })
+        .then(res => {
+          setFileStatus(res.ok ? 'available' : 'unavailable');
+        })
+        .catch(() => {
+          setFileStatus('unavailable');
+        });
+    }, [url]);
 
     if (!url) {
       return (
@@ -351,15 +367,25 @@ export default function AdminApplications() {
         </div>
       );
     }
+
     const resolvedUrl = resolveDocUrl(url);
     const isPdf = url.toLowerCase().endsWith('.pdf');
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
 
-    if (loadError) {
+    if (fileStatus === 'checking') {
+      return (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {label}: Checking...
+        </div>
+      );
+    }
+
+    if (fileStatus === 'unavailable') {
       return (
         <div className="flex items-center gap-2 text-sm text-amber-600">
           <AlertCircle className="h-4 w-4" />
-          {label}: File unavailable - driver needs to re-upload
+          {label}: File lost - use upload button to replace, or send back to driver
         </div>
       );
     }
@@ -383,7 +409,7 @@ export default function AdminApplications() {
             alt={label} 
             className="mt-1 max-h-32 max-w-48 rounded-md border object-cover cursor-pointer"
             onClick={() => window.open(resolvedUrl, '_blank')}
-            onError={() => setLoadError(true)}
+            onError={() => setFileStatus('unavailable')}
             data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
           />
         )}
