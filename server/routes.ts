@@ -5803,6 +5803,41 @@ export async function registerRoutes(
                 console.log(`[Driver Application] Profile picture synced for driver ${driver.driver_code}: ${application.profilePictureUrl}`);
               }
 
+              // Sync document URLs to driver columns
+              const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+              const docColumnUpdates: Record<string, any> = {};
+              if (application.drivingLicenceFrontUrl) {
+                docColumnUpdates.driving_licence_front_url = application.drivingLicenceFrontUrl.startsWith('http')
+                  ? application.drivingLicenceFrontUrl : `${baseUrl}${application.drivingLicenceFrontUrl}`;
+              }
+              if (application.drivingLicenceBackUrl) {
+                docColumnUpdates.driving_licence_back_url = application.drivingLicenceBackUrl.startsWith('http')
+                  ? application.drivingLicenceBackUrl : `${baseUrl}${application.drivingLicenceBackUrl}`;
+              }
+              if (application.dbsCertificateUrl) {
+                docColumnUpdates.dbs_certificate_url = application.dbsCertificateUrl.startsWith('http')
+                  ? application.dbsCertificateUrl : `${baseUrl}${application.dbsCertificateUrl}`;
+              }
+              if (application.goodsInTransitInsuranceUrl) {
+                docColumnUpdates.goods_in_transit_insurance_url = application.goodsInTransitInsuranceUrl.startsWith('http')
+                  ? application.goodsInTransitInsuranceUrl : `${baseUrl}${application.goodsInTransitInsuranceUrl}`;
+              }
+              if (application.hireAndRewardUrl) {
+                docColumnUpdates.hire_reward_insurance_url = application.hireAndRewardUrl.startsWith('http')
+                  ? application.hireAndRewardUrl : `${baseUrl}${application.hireAndRewardUrl}`;
+              }
+              if (Object.keys(docColumnUpdates).length > 0) {
+                const { error: docColErr } = await supabaseAdmin
+                  .from('drivers')
+                  .update(docColumnUpdates)
+                  .eq('id', driver.id);
+                if (docColErr) {
+                  console.error(`[Driver Application] Failed to sync document URLs to driver columns:`, docColErr);
+                } else {
+                  console.log(`[Driver Application] Document URLs synced to driver columns for ${driver.driver_code}`);
+                }
+              }
+
               const { sendDriverApprovalEmailExisting } = await import('./emailService');
               sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code)
                 .then(sent => {
