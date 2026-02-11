@@ -63,6 +63,8 @@ export default function AdminApplications() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [documentStatuses, setDocumentStatuses] = useState<Record<string, 'approved' | 'rejected' | 'pending'>>({});
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [fileAvailability, setFileAvailability] = useState<Record<string, boolean>>({});
+  const [fileCheckDone, setFileCheckDone] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -230,15 +232,6 @@ export default function AdminApplications() {
     );
   };
 
-  const documentFields = [
-    { key: 'profilePictureUrl', label: 'Profile Picture' },
-    { key: 'drivingLicenceFrontUrl', label: 'Driving Licence (Front)' },
-    { key: 'drivingLicenceBackUrl', label: 'Driving Licence (Back)' },
-    { key: 'dbsCertificateUrl', label: 'DBS Certificate' },
-    { key: 'goodsInTransitInsuranceUrl', label: 'Goods in Transit Insurance' },
-    { key: 'hireAndRewardUrl', label: 'Hire & Reward Insurance' },
-  ];
-
   const initializeDocumentStatuses = () => {
     const statuses: Record<string, 'approved' | 'rejected' | 'pending'> = {};
     documentFields.forEach(doc => {
@@ -340,28 +333,51 @@ export default function AdminApplications() {
     return url;
   };
 
+  const documentFields = [
+    { key: 'profilePictureUrl', label: 'Profile Picture' },
+    { key: 'drivingLicenceFrontUrl', label: 'Driving Licence (Front)' },
+    { key: 'drivingLicenceBackUrl', label: 'Driving Licence (Back)' },
+    { key: 'dbsCertificateUrl', label: 'DBS Certificate' },
+    { key: 'goodsInTransitInsuranceUrl', label: 'Goods in Transit Insurance' },
+    { key: 'hireAndRewardUrl', label: 'Hire & Reward Insurance' },
+  ];
+
+  useEffect(() => {
+    if (!selectedApplication || !isReviewDialogOpen) return;
+    setFileCheckDone(false);
+    setFileAvailability({});
+
+    const urls = documentFields
+      .map(d => (selectedApplication as any)[d.key] as string | null)
+      .filter((u): u is string => !!u);
+
+    if (urls.length === 0) {
+      setFileCheckDone(true);
+      return;
+    }
+
+    fetch('/api/check-files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        setFileAvailability(data);
+        setFileCheckDone(true);
+      })
+      .catch(() => {
+        const fallback: Record<string, boolean> = {};
+        urls.forEach(u => { fallback[u] = false; });
+        setFileAvailability(fallback);
+        setFileCheckDone(true);
+      });
+  }, [selectedApplication, isReviewDialogOpen]);
+
   const DocumentLink = ({ url, label }: { url: string | null; label: string }) => {
-    const [fileStatus, setFileStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
-
-    useEffect(() => {
-      if (!url) {
-        setFileStatus('unavailable');
-        return;
-      }
-      const resolvedUrl = resolveDocUrl(url);
-      setFileStatus('checking');
-      fetch(resolvedUrl, { method: 'HEAD' })
-        .then(res => {
-          setFileStatus(res.ok ? 'available' : 'unavailable');
-        })
-        .catch(() => {
-          setFileStatus('unavailable');
-        });
-    }, [url]);
-
     if (!url) {
       return (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={`doc-status-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}>
           <AlertCircle className="h-4 w-4" />
           {label}: Not provided
         </div>
@@ -371,8 +387,10 @@ export default function AdminApplications() {
     const resolvedUrl = resolveDocUrl(url);
     const isPdf = url.toLowerCase().endsWith('.pdf');
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+    const isAvailable = fileAvailability[url];
+    const [imgError, setImgError] = useState(false);
 
-    if (fileStatus === 'checking') {
+    if (!fileCheckDone) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -381,9 +399,9 @@ export default function AdminApplications() {
       );
     }
 
-    if (fileStatus === 'unavailable') {
+    if (!isAvailable || imgError) {
       return (
-        <div className="flex items-center gap-2 text-sm text-amber-600">
+        <div className="flex items-center gap-2 text-sm text-amber-600" data-testid={`doc-status-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}>
           <AlertCircle className="h-4 w-4" />
           {label}: File lost - use upload button to replace, or send back to driver
         </div>
@@ -409,7 +427,7 @@ export default function AdminApplications() {
             alt={label} 
             className="mt-1 max-h-32 max-w-48 rounded-md border object-cover cursor-pointer"
             onClick={() => window.open(resolvedUrl, '_blank')}
-            onError={() => setFileStatus('unavailable')}
+            onError={() => setImgError(true)}
             data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
           />
         )}

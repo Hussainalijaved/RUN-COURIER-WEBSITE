@@ -5413,6 +5413,88 @@ export async function registerRoutes(
     res.json(application);
   }));
 
+  let supabaseFileCache: { files: Set<string>; timestamp: number } | null = null;
+  const CACHE_TTL = 60000;
+
+  async function getSupabaseFileSet(): Promise<Set<string>> {
+    if (supabaseFileCache && Date.now() - supabaseFileCache.timestamp < CACHE_TTL) {
+      return supabaseFileCache.files;
+    }
+    const fileSet = new Set<string>();
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        const BUCKET = 'driver-documents';
+        const dirs = ['applications/pending'];
+        const { data: appDirs } = await supabaseAdmin.storage.from(BUCKET).list('applications', { limit: 200 });
+        if (appDirs) {
+          for (const d of appDirs) {
+            if (d.id && d.name !== 'pending' && d.name !== '.emptyFolderPlaceholder') {
+              dirs.push(`applications/${d.name}`);
+            }
+          }
+        }
+        for (const dir of dirs) {
+          const { data: files } = await supabaseAdmin.storage.from(BUCKET).list(dir, { limit: 500 });
+          if (files) {
+            for (const f of files) {
+              if (f.name && f.name !== '.emptyFolderPlaceholder') {
+                fileSet.add(`${dir}/${f.name}`);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[FileCache] Error building Supabase file cache:', err);
+    }
+    supabaseFileCache = { files: fileSet, timestamp: Date.now() };
+    return fileSet;
+  }
+
+  app.post("/api/check-files", asyncHandler(async (req, res) => {
+    const { urls } = req.body;
+    if (!Array.isArray(urls)) {
+      return res.status(400).json({ error: "urls array required" });
+    }
+
+    const supabaseFiles = await getSupabaseFileSet();
+    const results: Record<string, boolean> = {};
+
+    for (const url of urls) {
+      if (!url || typeof url !== 'string') continue;
+
+      if (url.startsWith('https://') && url.includes('supabase.co')) {
+        try {
+          const resp = await fetch(url, { method: 'HEAD' });
+          results[url] = resp.ok;
+        } catch {
+          results[url] = false;
+        }
+        continue;
+      }
+
+      const cleanUrl = url.replace(/^\/api/, '');
+      const localPath = path.join(process.cwd(), cleanUrl);
+      if (fs.existsSync(localPath)) {
+        results[url] = true;
+        continue;
+      }
+
+      const fileName = path.basename(url);
+      let found = false;
+      for (const storagePath of supabaseFiles) {
+        if (storagePath.endsWith('/' + fileName)) {
+          found = true;
+          break;
+        }
+      }
+      results[url] = found;
+    }
+
+    res.json(results);
+  }));
+
   app.head("/api/uploads/*", asyncHandler(async (req, res) => {
     const filePath = req.params[0];
     if (!filePath || filePath.includes('..')) {
@@ -5424,29 +5506,11 @@ export async function registerRoutes(
     }
 
     const fileName = path.basename(filePath);
-    const BUCKET = 'driver-documents';
-    const possiblePaths = [
-      `applications/pending/${fileName}`,
-      `applications/${filePath.replace('documents/', '')}`,
-      filePath,
-    ];
-
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (supabaseAdmin) {
-        for (const storagePath of possiblePaths) {
-          const dir = path.dirname(storagePath);
-          const name = path.basename(storagePath);
-          const { data } = await supabaseAdmin.storage
-            .from(BUCKET)
-            .list(dir, { search: name, limit: 1 });
-          if (data && data.length > 0 && data.some(f => f.name === name)) {
-            return res.status(200).end();
-          }
-        }
+    const supabaseFiles = await getSupabaseFileSet();
+    for (const storagePath of supabaseFiles) {
+      if (storagePath.endsWith('/' + fileName)) {
+        return res.status(200).end();
       }
-    } catch (err) {
-      // ignore
     }
 
     return res.status(404).end();
