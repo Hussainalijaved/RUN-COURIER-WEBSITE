@@ -47,6 +47,13 @@ import {
   ShieldCheck,
   Upload,
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -158,6 +165,23 @@ export default function AdminApplications() {
     },
     onError: () => {
       toast({ title: 'Failed to delete application', variant: 'destructive' });
+    },
+  });
+
+  const updateVehicleMutation = useMutation({
+    mutationFn: async ({ id, vehicleType, vehicleRegistration }: { id: string; vehicleType: string; vehicleRegistration?: string }) => {
+      const response = await apiRequest("PATCH", `/api/driver-applications/${id}`, { vehicleType, vehicleRegistration });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
+      toast({ title: 'Vehicle updated', description: 'Vehicle type has been updated successfully.' });
+      if (selectedApplication) {
+        setSelectedApplication({ ...selectedApplication, vehicleType: data.vehicleType, vehicleRegistration: data.vehicleRegistration });
+      }
+    },
+    onError: () => {
+      toast({ title: 'Failed to update vehicle type', variant: 'destructive' });
     },
   });
 
@@ -868,10 +892,33 @@ export default function AdminApplications() {
                       <Truck className="h-4 w-4" />
                       Vehicle
                     </h3>
-                    <dl className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Type:</dt>
-                        <dd className="font-medium capitalize">{selectedApplication.vehicleType.replace('_', ' ')}</dd>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Type</Label>
+                        <Select
+                          value={selectedApplication.vehicleType}
+                          onValueChange={(value) => {
+                            updateVehicleMutation.mutate({
+                              id: selectedApplication.id,
+                              vehicleType: value,
+                              vehicleRegistration: selectedApplication.vehicleRegistration || undefined,
+                            });
+                          }}
+                          disabled={updateVehicleMutation.isPending}
+                        >
+                          <SelectTrigger data-testid="select-vehicle-type-edit">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="car">Car</SelectItem>
+                            <SelectItem value="small_van">Small Van</SelectItem>
+                            <SelectItem value="medium_van">Medium Van</SelectItem>
+                            <SelectItem value="large_van">Large Van</SelectItem>
+                            <SelectItem value="luton_van">Luton Van</SelectItem>
+                            <SelectItem value="xlwb_van">XLWB Van</SelectItem>
+                            <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       {selectedApplication.vehicleRegistration && (
                         <div className="flex justify-between">
@@ -879,7 +926,7 @@ export default function AdminApplications() {
                           <dd className="font-medium uppercase">{selectedApplication.vehicleRegistration}</dd>
                         </div>
                       )}
-                    </dl>
+                    </div>
                   </div>
 
                   <div>
