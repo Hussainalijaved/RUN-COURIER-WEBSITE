@@ -103,6 +103,7 @@ export interface IStorage {
 
   getDriverApplication(id: string): Promise<DriverApplication | undefined>;
   getDriverApplicationByEmail(email: string): Promise<DriverApplication | undefined>;
+  getDriverApplicationByPhone(phone: string): Promise<DriverApplication | undefined>;
   getDriverApplications(filters?: { status?: DriverApplicationStatus }): Promise<DriverApplication[]>;
   createDriverApplication(application: InsertDriverApplication): Promise<DriverApplication>;
   updateDriverApplication(id: string, data: Partial<DriverApplication>): Promise<DriverApplication | undefined>;
@@ -1218,6 +1219,12 @@ export class MemStorage implements IStorage {
     // Use PostgreSQL database for persistence
     const results = await db.select().from(driverApplications);
     return results.find((app) => app.email.toLowerCase() === email.toLowerCase());
+  }
+
+  async getDriverApplicationByPhone(phone: string): Promise<DriverApplication | undefined> {
+    const normalized = phone.replace(/\D/g, '');
+    const results = await db.select().from(driverApplications);
+    return results.find((app) => app.phone.replace(/\D/g, '') === normalized);
   }
 
   async getDriverApplications(filters?: { status?: DriverApplicationStatus }): Promise<DriverApplication[]> {

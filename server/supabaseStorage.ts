@@ -1554,6 +1554,26 @@ export class SupabaseStorage implements IStorage {
     return mapDbToDriverApplication(data);
   }
 
+  async getDriverApplicationByPhone(phone: string): Promise<DriverApplication | undefined> {
+    const supabase = this.checkSupabase();
+    const normalized = phone.replace(/\D/g, '');
+    const { data, error } = await supabase.from('driver_applications').select('*').eq('phone', phone).single();
+    if (!error && data) return mapDbToDriverApplication(data);
+    if (normalized !== phone) {
+      const formats = [
+        phone,
+        `+44${normalized.startsWith('44') ? normalized.slice(2) : normalized.startsWith('0') ? normalized.slice(1) : normalized}`,
+        `0${normalized.startsWith('44') ? normalized.slice(2) : normalized}`,
+        normalized,
+      ];
+      for (const fmt of formats) {
+        const { data: d, error: e } = await supabase.from('driver_applications').select('*').eq('phone', fmt).single();
+        if (!e && d) return mapDbToDriverApplication(d);
+      }
+    }
+    return undefined;
+  }
+
   async getDriverApplications(filters?: { status?: DriverApplicationStatus }): Promise<DriverApplication[]> {
     const supabase = this.checkSupabase();
     let query = supabase.from('driver_applications').select('*').order('submitted_at', { ascending: false });

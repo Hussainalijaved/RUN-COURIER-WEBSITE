@@ -5374,6 +5374,33 @@ export async function registerRoutes(
       }
     }
 
+    if (req.body.phone) {
+      const existingPhoneApp = await storage.getDriverApplicationByPhone(req.body.phone);
+      if (existingPhoneApp && existingPhoneApp.email.toLowerCase() !== req.body.email.toLowerCase()) {
+        if (existingPhoneApp.status === 'approved') {
+          const { supabaseAdmin } = await import('./supabaseAdmin');
+          let accountStillExists = false;
+          if (supabaseAdmin) {
+            const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+            accountStillExists = !!users?.users?.find(
+              u => u.email?.toLowerCase() === existingPhoneApp.email.toLowerCase() && !u.deleted_at
+            );
+          }
+          if (!accountStillExists) {
+            await storage.deleteDriverApplication(existingPhoneApp.id);
+            console.log(`[Driver Application] Deleted old approved application ${existingPhoneApp.id} (phone reuse - account deleted)`);
+          } else {
+            return res.status(400).json({
+              error: "This phone number is already associated with an active driver account.",
+            });
+          }
+        } else if (['pending', 'corrections_needed', 'rejected'].includes(existingPhoneApp.status)) {
+          await storage.deleteDriverApplication(existingPhoneApp.id);
+          console.log(`[Driver Application] Deleted old ${existingPhoneApp.status} application ${existingPhoneApp.id} for phone reuse`);
+        }
+      }
+    }
+
     const { phoneVerified, phoneVerificationToken } = req.body;
     
     if (!phoneVerified || !phoneVerificationToken) {
