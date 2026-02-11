@@ -108,6 +108,8 @@ export default function DriverApplication() {
     goodsInTransitInsurance: null,
     hireAndReward: null,
   });
+  const [uploadedFileNames, setUploadedFileNames] = useState<Record<string, string>>({});
+  const [uploadingType, setUploadingType] = useState<string | null>(null);
 
   const form = useForm<DriverApplicationFormValues>({
     resolver: zodResolver(driverApplicationFormSchema),
@@ -171,6 +173,7 @@ export default function DriverApplication() {
     },
     onSettled: () => {
       setIsUploading(false);
+      setUploadingType(null);
     },
   });
 
@@ -320,6 +323,8 @@ export default function DriverApplication() {
       return;
     }
 
+    setUploadingType(type);
+    setUploadedFileNames(prev => ({ ...prev, [type]: file.name }));
     uploadFileMutation.mutate({ file, type });
   }, [uploadFileMutation, toast]);
 
@@ -416,30 +421,62 @@ export default function DriverApplication() {
     type: keyof typeof uploadedFiles;
     required?: boolean;
     description?: string;
-  }) => (
-    <div className="space-y-2">
-      <Label className="flex items-center gap-2">
-        {label}
-        {required && <span className="text-destructive">*</span>}
-      </Label>
-      {description && (
-        <p className="text-sm text-muted-foreground">{description}</p>
-      )}
-      <div className="flex items-center gap-4">
-        <Input
-          type="file"
-          accept="image/*,.pdf"
-          onChange={(e) => handleFileChange(e, type)}
-          disabled={isUploading}
-          className="flex-1"
-          data-testid={`input-file-${type}`}
-        />
-        {uploadedFiles[type] && (
-          <CheckCircle className="h-5 w-5 text-green-500" />
+  }) => {
+    const isThisUploading = uploadingType === type;
+    const isUploaded = !!uploadedFiles[type];
+    const fileName = uploadedFileNames[type];
+
+    return (
+      <div className="space-y-2">
+        <Label className="flex items-center gap-2">
+          {label}
+          {required && <span className="text-destructive">*</span>}
+        </Label>
+        {description && (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        )}
+        {isUploaded ? (
+          <div className="flex items-center gap-3 rounded-md border border-green-500/30 bg-green-500/10 p-3">
+            <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+            <span className="text-sm text-foreground truncate flex-1">{fileName || 'File uploaded'}</span>
+            <label className="cursor-pointer">
+              <span className="text-sm text-primary hover:underline">Replace</span>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => handleFileChange(e, type)}
+                disabled={isUploading}
+                className="hidden"
+                data-testid={`input-file-${type}-replace`}
+              />
+            </label>
+          </div>
+        ) : (
+          <label className={cn(
+            "flex items-center gap-3 rounded-md border border-dashed p-3 cursor-pointer transition-colors",
+            isThisUploading ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover-elevate"
+          )}>
+            {isThisUploading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
+            ) : (
+              <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
+            )}
+            <span className="text-sm text-muted-foreground">
+              {isThisUploading ? `Uploading ${fileName || ''}...` : 'Tap to choose a file'}
+            </span>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => handleFileChange(e, type)}
+              disabled={isUploading}
+              className="hidden"
+              data-testid={`input-file-${type}`}
+            />
+          </label>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <PublicLayout>
