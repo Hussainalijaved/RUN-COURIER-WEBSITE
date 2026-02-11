@@ -185,6 +185,7 @@ export function registerMobileRoutes(app: Express): void {
         profile: "/api/mobile/v1/driver/profile",
         jobs: "/api/mobile/v1/driver/jobs",
         hideJob: "/api/mobile/v1/driver/jobs/:jobId/hide",
+        assignedJobs: "/api/mobile/v1/driver/assigned-jobs",
         jobOffers: "/api/mobile/v1/driver/job-offers",
         location: "/api/mobile/v1/driver/location",
         availability: "/api/mobile/v1/driver/availability",
@@ -198,8 +199,8 @@ export function registerMobileRoutes(app: Express): void {
     });
   });
 
-  // GET /api/mobile/v1/driver/job-offers - Fetch geocoded job offers for driver
-  app.get("/api/mobile/v1/driver/job-offers",
+  // GET /api/mobile/v1/driver/assigned-jobs - Fetch geocoded assigned jobs for driver
+  app.get("/api/mobile/v1/driver/assigned-jobs",
     requireSupabaseAuth,
     asyncHandler(async (req, res) => {
       const authUser = req.auth!;
@@ -236,10 +237,10 @@ export function registerMobileRoutes(app: Express): void {
           if (addr) {
             const geo = await geocodeAddress(addr);
             if (geo) {
-              job.pickup_latitude = geo.lat;
-              job.pickup_longitude = geo.lng;
-              updates.pickup_latitude = geo.lat;
-              updates.pickup_longitude = geo.lng;
+              job.pickup_latitude = String(geo.lat);
+              job.pickup_longitude = String(geo.lng);
+              updates.pickup_latitude = String(geo.lat);
+              updates.pickup_longitude = String(geo.lng);
               updated = true;
               console.log(`[Job Offers API] Geocoded pickup for job ${job.id}: ${geo.lat}, ${geo.lng}`);
             }
@@ -252,10 +253,10 @@ export function registerMobileRoutes(app: Express): void {
           if (addr) {
             const geo = await geocodeAddress(addr);
             if (geo) {
-              job.delivery_latitude = geo.lat;
-              job.delivery_longitude = geo.lng;
-              updates.delivery_latitude = geo.lat;
-              updates.delivery_longitude = geo.lng;
+              job.delivery_latitude = String(geo.lat);
+              job.delivery_longitude = String(geo.lng);
+              updates.delivery_latitude = String(geo.lat);
+              updates.delivery_longitude = String(geo.lng);
               updated = true;
               console.log(`[Job Offers API] Geocoded delivery for job ${job.id}: ${geo.lat}, ${geo.lng}`);
             }
@@ -273,7 +274,15 @@ export function registerMobileRoutes(app: Express): void {
         }
       }
 
-      res.json({ success: true, jobs });
+      const parsedJobs = jobs.map(job => ({
+        ...job,
+        pickup_latitude: job.pickup_latitude ? parseFloat(String(job.pickup_latitude)) : null,
+        pickup_longitude: job.pickup_longitude ? parseFloat(String(job.pickup_longitude)) : null,
+        delivery_latitude: job.delivery_latitude ? parseFloat(String(job.delivery_latitude)) : null,
+        delivery_longitude: job.delivery_longitude ? parseFloat(String(job.delivery_longitude)) : null,
+      }));
+
+      res.json({ success: true, jobs: parsedJobs });
     })
   );
 
@@ -2881,12 +2890,12 @@ export function registerMobileRoutes(app: Express): void {
               vehicleType: job.vehicleType,
               pickupAddress: job.pickupAddress,
               pickupPostcode: job.pickupPostcode,
-              pickupLatitude: job.pickupLatitude,
-              pickupLongitude: job.pickupLongitude,
+              pickupLatitude: job.pickupLatitude ? parseFloat(String(job.pickupLatitude)) : null,
+              pickupLongitude: job.pickupLongitude ? parseFloat(String(job.pickupLongitude)) : null,
               deliveryAddress: job.deliveryAddress,
               deliveryPostcode: job.deliveryPostcode,
-              deliveryLatitude: job.deliveryLatitude,
-              deliveryLongitude: job.deliveryLongitude,
+              deliveryLatitude: job.deliveryLatitude ? parseFloat(String(job.deliveryLatitude)) : null,
+              deliveryLongitude: job.deliveryLongitude ? parseFloat(String(job.deliveryLongitude)) : null,
               recipientName: job.recipientName,
               recipientPhone: job.recipientPhone,
               weight: job.weight,

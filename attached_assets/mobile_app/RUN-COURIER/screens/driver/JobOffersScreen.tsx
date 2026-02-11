@@ -400,7 +400,7 @@ export function JobOffersScreen({ navigation }: any) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
             try {
-              const resp = await fetch(`${API_URL}/api/mobile/v1/driver/job-offers`, {
+              const resp = await fetch(`${API_URL}/api/mobile/v1/driver/assigned-jobs`, {
                 headers: { 'Authorization': `Bearer ${token}` },
                 signal: controller.signal,
               });
@@ -834,10 +834,10 @@ export function JobOffersScreen({ navigation }: any) {
                     </View>
 
                     <JobOfferMapPreview
-                      pickupLat={job.pickup_latitude ?? job.pickup_lat}
-                      pickupLng={job.pickup_longitude ?? job.pickup_lng}
-                      dropoffLat={job.delivery_latitude ?? job.dropoff_lat}
-                      dropoffLng={job.delivery_longitude ?? job.dropoff_lng}
+                      pickupLat={parseFloat(String(job.pickup_latitude ?? job.pickup_lat)) || undefined}
+                      pickupLng={parseFloat(String(job.pickup_longitude ?? job.pickup_lng)) || undefined}
+                      dropoffLat={parseFloat(String(job.delivery_latitude ?? job.dropoff_lat)) || undefined}
+                      dropoffLng={parseFloat(String(job.delivery_longitude ?? job.dropoff_lng)) || undefined}
                       staticMapUrl={(job as any).static_map_url || (job as any).staticMapUrl || null}
                     />
 
