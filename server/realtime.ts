@@ -116,6 +116,7 @@ interface JobAssignedMessage {
   payload: {
     jobId: string;
     trackingNumber: string;
+    jobNumber?: string | null;
     status: string;
     driverId: string;
     pickupAddress?: string;
@@ -132,6 +133,8 @@ interface JobAssignedMessage {
     vehicleType?: string;
     driverPrice?: string | null;
     assignedAt: string;
+    playSound: boolean;
+    alert: boolean;
   };
 }
 
@@ -585,6 +588,7 @@ export function broadcastJobCreated(job: {
 export function broadcastJobAssigned(job: {
   id: string;
   trackingNumber: string;
+  jobNumber?: string | null;
   status: string;
   driverId: string;
   pickupAddress?: string;
@@ -606,6 +610,7 @@ export function broadcastJobAssigned(job: {
     payload: {
       jobId: job.id,
       trackingNumber: job.trackingNumber,
+      jobNumber: job.jobNumber || null,
       status: job.status,
       driverId: job.driverId,
       pickupAddress: job.pickupAddress,
@@ -622,6 +627,8 @@ export function broadcastJobAssigned(job: {
       vehicleType: job.vehicleType,
       driverPrice: job.driverPrice,
       assignedAt: new Date().toISOString(),
+      playSound: true,
+      alert: true,
     },
   };
 

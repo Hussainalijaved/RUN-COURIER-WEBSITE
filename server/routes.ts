@@ -1694,6 +1694,7 @@ export async function registerRoutes(
       broadcastJobAssigned({
         id: job.id,
         trackingNumber: job.trackingNumber,
+        jobNumber: job.jobNumber,
         status: job.status,
         driverId: job.driverId,
         pickupAddress: job.pickupAddress,
@@ -2109,6 +2110,7 @@ export async function registerRoutes(
       broadcastJobAssigned({
         id: freshJob.id,
         trackingNumber: freshJob.trackingNumber,
+        jobNumber: freshJob.jobNumber,
         status: freshJob.status,
         driverId: freshJob.driverId,
         pickupAddress: freshJob.pickupAddress,
@@ -2131,6 +2133,7 @@ export async function registerRoutes(
       sendJobOfferNotification(freshJob.driverId, {
         jobId: freshJob.id,
         trackingNumber: freshJob.trackingNumber,
+        jobNumber: freshJob.jobNumber,
         pickupAddress: freshJob.pickupAddress,
         pickupPostcode: freshJob.pickupPostcode,
         pickupLatitude: freshJob.pickupLatitude,
@@ -7830,6 +7833,7 @@ export async function registerRoutes(
       broadcastJobAssigned({
         id: freshAssignJob.id,
         trackingNumber: freshAssignJob.trackingNumber,
+        jobNumber: freshAssignJob.jobNumber,
         status: freshAssignJob.status,
         driverId: freshAssignJob.driverId,
         pickupAddress: freshAssignJob.pickupAddress,
@@ -7852,6 +7856,7 @@ export async function registerRoutes(
     sendJobOfferNotification(driverId, {
       jobId,
       trackingNumber: freshAssignJob.trackingNumber,
+      jobNumber: freshAssignJob.jobNumber,
       pickupAddress: freshAssignJob.pickupAddress,
       pickupPostcode: freshAssignJob.pickupPostcode,
       pickupLatitude: freshAssignJob.pickupLatitude,
@@ -7962,6 +7967,7 @@ export async function registerRoutes(
           sendJobOfferNotification(driverId, {
             jobId: job.id,
             trackingNumber: job.trackingNumber,
+            jobNumber: job.jobNumber,
             pickupAddress: job.pickupAddress,
             deliveryAddress: job.deliveryAddress,
             driverPrice: driverPrice,

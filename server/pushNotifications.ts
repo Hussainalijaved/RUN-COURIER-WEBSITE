@@ -200,6 +200,7 @@ export async function sendJobOfferNotification(
   jobDetails: {
     jobId: string;
     trackingNumber: string;
+    jobNumber?: string | null;
     pickupAddress?: string;
     pickupPostcode?: string;
     pickupLatitude?: string | null;
@@ -238,6 +239,7 @@ export async function sendJobOfferNotification(
       type: "job_offer",
       jobId: jobDetails.jobId,
       trackingNumber: jobDetails.trackingNumber,
+      jobNumber: jobDetails.jobNumber || null,
       pickupAddress: jobDetails.pickupAddress,
       pickupPostcode: jobDetails.pickupPostcode,
       pickupLatitude: jobDetails.pickupLatitude,
