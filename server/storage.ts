@@ -107,6 +107,7 @@ export interface IStorage {
   createDriverApplication(application: InsertDriverApplication): Promise<DriverApplication>;
   updateDriverApplication(id: string, data: Partial<DriverApplication>): Promise<DriverApplication | undefined>;
   reviewDriverApplication(id: string, status: DriverApplicationStatus, reviewedBy: string, reviewNotes?: string, rejectionReason?: string): Promise<DriverApplication | undefined>;
+  deleteDriverApplication(id: string): Promise<boolean>;
 
   getInvoice(id: string): Promise<Invoice | undefined>;
   getInvoiceByNumber(invoiceNumber: string): Promise<Invoice | undefined>;
@@ -1324,6 +1325,10 @@ export class MemStorage implements IStorage {
       this.driverApplications.set(id, updated);
     }
     return updated;
+  }
+
+  async deleteDriverApplication(id: string): Promise<boolean> {
+    return this.driverApplications.delete(id);
   }
 
   async getInvoice(id: string): Promise<Invoice | undefined> {

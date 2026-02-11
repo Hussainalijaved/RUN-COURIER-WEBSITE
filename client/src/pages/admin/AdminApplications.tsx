@@ -115,6 +115,50 @@ export default function AdminApplications() {
     },
   });
 
+  const sendBackMutation = useMutation({
+    mutationFn: async ({ id, adminFeedback }: { id: string; adminFeedback: string }) => {
+      const response = await apiRequest("PATCH", `/api/driver-applications/${id}/send-back`, {
+        adminFeedback,
+        reviewedBy: user?.id || 'admin',
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
+      toast({ 
+        title: 'Application Sent Back',
+        description: 'The driver will be notified to make corrections and resubmit.',
+      });
+      setIsReviewDialogOpen(false);
+      setSelectedApplication(null);
+      setReviewNotes('');
+      setRejectionReason('');
+      setDocumentStatuses({});
+    },
+    onError: () => {
+      toast({ title: 'Failed to send back application', variant: 'destructive' });
+    },
+  });
+
+  const deleteApplicationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/driver-applications/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-applications'] });
+      toast({ 
+        title: 'Application Deleted',
+        description: 'The applicant can now reapply with the same email.',
+      });
+      setIsReviewDialogOpen(false);
+      setSelectedApplication(null);
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete application', variant: 'destructive' });
+    },
+  });
+
   const handleDocumentUpload = async (documentField: string, file: File) => {
     if (!selectedApplication) return;
     setUploadingDoc(documentField);
@@ -165,13 +209,16 @@ export default function AdminApplications() {
   const pendingApplications = applications?.filter(a => a.status === 'pending') || [];
   const approvedApplications = applications?.filter(a => a.status === 'approved') || [];
   const rejectedApplications = applications?.filter(a => a.status === 'rejected') || [];
+  const correctionsApplications = applications?.filter(a => a.status === 'corrections_needed') || [];
 
-  const filteredApplications = (status: 'pending' | 'approved' | 'rejected') => {
+  const filteredApplications = (status: string) => {
     const list = status === 'pending' 
       ? pendingApplications 
       : status === 'approved' 
         ? approvedApplications 
-        : rejectedApplications;
+        : status === 'corrections_needed'
+          ? correctionsApplications
+          : rejectedApplications;
     
     if (!searchQuery) return list;
     
@@ -251,6 +298,26 @@ export default function AdminApplications() {
     });
   };
 
+  const handleSendBack = () => {
+    if (!selectedApplication) return;
+    if (!reviewNotes.trim()) {
+      toast({
+        title: 'Feedback required',
+        description: 'Please describe what needs to be corrected before sending back.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    sendBackMutation.mutate({
+      id: selectedApplication.id,
+      adminFeedback: reviewNotes,
+    });
+  };
+
+  const handleDeleteApplication = (id: string) => {
+    deleteApplicationMutation.mutate(id);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -259,6 +326,8 @@ export default function AdminApplications() {
         return <Badge variant="outline" className="border-green-500 text-green-600"><CheckCircle className="h-3 w-3 mr-1" /> Approved</Badge>;
       case 'rejected':
         return <Badge variant="outline" className="border-red-500 text-red-600"><XCircle className="h-3 w-3 mr-1" /> Rejected</Badge>;
+      case 'corrections_needed':
+        return <Badge variant="outline" className="border-orange-500 text-orange-600"><AlertCircle className="h-3 w-3 mr-1" /> Corrections Needed</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -324,25 +393,48 @@ export default function AdminApplications() {
       </TableCell>
       <TableCell>{getStatusBadge(application.status)}</TableCell>
       <TableCell>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setSelectedApplication(application);
-            setIsReviewDialogOpen(true);
-            if (application.status === 'pending') {
-              const statuses: Record<string, 'approved' | 'rejected' | 'pending'> = {};
-              documentFields.forEach(doc => {
-                statuses[doc.key] = 'pending';
-              });
-              setDocumentStatuses(statuses);
-            }
-          }}
-          data-testid={`button-view-application-${application.id}`}
-        >
-          <Eye className="h-4 w-4 mr-1" />
-          View
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSelectedApplication(application);
+              setIsReviewDialogOpen(true);
+              if (application.status === 'pending') {
+                const statuses: Record<string, 'approved' | 'rejected' | 'pending'> = {};
+                documentFields.forEach(doc => {
+                  statuses[doc.key] = 'pending';
+                });
+                setDocumentStatuses(statuses);
+              }
+            }}
+            data-testid={`button-view-application-${application.id}`}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            View
+          </Button>
+          {application.status === 'rejected' && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm('Delete this application? The applicant will be able to reapply with the same email.')) {
+                  handleDeleteApplication(application.id);
+                }
+              }}
+              disabled={deleteApplicationMutation.isPending}
+              data-testid={`button-delete-application-${application.id}`}
+            >
+              {deleteApplicationMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="h-4 w-4 mr-1" />
+              )}
+              Delete
+            </Button>
+          )}
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -355,7 +447,7 @@ export default function AdminApplications() {
           <p className="text-muted-foreground">Review and manage driver applications</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Link href="/admin/applications?status=pending">
             <Card 
               className="cursor-pointer transition-all duration-200 hover-elevate" 
@@ -418,6 +510,27 @@ export default function AdminApplications() {
               </CardContent>
             </Card>
           </Link>
+
+          <Link href="/admin/applications?status=corrections_needed">
+            <Card 
+              className="cursor-pointer transition-all duration-200 hover-elevate" 
+              data-testid="stat-corrections-applications"
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12" />
+                    ) : (
+                      <div className="text-2xl font-bold">{correctionsApplications.length}</div>
+                    )}
+                    <p className="text-sm text-muted-foreground">Corrections Needed</p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         <Card>
@@ -448,9 +561,12 @@ export default function AdminApplications() {
                 <TabsTrigger value="rejected" data-testid="tab-rejected">
                   Rejected ({rejectedApplications.length})
                 </TabsTrigger>
+                <TabsTrigger value="corrections_needed" data-testid="tab-corrections">
+                  Corrections ({correctionsApplications.length})
+                </TabsTrigger>
               </TabsList>
 
-              {(['pending', 'approved', 'rejected'] as const).map((status) => (
+              {(['pending', 'approved', 'rejected', 'corrections_needed'] as const).map((status) => (
                 <TabsContent key={status} value={status}>
                   {isLoading ? (
                     <div className="space-y-4">
@@ -743,11 +859,23 @@ export default function AdminApplications() {
                     <p className="text-sm text-muted-foreground">{selectedApplication.rejectionReason}</p>
                   </div>
                 )}
+
+                {selectedApplication.status === 'corrections_needed' && selectedApplication.reviewNotes && (
+                  <div className="pt-4 border-t">
+                    <h3 className="font-semibold mb-2 text-orange-600">Corrections Requested</h3>
+                    <p className="text-sm text-muted-foreground">{selectedApplication.reviewNotes}</p>
+                    {selectedApplication.reviewedAt && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Sent back on {format(new Date(selectedApplication.reviewedAt), 'dd MMM yyyy HH:mm')}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <DialogFooter>
                 {selectedApplication.status === 'pending' ? (
-                  <>
+                  <div className="flex flex-wrap items-center gap-2 w-full justify-end">
                     <Button
                       variant="outline"
                       onClick={() => setIsReviewDialogOpen(false)}
@@ -755,9 +883,23 @@ export default function AdminApplications() {
                       Cancel
                     </Button>
                     <Button
+                      variant="outline"
+                      className="border-orange-500 text-orange-600"
+                      onClick={handleSendBack}
+                      disabled={sendBackMutation.isPending || reviewApplicationMutation.isPending}
+                      data-testid="button-send-back-application"
+                    >
+                      {sendBackMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Send Back
+                    </Button>
+                    <Button
                       variant="destructive"
                       onClick={handleReject}
-                      disabled={reviewApplicationMutation.isPending}
+                      disabled={reviewApplicationMutation.isPending || sendBackMutation.isPending}
                       data-testid="button-reject-application"
                     >
                       {reviewApplicationMutation.isPending ? (
@@ -769,7 +911,7 @@ export default function AdminApplications() {
                     </Button>
                     <Button
                       onClick={handleApprove}
-                      disabled={reviewApplicationMutation.isPending}
+                      disabled={reviewApplicationMutation.isPending || sendBackMutation.isPending}
                       data-testid="button-approve-application"
                     >
                       {reviewApplicationMutation.isPending ? (
@@ -779,7 +921,30 @@ export default function AdminApplications() {
                       )}
                       Approve
                     </Button>
-                  </>
+                  </div>
+                ) : selectedApplication.status === 'rejected' ? (
+                  <div className="flex flex-wrap items-center gap-2 w-full justify-end">
+                    <Button onClick={() => setIsReviewDialogOpen(false)}>
+                      Close
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        if (confirm('Delete this application? The applicant will be able to reapply with the same email.')) {
+                          handleDeleteApplication(selectedApplication.id);
+                        }
+                      }}
+                      disabled={deleteApplicationMutation.isPending}
+                      data-testid="button-delete-rejected-application"
+                    >
+                      {deleteApplicationMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Delete Application
+                    </Button>
+                  </div>
                 ) : (
                   <Button onClick={() => setIsReviewDialogOpen(false)}>
                     Close

@@ -1621,6 +1621,16 @@ export class SupabaseStorage implements IStorage {
     });
   }
 
+  async deleteDriverApplication(id: string): Promise<boolean> {
+    const supabase = this.checkSupabase();
+    const { error } = await supabase.from('driver_applications').delete().eq('id', id);
+    if (error) {
+      console.error('[Storage] Failed to delete driver application:', error);
+      return false;
+    }
+    return true;
+  }
+
   async getInvoice(id: string): Promise<Invoice | undefined> {
     const supabase = this.checkSupabase();
     const { data, error } = await supabase.from('invoices').select('*').eq('id', id).single();

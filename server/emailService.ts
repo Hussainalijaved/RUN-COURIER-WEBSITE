@@ -1411,6 +1411,31 @@ export async function sendDriverApprovalEmailExisting(
   return sendEmailNotification(email, 'Application Approved - Welcome to Run Courier!', htmlContent, textContent);
 }
 
+export async function sendApplicationCorrectionEmail(
+  email: string,
+  fullName: string,
+  feedback: string
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #333; margin-top: 0;">Application Requires Corrections</h2>
+    <div style="background-color: white; border-radius: 8px; padding: 20px;">
+      <p style="color: #333; font-size: 16px;">Dear ${fullName},</p>
+      <p style="color: #333;">Thank you for your application to join Run Courier. After reviewing your submission, we need you to make some corrections before we can proceed.</p>
+      <div style="background-color: #FFF7ED; border-left: 4px solid #F97316; padding: 16px; margin: 20px 0; border-radius: 4px;">
+        <strong style="color: #C2410C;">What needs to be fixed:</strong>
+        <p style="color: #333; white-space: pre-line; margin-top: 8px;">${feedback}</p>
+      </div>
+      <p style="color: #333;">Please visit <a href="https://runcourier.co.uk/apply" style="color: #007BFF;">runcourier.co.uk/apply</a> to resubmit your application with the required corrections.</p>
+    </div>
+    <p style="color: #666; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call +44 20 4634 6100.</p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Corrections Required');
+  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. After reviewing your submission, we need you to make some corrections.\n\nWhat needs to be fixed:\n${feedback}\n\nPlease visit runcourier.co.uk/apply to resubmit your application.\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+
+  return sendEmailNotification(email, 'Application Corrections Required - Run Courier', htmlContent, textContent);
+}
+
 export async function sendContactFormSubmission(
   name: string,
   email: string,

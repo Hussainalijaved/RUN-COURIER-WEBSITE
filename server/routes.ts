@@ -5343,11 +5343,16 @@ export async function registerRoutes(
   app.post("/api/driver-applications", asyncHandler(async (req, res) => {
     const existingApplication = await storage.getDriverApplicationByEmail(req.body.email);
     if (existingApplication) {
-      return res.status(400).json({ 
-        error: "An application with this email already exists",
-        status: existingApplication.status,
-        applicationId: existingApplication.id
-      });
+      if (existingApplication.status === 'corrections_needed') {
+        await storage.deleteDriverApplication(existingApplication.id);
+        console.log(`[Driver Application] Deleted corrections_needed application ${existingApplication.id} for resubmission`);
+      } else {
+        return res.status(400).json({ 
+          error: "An application with this email already exists",
+          status: existingApplication.status,
+          applicationId: existingApplication.id
+        });
+      }
     }
 
     const { phoneVerified, phoneVerificationToken } = req.body;
@@ -5801,6 +5806,62 @@ export async function registerRoutes(
     await sendDriverApplicationNotification(application.fullName, status).catch(err => console.error('Failed to send application notification:', err));
 
     res.json(application);
+  }));
+
+  app.patch("/api/driver-applications/:id/send-back", asyncHandler(async (req, res) => {
+    const { adminFeedback, reviewedBy } = req.body;
+    
+    if (!adminFeedback?.trim()) {
+      return res.status(400).json({ error: "Feedback message is required" });
+    }
+
+    const application = await storage.getDriverApplication(req.params.id);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    if (application.status !== 'pending') {
+      return res.status(400).json({ error: "Only pending applications can be sent back for corrections" });
+    }
+
+    const updated = await storage.updateDriverApplication(req.params.id, {
+      status: 'corrections_needed' as any,
+      reviewNotes: adminFeedback.trim(),
+      reviewedBy: reviewedBy || 'admin',
+      reviewedAt: new Date(),
+    });
+
+    if (!updated) {
+      return res.status(500).json({ error: "Failed to update application" });
+    }
+
+    try {
+      const { sendApplicationCorrectionEmail } = await import('./emailService');
+      await sendApplicationCorrectionEmail(application.email, application.fullName, adminFeedback.trim());
+    } catch (err) {
+      console.error('[Driver Application] Failed to send correction email:', err);
+    }
+
+    res.json(updated);
+  }));
+
+  app.delete("/api/driver-applications/:id", asyncHandler(async (req, res) => {
+    const application = await storage.getDriverApplication(req.params.id);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    if (application.status !== 'rejected') {
+      return res.status(400).json({ error: "Only rejected applications can be deleted" });
+    }
+
+    const deleted = await storage.deleteDriverApplication(req.params.id);
+    if (!deleted) {
+      return res.status(500).json({ error: "Failed to delete application" });
+    }
+
+    console.log(`[Driver Application] Deleted rejected application for ${application.email}`);
+    res.json({ success: true, message: "Application deleted successfully" });
   }));
 
   // Invoice routes for Pay Later customers
