@@ -278,6 +278,45 @@ export async function sendJobOfferNotification(
   return { success: successCount > 0, sentCount: successCount };
 }
 
+export async function sendJobWithdrawalNotification(
+  driverId: string,
+  jobDetails: {
+    jobId: string;
+    trackingNumber: string;
+    reason?: string;
+  }
+): Promise<{ success: boolean; sentCount: number }> {
+  const devices = await getDriverDevices(driverId);
+
+  if (devices.length === 0) {
+    log(`No registered devices for driver ${driverId} - cannot send withdrawal notification`, "push");
+    return { success: false, sentCount: 0 };
+  }
+
+  const messages: ExpoPushMessage[] = devices.map(device => ({
+    to: device.push_token,
+    sound: "default",
+    title: "Job Withdrawn",
+    body: "A job offer has been withdrawn by admin.",
+    data: {
+      type: "job_withdrawn",
+      jobId: jobDetails.jobId,
+      trackingNumber: jobDetails.trackingNumber,
+      reason: jobDetails.reason || "Withdrawn by admin",
+      screen: "JobOffers",
+    },
+    priority: "high",
+    channelId: "job-offers",
+  }));
+
+  const tickets = await sendExpoPushNotifications(messages);
+  const successCount = tickets.filter(t => t.status === "ok").length;
+
+  log(`Sent job withdrawal notification to ${successCount}/${devices.length} devices for driver ${driverId}`, "push");
+
+  return { success: successCount > 0, sentCount: successCount };
+}
+
 export async function sendJobStatusNotification(
   driverId: string,
   jobDetails: {

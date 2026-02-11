@@ -18,6 +18,7 @@ import { JobOfferMapPreview } from '@/components/JobOfferMapPreview';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 
 const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || '';
 const DRIVER_ONLINE_STATUS_KEY = '@driver_online_status';
@@ -372,10 +373,10 @@ export function JobOffersScreen({ navigation }: any) {
 
   // FREEZE PREVENTION: Fetch jobs with timeout protection
   // Always resolves loading state - never leaves UI hanging
+  // Strategy: Try backend API first (returns geocoded coords), fall back to direct Supabase query
   const fetchAssignedJobs = useCallback(async (playSound: boolean = false) => {
     console.log('[JobOffers] Fetching jobs for driver IDs:', allDriverIds);
     
-    // FREEZE PREVENTION: Immediately resolve if no driverId
     if (!driverId || allDriverIds.length === 0) {
       console.log('[JobOffers] No driverId available, skipping fetch');
       if (isMountedRef.current) {
@@ -385,61 +386,90 @@ export function JobOffersScreen({ navigation }: any) {
       return;
     }
 
-    // FREEZE PREVENTION: Increment request ID to track this specific request
     const thisRequestId = ++fetchRequestIdRef.current;
-    let timedOut = false;
 
     try {
-      // FREEZE PREVENTION: Race query against timeout
-      // Query jobs assigned to either driver.id or auth user.id
-      // SECURITY: Query driver_jobs_view instead of jobs table to hide customer pricing
-      const queryPromise = supabase
-        .from('driver_jobs_view')
-        .select('*')
-        .in('driver_id', allDriverIds)
-        .in('status', ['assigned', 'offered'])
-        .order('created_at', { ascending: false });
+      let newJobs: Job[] = [];
+      let usedApi = false;
 
-      const timeoutPromise = new Promise<null>((resolve) => 
-        setTimeout(() => { timedOut = true; resolve(null); }, API_TIMEOUT_MS)
-      );
-
-      const result = await Promise.race([queryPromise, timeoutPromise]);
-
-      // FREEZE PREVENTION: Ignore late-arriving results from stale requests
-      if (fetchRequestIdRef.current !== thisRequestId) {
-        console.log('[JobOffers] Ignoring stale fetch result');
-        return;
-      }
-
-      // FREEZE PREVENTION: If timed out, use empty array fallback
-      if (timedOut || !result) {
-        console.warn('[JobOffers] Query timed out, using empty fallback');
-        if (isMountedRef.current) {
-          setJobs([]);
-          setLoading(false);
-          setRefreshing(false);
+      // FIRST: Try fetching from backend API (server geocodes missing coordinates)
+      if (API_URL) {
+        try {
+          const token = await getAuthToken();
+          if (token) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+            try {
+              const resp = await fetch(`${API_URL}/api/mobile/v1/driver/job-offers`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+                signal: controller.signal,
+              });
+              clearTimeout(timeoutId);
+              if (resp.ok) {
+                const body = await resp.json();
+                if (body.success && Array.isArray(body.jobs)) {
+                  newJobs = body.jobs;
+                  usedApi = true;
+                  console.log(`[JobOffers] API returned ${newJobs.length} geocoded jobs`);
+                }
+              } else {
+                console.warn('[JobOffers] API returned status', resp.status);
+              }
+            } catch (fetchErr) {
+              clearTimeout(timeoutId);
+              console.warn('[JobOffers] API fetch failed, falling back to Supabase:', fetchErr);
+            }
+          }
+        } catch (tokenErr) {
+          console.warn('[JobOffers] Could not get auth token for API call');
         }
-        return;
       }
 
-      const { data, error } = result;
-      console.log('[JobOffers] Query result:', { count: data?.length || 0, error: error ? String(error) : null });
-      
-      // FREEZE PREVENTION: Gracefully handle errors, don't throw
-      if (error) {
-        console.warn('[JobOffers] Query error (non-blocking):', error);
+      // FALLBACK: Direct Supabase query if API call failed
+      if (!usedApi) {
+        let timedOut = false;
+        const queryPromise = supabase
+          .from('driver_jobs_view')
+          .select('*')
+          .in('driver_id', allDriverIds)
+          .in('status', ['assigned', 'offered'])
+          .order('created_at', { ascending: false });
+
+        const timeoutPromise = new Promise<null>((resolve) => 
+          setTimeout(() => { timedOut = true; resolve(null); }, API_TIMEOUT_MS)
+        );
+
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+
+        if (fetchRequestIdRef.current !== thisRequestId) {
+          console.log('[JobOffers] Ignoring stale fetch result');
+          return;
+        }
+
+        if (timedOut || !result) {
+          console.warn('[JobOffers] Supabase query timed out, using empty fallback');
+          if (isMountedRef.current) {
+            setJobs([]);
+            setLoading(false);
+            setRefreshing(false);
+          }
+          return;
+        }
+
+        const { data, error } = result;
+        if (error) {
+          console.warn('[JobOffers] Supabase query error (non-blocking):', error);
+        }
+        newJobs = Array.isArray(data) ? data : [];
+        console.log('[JobOffers] Supabase fallback returned', newJobs.length, 'jobs');
+
+        if (API_URL && newJobs.length > 0) {
+          geocodeJobsWithMissingCoords(newJobs);
+        }
       }
-      
-      // FREEZE PREVENTION: Always use safe default
-      const newJobs = Array.isArray(data) ? data : [];
-      console.log('[JobOffers] Found', newJobs.length, 'jobs');
-      
-      // Geocode any jobs missing coordinates (fallback for when server-side geocoding fails)
-      if (API_URL && newJobs.length > 0) {
-        geocodeJobsWithMissingCoords(newJobs);
-      }
-      
+
+      if (fetchRequestIdRef.current !== thisRequestId) return;
+
       if (playSound && !isInitialLoadRef.current && newJobs.length > previousJobCountRef.current) {
         startRepeatingAlarm(4000);
         
@@ -460,12 +490,9 @@ export function JobOffersScreen({ navigation }: any) {
       isInitialLoadRef.current = false;
       if (isMountedRef.current) setJobs(newJobs);
     } catch (error) {
-      // FREEZE PREVENTION: Catch-all - never block UI
       console.warn('[JobOffers] Error fetching jobs (recovered):', error);
-      // Keep existing jobs or set to empty - don't leave undefined
       if (isMountedRef.current) setJobs(prev => prev || []);
     } finally {
-      // FREEZE PREVENTION: ALWAYS resolve loading states (only if this is still the active request)
       if (isMountedRef.current && fetchRequestIdRef.current === thisRequestId) {
         setLoading(false);
         setRefreshing(false);
@@ -531,6 +558,32 @@ export function JobOffersScreen({ navigation }: any) {
       }
     };
   }, [fetchAssignedJobs, allDriverIds.join(',')]);
+
+  // Handle push notifications for job_withdrawn
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (data?.type === 'job_withdrawn') {
+        console.log('[JobOffers] Received job_withdrawn push notification');
+        stopAlarmAndVerification();
+        fetchAssignedJobs(false);
+      }
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.type === 'job_withdrawn') {
+        console.log('[JobOffers] User tapped job_withdrawn notification');
+        stopAlarmAndVerification();
+        fetchAssignedJobs(false);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      responseSubscription.remove();
+    };
+  }, [fetchAssignedJobs, stopAlarmAndVerification]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

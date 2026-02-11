@@ -27,7 +27,7 @@ import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
 import { geocodeAddress } from "./geocoding";
-import { sendJobOfferNotification } from "./pushNotifications";
+import { sendJobOfferNotification, sendJobWithdrawalNotification } from "./pushNotifications";
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
 import { cache, CACHE_TTL } from "./cache";
 
@@ -8187,6 +8187,12 @@ export async function registerRoutes(
       });
     }
 
+    sendJobWithdrawalNotification(assignment.driverId, {
+      jobId: assignment.jobId,
+      trackingNumber: job?.trackingNumber || '',
+      reason: "Withdrawn by admin",
+    }).catch(err => console.error('[Job Assignment] Push notification failed:', err));
+
     res.json(updated);
   }));
 
@@ -8241,6 +8247,12 @@ export async function registerRoutes(
         reason: reason || "Removed by admin",
       });
     }
+
+    sendJobWithdrawalNotification(assignment.driverId, {
+      jobId: assignment.jobId,
+      trackingNumber: job?.trackingNumber || '',
+      reason: reason || "Removed by admin",
+    }).catch(err => console.error('[Job Assignment] Push notification failed:', err));
 
     res.json(updated);
   }));
@@ -8305,6 +8317,12 @@ export async function registerRoutes(
         data: { assignmentId: assignment.id, jobId: assignment.jobId },
       });
     }
+
+    sendJobWithdrawalNotification(assignment.driverId, {
+      jobId: assignment.jobId,
+      trackingNumber: job?.trackingNumber || '',
+      reason: "Assignment cleaned by admin",
+    }).catch(err => console.error('[Job Assignment] Push notification failed:', err));
 
     res.json(updated);
   }));
@@ -8372,6 +8390,12 @@ export async function registerRoutes(
       driverId: previousDriverId,
       reason: reason || "Unassigned by admin",
     });
+
+    sendJobWithdrawalNotification(previousDriverId, {
+      jobId: jobId,
+      trackingNumber: job.trackingNumber,
+      reason: reason || "Unassigned by admin",
+    }).catch(err => console.error('[Job Unassign] Push notification failed:', err));
 
     res.json({ 
       success: true, 

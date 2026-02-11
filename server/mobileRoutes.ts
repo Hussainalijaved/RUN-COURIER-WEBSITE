@@ -10,6 +10,7 @@ import multer from "multer";
 import path from "path";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "./pushNotifications";
+import { geocodeAddress } from "./geocoding";
 
 // Helper to map Supabase job to local Job format for mobile API response
 // CRITICAL: Only expose driver_price to drivers, NEVER total_price or customer pricing
@@ -196,6 +197,85 @@ export function registerMobileRoutes(app: Express): void {
       }
     });
   });
+
+  // GET /api/mobile/v1/driver/job-offers - Fetch geocoded job offers for driver
+  app.get("/api/mobile/v1/driver/job-offers",
+    requireSupabaseAuth,
+    asyncHandler(async (req, res) => {
+      const authUser = req.auth!;
+      const driverId = authUser.id;
+
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Server not configured", code: "NO_SUPABASE" });
+      }
+
+      const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
+
+      const { data: jobsData, error } = await supabaseAdmin
+        .from('jobs')
+        .select(driverSafeColumns)
+        .eq('driver_id', driverId)
+        .in('status', ['assigned', 'offered'])
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[Job Offers API] Query error:', error);
+        return res.status(500).json({ error: "Failed to fetch jobs", code: "QUERY_ERROR" });
+      }
+
+      const jobs = jobsData || [];
+      console.log(`[Job Offers API] Found ${jobs.length} jobs for driver ${driverId}`);
+
+      for (const job of jobs) {
+        let updated = false;
+        const updates: Record<string, any> = {};
+
+        const hasPickupCoords = job.pickup_latitude && job.pickup_longitude;
+        if (!hasPickupCoords) {
+          const addr = job.pickup_address || job.pickup_postcode;
+          if (addr) {
+            const geo = await geocodeAddress(addr);
+            if (geo) {
+              job.pickup_latitude = geo.lat;
+              job.pickup_longitude = geo.lng;
+              updates.pickup_latitude = geo.lat;
+              updates.pickup_longitude = geo.lng;
+              updated = true;
+              console.log(`[Job Offers API] Geocoded pickup for job ${job.id}: ${geo.lat}, ${geo.lng}`);
+            }
+          }
+        }
+
+        const hasDeliveryCoords = job.delivery_latitude && job.delivery_longitude;
+        if (!hasDeliveryCoords) {
+          const addr = job.delivery_address || job.delivery_postcode;
+          if (addr) {
+            const geo = await geocodeAddress(addr);
+            if (geo) {
+              job.delivery_latitude = geo.lat;
+              job.delivery_longitude = geo.lng;
+              updates.delivery_latitude = geo.lat;
+              updates.delivery_longitude = geo.lng;
+              updated = true;
+              console.log(`[Job Offers API] Geocoded delivery for job ${job.id}: ${geo.lat}, ${geo.lng}`);
+            }
+          }
+        }
+
+        if (updated) {
+          const { error: updateError } = await supabaseAdmin
+            .from('jobs')
+            .update(updates)
+            .eq('id', job.id);
+          if (updateError) {
+            console.error(`[Job Offers API] Failed to cache geocoded coords for job ${job.id}:`, updateError);
+          }
+        }
+      }
+
+      res.json({ success: true, jobs });
+    })
+  );
 
   // Register push notification token for driver
   app.post("/api/mobile/v1/driver/push-token",
