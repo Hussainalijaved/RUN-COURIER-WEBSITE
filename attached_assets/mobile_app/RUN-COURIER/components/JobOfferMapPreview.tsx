@@ -9,6 +9,7 @@ import * as Location from 'expo-location';
 
 const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey || 
                             process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || '';
 
 // FREEZE PREVENTION: Timeout for location and API calls
 // ALWAYS resolves - never rejects - to prevent UI freezes
@@ -39,6 +40,7 @@ interface JobOfferMapPreviewProps {
   pickupLng?: number;
   dropoffLat?: number;
   dropoffLng?: number;
+  staticMapUrl?: string | null;
 }
 
 function decodePolyline(encoded: string): Array<{ latitude: number; longitude: number }> {
@@ -86,13 +88,14 @@ export function JobOfferMapPreview({
   pickupLat, 
   pickupLng, 
   dropoffLat, 
-  dropoffLng 
+  dropoffLng,
+  staticMapUrl,
 }: JobOfferMapPreviewProps) {
   const { theme } = useTheme();
   const [driverLocation, setDriverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  const hasPickup = typeof pickupLat === 'number' && typeof pickupLng === 'number';
-  const hasDropoff = typeof dropoffLat === 'number' && typeof dropoffLng === 'number';
+  const hasPickup = typeof pickupLat === 'number' && typeof pickupLng === 'number' && !isNaN(pickupLat) && !isNaN(pickupLng);
+  const hasDropoff = typeof dropoffLat === 'number' && typeof dropoffLng === 'number' && !isNaN(dropoffLat) && !isNaN(dropoffLng);
   const hasAnyCoords = hasPickup || hasDropoff;
 
   useEffect(() => {
@@ -101,20 +104,14 @@ export function JobOfferMapPreview({
     }
   }, []);
 
-  // FREEZE PREVENTION: Only use location if already granted - DO NOT request permission
-  // Wrapped in timeout to prevent any hanging
-  // This complies with Apple App Store Guidelines 5.1.1 and 5.1.5
   const getDriverLocation = async () => {
-    // FREEZE PREVENTION: Wrap permission check in safeTimeout (always resolves)
     const permResult = await safeTimeout(
       Location.getForegroundPermissionsAsync(),
       LOCATION_TIMEOUT_MS,
       { status: 'denied' as const, granted: false, canAskAgain: false, expires: 'never' as const }
     );
-    // Only proceed if permission was already granted elsewhere
     if (permResult.status !== 'granted') return;
     
-    // FREEZE PREVENTION: Wrap location fetch in safeTimeout (always resolves)
     const location = await safeTimeout(
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
       LOCATION_TIMEOUT_MS,
@@ -130,6 +127,23 @@ export function JobOfferMapPreview({
   };
 
   if (Platform.OS === 'web') {
+    if (staticMapUrl) {
+      return (
+        <View style={[styles.mapContainer, { backgroundColor: theme.backgroundSecondary }]}>
+          <Image source={{ uri: staticMapUrl }} style={styles.map} resizeMode="cover" />
+          <View style={styles.mapLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
+              <ThemedText type="caption" color="secondary">Pickup</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
+              <ThemedText type="caption" color="secondary">Delivery</ThemedText>
+            </View>
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={[styles.noMapContainer, { backgroundColor: theme.backgroundSecondary }]}>
         <Feather name="map" size={24} color={theme.secondaryText} />
@@ -139,6 +153,23 @@ export function JobOfferMapPreview({
   }
 
   if (!hasAnyCoords) {
+    if (staticMapUrl) {
+      return (
+        <View style={[styles.mapContainer, { backgroundColor: theme.backgroundSecondary }]}>
+          <Image source={{ uri: staticMapUrl }} style={styles.map} resizeMode="cover" />
+          <View style={styles.mapLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
+              <ThemedText type="caption" color="secondary">Pickup</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
+              <ThemedText type="caption" color="secondary">Delivery</ThemedText>
+            </View>
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={[styles.noMapContainer, { backgroundColor: theme.backgroundSecondary }]}>
         <Feather name="map" size={24} color={theme.secondaryText} />
@@ -157,6 +188,7 @@ export function JobOfferMapPreview({
       hasPickup={hasPickup}
       hasDropoff={hasDropoff}
       theme={theme}
+      staticMapUrl={staticMapUrl}
     />
   );
 }
@@ -170,6 +202,7 @@ function NativeMapPreview({
   hasPickup,
   hasDropoff,
   theme,
+  staticMapUrl,
 }: {
   pickupLat?: number;
   pickupLng?: number;
@@ -179,34 +212,83 @@ function NativeMapPreview({
   hasPickup: boolean;
   hasDropoff: boolean;
   theme: any;
+  staticMapUrl?: string | null;
 }) {
-  const MapView = require('react-native-maps').default;
-  const { Marker, Polyline, PROVIDER_GOOGLE } = require('react-native-maps');
+  let MapView: any;
+  let Marker: any;
+  let Polyline: any;
+  let PROVIDER_GOOGLE: any;
+  let mapAvailable = false;
+  
+  try {
+    const maps = require('react-native-maps');
+    MapView = maps.default;
+    Marker = maps.Marker;
+    Polyline = maps.Polyline;
+    PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE;
+    mapAvailable = true;
+  } catch (e) {
+    console.log('[MapPreview] react-native-maps not available, using static map fallback');
+    mapAvailable = false;
+  }
+
   const mapRef = useRef<any>(null);
   const [routePoints, setRoutePoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null);
+  const [mapError, setMapError] = useState(false);
 
   useEffect(() => {
-    if (hasPickup && hasDropoff && GOOGLE_MAPS_API_KEY) {
+    if (hasPickup && hasDropoff) {
       fetchRoute();
     }
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng, hasPickup, hasDropoff]);
 
-  // FREEZE PREVENTION: Wrap route fetch in timeout
   const fetchRoute = async () => {
     if (!pickupLat || !pickupLng || !dropoffLat || !dropoffLng) return;
     
     try {
       const origin = `${pickupLat},${pickupLng}`;
       const destination = `${dropoffLat},${dropoffLng}`;
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
       
-      // FREEZE PREVENTION: Timeout for API call (always resolves)
-      const response = await safeTimeout(fetch(url), API_TIMEOUT_MS, null as any);
-      if (!response) return; // Timed out or failed
+      let url: string;
+      if (API_URL) {
+        url = `${API_URL}/api/mobile/v1/directions?origin=${origin}&destination=${destination}&mode=driving`;
+      } else if (GOOGLE_MAPS_API_KEY) {
+        url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+      } else {
+        console.log('[MapPreview] No API URL or Maps key available for directions');
+        return;
+      }
+      
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (API_URL) {
+        try {
+          const { supabase: sb } = require('@/lib/supabase');
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+          }
+        } catch (e) {
+          console.log('[MapPreview] Could not get auth token for directions API');
+        }
+      }
+      
+      const response = await safeTimeout(fetch(url, { headers }), API_TIMEOUT_MS, null as any);
+      if (!response) return;
       const data = await response.json();
 
-      if (data?.status === 'OK' && data?.routes?.length > 0) {
+      if (API_URL && data?.routes?.length > 0) {
+        const route = data.routes[0];
+        if (route.polyline) {
+          setRoutePoints(decodePolyline(route.polyline));
+        }
+        if (route.distance?.text && route.duration?.text) {
+          setRouteInfo({
+            distance: route.distance.text,
+            duration: route.duration.text,
+          });
+        }
+      } else if (data?.status === 'OK' && data?.routes?.length > 0) {
         const route = data.routes[0];
         const leg = route?.legs?.[0];
         const polylineEncoded = route?.overview_polyline?.points;
@@ -222,10 +304,41 @@ function NativeMapPreview({
         }
       }
     } catch (err) {
-      // FREEZE PREVENTION: Silently fail - route is optional for map preview
       console.log('[MapPreview] Error fetching route (non-blocking):', err);
     }
   };
+
+  if (!mapAvailable || mapError) {
+    if (staticMapUrl) {
+      return (
+        <View style={[styles.mapContainer, { backgroundColor: theme.backgroundSecondary }]}>
+          <Image source={{ uri: staticMapUrl }} style={styles.map} resizeMode="cover" />
+          <View style={styles.mapLegend}>
+            {driverLocation ? (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#2196F3' }]} />
+                <ThemedText type="caption" color="secondary">You</ThemedText>
+              </View>
+            ) : null}
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
+              <ThemedText type="caption" color="secondary">Pickup</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
+              <ThemedText type="caption" color="secondary">Delivery</ThemedText>
+            </View>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.noMapContainer, { backgroundColor: theme.backgroundSecondary }]}>
+        <Feather name="map" size={24} color={theme.secondaryText} />
+        <ThemedText type="small" color="secondary">Map preview unavailable</ThemedText>
+      </View>
+    );
+  }
 
   useEffect(() => {
     if (mapRef.current) {
@@ -285,6 +398,11 @@ function NativeMapPreview({
         rotateEnabled={false}
         pitchEnabled={false}
         liteMode={Platform.OS === 'android'}
+        onMapReady={() => console.log('[MapPreview] Map ready')}
+        onError={(e: any) => {
+          console.log('[MapPreview] Map error, falling back to static map:', e);
+          setMapError(true);
+        }}
       >
         {driverLocation ? (
           <Marker

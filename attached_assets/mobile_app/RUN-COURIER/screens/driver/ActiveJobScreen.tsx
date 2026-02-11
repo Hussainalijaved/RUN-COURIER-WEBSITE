@@ -348,12 +348,12 @@ export function ActiveJobScreen({ navigation }: any) {
       : (activeJob.dropoff_address || activeJob.delivery_address || activeJob.delivery_postcode || '');
     
     const lat = type === 'pickup' 
-      ? (activeJob as any).pickup_lat 
-      : ((activeJob as any).dropoff_lat || (activeJob as any).delivery_lat);
+      ? ((activeJob as any).pickup_latitude ?? (activeJob as any).pickup_lat)
+      : ((activeJob as any).delivery_latitude ?? (activeJob as any).dropoff_lat ?? (activeJob as any).delivery_lat);
     
     const lng = type === 'pickup' 
-      ? (activeJob as any).pickup_lng 
-      : ((activeJob as any).dropoff_lng || (activeJob as any).delivery_lng);
+      ? ((activeJob as any).pickup_longitude ?? (activeJob as any).pickup_lng)
+      : ((activeJob as any).delivery_longitude ?? (activeJob as any).dropoff_lng ?? (activeJob as any).delivery_lng);
     
     if (lat && lng && typeof lat === 'number' && typeof lng === 'number') {
       setNavDestination({ lat, lng, address, type });
@@ -1458,10 +1458,10 @@ export function ActiveJobScreen({ navigation }: any) {
           <DriverJobMap
             pickupAddress={activeJob.pickup_address || activeJob.pickup_postcode || ''}
             deliveryAddress={activeJob.dropoff_address || activeJob.delivery_address || activeJob.delivery_postcode || ''}
-            pickupLat={activeJob.pickup_lat}
-            pickupLng={activeJob.pickup_lng}
-            dropoffLat={activeJob.dropoff_lat}
-            dropoffLng={activeJob.dropoff_lng}
+            pickupLat={(activeJob as any).pickup_latitude ?? activeJob.pickup_lat}
+            pickupLng={(activeJob as any).pickup_longitude ?? activeJob.pickup_lng}
+            dropoffLat={(activeJob as any).delivery_latitude ?? activeJob.dropoff_lat}
+            dropoffLng={(activeJob as any).delivery_longitude ?? activeJob.dropoff_lng}
             driverLat={currentLocation?.coords.latitude}
             driverLng={currentLocation?.coords.longitude}
             trackingNumber={activeJob.tracking_number || ''}

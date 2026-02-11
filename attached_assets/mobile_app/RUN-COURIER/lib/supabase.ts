@@ -268,8 +268,12 @@ export type Job = {
   dropoff_address: string;
   pickup_lat?: number;
   pickup_lng?: number;
+  pickup_latitude?: number;
+  pickup_longitude?: number;
   dropoff_lat?: number;
   dropoff_lng?: number;
+  delivery_latitude?: number;
+  delivery_longitude?: number;
   price_customer?: number;
   notes?: string;
   parcel_weight?: number;
@@ -308,6 +312,8 @@ export type Job = {
   pickup_barcode?: string;
   delivery_barcode?: string;
   failure_reason?: string;
+  static_map_url?: string | null;
+  staticMapUrl?: string | null;
 };
 
 export type Driver = {

@@ -650,10 +650,11 @@ export function JobOffersScreen({ navigation }: any) {
                     </View>
 
                     <JobOfferMapPreview
-                      pickupLat={job.pickup_lat}
-                      pickupLng={job.pickup_lng}
-                      dropoffLat={job.dropoff_lat}
-                      dropoffLng={job.dropoff_lng}
+                      pickupLat={job.pickup_latitude ?? job.pickup_lat}
+                      pickupLng={job.pickup_longitude ?? job.pickup_lng}
+                      dropoffLat={job.delivery_latitude ?? job.dropoff_lat}
+                      dropoffLng={job.delivery_longitude ?? job.dropoff_lng}
+                      staticMapUrl={(job as any).static_map_url || (job as any).staticMapUrl || null}
                     />
 
                     <View style={styles.locationRow}>
