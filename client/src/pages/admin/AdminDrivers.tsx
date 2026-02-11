@@ -207,6 +207,11 @@ export default function AdminDrivers() {
 
   const driversLoading = localDriversLoading;
 
+  const { data: driverJobs } = useQuery<any[]>({
+    queryKey: ['/api/jobs', { driverId: selectedDriver?.id }],
+    enabled: !!selectedDriver?.id && profileDialogOpen,
+  });
+
   const { data: documents } = useQuery<Document[]>({
     queryKey: ['/api/documents'],
   });
@@ -1314,7 +1319,7 @@ export default function AdminDrivers() {
 
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <div className="text-2xl font-bold">{selectedDriver.totalJobs || 0}</div>
+                    <div className="text-2xl font-bold" data-testid="text-driver-total-jobs">{driverJobs?.length ?? selectedDriver.totalJobs ?? 0}</div>
                     <p className="text-sm text-muted-foreground">Total Jobs</p>
                   </div>
                   <div>
