@@ -62,6 +62,7 @@ export function JobOffersScreen({ navigation }: any) {
   const [rejectingJob, setRejectingJob] = useState(false);
   const previousJobCountRef = useRef<number>(0);
   const isInitialLoadRef = useRef<boolean>(true);
+  const alarmVerifyIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Online/Offline status
   const [isOnline, setIsOnline] = useState(false);
@@ -89,6 +90,73 @@ export function JobOffersScreen({ navigation }: any) {
       return null;
     }
   };
+
+  // Geocode jobs that are missing coordinates but have addresses
+  // This is a fire-and-forget background operation that updates state when done
+  const geocodeJobsWithMissingCoords = useCallback(async (jobsList: Job[]) => {
+    const token = await getAuthToken();
+    if (!token || !API_URL) return;
+    
+    const jobsNeedingGeocode = jobsList.filter(job => {
+      const hasPickupCoords = (job.pickup_latitude || job.pickup_lat) && (job.pickup_longitude || job.pickup_lng);
+      const hasDeliveryCoords = (job.delivery_latitude || job.dropoff_lat) && (job.delivery_longitude || job.dropoff_lng);
+      const hasPickupAddr = job.pickup_address || job.pickup_postcode;
+      const hasDeliveryAddr = job.dropoff_address || (job as any).delivery_address || (job as any).delivery_postcode;
+      return (!hasPickupCoords && hasPickupAddr) || (!hasDeliveryCoords && hasDeliveryAddr);
+    });
+    
+    if (jobsNeedingGeocode.length === 0) return;
+    console.log(`[JobOffers] Geocoding ${jobsNeedingGeocode.length} jobs with missing coordinates`);
+    
+    let updated = false;
+    const updatedJobs = [...jobsList];
+    
+    for (const job of jobsNeedingGeocode) {
+      const idx = updatedJobs.findIndex(j => j.id === job.id);
+      if (idx === -1) continue;
+      
+      try {
+        const hasPickupCoords = (job.pickup_latitude || job.pickup_lat) && (job.pickup_longitude || job.pickup_lng);
+        if (!hasPickupCoords) {
+          const addr = job.pickup_address || job.pickup_postcode || '';
+          if (addr) {
+            const resp = await fetch(`${API_URL}/api/mobile/v1/geocode?address=${encodeURIComponent(addr)}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const geo = await resp.json();
+            if (geo.lat && geo.lng) {
+              updatedJobs[idx] = { ...updatedJobs[idx], pickup_latitude: geo.lat, pickup_longitude: geo.lng };
+              updated = true;
+              console.log(`[JobOffers] Geocoded pickup for job ${job.id}: ${geo.lat}, ${geo.lng}`);
+            }
+          }
+        }
+        
+        const hasDeliveryCoords = (job.delivery_latitude || job.dropoff_lat) && (job.delivery_longitude || job.dropoff_lng);
+        if (!hasDeliveryCoords) {
+          const addr = job.dropoff_address || (job as any).delivery_address || (job as any).delivery_postcode || '';
+          if (addr) {
+            const resp = await fetch(`${API_URL}/api/mobile/v1/geocode?address=${encodeURIComponent(addr)}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const geo = await resp.json();
+            if (geo.lat && geo.lng) {
+              updatedJobs[idx] = { ...updatedJobs[idx], delivery_latitude: geo.lat, delivery_longitude: geo.lng };
+              updated = true;
+              console.log(`[JobOffers] Geocoded delivery for job ${job.id}: ${geo.lat}, ${geo.lng}`);
+            }
+          }
+        }
+      } catch (err) {
+        console.log(`[JobOffers] Geocoding failed for job ${job.id}:`, err);
+      }
+    }
+    
+    if (updated && isMountedRef.current) {
+      console.log('[JobOffers] Updating jobs with geocoded coordinates');
+      setJobs(updatedJobs);
+    }
+  }, []);
 
   // FREEZE PREVENTION: Mounted ref to prevent state updates after unmount
   const isMountedRef = useRef(true);
@@ -367,10 +435,25 @@ export function JobOffersScreen({ navigation }: any) {
       const newJobs = Array.isArray(data) ? data : [];
       console.log('[JobOffers] Found', newJobs.length, 'jobs');
       
+      // Geocode any jobs missing coordinates (fallback for when server-side geocoding fails)
+      if (API_URL && newJobs.length > 0) {
+        geocodeJobsWithMissingCoords(newJobs);
+      }
+      
       if (playSound && !isInitialLoadRef.current && newJobs.length > previousJobCountRef.current) {
         startRepeatingAlarm(4000);
+        
+        if (alarmVerifyIntervalRef.current) clearInterval(alarmVerifyIntervalRef.current);
+        alarmVerifyIntervalRef.current = setInterval(() => {
+          console.log('[JobOffers] Alarm verify poll - re-checking jobs');
+          fetchAssignedJobsSilent();
+        }, 5000);
       } else if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
         stopRepeatingAlarm();
+        if (alarmVerifyIntervalRef.current) {
+          clearInterval(alarmVerifyIntervalRef.current);
+          alarmVerifyIntervalRef.current = null;
+        }
       }
       
       previousJobCountRef.current = newJobs.length;
@@ -390,6 +473,40 @@ export function JobOffersScreen({ navigation }: any) {
     }
   }, [driverId, allDriverIds.join(','), startRepeatingAlarm]);
 
+  const fetchAssignedJobsSilent = useCallback(async () => {
+    if (!driverId || allDriverIds.length === 0) return;
+    try {
+      const { data, error } = await supabase
+        .from('driver_jobs_view')
+        .select('*')
+        .in('driver_id', allDriverIds)
+        .in('status', ['assigned', 'offered'])
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('[JobOffers] Silent fetch error:', error);
+        return;
+      }
+
+      const newJobs = Array.isArray(data) ? data : [];
+      console.log('[JobOffers] Silent verify: found', newJobs.length, 'jobs, prev:', previousJobCountRef.current);
+      
+      if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
+        console.log('[JobOffers] Jobs withdrawn/removed - STOPPING ALARM');
+        stopRepeatingAlarm();
+        if (alarmVerifyIntervalRef.current) {
+          clearInterval(alarmVerifyIntervalRef.current);
+          alarmVerifyIntervalRef.current = null;
+        }
+      }
+      
+      previousJobCountRef.current = newJobs.length;
+      if (isMountedRef.current) setJobs(newJobs);
+    } catch (err) {
+      console.warn('[JobOffers] Silent fetch failed:', err);
+    }
+  }, [driverId, allDriverIds.join(','), stopRepeatingAlarm]);
+
   useEffect(() => {
     fetchAssignedJobs(false);
     
@@ -408,6 +525,10 @@ export function JobOffersScreen({ navigation }: any) {
     return () => { 
       channels.forEach(ch => supabase.removeChannel(ch));
       stopRepeatingAlarm();
+      if (alarmVerifyIntervalRef.current) {
+        clearInterval(alarmVerifyIntervalRef.current);
+        alarmVerifyIntervalRef.current = null;
+      }
     };
   }, [fetchAssignedJobs, allDriverIds.join(',')]);
 
@@ -444,9 +565,17 @@ export function JobOffersScreen({ navigation }: any) {
     }
   };
 
+  const stopAlarmAndVerification = useCallback(() => {
+    stopRepeatingAlarm();
+    if (alarmVerifyIntervalRef.current) {
+      clearInterval(alarmVerifyIntervalRef.current);
+      alarmVerifyIntervalRef.current = null;
+    }
+  }, [stopRepeatingAlarm]);
+
   const handleAcceptJob = async (job: Job) => {
     if (!driverId || acceptingJobId !== null) return;
-    stopRepeatingAlarm();
+    stopAlarmAndVerification();
     setAcceptingJobId(job.id);
 
     try {
@@ -478,7 +607,7 @@ export function JobOffersScreen({ navigation }: any) {
 
   const handleRejectJob = async () => {
     if (!selectedJob || !selectedReason || !driverId || rejectingJob) return;
-    stopRepeatingAlarm();
+    stopAlarmAndVerification();
     setRejectingJob(true);
 
     // Remove job from list immediately for better UX

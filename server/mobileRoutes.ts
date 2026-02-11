@@ -191,7 +191,8 @@ export function registerMobileRoutes(app: Express): void {
         websocket: "/ws/realtime",
         pushToken: "/api/mobile/v1/driver/push-token",
         directions: "/api/mobile/v1/directions",
-        staticMap: "/api/mobile/v1/static-map"
+        staticMap: "/api/mobile/v1/static-map",
+        geocode: "/api/mobile/v1/geocode"
       }
     });
   });
@@ -3126,6 +3127,43 @@ export function registerMobileRoutes(app: Express): void {
           error: "Failed to generate static map URL",
           code: "STATIC_MAP_ERROR"
         });
+      }
+    })
+  );
+
+  // Geocode an address - returns coordinates for mobile app map fallback
+  app.get("/api/mobile/v1/geocode",
+    requireSupabaseAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const address = req.query.address as string;
+      if (!address) {
+        return res.status(400).json({ error: "Address parameter is required" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Geocoding service not configured" });
+      }
+
+      try {
+        const encodedAddress = encodeURIComponent(address);
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.results?.length > 0) {
+          const location = data.results[0].geometry.location;
+          res.json({ 
+            lat: location.lat, 
+            lng: location.lng,
+            formattedAddress: data.results[0].formatted_address 
+          });
+        } else {
+          res.json({ lat: null, lng: null, error: "Address not found" });
+        }
+      } catch (err: any) {
+        console.error("[Mobile Geocode] Error:", err.message);
+        res.status(500).json({ error: "Geocoding failed" });
       }
     })
   );
