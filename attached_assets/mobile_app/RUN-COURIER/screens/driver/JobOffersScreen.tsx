@@ -369,6 +369,8 @@ export function JobOffersScreen({ navigation }: any) {
       
       if (playSound && !isInitialLoadRef.current && newJobs.length > previousJobCountRef.current) {
         startRepeatingAlarm(4000);
+      } else if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
+        stopRepeatingAlarm();
       }
       
       previousJobCountRef.current = newJobs.length;
