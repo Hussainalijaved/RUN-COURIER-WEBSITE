@@ -1593,7 +1593,7 @@ export class SupabaseStorage implements IStorage {
     const supabase = this.checkSupabase();
     const id = randomUUID();
     
-    const dbApp = {
+    const dbApp: Record<string, any> = {
       id,
       full_name: application.fullName,
       email: application.email.toLowerCase(),
@@ -1620,7 +1620,14 @@ export class SupabaseStorage implements IStorage {
       status: application.status || 'pending',
     };
     
-    const { data, error } = await supabase.from('driver_applications').insert(dbApp).select().single();
+    let { data, error } = await supabase.from('driver_applications').insert(dbApp).select().single();
+    if (error && error.code === 'PGRST204' && error.message?.includes('vehicle_registration')) {
+      console.log('[DriverApplication] vehicle_registration column not found, retrying without it');
+      const { vehicle_registration, ...dbAppWithout } = dbApp;
+      const result = await supabase.from('driver_applications').insert(dbAppWithout).select().single();
+      data = result.data;
+      error = result.error;
+    }
     if (error) throw error;
     return mapDbToDriverApplication(data);
   }
