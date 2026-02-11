@@ -230,6 +230,16 @@ export async function sendJobOfferNotification(
   const pickupShort = jobDetails.pickupAddress?.split(",")[0] || "Pickup";
   const deliveryShort = jobDetails.deliveryAddress?.split(",")[0] || "Delivery";
 
+  let staticMapUrl: string | null = null;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (apiKey && jobDetails.pickupLatitude && jobDetails.pickupLongitude && jobDetails.deliveryLatitude && jobDetails.deliveryLongitude) {
+    const pLat = jobDetails.pickupLatitude;
+    const pLng = jobDetails.pickupLongitude;
+    const dLat = jobDetails.deliveryLatitude;
+    const dLng = jobDetails.deliveryLongitude;
+    staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${pLat},${pLng}&markers=color:red|label:D|${dLat},${dLng}&path=color:0x007BFF|weight:4|${pLat},${pLng}|${dLat},${dLng}&key=${apiKey}`;
+  }
+
   const messages: ExpoPushMessage[] = devices.map(device => ({
     to: device.push_token,
     sound: "default",
@@ -253,6 +263,7 @@ export async function sendJobOfferNotification(
       distance: jobDetails.distance,
       driverPrice: jobDetails.driverPrice,
       vehicleType: jobDetails.vehicleType,
+      staticMapUrl: staticMapUrl,
       screen: "JobOffers",
     },
     priority: "high",

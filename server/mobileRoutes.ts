@@ -21,6 +21,12 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
   const senderPhone = job.pickup_contact_phone || null;
   const recipientPhone = job.recipient_phone || null;
   
+  let staticMapUrl: string | null = null;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (apiKey && pickupLat && pickupLng && deliveryLat && deliveryLng) {
+    staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${pickupLat},${pickupLng}&markers=color:red|label:D|${deliveryLat},${deliveryLng}&path=color:0x007BFF|weight:4|${pickupLat},${pickupLng}|${deliveryLat},${deliveryLng}&key=${apiKey}`;
+  }
+  
   // Map multi-drop stops to mobile format
   const mappedStops = (multiDropStops || []).map(stop => ({
     id: String(stop.id),
@@ -68,10 +74,9 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     isReturnTrip: job.is_return_trip || false,
     // Include multi-drop stops for the driver to see all delivery points
     multiDropStops: mappedStops,
+    staticMapUrl: staticMapUrl,
     createdAt: job.created_at,
     updatedAt: job.updated_at,
-    // SECURITY: Explicitly exclude customer pricing fields - these must NEVER be exposed to drivers
-    // Excluded: total_price, base_price, distance_price, weight_surcharge, etc.
   };
 }
 
@@ -184,7 +189,9 @@ export function registerMobileRoutes(app: Express): void {
         availability: "/api/mobile/v1/driver/availability",
         status: "/api/driver/status",
         websocket: "/ws/realtime",
-        pushToken: "/api/mobile/v1/driver/push-token"
+        pushToken: "/api/mobile/v1/driver/push-token",
+        directions: "/api/mobile/v1/directions",
+        staticMap: "/api/mobile/v1/static-map"
       }
     });
   });
@@ -2962,6 +2969,164 @@ export function registerMobileRoutes(app: Express): void {
         success: true,
         message: "Job offer rejected"
       });
+    })
+  );
+
+  // ==================== Google Maps Endpoints ====================
+
+  // GET /api/mobile/v1/directions - Get route directions between points
+  app.get("/api/mobile/v1/directions",
+    requireSupabaseAuth,
+    asyncHandler(async (req, res) => {
+      const { origin, destination, waypoints, mode } = req.query;
+
+      if (!origin || !destination) {
+        return res.status(400).json({
+          error: "origin and destination query params are required (format: lat,lng)",
+          code: "MISSING_PARAMS"
+        });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.error("[Mobile Maps] GOOGLE_MAPS_API_KEY not configured");
+        return res.status(500).json({
+          error: "Maps service not configured",
+          code: "MAPS_NOT_CONFIGURED"
+        });
+      }
+
+      try {
+        const travelMode = (mode as string) || "driving";
+        console.log(`[Mobile Maps] Directions request: origin=${origin}, destination=${destination}, mode=${travelMode}`);
+
+        const params = new URLSearchParams({
+          origin: origin as string,
+          destination: destination as string,
+          mode: travelMode,
+          key: apiKey,
+        });
+
+        if (waypoints) {
+          params.append("waypoints", waypoints as string);
+        }
+
+        const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`;
+        const response = await fetch(directionsUrl);
+        const data = await response.json();
+
+        if (data.status !== "OK") {
+          console.error("[Mobile Maps] Directions API error:", data.status, data.error_message);
+          return res.status(400).json({
+            error: `Directions API error: ${data.status}`,
+            details: data.error_message || null,
+            code: "DIRECTIONS_API_ERROR"
+          });
+        }
+
+        const routes = data.routes.map((route: any) => ({
+          polyline: route.overview_polyline?.points || "",
+          distance: route.legs.reduce(
+            (acc: any, leg: any) => ({
+              text: acc.text || leg.distance?.text,
+              value: (acc.value || 0) + (leg.distance?.value || 0),
+            }),
+            { text: null, value: 0 }
+          ),
+          duration: route.legs.reduce(
+            (acc: any, leg: any) => ({
+              text: acc.text || leg.duration?.text,
+              value: (acc.value || 0) + (leg.duration?.value || 0),
+            }),
+            { text: null, value: 0 }
+          ),
+          legs: route.legs.map((leg: any) => ({
+            start: {
+              lat: leg.start_location?.lat,
+              lng: leg.start_location?.lng,
+            },
+            end: {
+              lat: leg.end_location?.lat,
+              lng: leg.end_location?.lng,
+            },
+            distance: leg.distance || { text: "", value: 0 },
+            duration: leg.duration || { text: "", value: 0 },
+            polyline: leg.steps
+              ? leg.steps.map((s: any) => s.polyline?.points || "").join("")
+              : "",
+          })),
+        }));
+
+        console.log(`[Mobile Maps] Directions returned ${routes.length} route(s)`);
+        res.json({ routes });
+      } catch (err: any) {
+        console.error("[Mobile Maps] Directions fetch error:", err.message);
+        res.status(500).json({
+          error: "Failed to fetch directions",
+          code: "DIRECTIONS_FETCH_ERROR"
+        });
+      }
+    })
+  );
+
+  // GET /api/mobile/v1/static-map - Generate a Google Static Maps URL
+  app.get("/api/mobile/v1/static-map",
+    requireSupabaseAuth,
+    asyncHandler(async (req, res) => {
+      const { pickupLat, pickupLng, deliveryLat, deliveryLng, driverLat, driverLng, size } = req.query;
+
+      if (!pickupLat || !pickupLng || !deliveryLat || !deliveryLng) {
+        return res.status(400).json({
+          error: "pickupLat, pickupLng, deliveryLat, and deliveryLng are required",
+          code: "MISSING_PARAMS"
+        });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.error("[Mobile Maps] GOOGLE_MAPS_API_KEY not configured");
+        return res.status(500).json({
+          error: "Maps service not configured",
+          code: "MAPS_NOT_CONFIGURED"
+        });
+      }
+
+      try {
+        const mapSize = (size as string) || "600x300";
+        console.log(`[Mobile Maps] Static map request: pickup=${pickupLat},${pickupLng} delivery=${deliveryLat},${deliveryLng} size=${mapSize}`);
+
+        const params = new URLSearchParams({
+          size: mapSize,
+          maptype: "roadmap",
+          key: apiKey,
+        });
+
+        params.append("markers", `color:green|label:P|${pickupLat},${pickupLng}`);
+        params.append("markers", `color:red|label:D|${deliveryLat},${deliveryLng}`);
+
+        const markers: any = {
+          pickup: { lat: parseFloat(pickupLat as string), lng: parseFloat(pickupLng as string) },
+          delivery: { lat: parseFloat(deliveryLat as string), lng: parseFloat(deliveryLng as string) },
+        };
+
+        if (driverLat && driverLng) {
+          params.append("markers", `color:blue|label:C|${driverLat},${driverLng}`);
+          markers.driver = { lat: parseFloat(driverLat as string), lng: parseFloat(driverLng as string) };
+        }
+
+        params.append("path", `color:0x4285F4FF|weight:4|${pickupLat},${pickupLng}|${deliveryLat},${deliveryLng}`);
+
+        const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+
+        console.log("[Mobile Maps] Static map URL generated successfully");
+        res.json({ mapUrl, markers });
+      } catch (err: any) {
+        console.error("[Mobile Maps] Static map error:", err.message);
+        res.status(500).json({
+          error: "Failed to generate static map URL",
+          code: "STATIC_MAP_ERROR"
+        });
+      }
     })
   );
 

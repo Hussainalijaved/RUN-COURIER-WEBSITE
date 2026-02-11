@@ -132,6 +132,7 @@ interface JobAssignedMessage {
     distance?: string | null;
     vehicleType?: string;
     driverPrice?: string | null;
+    staticMapUrl?: string | null;
     assignedAt: string;
     playSound: boolean;
     alert: boolean;
@@ -605,6 +606,12 @@ export function broadcastJobAssigned(job: {
   vehicleType?: string;
   driverPrice?: string | null;
 }): void {
+  let staticMapUrl: string | null = null;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (apiKey && job.pickupLatitude && job.pickupLongitude && job.deliveryLatitude && job.deliveryLongitude) {
+    staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${job.pickupLatitude},${job.pickupLongitude}&markers=color:red|label:D|${job.deliveryLatitude},${job.deliveryLongitude}&path=color:0x007BFF|weight:4|${job.pickupLatitude},${job.pickupLongitude}|${job.deliveryLatitude},${job.deliveryLongitude}&key=${apiKey}`;
+  }
+
   const message: JobAssignedMessage = {
     type: 'job:assigned',
     payload: {
@@ -626,6 +633,7 @@ export function broadcastJobAssigned(job: {
       distance: job.distance,
       vehicleType: job.vehicleType,
       driverPrice: job.driverPrice,
+      staticMapUrl: staticMapUrl,
       assignedAt: new Date().toISOString(),
       playSound: true,
       alert: true,
