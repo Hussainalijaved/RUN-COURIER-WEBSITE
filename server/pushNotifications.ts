@@ -201,7 +201,16 @@ export async function sendJobOfferNotification(
     jobId: string;
     trackingNumber: string;
     pickupAddress?: string;
+    pickupPostcode?: string;
+    pickupLatitude?: string | null;
+    pickupLongitude?: string | null;
     deliveryAddress?: string;
+    deliveryPostcode?: string;
+    deliveryLatitude?: string | null;
+    deliveryLongitude?: string | null;
+    recipientName?: string;
+    recipientPhone?: string;
+    distance?: string | null;
     driverPrice?: string | null;
     vehicleType?: string;
   }
@@ -229,6 +238,19 @@ export async function sendJobOfferNotification(
       type: "job_offer",
       jobId: jobDetails.jobId,
       trackingNumber: jobDetails.trackingNumber,
+      pickupAddress: jobDetails.pickupAddress,
+      pickupPostcode: jobDetails.pickupPostcode,
+      pickupLatitude: jobDetails.pickupLatitude,
+      pickupLongitude: jobDetails.pickupLongitude,
+      deliveryAddress: jobDetails.deliveryAddress,
+      deliveryPostcode: jobDetails.deliveryPostcode,
+      deliveryLatitude: jobDetails.deliveryLatitude,
+      deliveryLongitude: jobDetails.deliveryLongitude,
+      recipientName: jobDetails.recipientName,
+      recipientPhone: jobDetails.recipientPhone,
+      distance: jobDetails.distance,
+      driverPrice: jobDetails.driverPrice,
+      vehicleType: jobDetails.vehicleType,
       screen: "JobOffers",
     },
     priority: "high",

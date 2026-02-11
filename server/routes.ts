@@ -2091,49 +2091,68 @@ export async function registerRoutes(
       }
     }
     
+    // Re-fetch the job AFTER geocoding so we have updated coordinates
+    const freshJob = await storage.getJob(req.params.id) || job;
+    
     // Broadcast job assignment for real-time updates
     broadcastJobUpdate({
-      id: job.id,
-      trackingNumber: job.trackingNumber,
-      status: job.status,
+      id: freshJob.id,
+      trackingNumber: freshJob.trackingNumber,
+      status: freshJob.status,
       previousStatus: previousJob?.status,
-      customerId: job.customerId,
-      driverId: job.driverId,
-      updatedAt: job.updatedAt,
+      customerId: freshJob.customerId,
+      driverId: freshJob.driverId,
+      updatedAt: freshJob.updatedAt,
     });
-    // Send specific notification to the assigned driver
-    if (job.driverId) {
-      // CRITICAL: Use finalDriverPrice here, not job.driverPrice which may be stale
+    // Send specific notification to the assigned driver with full coordinates for map
+    if (freshJob.driverId) {
       broadcastJobAssigned({
-        id: job.id,
-        trackingNumber: job.trackingNumber,
-        status: job.status,
-        driverId: job.driverId,
-        pickupAddress: job.pickupAddress,
-        deliveryAddress: job.deliveryAddress,
-        vehicleType: job.vehicleType,
-        driverPrice: finalDriverPrice, // Use admin-set price, not customer price
+        id: freshJob.id,
+        trackingNumber: freshJob.trackingNumber,
+        status: freshJob.status,
+        driverId: freshJob.driverId,
+        pickupAddress: freshJob.pickupAddress,
+        pickupPostcode: freshJob.pickupPostcode,
+        pickupLatitude: freshJob.pickupLatitude,
+        pickupLongitude: freshJob.pickupLongitude,
+        deliveryAddress: freshJob.deliveryAddress,
+        deliveryPostcode: freshJob.deliveryPostcode,
+        deliveryLatitude: freshJob.deliveryLatitude,
+        deliveryLongitude: freshJob.deliveryLongitude,
+        recipientName: freshJob.recipientName,
+        recipientPhone: freshJob.recipientPhone,
+        distance: freshJob.distance,
+        vehicleType: freshJob.vehicleType,
+        driverPrice: finalDriverPrice,
       });
-      console.log(`[Jobs] Job ${job.id} assigned to driver ${job.driverId} with driver_price £${finalDriverPrice}, notification sent`);
+      console.log(`[Jobs] Job ${freshJob.id} assigned to driver ${freshJob.driverId} with driver_price £${finalDriverPrice}, coordinates: pickup(${freshJob.pickupLatitude},${freshJob.pickupLongitude}) delivery(${freshJob.deliveryLatitude},${freshJob.deliveryLongitude})`);
       
-      // Send push notification to driver's mobile device
-      sendJobOfferNotification(job.driverId, {
-        jobId: job.id,
-        trackingNumber: job.trackingNumber,
-        pickupAddress: job.pickupAddress,
-        deliveryAddress: job.deliveryAddress,
-        driverPrice: finalDriverPrice, // Use admin-set price, not customer price
-        vehicleType: job.vehicleType,
+      // Send push notification to driver's mobile device with coordinates for map
+      sendJobOfferNotification(freshJob.driverId, {
+        jobId: freshJob.id,
+        trackingNumber: freshJob.trackingNumber,
+        pickupAddress: freshJob.pickupAddress,
+        pickupPostcode: freshJob.pickupPostcode,
+        pickupLatitude: freshJob.pickupLatitude,
+        pickupLongitude: freshJob.pickupLongitude,
+        deliveryAddress: freshJob.deliveryAddress,
+        deliveryPostcode: freshJob.deliveryPostcode,
+        deliveryLatitude: freshJob.deliveryLatitude,
+        deliveryLongitude: freshJob.deliveryLongitude,
+        recipientName: freshJob.recipientName,
+        recipientPhone: freshJob.recipientPhone,
+        distance: freshJob.distance,
+        driverPrice: finalDriverPrice,
+        vehicleType: freshJob.vehicleType,
       }).then(result => {
         if (result.success) {
-          console.log(`[Jobs] Push notification sent to ${result.sentCount} device(s) for driver ${job.driverId}`);
+          console.log(`[Jobs] Push notification sent to ${result.sentCount} device(s) for driver ${freshJob.driverId}`);
         }
       }).catch(err => console.error('[Jobs] Failed to send push notification:', err));
     }
     
     // Return the updated job with correct driver price
-    const updatedJob = await storage.getJob(req.params.id);
-    res.json(ensureJobNumber(updatedJob || job));
+    res.json(ensureJobNumber(freshJob));
   }));
 
   app.patch("/api/jobs/:id/pod", asyncHandler(async (req, res) => {
@@ -7685,23 +7704,58 @@ export async function registerRoutes(
       }
     }
 
+    // Re-fetch the job AFTER geocoding so we have updated coordinates for mobile map
+    const freshAssignJob = await storage.getJob(jobId) || job;
+
     // Create notification for driver
     await storage.createNotification({
       userId: driverUserId,
       title: "New Job Assignment",
-      message: `You have been assigned a new job (${job.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
+      message: `You have been assigned a new job (${freshAssignJob.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
       type: "job_assigned",
       data: { assignmentId: assignment.id, jobId },
     });
 
-    // Send push notification to driver's mobile device (with sound)
+    // Send WebSocket notification with full coordinates for map
+    if (freshAssignJob.driverId) {
+      broadcastJobAssigned({
+        id: freshAssignJob.id,
+        trackingNumber: freshAssignJob.trackingNumber,
+        status: freshAssignJob.status,
+        driverId: freshAssignJob.driverId,
+        pickupAddress: freshAssignJob.pickupAddress,
+        pickupPostcode: freshAssignJob.pickupPostcode,
+        pickupLatitude: freshAssignJob.pickupLatitude,
+        pickupLongitude: freshAssignJob.pickupLongitude,
+        deliveryAddress: freshAssignJob.deliveryAddress,
+        deliveryPostcode: freshAssignJob.deliveryPostcode,
+        deliveryLatitude: freshAssignJob.deliveryLatitude,
+        deliveryLongitude: freshAssignJob.deliveryLongitude,
+        recipientName: freshAssignJob.recipientName,
+        recipientPhone: freshAssignJob.recipientPhone,
+        distance: freshAssignJob.distance,
+        vehicleType: freshAssignJob.vehicleType,
+        driverPrice: driverPrice,
+      });
+    }
+
+    // Send push notification to driver's mobile device with coordinates for map
     sendJobOfferNotification(driverId, {
       jobId,
-      trackingNumber: job.trackingNumber,
-      pickupAddress: job.pickupAddress,
-      deliveryAddress: job.deliveryAddress,
+      trackingNumber: freshAssignJob.trackingNumber,
+      pickupAddress: freshAssignJob.pickupAddress,
+      pickupPostcode: freshAssignJob.pickupPostcode,
+      pickupLatitude: freshAssignJob.pickupLatitude,
+      pickupLongitude: freshAssignJob.pickupLongitude,
+      deliveryAddress: freshAssignJob.deliveryAddress,
+      deliveryPostcode: freshAssignJob.deliveryPostcode,
+      deliveryLatitude: freshAssignJob.deliveryLatitude,
+      deliveryLongitude: freshAssignJob.deliveryLongitude,
+      recipientName: freshAssignJob.recipientName,
+      recipientPhone: freshAssignJob.recipientPhone,
+      distance: freshAssignJob.distance,
       driverPrice: driverPrice,
-      vehicleType: job.vehicleType,
+      vehicleType: freshAssignJob.vehicleType,
     }).then(result => {
       if (result.success) {
         console.log(`[Job Assignment] Push notification sent to ${result.sentCount} device(s) for driver ${driverId}`);

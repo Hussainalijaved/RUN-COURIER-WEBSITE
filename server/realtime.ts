@@ -119,7 +119,16 @@ interface JobAssignedMessage {
     status: string;
     driverId: string;
     pickupAddress?: string;
+    pickupPostcode?: string;
+    pickupLatitude?: string | null;
+    pickupLongitude?: string | null;
     deliveryAddress?: string;
+    deliveryPostcode?: string;
+    deliveryLatitude?: string | null;
+    deliveryLongitude?: string | null;
+    recipientName?: string;
+    recipientPhone?: string;
+    distance?: string | null;
     vehicleType?: string;
     driverPrice?: string | null;
     assignedAt: string;
@@ -579,7 +588,16 @@ export function broadcastJobAssigned(job: {
   status: string;
   driverId: string;
   pickupAddress?: string;
+  pickupPostcode?: string;
+  pickupLatitude?: string | null;
+  pickupLongitude?: string | null;
   deliveryAddress?: string;
+  deliveryPostcode?: string;
+  deliveryLatitude?: string | null;
+  deliveryLongitude?: string | null;
+  recipientName?: string;
+  recipientPhone?: string;
+  distance?: string | null;
   vehicleType?: string;
   driverPrice?: string | null;
 }): void {
@@ -591,7 +609,16 @@ export function broadcastJobAssigned(job: {
       status: job.status,
       driverId: job.driverId,
       pickupAddress: job.pickupAddress,
+      pickupPostcode: job.pickupPostcode,
+      pickupLatitude: job.pickupLatitude,
+      pickupLongitude: job.pickupLongitude,
       deliveryAddress: job.deliveryAddress,
+      deliveryPostcode: job.deliveryPostcode,
+      deliveryLatitude: job.deliveryLatitude,
+      deliveryLongitude: job.deliveryLongitude,
+      recipientName: job.recipientName,
+      recipientPhone: job.recipientPhone,
+      distance: job.distance,
       vehicleType: job.vehicleType,
       driverPrice: job.driverPrice,
       assignedAt: new Date().toISOString(),
