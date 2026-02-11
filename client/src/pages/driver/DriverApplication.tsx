@@ -135,10 +135,12 @@ export default function DriverApplication() {
 
   const isBritish = form.watch("isBritish");
 
-  const uploadFileMutation = useMutation({
-    mutationFn: async ({ file, type }: { file: File; type: keyof typeof uploadedFiles }) => {
-      setIsUploading(true);
-      
+  const uploadFile = useCallback(async (file: File, type: keyof typeof uploadedFiles) => {
+    setIsUploading(true);
+    setUploadingType(type);
+    setUploadedFileNames(prev => ({ ...prev, [type]: file.name }));
+
+    try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('driverId', 'application-pending');
@@ -150,32 +152,27 @@ export default function DriverApplication() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to upload document');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to upload document');
       }
 
       const data = await response.json();
-      return { type, url: data.fileUrl };
-    },
-    onSuccess: ({ type, url }) => {
-      setUploadedFiles(prev => ({ ...prev, [type]: url }));
+      setUploadedFiles(prev => ({ ...prev, [type]: data.fileUrl }));
       toast({
         title: "File uploaded",
         description: "Your document has been uploaded successfully.",
       });
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       toast({
         title: "Upload failed",
         description: error.message || "Failed to upload file. Please try again.",
         variant: "destructive",
       });
-    },
-    onSettled: () => {
+    } finally {
       setIsUploading(false);
       setUploadingType(null);
-    },
-  });
+    }
+  }, [toast]);
 
   const sendVerificationCode = useCallback(async () => {
     const phone = form.getValues("phone");
@@ -314,6 +311,9 @@ export default function DriverApplication() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset input value so the same file can be re-selected
+    e.target.value = '';
+
     if (file.size > 10 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -323,10 +323,8 @@ export default function DriverApplication() {
       return;
     }
 
-    setUploadingType(type);
-    setUploadedFileNames(prev => ({ ...prev, [type]: file.name }));
-    uploadFileMutation.mutate({ file, type });
-  }, [uploadFileMutation, toast]);
+    uploadFile(file, type);
+  }, [uploadFile, toast]);
 
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
