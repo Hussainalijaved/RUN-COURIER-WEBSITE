@@ -101,8 +101,8 @@ export type DriverJob = {
   deliveryInstructions: string | null;
   recipientName: string | null;
   recipientPhone: string | null;
-  senderName: string | null;
-  senderPhone: string | null;
+  senderName?: string | null;
+  senderPhone?: string | null;
   parcelDescription?: string | null;
   parcelWeight?: string | null;
   parcelDimensions?: string | null;
@@ -111,9 +111,9 @@ export type DriverJob = {
   distanceMiles?: string | null;
   isMultiDrop: boolean;
   isReturnTrip: boolean;
-  isUrgent: boolean;
-  isFragile: boolean;
-  requiresSignature: boolean;
+  isUrgent?: boolean;
+  isFragile?: boolean;
+  requiresSignature?: boolean;
   driverPrice: string | null;
   scheduledPickupTime: string | null;
   estimatedDeliveryTime: string | null;

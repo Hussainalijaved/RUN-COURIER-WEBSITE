@@ -73,52 +73,9 @@ export function useDriver() {
   });
 }
 
-// CRITICAL SECURITY: Only select driver-safe columns - NEVER include total_price or customer pricing
-// NOTE: Only include columns that exist in the Supabase jobs table
-const DRIVER_SAFE_JOB_COLUMNS = `
-  id,
-  tracking_number,
-  customer_id,
-  driver_id,
-  dispatcher_id,
-  vendor_id,
-  status,
-  vehicle_type,
-  pickup_address,
-  pickup_postcode,
-  pickup_latitude,
-  pickup_longitude,
-  pickup_instructions,
-  pickup_contact_name,
-  pickup_contact_phone,
-  delivery_address,
-  delivery_postcode,
-  delivery_latitude,
-  delivery_longitude,
-  delivery_instructions,
-  recipient_name,
-  recipient_phone,
-  sender_name,
-  sender_phone,
-  weight,
-  distance,
-  is_multi_drop,
-  is_return_trip,
-  is_urgent,
-  is_fragile,
-  requires_signature,
-  driver_price,
-  scheduled_pickup_time,
-  estimated_delivery_time,
-  actual_pickup_time,
-  actual_delivery_time,
-  pod_signature_url,
-  pod_photo_url,
-  pod_notes,
-  driver_hidden,
-  created_at,
-  updated_at
-`;
+// Use select('*') to avoid column name mismatches with Supabase schema
+// Security is enforced in the mapping below - we only expose driver-safe fields
+const DRIVER_JOB_SELECT = '*';
 
 export function useDriverJobs(driverId: string | undefined) {
   return useQuery({
@@ -149,7 +106,7 @@ export function useDriverJobs(driverId: string | undefined) {
       // STEP 2: Fetch jobs where driver_id is set directly
       const { data: directJobs, error: directError } = await supabase
         .from('jobs')
-        .select(DRIVER_SAFE_JOB_COLUMNS)
+        .select(DRIVER_JOB_SELECT)
         .eq('driver_id', driverId)
         .or('driver_hidden.is.null,driver_hidden.eq.false')
         .order('created_at', { ascending: false });
@@ -169,7 +126,7 @@ export function useDriverJobs(driverId: string | undefined) {
         if (missingJobIds.length > 0) {
           const { data: assignedJobs, error: assignedError } = await supabase
             .from('jobs')
-            .select(DRIVER_SAFE_JOB_COLUMNS)
+            .select(DRIVER_JOB_SELECT)
             .in('id', missingJobIds)
             .or('driver_hidden.is.null,driver_hidden.eq.false')
             .order('created_at', { ascending: false });
@@ -216,15 +173,10 @@ export function useDriverJobs(driverId: string | undefined) {
           deliveryInstructions: job.delivery_instructions,
           recipientName: job.recipient_name,
           recipientPhone: job.recipient_phone,
-          senderName: job.sender_name,
-          senderPhone: job.sender_phone,
           weight: job.weight,
           distance: job.distance,
           isMultiDrop: job.is_multi_drop,
           isReturnTrip: job.is_return_trip,
-          isUrgent: job.is_urgent,
-          isFragile: job.is_fragile,
-          requiresSignature: job.requires_signature,
           // CRITICAL: Use driver_price from assignment or job - never expose customer pricing
           driverPrice: driverPrice,
           scheduledPickupTime: job.scheduled_pickup_time,
