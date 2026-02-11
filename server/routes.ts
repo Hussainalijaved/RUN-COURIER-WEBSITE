@@ -5321,12 +5321,25 @@ export async function registerRoutes(
     });
   }));
 
+  const docUrlFields = ['profilePictureUrl', 'drivingLicenceFrontUrl', 'drivingLicenceBackUrl', 'dbsCertificateUrl', 'goodsInTransitInsuranceUrl', 'hireAndRewardUrl'] as const;
+
+  function resolveDocUrls(app: any): any {
+    const resolved = { ...app };
+    for (const field of docUrlFields) {
+      const url = resolved[field];
+      if (url && typeof url === 'string' && url.startsWith('/uploads/')) {
+        resolved[field] = '/api' + url;
+      }
+    }
+    return resolved;
+  }
+
   app.get("/api/driver-applications", asyncHandler(async (req, res) => {
     const { status } = req.query;
     const applications = await storage.getDriverApplications({
       status: status as DriverApplicationStatus | undefined,
     });
-    res.json(applications);
+    res.json(applications.map(resolveDocUrls));
   }));
 
   app.get("/api/driver-applications/:id", asyncHandler(async (req, res) => {
@@ -5334,7 +5347,7 @@ export async function registerRoutes(
     if (!application) {
       return res.status(404).json({ error: "Application not found" });
     }
-    res.json(application);
+    res.json(resolveDocUrls(application));
   }));
 
   app.get("/api/driver-applications/check/:email", asyncHandler(async (req, res) => {
