@@ -245,7 +245,7 @@ function mapDbToDriverApplication(dbApp: any): DriverApplication {
     accountHolderName: dbApp.account_holder_name,
     sortCode: dbApp.sort_code,
     accountNumber: dbApp.account_number,
-    status: dbApp.status as DriverApplicationStatus,
+    status: (dbApp.status === 'rejected' && dbApp.rejection_reason === 'CORRECTIONS_NEEDED' ? 'corrections_needed' : dbApp.status) as DriverApplicationStatus,
     reviewedBy: dbApp.reviewed_by,
     reviewNotes: dbApp.review_notes,
     rejectionReason: dbApp.rejection_reason,
@@ -1556,7 +1556,13 @@ export class SupabaseStorage implements IStorage {
   async getDriverApplications(filters?: { status?: DriverApplicationStatus }): Promise<DriverApplication[]> {
     const supabase = this.checkSupabase();
     let query = supabase.from('driver_applications').select('*').order('submitted_at', { ascending: false });
-    if (filters?.status) query = query.eq('status', filters.status);
+    if (filters?.status === 'corrections_needed') {
+      query = query.eq('status', 'rejected').eq('rejection_reason', 'CORRECTIONS_NEEDED');
+    } else if (filters?.status === 'rejected') {
+      query = query.eq('status', 'rejected').neq('rejection_reason', 'CORRECTIONS_NEEDED');
+    } else if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
     const { data, error } = await query;
     if (error || !data) return [];
     return data.map(mapDbToDriverApplication);
@@ -1607,7 +1613,10 @@ export class SupabaseStorage implements IStorage {
     if (data.reviewedAt !== undefined) dbData.reviewed_at = data.reviewedAt;
     
     const { data: updated, error } = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
-    if (error || !updated) return undefined;
+    if (error || !updated) {
+      console.error('[Storage] updateDriverApplication error:', error, 'data:', updated);
+      return undefined;
+    }
     return mapDbToDriverApplication(updated);
   }
 

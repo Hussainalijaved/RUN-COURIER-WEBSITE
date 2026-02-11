@@ -5988,16 +5988,21 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Application not found" });
     }
 
-    if (application.status !== 'pending') {
+    if (application.status !== 'pending' && application.status !== 'corrections_needed') {
       return res.status(400).json({ error: "Only pending applications can be sent back for corrections" });
     }
 
-    const updated = await storage.updateDriverApplication(req.params.id, {
-      status: 'corrections_needed' as any,
+    const updateData: any = {
+      status: 'rejected',
       reviewNotes: adminFeedback.trim(),
-      reviewedBy: reviewedBy || 'admin',
+      rejectionReason: 'CORRECTIONS_NEEDED',
       reviewedAt: new Date(),
-    });
+    };
+    if (reviewedBy && reviewedBy !== 'admin') {
+      updateData.reviewedBy = reviewedBy;
+    }
+
+    const updated = await storage.updateDriverApplication(req.params.id, updateData);
 
     if (!updated) {
       return res.status(500).json({ error: "Failed to update application" });
