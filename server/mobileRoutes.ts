@@ -18,7 +18,7 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
   const pickupLng = job.pickup_longitude?.toString() || job.pickup_lng?.toString() || null;
   const deliveryLat = job.delivery_latitude?.toString() || job.dropoff_lat?.toString() || null;
   const deliveryLng = job.delivery_longitude?.toString() || job.dropoff_lng?.toString() || null;
-  const senderPhone = job.sender_phone || job.pickup_contact_phone || null;
+  const senderPhone = job.pickup_contact_phone || null;
   const recipientPhone = job.recipient_phone || null;
   
   // Map multi-drop stops to mobile format
@@ -39,6 +39,7 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
   return {
     id: String(job.id),
     trackingNumber: job.tracking_number,
+    jobNumber: job.job_number || null,
     status: job.status,
     pickupAddress: job.pickup_address || job.dropoff_address,
     pickupPostcode: job.pickup_postcode || null,
@@ -52,14 +53,14 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     deliveryLongitude: deliveryLng,
     recipientName: job.recipient_name,
     recipientPhone: recipientPhone,
-    senderName: job.sender_name || job.pickup_contact_name,
+    senderName: job.pickup_contact_name || null,
     senderPhone: senderPhone,
     // Also include pickupContactPhone directly for mobile app compatibility
     pickupContactPhone: job.pickup_contact_phone || null,
     pickupContactName: job.pickup_contact_name || null,
     vehicleType: job.vehicle_type,
-    distance: job.distance?.toString() || job.distance_miles?.toString() || null,
-    weight: job.weight?.toString() || job.parcel_weight?.toString() || null,
+    distance: job.distance?.toString() || null,
+    weight: job.weight?.toString() || null,
     // CRITICAL: Use driver_price column (admin-set price), NEVER total_price
     driverPrice: job.driver_price?.toString() || null,
     scheduledPickupTime: job.scheduled_pickup_time,
@@ -1271,15 +1272,15 @@ export function registerMobileRoutes(app: Express): void {
           .from('job_assignments')
           .select('job_id, driver_price, status')
           .eq('driver_id', driver.id)
-          .not('status', 'in', '("rejected","expired","withdrawn")');
+          .not('status', 'in', '("rejected","expired","withdrawn","cancelled")');
         
         if (assignmentsError) {
           console.log(`[Mobile Jobs] Error fetching assignments:`, assignmentsError.message);
         }
         
-        // Filter to only include valid (non-rejected) assignments
+        // Filter to only include valid assignments
         const validAssignments = (allAssignments || []).filter(a => 
-          !['rejected', 'expired', 'withdrawn'].includes(a.status)
+          !['rejected', 'expired', 'withdrawn', 'cancelled'].includes(a.status)
         );
         const assignmentJobIds = validAssignments.map(a => String(a.job_id));
         console.log(`[Mobile Jobs] Found ${allAssignments?.length || 0} job assignments for driver ${driver.id}`);
@@ -1294,6 +1295,7 @@ export function registerMobileRoutes(app: Express): void {
           .select(`
             id,
             tracking_number,
+            job_number,
             status,
             driver_price,
             vehicle_type,
@@ -1312,12 +1314,8 @@ export function registerMobileRoutes(app: Express): void {
             delivery_instructions,
             recipient_name,
             recipient_phone,
-            sender_name,
-            sender_phone,
-            parcel_description,
-            parcel_weight,
-            parcel_dimensions,
-            distance_miles,
+            weight,
+            distance,
             scheduled_pickup_time,
             estimated_delivery_time,
             actual_pickup_time,
@@ -1327,10 +1325,8 @@ export function registerMobileRoutes(app: Express): void {
             pod_notes,
             is_multi_drop,
             is_return_trip,
-            is_urgent,
-            is_fragile,
-            requires_signature,
             driver_hidden,
+            notes,
             created_at,
             updated_at
           `)
@@ -1352,6 +1348,7 @@ export function registerMobileRoutes(app: Express): void {
             .select(`
               id,
               tracking_number,
+              job_number,
               status,
               driver_price,
               vehicle_type,
@@ -1370,12 +1367,8 @@ export function registerMobileRoutes(app: Express): void {
               delivery_instructions,
               recipient_name,
               recipient_phone,
-              sender_name,
-              sender_phone,
-              parcel_description,
-              parcel_weight,
-              parcel_dimensions,
-              distance_miles,
+              weight,
+              distance,
               scheduled_pickup_time,
               estimated_delivery_time,
               actual_pickup_time,
@@ -1385,10 +1378,8 @@ export function registerMobileRoutes(app: Express): void {
               pod_notes,
               is_multi_drop,
               is_return_trip,
-              is_urgent,
-              is_fragile,
-              requires_signature,
               driver_hidden,
+              notes,
               created_at,
               updated_at
             `)
@@ -1922,6 +1913,7 @@ export function registerMobileRoutes(app: Express): void {
           .select(`
             id,
             tracking_number,
+            job_number,
             status,
             driver_id,
             driver_price,
@@ -1941,15 +1933,11 @@ export function registerMobileRoutes(app: Express): void {
             delivery_instructions,
             recipient_name,
             recipient_phone,
-            sender_name,
-            sender_phone,
             customer_name,
             customer_phone,
             customer_email,
-            parcel_description,
-            parcel_weight,
-            parcel_dimensions,
-            distance_miles,
+            weight,
+            distance,
             scheduled_pickup_time,
             estimated_delivery_time,
             actual_pickup_time,
@@ -1962,9 +1950,6 @@ export function registerMobileRoutes(app: Express): void {
             delivered_at,
             is_multi_drop,
             is_return_trip,
-            is_urgent,
-            is_fragile,
-            requires_signature,
             notes,
             created_at,
             updated_at
@@ -2084,16 +2069,16 @@ export function registerMobileRoutes(app: Express): void {
           deliveryLongitude: supabaseJob.delivery_longitude?.toString() || supabaseJob.dropoff_lng?.toString() || null,
           recipientName: supabaseJob.recipient_name,
           recipientPhone: supabaseJob.recipient_phone || null,
-          senderName: supabaseJob.sender_name || supabaseJob.pickup_contact_name || null,
-          senderPhone: supabaseJob.sender_phone || supabaseJob.pickup_contact_phone || null,
+          senderName: supabaseJob.pickup_contact_name || null,
+          senderPhone: supabaseJob.pickup_contact_phone || null,
           pickupContactPhone: supabaseJob.pickup_contact_phone || null,
           pickupContactName: supabaseJob.pickup_contact_name || null,
           customerName: supabaseJob.customer_name,
           customerPhone: supabaseJob.customer_phone,
           customerEmail: supabaseJob.customer_email,
           vehicleType: supabaseJob.vehicle_type,
-          distance: supabaseJob.distance_miles?.toString() || supabaseJob.distance || null,
-          weight: supabaseJob.parcel_weight?.toString() || supabaseJob.weight || null,
+          distance: supabaseJob.distance?.toString() || null,
+          weight: supabaseJob.weight?.toString() || null,
           // CRITICAL: Use driver_price (admin-set), NEVER total_price
           driverPrice: effectiveDriverPrice?.toString() || null,
           scheduledPickupTime: supabaseJob.scheduled_pickup_time,
