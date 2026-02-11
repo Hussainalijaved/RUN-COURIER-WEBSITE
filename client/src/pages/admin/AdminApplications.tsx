@@ -333,6 +333,13 @@ export default function AdminApplications() {
     }
   };
 
+  const resolveDocUrl = (url: string): string => {
+    if (url.startsWith('/uploads/')) {
+      return '/api' + url;
+    }
+    return url;
+  };
+
   const DocumentLink = ({ url, label }: { url: string | null; label: string }) => {
     if (!url) {
       return (
@@ -342,12 +349,13 @@ export default function AdminApplications() {
         </div>
       );
     }
+    const resolvedUrl = resolveDocUrl(url);
     const isPdf = url.toLowerCase().endsWith('.pdf');
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
     return (
       <div className="flex flex-col gap-1">
         <a 
-          href={url} 
+          href={resolvedUrl} 
           target="_blank" 
           rel="noopener noreferrer"
           className="flex items-center gap-2 text-sm text-primary hover:underline"
@@ -359,10 +367,10 @@ export default function AdminApplications() {
         </a>
         {isImage && (
           <img 
-            src={url} 
+            src={resolvedUrl} 
             alt={label} 
             className="mt-1 max-h-32 max-w-48 rounded-md border object-cover cursor-pointer"
-            onClick={() => window.open(url, '_blank')}
+            onClick={() => window.open(resolvedUrl, '_blank')}
             data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
           />
         )}
@@ -382,7 +390,7 @@ export default function AdminApplications() {
         <div className="flex items-center gap-3">
           <Avatar>
             {application.profilePictureUrl ? (
-              <AvatarImage src={application.profilePictureUrl} alt={application.fullName} />
+              <AvatarImage src={resolveDocUrl(application.profilePictureUrl)} alt={application.fullName} />
             ) : null}
             <AvatarFallback>
               {application.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}

@@ -5394,6 +5394,18 @@ export async function registerRoutes(
     res.json(application);
   }));
 
+  app.get("/api/uploads/*", (req, res) => {
+    const filePath = req.params[0];
+    if (!filePath || filePath.includes('..')) {
+      return res.status(400).json({ error: "Invalid path" });
+    }
+    const fullPath = path.join(process.cwd(), 'uploads', filePath);
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    res.sendFile(fullPath);
+  });
+
   app.post("/api/driver-applications/:id/upload-document", requireAdminAccessStrict, (req, res, next) => {
     uploadDocument.single('file')(req, res, (err) => {
       if (err) {
