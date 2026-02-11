@@ -341,6 +341,8 @@ export default function AdminApplications() {
   };
 
   const DocumentLink = ({ url, label }: { url: string | null; label: string }) => {
+    const [loadError, setLoadError] = useState(false);
+
     if (!url) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -352,6 +354,16 @@ export default function AdminApplications() {
     const resolvedUrl = resolveDocUrl(url);
     const isPdf = url.toLowerCase().endsWith('.pdf');
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+
+    if (loadError) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-amber-600">
+          <AlertCircle className="h-4 w-4" />
+          {label}: File unavailable - driver needs to re-upload
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col gap-1">
         <a 
@@ -371,6 +383,7 @@ export default function AdminApplications() {
             alt={label} 
             className="mt-1 max-h-32 max-w-48 rounded-md border object-cover cursor-pointer"
             onClick={() => window.open(resolvedUrl, '_blank')}
+            onError={() => setLoadError(true)}
             data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
           />
         )}

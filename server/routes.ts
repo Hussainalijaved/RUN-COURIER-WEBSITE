@@ -3963,6 +3963,18 @@ export async function registerRoutes(
     const isPendingApplication = rawDriverId === 'application-pending';
     let fileUrl = '';
 
+    const driverDir = path.join(uploadsDir, safeDriverId);
+    if (!fs.existsSync(driverDir)) {
+      fs.mkdirSync(driverDir, { recursive: true });
+    }
+    const finalPath = path.join(driverDir, finalFilename);
+    try {
+      fs.copyFileSync(file.path, finalPath);
+    } catch (copyErr) {
+      console.error('[Documents] Local copy failed:', copyErr);
+    }
+    const localUrl = `/uploads/documents/${safeDriverId}/${finalFilename}`;
+
     const BUCKET = 'driver-documents';
     const storagePath = isPendingApplication
       ? `applications/pending/${finalFilename}`
@@ -3972,8 +3984,13 @@ export async function registerRoutes(
     try {
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (supabaseAdmin) {
-        const fileBuffer = fs.readFileSync(file.path);
-        const contentType = file.mimetype || 'application/octet-stream';
+        const fileBuffer = fs.readFileSync(finalPath);
+        const extLower = ext.toLowerCase();
+        const mimeMap: Record<string, string> = {
+          '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+          '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
+        };
+        const contentType = mimeMap[extLower] || file.mimetype || 'application/octet-stream';
 
         const { error: uploadErr } = await supabaseAdmin.storage
           .from(BUCKET)
@@ -3995,23 +4012,12 @@ export async function registerRoutes(
     }
 
     if (!supabaseUploadSuccess) {
-      const driverDir = path.join(uploadsDir, safeDriverId);
-      if (!fs.existsSync(driverDir)) {
-        fs.mkdirSync(driverDir, { recursive: true });
-      }
-      const finalPath = path.join(driverDir, finalFilename);
-      try {
-        fs.renameSync(file.path, finalPath);
-      } catch (moveError) {
-        fs.copyFileSync(file.path, finalPath);
-        fs.unlinkSync(file.path);
-      }
-      fileUrl = `/uploads/documents/${safeDriverId}/${finalFilename}`;
-      console.log(`[Documents] Fell back to local storage: ${fileUrl}`);
-    } else {
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
+      fileUrl = localUrl;
+      console.log(`[Documents] Using local storage: ${fileUrl}`);
+    }
+
+    if (file.path && fs.existsSync(file.path)) {
+      try { fs.unlinkSync(file.path); } catch {}
     }
     
     if (isPendingApplication) {
@@ -5394,17 +5400,51 @@ export async function registerRoutes(
     res.json(application);
   }));
 
-  app.get("/api/uploads/*", (req, res) => {
+  app.get("/api/uploads/*", asyncHandler(async (req, res) => {
     const filePath = req.params[0];
     if (!filePath || filePath.includes('..')) {
       return res.status(400).json({ error: "Invalid path" });
     }
     const fullPath = path.join(process.cwd(), 'uploads', filePath);
-    if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({ error: "File not found" });
+    if (fs.existsSync(fullPath)) {
+      return res.sendFile(fullPath);
     }
-    res.sendFile(fullPath);
-  });
+
+    const fileName = path.basename(filePath);
+    const BUCKET = 'driver-documents';
+    const possiblePaths = [
+      `applications/pending/${fileName}`,
+      `applications/${filePath.replace('documents/', '')}`,
+      filePath,
+    ];
+
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        for (const storagePath of possiblePaths) {
+          const { data, error } = await supabaseAdmin.storage
+            .from(BUCKET)
+            .download(storagePath);
+          if (!error && data) {
+            const ext = path.extname(fileName).toLowerCase();
+            const mimeTypes: Record<string, string> = {
+              '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+              '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
+            };
+            const contentType = mimeTypes[ext] || 'application/octet-stream';
+            const buffer = Buffer.from(await data.arrayBuffer());
+            res.set('Content-Type', contentType);
+            res.set('Cache-Control', 'public, max-age=3600');
+            return res.send(buffer);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Uploads] Supabase Storage fallback error:', err);
+    }
+
+    return res.status(404).json({ error: "File not found" });
+  }));
 
   app.post("/api/driver-applications/:id/upload-document", requireAdminAccessStrict, (req, res, next) => {
     uploadDocument.single('file')(req, res, (err) => {
