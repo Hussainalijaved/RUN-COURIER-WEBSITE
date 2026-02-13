@@ -5700,18 +5700,28 @@ export async function registerRoutes(
         try {
           const { supabaseAdmin } = await import('./supabaseAdmin');
           if (supabaseAdmin) {
+            const strippedPath = cleanUrl.replace(/^\/uploads\/documents\//, '');
+            const appPendingPath = strippedPath.replace(/^application-pending\//, 'applications/pending/');
             const possiblePaths = [
+              strippedPath,
+              appPendingPath,
               `applications/pending/${fileName}`,
-              cleanUrl.replace(/^\/uploads\/documents\//, 'applications/'),
-              cleanUrl.replace(/^\/uploads\//, ''),
+              `applications/${strippedPath}`,
+              fileName,
             ];
-            for (const sp of possiblePaths) {
-              const { data, error } = await supabaseAdmin.storage
-                .from('driver-documents')
-                .download(sp);
-              if (!error && data) {
-                found = true;
-                break;
+            const buckets = ['driver-documents', 'DRIVER-DOCUMENTS'];
+            outer:
+            for (const bucket of buckets) {
+              for (const sp of possiblePaths) {
+                try {
+                  const { data, error } = await supabaseAdmin.storage
+                    .from(bucket)
+                    .download(sp);
+                  if (!error && data) {
+                    found = true;
+                    break outer;
+                  }
+                } catch (_) {}
               }
             }
           }

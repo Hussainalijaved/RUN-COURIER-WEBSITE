@@ -364,4 +364,58 @@ async function runBackgroundTasks() {
       console.warn("[BACKGROUND] Stripe error:", e?.message);
     }
   })();
+
+  setTimeout(async () => {
+    try {
+      const fs = await import('fs');
+      const pathMod = await import('path');
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+
+      const uploadsDir = pathMod.default.join(process.cwd(), 'uploads', 'documents');
+      if (!fs.existsSync(uploadsDir)) return;
+
+      const BUCKET = 'driver-documents';
+      const mimeMap: Record<string, string> = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+        '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
+      };
+
+      const localDirToStoragePrefix = (dirName: string): string => {
+        if (dirName === 'application-pending') return 'applications/pending';
+        if (dirName.startsWith('application-')) return `applications/${dirName.replace('application-', '')}`;
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidPattern.test(dirName)) return `${dirName}`;
+        return dirName;
+      };
+
+      const dirs = fs.readdirSync(uploadsDir, { withFileTypes: true })
+        .filter((d: any) => d.isDirectory());
+
+      let synced = 0;
+      for (const dir of dirs) {
+        const dirPath = pathMod.default.join(uploadsDir, dir.name);
+        const files = fs.readdirSync(dirPath);
+        const storagePrefix = localDirToStoragePrefix(dir.name);
+
+        for (const file of files) {
+          const ext = pathMod.default.extname(file).toLowerCase();
+          const contentType = mimeMap[ext];
+          if (!contentType) continue;
+
+          const storagePath = `${storagePrefix}/${file}`;
+          const fileBuf = fs.readFileSync(pathMod.default.join(dirPath, file));
+          const { error } = await supabaseAdmin.storage
+            .from(BUCKET)
+            .upload(storagePath, fileBuf, { contentType, upsert: false });
+          if (!error) synced++;
+        }
+      }
+      if (synced > 0) {
+        console.log(`[BACKGROUND] Synced ${synced} local document files to Supabase Storage`);
+      }
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Document sync error:", e?.message);
+    }
+  }, 10000);
 }
