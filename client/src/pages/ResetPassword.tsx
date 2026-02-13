@@ -54,9 +54,9 @@ export default function ResetPassword() {
       setIsValidToken(true);
       setCheckingToken(false);
     } else {
-      setCheckingToken(false);
+      setLocation('/forgot-password');
     }
-  }, [searchString]);
+  }, [searchString, setLocation]);
 
   const form = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),

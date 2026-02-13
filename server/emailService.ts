@@ -1252,28 +1252,33 @@ export async function sendEmailVerification(
 
 export async function sendPasswordResetEmail(
   email: string,
-  resetLink: string
+  code: string
 ): Promise<boolean> {
+  const spaced = code.split('').join(' &nbsp; ');
   const content = `
     <h2 style="color: #333;">Reset Your Password</h2>
     <p style="color: #666; font-size: 16px;">
-      You requested to reset your password. Click the button below to create a new password:
+      You requested to reset your password. Use the verification code below to create a new password:
     </p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${resetLink}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
-        Reset Password
-      </a>
+    <div style="text-align: center; margin: 30px 0; padding: 25px; background-color: #f0f4f8; border-radius: 8px;">
+      <p style="color: #666; font-size: 14px; margin: 0 0 10px 0;">Your verification code:</p>
+      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #007BFF; font-family: 'Courier New', monospace; padding: 10px 0;">
+        ${spaced}
+      </div>
     </div>
+    <p style="color: #333; font-size: 15px; text-align: center; font-weight: 500;">
+      Enter this code on the password reset page to create your new password.
+    </p>
     <p style="color: #666; font-size: 14px;">
       If you didn't request this, you can safely ignore this email.
     </p>
     <p style="color: #666; font-size: 14px;">
-      This link will expire in 1 hour.
+      This code will expire in 1 hour.
     </p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Password Reset');
-  const textContent = `Reset Your Password\n\nYou requested to reset your password. Click this link to create a new password:\n\n${resetLink}\n\nIf you didn't request this, you can safely ignore this email.\n\nThis link will expire in 1 hour.\n\nRun Courier - https://runcourier.co.uk`;
+  const textContent = `Reset Your Password\n\nYou requested to reset your password.\n\nYour verification code: ${code}\n\nEnter this code on the password reset page to create your new password.\n\nIf you didn't request this, you can safely ignore this email.\n\nThis code will expire in 1 hour.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Reset Your Password - Run Courier', htmlContent, textContent);
 }

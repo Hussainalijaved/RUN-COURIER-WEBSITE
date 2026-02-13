@@ -7799,11 +7799,11 @@ export async function registerRoutes(
   }));
 
   const RESET_TOKENS_FILE = path.resolve(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'data', 'reset-tokens.json'));
-  function loadResetTokens(): Map<string, { email: string; userId: string; expiresAt: number }> {
+  function loadResetTokens(): Map<string, { code: string; email: string; userId: string; expiresAt: number }> {
     try {
       if (fs.existsSync(RESET_TOKENS_FILE)) {
         const data = JSON.parse(fs.readFileSync(RESET_TOKENS_FILE, 'utf-8'));
-        const map = new Map<string, { email: string; userId: string; expiresAt: number }>();
+        const map = new Map<string, { code: string; email: string; userId: string; expiresAt: number }>();
         for (const [k, v] of Object.entries(data)) {
           const val = v as any;
           if (val.expiresAt > Date.now()) map.set(k, val);
@@ -7813,7 +7813,7 @@ export async function registerRoutes(
     } catch {}
     return new Map();
   }
-  function saveResetTokens(tokens: Map<string, { email: string; userId: string; expiresAt: number }>) {
+  function saveResetTokens(tokens: Map<string, { code: string; email: string; userId: string; expiresAt: number }>) {
     try {
       const dir = path.dirname(RESET_TOKENS_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -7828,7 +7828,7 @@ export async function registerRoutes(
   }
 
   app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
-    const { email, redirectUrl } = req.body;
+    const { email } = req.body;
     
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
@@ -7845,30 +7845,27 @@ export async function registerRoutes(
       const user = users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
       if (!user) {
-        return res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
+        return res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a reset code." });
       }
 
-      const crypto = await import('crypto');
-      const token = crypto.randomBytes(32).toString('hex');
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 60 * 60 * 1000;
+      const emailKey = email.toLowerCase();
 
       const tokens = loadResetTokens();
-      tokens.set(token, { email: email.toLowerCase(), userId: user.id, expiresAt });
+      tokens.set(emailKey, { code, email: emailKey, userId: user.id, expiresAt });
       saveResetTokens(tokens);
 
-      const baseUrl = redirectUrl?.replace('/reset-password', '') || process.env.APP_URL || 'https://runcourier.co.uk';
-      const resetLink = `${baseUrl}/reset-password?token=${token}`;
-
-      const emailSent = await sendPasswordResetEmail(email, resetLink);
+      const emailSent = await sendPasswordResetEmail(email, code);
       
       if (!emailSent) {
         console.error('Failed to send password reset email via Resend');
         return res.status(500).json({ error: "Failed to send password reset email. Please try again later." });
       }
 
-      console.log('Password reset email sent successfully to:', email);
+      console.log('Password reset code sent successfully to:', email);
 
-      res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
+      res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a reset code." });
     } catch (error) {
       console.error('Password reset error:', error);
       res.status(500).json({ error: "An error occurred. Please try again later." });
@@ -7876,10 +7873,62 @@ export async function registerRoutes(
   }));
 
   app.post("/api/auth/reset-password", asyncHandler(async (req, res) => {
-    const { token, newPassword } = req.body;
+    const { token, email, code, newPassword } = req.body;
 
-    if (!token || !newPassword) {
-      return res.status(400).json({ error: "Token and new password are required" });
+    if (token && newPassword) {
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+
+      try {
+        const { supabaseAdmin } = await import("./supabaseAdmin");
+        if (!supabaseAdmin) {
+          return res.status(500).json({ error: "Authentication service not configured" });
+        }
+
+        const tokens = loadResetTokens();
+        let resetData: { code: string; email: string; userId: string; expiresAt: number } | undefined;
+        let resetKey: string | undefined;
+        for (const [k, v] of tokens) {
+          if (v.code === token || k === token) {
+            resetData = v;
+            resetKey = k;
+            break;
+          }
+        }
+
+        if (!resetData || !resetKey) {
+          return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+        }
+
+        if (resetData.expiresAt < Date.now()) {
+          tokens.delete(resetKey);
+          saveResetTokens(tokens);
+          return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
+        }
+
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(resetData.userId, {
+          password: newPassword
+        });
+
+        if (error) {
+          console.error('Password update error:', error);
+          return res.status(500).json({ error: "Failed to update password. Please try again." });
+        }
+
+        tokens.delete(resetKey);
+        saveResetTokens(tokens);
+        console.log(`Password reset successfully for: ${resetData.email}`);
+
+        return res.json({ success: true, message: "Password has been reset successfully." });
+      } catch (error) {
+        console.error('Reset password error:', error);
+        return res.status(500).json({ error: "An error occurred. Please try again later." });
+      }
+    }
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: "Email, code, and new password are required" });
     }
 
     if (newPassword.length < 8) {
@@ -7892,17 +7941,22 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Authentication service not configured" });
       }
 
+      const emailKey = email.toLowerCase();
       const tokens = loadResetTokens();
-      const resetData = tokens.get(token);
+      const resetData = tokens.get(emailKey);
 
       if (!resetData) {
-        return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+        return res.status(400).json({ error: "Invalid or expired reset code. Please request a new one." });
       }
 
       if (resetData.expiresAt < Date.now()) {
-        tokens.delete(token);
+        tokens.delete(emailKey);
         saveResetTokens(tokens);
-        return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
+        return res.status(400).json({ error: "Reset code has expired. Please request a new one." });
+      }
+
+      if (resetData.code !== code) {
+        return res.status(400).json({ error: "Invalid reset code. Please check and try again." });
       }
 
       const { error } = await supabaseAdmin.auth.admin.updateUserById(resetData.userId, {
@@ -7914,7 +7968,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to update password. Please try again." });
       }
 
-      tokens.delete(token);
+      tokens.delete(emailKey);
       saveResetTokens(tokens);
       console.log(`Password reset successfully for: ${resetData.email}`);
 
