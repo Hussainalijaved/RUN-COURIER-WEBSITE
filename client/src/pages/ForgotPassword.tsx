@@ -24,7 +24,7 @@ const forgotPasswordSchema = z.object({
 });
 
 const resetWithCodeSchema = z.object({
-  code: z.string().length(6, 'Code must be 6 digits'),
+  code: z.string().min(6, 'Code must be 6 digits').max(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
@@ -218,7 +218,7 @@ export default function ForgotPassword() {
                             inputMode="numeric"
                             maxLength={6}
                             placeholder="000000"
-                            className="text-center text-2xl tracking-[0.5em] font-mono"
+                            className="text-center text-2xl tracking-widest font-mono"
                             {...field}
                             data-testid="input-reset-code"
                           />
