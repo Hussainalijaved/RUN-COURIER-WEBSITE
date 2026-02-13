@@ -383,11 +383,17 @@ export default function AdminApplications() {
   };
 
   const resolveDocUrl = (url: string): string => {
-    if (url.startsWith('https://') && url.includes('supabase.co')) {
+    if (url.startsWith('/api/uploads/')) {
       return url;
     }
     if (url.startsWith('/uploads/')) {
-      return url;
+      return '/api' + url;
+    }
+    if (url.includes('supabase.co/storage/v1/object/') && url.includes('driver-documents/')) {
+      const storagePath = url.split('/driver-documents/')[1];
+      if (storagePath) {
+        return `/api/uploads/documents/${storagePath}`;
+      }
     }
     return url;
   };

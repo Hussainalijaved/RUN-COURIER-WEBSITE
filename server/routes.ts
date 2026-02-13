@@ -4022,6 +4022,26 @@ export async function registerRoutes(
       console.error("Failed to fetch documents from memory:", e);
     }
     
+    allDocuments.forEach(doc => {
+      if (doc.fileUrl && typeof doc.fileUrl === 'string') {
+        if (doc.fileUrl.startsWith('/uploads/')) {
+          doc.fileUrl = '/api' + doc.fileUrl;
+        } else if (doc.fileUrl.includes('supabase.co/storage/v1/object/public/driver-documents/')) {
+          const storagePath = doc.fileUrl.split('/driver-documents/')[1];
+          if (storagePath) {
+            doc.fileUrl = `/api/uploads/documents/${storagePath}`;
+          }
+        } else if (doc.fileUrl.includes('supabase.co/storage/v1/object/') && !doc.fileUrl.includes('/public/')) {
+          const storagePath = doc.fileUrl.split('/driver-documents/')[1];
+          if (storagePath) {
+            doc.fileUrl = `/api/uploads/documents/${storagePath}`;
+          }
+        } else if (!doc.fileUrl.startsWith('/api/') && !doc.fileUrl.startsWith('http') && !doc.fileUrl.startsWith('text:')) {
+          doc.fileUrl = `/api/uploads/documents/${doc.fileUrl}`;
+        }
+      }
+    });
+
     // Sort by uploadedAt descending
     allDocuments.sort((a, b) => {
       const dateA = new Date(a.uploadedAt || 0).getTime();
@@ -5741,11 +5761,13 @@ export async function registerRoutes(
 
     const fileName = path.basename(filePath);
     const BUCKET = 'driver-documents';
+    const cleanPath = filePath.replace(/^documents\//, '');
     const possiblePaths = [
-      `applications/pending/${fileName}`,
-      `applications/${filePath.replace('documents/', '')}`,
-      filePath.replace('documents/', ''),
       filePath,
+      cleanPath,
+      `applications/pending/${fileName}`,
+      `applications/${cleanPath}`,
+      fileName,
     ];
 
     try {
