@@ -24,7 +24,7 @@ const forgotPasswordSchema = z.object({
 });
 
 const resetWithCodeSchema = z.object({
-  code: z.string().min(6, 'Code must be 6 digits').max(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
+  code: z.string().min(1, 'Please enter the verification code').refine((val) => /^\d{6}$/.test(val), { message: 'Code must be exactly 6 digits' }),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
@@ -224,17 +224,12 @@ export default function ForgotPassword() {
                         <FormControl>
                           <Input
                             type="text"
-                            inputMode="numeric"
                             maxLength={6}
                             placeholder="Enter 6-digit code"
                             autoComplete="one-time-code"
                             className="text-center text-2xl font-bold h-14"
-                            {...field}
-                            onChange={(e) => {
-                              const cleaned = e.target.value.replace(/\D/g, '').slice(0, 6);
-                              field.onChange(cleaned);
-                            }}
                             data-testid="input-reset-code"
+                            {...field}
                           />
                         </FormControl>
                         <FormMessage />
