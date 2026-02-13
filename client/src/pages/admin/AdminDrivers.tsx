@@ -73,7 +73,7 @@ import {
   Check,
   Trash2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeDocUrl } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -398,7 +398,7 @@ export default function AdminDrivers() {
           driverId,
           type: m.type,
           fileName: m.label,
-          fileUrl: url,
+          fileUrl: normalizeDocUrl(url),
           status: 'approved',
           uploadedAt: raw.created_at ? new Date(raw.created_at) : new Date(),
           expiryDate: null,
@@ -1524,16 +1524,7 @@ export default function AdminDrivers() {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              let viewUrl = doc.fileUrl;
-                              if (viewUrl.startsWith('/uploads/')) {
-                                viewUrl = '/api' + viewUrl;
-                              } else {
-                                const supabaseMatch = viewUrl.match(/\/storage\/v1\/object\/public\/driver-documents\/(.+)/);
-                                if (supabaseMatch) {
-                                  viewUrl = '/api/uploads/' + supabaseMatch[1];
-                                }
-                              }
-                              window.open(viewUrl, '_blank');
+                              window.open(normalizeDocUrl(doc.fileUrl), '_blank');
                             }}
                           >
                             <ExternalLink className="h-4 w-4 mr-1" />

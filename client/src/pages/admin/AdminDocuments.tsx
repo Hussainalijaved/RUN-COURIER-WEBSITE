@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
+import { normalizeDocUrl } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -302,32 +303,44 @@ export default function AdminDocuments() {
                   </div>
                 </div>
                 <div>
-                  {selectedDoc.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                    <iframe
-                      src={selectedDoc.fileUrl}
-                      className="w-full h-96 border rounded"
-                      title="Document Preview"
-                    />
-                  ) : selectedDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <img
-                      src={selectedDoc.fileUrl}
-                      alt="Document Preview"
-                      className="max-w-full h-auto max-h-96 rounded border"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-48 bg-muted rounded">
-                      <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">Preview not available for this file type</p>
-                      <a
-                        href={selectedDoc.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 text-primary hover:underline"
-                      >
-                        Open in new tab
-                      </a>
-                    </div>
-                  )}
+                  {(() => {
+                    const docUrl = normalizeDocUrl(selectedDoc.fileUrl);
+                    if (docUrl.toLowerCase().endsWith('.pdf')) {
+                      return (
+                        <iframe
+                          src={docUrl}
+                          className="w-full h-96 border rounded"
+                          title="Document Preview"
+                          data-testid="iframe-document-preview"
+                        />
+                      );
+                    } else if (docUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                      return (
+                        <img
+                          src={docUrl}
+                          alt="Document Preview"
+                          className="max-w-full h-auto max-h-96 rounded border"
+                          data-testid="img-document-preview"
+                        />
+                      );
+                    } else {
+                      return (
+                        <div className="flex flex-col items-center justify-center h-48 bg-muted rounded">
+                          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                          <p className="text-muted-foreground">Preview not available for this file type</p>
+                          <a
+                            href={docUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 text-primary hover:underline"
+                            data-testid="link-document-open"
+                          >
+                            Open in new tab
+                          </a>
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
             )}

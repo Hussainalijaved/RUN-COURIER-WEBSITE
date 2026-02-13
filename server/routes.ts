@@ -239,6 +239,91 @@ function stripCustomerPricing<T extends Record<string, any>>(job: T): Omit<T,
   return safeJob;
 }
 
+function normalizeDocumentUrl(url: string | null | undefined): string | null | undefined {
+  if (!url || typeof url !== 'string' || url.trim() === '') return url;
+  if (url.startsWith('text:')) return url;
+  if (url.startsWith('/api/uploads/documents/')) return url;
+  if (url.startsWith('/uploads/documents/')) return '/api' + url;
+  if (url.startsWith('/uploads/')) return '/api' + url;
+  const prodMatch = url.match(/^https?:\/\/(?:www\.)?runcourier\.co\.uk\/uploads\/(.+)$/i);
+  if (prodMatch) return `/api/uploads/${prodMatch[1]}`;
+  const supabaseMatch = url.match(/supabase\.co\/storage\/v1\/object\/(?:public\/)?(?:driver-documents|DRIVER-DOCUMENTS)\/(.+?)(?:\?.*)?$/i);
+  if (supabaseMatch) return `/api/uploads/documents/${decodeURIComponent(supabaseMatch[1])}`;
+  if (!url.startsWith('http') && !url.startsWith('/')) {
+    return `/api/uploads/documents/${url}`;
+  }
+  return url;
+}
+
+async function copyApplicationFileToDriver(
+  originalUrl: string,
+  driverUUID: string,
+  supabaseClient: any
+): Promise<string> {
+  const normalized = normalizeDocumentUrl(originalUrl);
+  if (!normalized || !supabaseClient) return normalized || originalUrl;
+
+  try {
+    let sourcePath: string | null = null;
+    const pendingMatch = originalUrl.match(/application-pending\/(.+)$/);
+    if (pendingMatch) {
+      sourcePath = `applications/pending/${pendingMatch[1]}`;
+    } else {
+      const pathMatch = (normalized || '').match(/\/api\/uploads\/documents\/(.+)$/);
+      if (pathMatch) {
+        sourcePath = pathMatch[1];
+        if (sourcePath.startsWith('application-pending/')) {
+          sourcePath = sourcePath.replace('application-pending/', 'applications/pending/');
+        }
+      }
+    }
+
+    if (!sourcePath) return normalized;
+
+    const fileName = sourcePath.split('/').pop();
+    if (!fileName) return normalized;
+    const destPath = `${driverUUID}/${fileName}`;
+
+    const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
+    const altPath = sourcePath.replace('applications/pending/', 'application-pending/');
+    const tryPaths = [sourcePath, altPath];
+    
+    let downloadedData: any = null;
+    for (const bucket of BUCKETS) {
+      for (const tryPath of tryPaths) {
+        try {
+          const { data, error } = await supabaseClient.storage.from(bucket).download(tryPath);
+          if (!error && data) {
+            downloadedData = data;
+            break;
+          }
+        } catch (_) {}
+      }
+      if (downloadedData) break;
+    }
+
+    if (!downloadedData) {
+      console.log(`[FileCopy] Could not download from any path/bucket for ${sourcePath}, using normalized URL`);
+      return normalized;
+    }
+
+    const arrayBuf = await downloadedData.arrayBuffer();
+    const { error: uploadErr } = await supabaseClient.storage
+      .from('driver-documents')
+      .upload(destPath, Buffer.from(arrayBuf), { upsert: true });
+    if (uploadErr) {
+      console.error(`[FileCopy] Upload to ${destPath} failed:`, uploadErr);
+      return normalized;
+    }
+
+    console.log(`[FileCopy] Copied ${sourcePath} -> ${destPath}`);
+    return `/api/uploads/documents/${destPath}`;
+  } catch (err) {
+    console.error(`[FileCopy] Error copying file:`, err);
+    return normalized;
+  }
+}
+
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
 if (!fs.existsSync(uploadsDir)) {
@@ -4024,17 +4109,9 @@ export async function registerRoutes(
     
     allDocuments.forEach(doc => {
       if (doc.fileUrl && typeof doc.fileUrl === 'string') {
-        if (doc.fileUrl.startsWith('/api/uploads/')) {
-          // already resolved
-        } else if (doc.fileUrl.startsWith('/uploads/')) {
-          doc.fileUrl = '/api' + doc.fileUrl;
-        } else if (doc.fileUrl.includes('supabase.co/storage/v1/object/')) {
-          const match = doc.fileUrl.match(/\/(?:driver-documents|DRIVER-DOCUMENTS)\/(.+?)(?:\?.*)?$/i);
-          if (match && match[1]) {
-            doc.fileUrl = `/api/uploads/documents/${decodeURIComponent(match[1])}`;
-          }
-        } else if (!doc.fileUrl.startsWith('http') && !doc.fileUrl.startsWith('text:')) {
-          doc.fileUrl = `/api/uploads/documents/${doc.fileUrl}`;
+        const normalized = normalizeDocumentUrl(doc.fileUrl);
+        if (normalized && typeof normalized === 'string') {
+          doc.fileUrl = normalized;
         }
       }
     });
@@ -5981,11 +6058,7 @@ export async function registerRoutes(
             };
 
             if (application.profilePictureUrl) {
-              const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
-              const picUrl = application.profilePictureUrl.startsWith('http') 
-                ? application.profilePictureUrl 
-                : `${baseUrl}${application.profilePictureUrl}`;
-              updateData.profile_picture_url = picUrl;
+              updateData.profile_picture_url = normalizeDocumentUrl(application.profilePictureUrl) || application.profilePictureUrl;
             }
             if (application.fullAddress) {
               updateData.address = application.fullAddress;
@@ -6026,28 +6099,22 @@ export async function registerRoutes(
                 console.log(`[Driver Application] Profile picture synced for driver ${driver.driver_code}: ${application.profilePictureUrl}`);
               }
 
-              // Sync document URLs to driver columns
-              const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+              // Sync document URLs to driver columns using normalized proxy URLs
+              // Also copy files from application-pending to driver's own folder
               const docColumnUpdates: Record<string, any> = {};
-              if (application.drivingLicenceFrontUrl) {
-                docColumnUpdates.driving_licence_front_url = application.drivingLicenceFrontUrl.startsWith('http')
-                  ? application.drivingLicenceFrontUrl : `${baseUrl}${application.drivingLicenceFrontUrl}`;
-              }
-              if (application.drivingLicenceBackUrl) {
-                docColumnUpdates.driving_licence_back_url = application.drivingLicenceBackUrl.startsWith('http')
-                  ? application.drivingLicenceBackUrl : `${baseUrl}${application.drivingLicenceBackUrl}`;
-              }
-              if (application.dbsCertificateUrl) {
-                docColumnUpdates.dbs_certificate_url = application.dbsCertificateUrl.startsWith('http')
-                  ? application.dbsCertificateUrl : `${baseUrl}${application.dbsCertificateUrl}`;
-              }
-              if (application.goodsInTransitInsuranceUrl) {
-                docColumnUpdates.goods_in_transit_insurance_url = application.goodsInTransitInsuranceUrl.startsWith('http')
-                  ? application.goodsInTransitInsuranceUrl : `${baseUrl}${application.goodsInTransitInsuranceUrl}`;
-              }
-              if (application.hireAndRewardUrl) {
-                docColumnUpdates.hire_reward_insurance_url = application.hireAndRewardUrl.startsWith('http')
-                  ? application.hireAndRewardUrl : `${baseUrl}${application.hireAndRewardUrl}`;
+              const docUrlFields = [
+                { appField: 'drivingLicenceFrontUrl', col: 'driving_licence_front_url' },
+                { appField: 'drivingLicenceBackUrl', col: 'driving_licence_back_url' },
+                { appField: 'dbsCertificateUrl', col: 'dbs_certificate_url' },
+                { appField: 'goodsInTransitInsuranceUrl', col: 'goods_in_transit_insurance_url' },
+                { appField: 'hireAndRewardUrl', col: 'hire_reward_insurance_url' },
+              ];
+              for (const field of docUrlFields) {
+                const rawUrl = (application as any)[field.appField];
+                if (rawUrl) {
+                  const copiedUrl = await copyApplicationFileToDriver(rawUrl, driver.id, supabaseAdmin);
+                  docColumnUpdates[field.col] = copiedUrl;
+                }
               }
               if (Object.keys(docColumnUpdates).length > 0) {
                 const { error: docColErr } = await supabaseAdmin
@@ -6072,11 +6139,12 @@ export async function registerRoutes(
               for (const mapping of docMappings) {
                 if (!mapping.url) continue;
                 try {
+                  const copiedUrl = await copyApplicationFileToDriver(mapping.url, driver.id, supabaseAdmin);
                   await storage.createDocument({
                     driverId: driver.id,
                     type: mapping.type as any,
                     fileName: mapping.label,
-                    fileUrl: mapping.url,
+                    fileUrl: copiedUrl,
                     status: 'approved',
                   });
                   console.log(`[Driver Application] Created document record: ${mapping.type} for driver ${driver.driver_code}`);
@@ -6131,7 +6199,6 @@ export async function registerRoutes(
                   driverCode = `RC${num1}${num2}${letter}`;
                 }
 
-                const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
                 const driverData: Record<string, any> = {
                   id: userId,
                   user_id: userId,
@@ -6155,35 +6222,19 @@ export async function registerRoutes(
                   account_number: application.accountNumber || null,
                 };
 
-                if (application.profilePictureUrl) {
-                  driverData.profile_picture_url = application.profilePictureUrl.startsWith('http')
-                    ? application.profilePictureUrl
-                    : `${baseUrl}${application.profilePictureUrl}`;
-                }
-                if (application.drivingLicenceFrontUrl) {
-                  driverData.driving_licence_front_url = application.drivingLicenceFrontUrl.startsWith('http')
-                    ? application.drivingLicenceFrontUrl
-                    : `${baseUrl}${application.drivingLicenceFrontUrl}`;
-                }
-                if (application.drivingLicenceBackUrl) {
-                  driverData.driving_licence_back_url = application.drivingLicenceBackUrl.startsWith('http')
-                    ? application.drivingLicenceBackUrl
-                    : `${baseUrl}${application.drivingLicenceBackUrl}`;
-                }
-                if (application.dbsCertificateUrl) {
-                  driverData.dbs_certificate_url = application.dbsCertificateUrl.startsWith('http')
-                    ? application.dbsCertificateUrl
-                    : `${baseUrl}${application.dbsCertificateUrl}`;
-                }
-                if (application.goodsInTransitInsuranceUrl) {
-                  driverData.goods_in_transit_insurance_url = application.goodsInTransitInsuranceUrl.startsWith('http')
-                    ? application.goodsInTransitInsuranceUrl
-                    : `${baseUrl}${application.goodsInTransitInsuranceUrl}`;
-                }
-                if (application.hireAndRewardUrl) {
-                  driverData.hire_reward_insurance_url = application.hireAndRewardUrl.startsWith('http')
-                    ? application.hireAndRewardUrl
-                    : `${baseUrl}${application.hireAndRewardUrl}`;
+                const newDriverDocFields = [
+                  { appField: 'profilePictureUrl', col: 'profile_picture_url' },
+                  { appField: 'drivingLicenceFrontUrl', col: 'driving_licence_front_url' },
+                  { appField: 'drivingLicenceBackUrl', col: 'driving_licence_back_url' },
+                  { appField: 'dbsCertificateUrl', col: 'dbs_certificate_url' },
+                  { appField: 'goodsInTransitInsuranceUrl', col: 'goods_in_transit_insurance_url' },
+                  { appField: 'hireAndRewardUrl', col: 'hire_reward_insurance_url' },
+                ];
+                for (const field of newDriverDocFields) {
+                  const rawUrl = (application as any)[field.appField];
+                  if (rawUrl) {
+                    driverData[field.col] = await copyApplicationFileToDriver(rawUrl, userId, supabaseAdmin);
+                  }
                 }
 
                 const { error: insertError } = await supabaseAdmin
@@ -6218,11 +6269,12 @@ export async function registerRoutes(
                   for (const mapping of newDocMappings) {
                     if (!mapping.url) continue;
                     try {
+                      const copiedUrl = await copyApplicationFileToDriver(mapping.url, userId, supabaseAdmin);
                       await storage.createDocument({
                         driverId: userId,
                         type: mapping.type as any,
                         fileName: mapping.label,
-                        fileUrl: mapping.url,
+                        fileUrl: copiedUrl,
                         status: 'approved',
                       });
                       console.log(`[Driver Application] Created document record: ${mapping.type} for new driver ${driverCode}`);
@@ -6276,11 +6328,12 @@ export async function registerRoutes(
               .filter(d => d.url)
               .map(d => {
                 const docStatus = documentStatuses?.[d.field] || 'pending';
+                const normalizedUrl = normalizeDocumentUrl(d.url);
                 return {
                   driver_id: driver.id,
                   type: d.type,
                   file_name: d.url!.split('/').pop() || d.type,
-                  file_url: d.url,
+                  file_url: normalizedUrl || d.url,
                   status: docStatus,
                   uploaded_at: new Date().toISOString(),
                   reviewed_at: new Date().toISOString(),
