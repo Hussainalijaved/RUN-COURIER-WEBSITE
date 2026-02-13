@@ -5759,8 +5759,10 @@ export async function registerRoutes(
     const fileName = path.basename(filePath);
     const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
     const cleanPath = filePath.replace(/^documents\//, '');
+    const appPendingConverted = cleanPath.replace(/^application-pending\//, 'applications/pending/');
     const possiblePaths = [
       cleanPath,
+      appPendingConverted,
       filePath,
       `applications/pending/${fileName}`,
       `applications/${cleanPath}`,
