@@ -354,6 +354,10 @@ export default function AdminApplications() {
     if (url.startsWith('/uploads/')) {
       return '/api' + url;
     }
+    const supabaseMatch = url.match(/\/storage\/v1\/object\/public\/driver-documents\/(.+)/);
+    if (supabaseMatch) {
+      return '/api/uploads/' + supabaseMatch[1];
+    }
     return url;
   };
 

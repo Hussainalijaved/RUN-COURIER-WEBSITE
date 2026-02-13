@@ -5515,11 +5515,30 @@ export async function registerRoutes(
       if (!url || typeof url !== 'string') continue;
 
       if (url.startsWith('https://') && url.includes('supabase.co')) {
-        try {
-          const resp = await fetch(url, { method: 'HEAD' });
-          results[url] = resp.ok;
-        } catch {
-          results[url] = false;
+        const match = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
+        if (match) {
+          const [, bucket, storagePath] = match;
+          try {
+            const { supabaseAdmin } = await import('./supabaseAdmin');
+            if (supabaseAdmin) {
+              const { data, error } = await supabaseAdmin.storage
+                .from(bucket)
+                .download(storagePath);
+              results[url] = !error && !!data;
+            } else {
+              const resp = await fetch(url, { method: 'HEAD' });
+              results[url] = resp.ok;
+            }
+          } catch {
+            results[url] = false;
+          }
+        } else {
+          try {
+            const resp = await fetch(url, { method: 'HEAD' });
+            results[url] = resp.ok;
+          } catch {
+            results[url] = false;
+          }
         }
         continue;
       }
