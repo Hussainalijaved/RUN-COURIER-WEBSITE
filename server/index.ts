@@ -418,4 +418,153 @@ async function runBackgroundTasks() {
       console.warn("[BACKGROUND] Document sync error:", e?.message);
     }
   }, 10000);
+
+  setTimeout(async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+
+      console.log("[BACKGROUND] Starting driver_documents reconciliation...");
+
+      const { data: docs, error: docsErr } = await supabaseAdmin
+        .from('driver_documents')
+        .select('id, driver_id, doc_type, file_url');
+
+      if (docsErr || !docs || docs.length === 0) {
+        if (docsErr) console.warn("[BACKGROUND] Failed to fetch driver_documents:", docsErr.message);
+        return;
+      }
+
+      console.log(`[BACKGROUND] Checking ${docs.length} driver_documents entries...`);
+
+      const DOC_TYPE_GROUPS: string[][] = [
+        ['driving_license', 'driving_licence_front', 'driving_license_front', 'drivingLicenceFront', 'drivingLicenseFront'],
+        ['driving_licence_back', 'driving_license_back', 'drivingLicenceBack', 'drivingLicenseBack'],
+        ['dbs_certificate', 'dbsCertificate'],
+        ['goods_in_transit', 'goods_in_transit_insurance', 'goodsInTransitInsurance', 'goodsInTransit'],
+        ['hire_and_reward', 'hire_and_reward_insurance', 'hire_reward_insurance', 'hireAndReward', 'hireAndRewardInsurance'],
+        ['proof_of_identity', 'proofOfIdentity'],
+        ['proof_of_address', 'proofOfAddress'],
+        ['profile_picture', 'profile', 'profilePicture'],
+        ['vehicle_photo_front', 'vehicle_photos_front', 'vehiclePhotoFront'],
+        ['vehicle_photo_back', 'vehicle_photos_back', 'vehiclePhotoBack'],
+        ['vehicle_photo_left', 'vehicle_photos_left', 'vehiclePhotoLeft'],
+        ['vehicle_photo_right', 'vehicle_photos_right', 'vehiclePhotoRight'],
+        ['vehicle_photo_load_space', 'vehicle_photos_load', 'vehiclePhotoLoadSpace'],
+      ];
+
+      const getDocPrefixes = (fileName: string): string[] => {
+        const baseName = fileName.replace(/\.[^.]+$/, '');
+        const withoutTimestamp = baseName.replace(/_\d{10,}$/, '');
+        for (const group of DOC_TYPE_GROUPS) {
+          for (const prefix of group) {
+            if (withoutTimestamp === prefix || withoutTimestamp.startsWith(prefix + '_')) {
+              return group;
+            }
+          }
+        }
+        return [withoutTimestamp];
+      }
+
+      const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const folderCache = new Map<string, { bucket: string; name: string }[]>();
+
+      const listDriverFolder = async (driverId: string): Promise<{ bucket: string; name: string }[]> => {
+        const cached = folderCache.get(driverId);
+        if (cached) return cached;
+        const allFiles: { bucket: string; name: string }[] = [];
+        for (const bucket of BUCKETS) {
+          try {
+            const { data, error } = await supabaseAdmin!.storage
+              .from(bucket)
+              .list(driverId, { limit: 200 });
+            if (!error && data) {
+              for (const f of data) {
+                if (f.name && f.name !== '.emptyFolderPlaceholder') {
+                  allFiles.push({ bucket, name: f.name });
+                }
+              }
+            }
+          } catch (_) {}
+        }
+        folderCache.set(driverId, allFiles);
+        return allFiles;
+      }
+
+      let updated = 0;
+      let checked = 0;
+
+      for (const doc of docs) {
+        checked++;
+        if (!doc.file_url || !doc.driver_id) continue;
+        if (!uuidPattern.test(doc.driver_id)) continue;
+
+        const fileUrl = doc.file_url as string;
+        const pathMatch = fileUrl.match(/\/(?:api\/)?uploads\/documents\/([^/]+)\/(.+)$/);
+        if (!pathMatch) continue;
+
+        const driverId = pathMatch[1];
+        const requestedFile = pathMatch[2];
+
+        if (!uuidPattern.test(driverId)) continue;
+
+        const storagePath = `${driverId}/${requestedFile}`;
+        let exactExists = false;
+        for (const bucket of BUCKETS) {
+          try {
+            const { data, error } = await supabaseAdmin.storage
+              .from(bucket)
+              .download(storagePath);
+            if (!error && data) {
+              exactExists = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        if (exactExists) continue;
+
+        const searchFolders = [driverId, `applications/${driverId}`];
+        const prefixes = getDocPrefixes(requestedFile);
+        let matchedFile: string | null = null;
+        let matchedFolder: string | null = null;
+
+        for (const folder of searchFolders) {
+          const folderFiles = await listDriverFolder(folder);
+          if (folderFiles.length === 0) continue;
+
+          for (const storageFile of folderFiles) {
+            const storageBaseName = storageFile.name.replace(/\.[^.]+$/, '');
+            const storageWithoutTs = storageBaseName.replace(/_\d{10,}$/, '');
+            for (const prefix of prefixes) {
+              if (storageWithoutTs === prefix || storageWithoutTs.startsWith(prefix + '_')) {
+                matchedFile = storageFile.name;
+                matchedFolder = folder;
+                break;
+              }
+            }
+            if (matchedFile) break;
+          }
+          if (matchedFile) break;
+        }
+
+        if (matchedFile && matchedFolder) {
+          const newUrl = `/api/uploads/documents/${matchedFolder}/${matchedFile}`;
+          const { error: updateErr } = await supabaseAdmin
+            .from('driver_documents')
+            .update({ file_url: newUrl })
+            .eq('id', doc.id);
+          if (!updateErr) {
+            updated++;
+            console.log(`[BACKGROUND] Reconciled doc ${doc.id}: ${requestedFile} -> ${matchedFolder}/${matchedFile}`);
+          }
+        }
+      }
+
+      console.log(`[BACKGROUND] Document reconciliation complete: checked ${checked}, updated ${updated}`);
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Document reconciliation error:", e?.message);
+    }
+  }, 20000);
 }

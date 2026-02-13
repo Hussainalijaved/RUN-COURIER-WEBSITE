@@ -515,6 +515,35 @@ async function generateJobNumber(): Promise<string> {
   return jobNumber;
 }
 
+const DOC_TYPE_GROUPS: string[][] = [
+  ['driving_license', 'driving_licence_front', 'driving_license_front', 'drivingLicenceFront', 'drivingLicenseFront'],
+  ['driving_licence_back', 'driving_license_back', 'drivingLicenceBack', 'drivingLicenseBack'],
+  ['dbs_certificate', 'dbsCertificate'],
+  ['goods_in_transit', 'goods_in_transit_insurance', 'goodsInTransitInsurance', 'goodsInTransit'],
+  ['hire_and_reward', 'hire_and_reward_insurance', 'hire_reward_insurance', 'hireAndReward', 'hireAndRewardInsurance'],
+  ['proof_of_identity', 'proofOfIdentity'],
+  ['proof_of_address', 'proofOfAddress'],
+  ['profile_picture', 'profile', 'profilePicture'],
+  ['vehicle_photo_front', 'vehicle_photos_front', 'vehiclePhotoFront'],
+  ['vehicle_photo_back', 'vehicle_photos_back', 'vehiclePhotoBack'],
+  ['vehicle_photo_left', 'vehicle_photos_left', 'vehiclePhotoLeft'],
+  ['vehicle_photo_right', 'vehicle_photos_right', 'vehiclePhotoRight'],
+  ['vehicle_photo_load_space', 'vehicle_photos_load', 'vehiclePhotoLoadSpace'],
+];
+
+function findDocTypeMatch(fileName: string): string[] {
+  const baseName = fileName.replace(/\.[^.]+$/, '');
+  const withoutTimestamp = baseName.replace(/_\d{10,}$/, '');
+  for (const group of DOC_TYPE_GROUPS) {
+    for (const prefix of group) {
+      if (withoutTimestamp === prefix || withoutTimestamp.startsWith(prefix + '_')) {
+        return group;
+      }
+    }
+  }
+  return [withoutTimestamp];
+}
+
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -5878,6 +5907,60 @@ export async function registerRoutes(
                 return res.send(buffer);
               }
             } catch (_) {}
+          }
+        }
+
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const pathParts = cleanPath.split('/');
+        const driverUUID = pathParts.length >= 2 ? pathParts[0] : null;
+        
+        if (driverUUID && uuidPattern.test(driverUUID)) {
+          const docPrefixes = findDocTypeMatch(fileName);
+          console.log(`[Uploads] Exact path not found for ${fileName}, trying doc-type fallback with prefixes: ${docPrefixes.join(', ')}`);
+          
+          const searchFolders = [
+            driverUUID,
+            `applications/${driverUUID}`,
+            'applications/pending',
+          ];
+          
+          for (const folder of searchFolders) {
+            for (const bucket of BUCKETS) {
+              try {
+                const { data: folderFiles, error: listErr } = await supabaseAdmin.storage
+                  .from(bucket)
+                  .list(folder, { limit: 200 });
+                
+                if (listErr || !folderFiles) continue;
+                
+                for (const storageFile of folderFiles) {
+                  if (!storageFile.name || storageFile.name === '.emptyFolderPlaceholder') continue;
+                  const storageBaseName = storageFile.name.replace(/\.[^.]+$/, '');
+                  const storageWithoutTs = storageBaseName.replace(/_\d{10,}$/, '');
+                  
+                  for (const prefix of docPrefixes) {
+                    if (storageWithoutTs === prefix || storageWithoutTs.startsWith(prefix + '_')) {
+                      console.log(`[Uploads] Doc-type match found: ${storageFile.name} in ${bucket}/${folder} for requested ${fileName}`);
+                      const { data: matchData, error: matchErr } = await supabaseAdmin.storage
+                        .from(bucket)
+                        .download(`${folder}/${storageFile.name}`);
+                      if (!matchErr && matchData) {
+                        const matchExt = path.extname(storageFile.name).toLowerCase();
+                        const mimeTypes: Record<string, string> = {
+                          '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+                          '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
+                        };
+                        const contentType = mimeTypes[matchExt] || 'application/octet-stream';
+                        const buffer = Buffer.from(await matchData.arrayBuffer());
+                        res.set('Content-Type', contentType);
+                        res.set('Cache-Control', 'public, max-age=3600');
+                        return res.send(buffer);
+                      }
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
           }
         }
       }
