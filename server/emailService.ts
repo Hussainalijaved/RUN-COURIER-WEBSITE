@@ -1254,7 +1254,6 @@ export async function sendPasswordResetEmail(
   email: string,
   code: string
 ): Promise<boolean> {
-  const spaced = code.split('').join(' &nbsp; ');
   const content = `
     <h2 style="color: #333;">Reset Your Password</h2>
     <p style="color: #666; font-size: 16px;">
@@ -1262,8 +1261,8 @@ export async function sendPasswordResetEmail(
     </p>
     <div style="text-align: center; margin: 30px 0; padding: 25px; background-color: #f0f4f8; border-radius: 8px;">
       <p style="color: #666; font-size: 14px; margin: 0 0 10px 0;">Your verification code:</p>
-      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #007BFF; font-family: 'Courier New', monospace; padding: 10px 0;">
-        ${spaced}
+      <div style="font-size: 36px; font-weight: bold; color: #007BFF; font-family: 'Courier New', monospace; padding: 10px 0;">
+        ${code}
       </div>
     </div>
     <p style="color: #333; font-size: 15px; text-align: center; font-weight: 500;">
