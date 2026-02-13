@@ -351,12 +351,11 @@ export default function AdminApplications() {
   };
 
   const resolveDocUrl = (url: string): string => {
-    if (url.startsWith('/uploads/')) {
-      return '/api' + url;
+    if (url.startsWith('https://') && url.includes('supabase.co')) {
+      return url;
     }
-    const supabaseMatch = url.match(/\/storage\/v1\/object\/public\/driver-documents\/(.+)/);
-    if (supabaseMatch) {
-      return '/api/uploads/' + supabaseMatch[1];
+    if (url.startsWith('/uploads/')) {
+      return url;
     }
     return url;
   };
