@@ -73,6 +73,27 @@ export default function Login({ role = 'customer' }: LoginProps) {
           variant: 'destructive',
         });
       } else {
+        if (role === 'driver') {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              const resp = await fetch('/api/driver/must-change-password', {
+                headers: { 'Authorization': `Bearer ${session.access_token}` }
+              });
+              const pwData = await resp.json();
+              if (pwData.mustChangePassword) {
+                toast({
+                  title: 'Password Change Required',
+                  description: 'Please change your temporary password before continuing.',
+                });
+                setLocation('/driver/change-password');
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('Error checking password change requirement:', e);
+          }
+        }
         toast({
           title: 'Welcome back!',
           description: 'You have been logged in successfully.',

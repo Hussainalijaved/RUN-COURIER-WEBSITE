@@ -275,6 +275,28 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      
+      const { error } = await supabaseAdmin.rpc('exec_sql', {
+        query: `
+          ALTER TABLE drivers ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;
+          ALTER TABLE drivers ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+        `
+      });
+      
+      if (error) {
+        console.warn("[BACKGROUND] Driver columns migration via RPC failed:", error.message);
+      } else {
+        console.log("[BACKGROUND] Driver must_change_password and approved_at columns ensured");
+      }
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Driver columns migration error:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
       const { hydrateLocationCache } = await import('./realtime');
       await hydrateLocationCache();
       console.log("[BACKGROUND] Cache hydrated");

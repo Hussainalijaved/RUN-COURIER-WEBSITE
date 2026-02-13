@@ -46,6 +46,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Upload,
+  Mail,
 } from 'lucide-react';
 import {
   Select,
@@ -165,6 +166,37 @@ export default function AdminApplications() {
     },
     onError: () => {
       toast({ title: 'Failed to delete application', variant: 'destructive' });
+    },
+  });
+
+  const resendApprovalMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`/api/driver-applications/${applicationId}/resend-approval`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to resend approval email');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Email Sent',
+        description: 'The approval email with new login credentials has been resent.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to Resend',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -498,6 +530,25 @@ export default function AdminApplications() {
             <Eye className="h-4 w-4 mr-1" />
             View
           </Button>
+          {application.status === 'approved' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                resendApprovalMutation.mutate(application.id);
+              }}
+              disabled={resendApprovalMutation.isPending}
+              data-testid={`button-resend-approval-${application.id}`}
+            >
+              {resendApprovalMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Mail className="h-4 w-4 mr-1" />
+              )}
+              Resend Email
+            </Button>
+          )}
           {application.status === 'rejected' && (
             <Button
               size="sm"

@@ -5915,7 +5915,8 @@ export async function registerRoutes(
           if (driver) {
             const updateData: Record<string, any> = { 
               status: 'approved',
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              approved_at: new Date().toISOString()
             };
 
             if (application.profilePictureUrl) {
@@ -6133,6 +6134,11 @@ export async function registerRoutes(
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email}`);
 
+                  await supabaseAdmin.from('drivers').update({
+                    must_change_password: true,
+                    approved_at: new Date().toISOString()
+                  }).eq('id', userId);
+
                   const newDocMappings = [
                     { url: application.profilePictureUrl, type: 'profilePicture', label: 'Profile Picture' },
                     { url: application.drivingLicenceFrontUrl, type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
@@ -6245,6 +6251,131 @@ export async function registerRoutes(
     await sendDriverApplicationNotification(application.fullName, status).catch(err => console.error('Failed to send application notification:', err));
 
     res.json(application);
+  }));
+
+  app.post("/api/driver-applications/:id/resend-approval", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.substring(7);
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin!.auth.getUser(token);
+    if (authError || !authUser?.email) {
+      return res.status(401).json({ error: "Invalid authentication token" });
+    }
+    const isAdmin = await isAdminByEmail(authUser.email);
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const application = await storage.getDriverApplication(req.params.id);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+    if (application.status !== 'approved') {
+      return res.status(400).json({ error: "Application is not approved" });
+    }
+
+    const { data: driver, error: findError } = await supabaseAdmin!
+      .from('drivers')
+      .select('id, driver_code, email')
+      .ilike('email', application.email)
+      .maybeSingle();
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver account not found for this application" });
+    }
+
+    const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
+
+    const { error: updateError } = await supabaseAdmin!.auth.admin.updateUserById(driver.id, {
+      password: tempPassword
+    });
+    if (updateError) {
+      console.error('[Resend Approval] Failed to update password:', updateError);
+      return res.status(500).json({ error: "Failed to reset password" });
+    }
+
+    await supabaseAdmin!.from('drivers').update({
+      must_change_password: true
+    }).eq('id', driver.id);
+
+    const { sendDriverApprovalEmail } = await import('./emailService');
+    const sent = await sendDriverApprovalEmail(application.email, application.fullName, driver.driver_code, tempPassword);
+
+    if (sent) {
+      console.log(`[Resend Approval] Approval email resent to ${application.email}`);
+      res.json({ success: true, message: "Approval email sent successfully" });
+    } else {
+      console.error(`[Resend Approval] Failed to send email to ${application.email}`);
+      res.status(500).json({ error: "Failed to send email" });
+    }
+  }));
+
+  app.get("/api/driver/must-change-password", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.substring(7);
+    const { data: { user }, error } = await supabaseAdmin!.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const { data: driver } = await supabaseAdmin!
+      .from('drivers')
+      .select('must_change_password')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    res.json({ mustChangePassword: driver?.must_change_password === true });
+  }));
+
+  app.post("/api/driver/change-password", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authErr } = await supabaseAdmin!.auth.getUser(token);
+    if (authErr || !user) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    // Verify the user is actually a driver
+    const { data: driver } = await supabaseAdmin!
+      .from('drivers')
+      .select('id, must_change_password')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!driver) {
+      return res.status(403).json({ error: "Only drivers can use this endpoint" });
+    }
+
+    // Verify that password change is required
+    if (!driver.must_change_password) {
+      return res.status(400).json({ error: "Password change not required. Use the forgot password feature to reset your password." });
+    }
+
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    const { error: updateErr } = await supabaseAdmin!.auth.admin.updateUserById(user.id, {
+      password: newPassword
+    });
+    if (updateErr) {
+      return res.status(500).json({ error: "Failed to update password" });
+    }
+
+    await supabaseAdmin!.from('drivers').update({
+      must_change_password: false
+    }).eq('id', user.id);
+
+    res.json({ success: true, message: "Password changed successfully" });
   }));
 
   app.patch("/api/driver-applications/:id/send-back", asyncHandler(async (req, res) => {

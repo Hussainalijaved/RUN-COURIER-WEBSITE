@@ -94,6 +94,7 @@ const DriverProfile = lazy(() => import("@/pages/driver/DriverProfile"));
 const DriverPayments = lazy(() => import("@/pages/driver/DriverPayments"));
 const DriverApplication = lazy(() => import("@/pages/driver/DriverApplication"));
 const DriverApplicationSuccess = lazy(() => import("@/pages/driver/ApplicationSuccess"));
+const DriverChangePassword = lazy(() => import("@/pages/driver/DriverChangePassword"));
 
 const DispatcherDashboard = lazy(() => import("@/pages/dispatcher/DispatcherDashboard"));
 const VendorDashboard = lazy(() => import("@/pages/vendor/VendorDashboard"));
@@ -155,6 +156,7 @@ function Router() {
         </Route>
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/driver/change-password" component={DriverChangePassword} />
         <Route path="/driver/apply" component={DriverApplication} />
         <Route path="/driver/application-success" component={DriverApplicationSuccess} />
         

@@ -1,0 +1,126 @@
+When a driver application is approved, automatically send a detailed “Approved + Next Steps” email with:
+
+Direct login link to Driver Portal: https://runcourier.co.uk/driver/login
+
+iPhone app download link: https://apps.apple.com/gb/app/run-courier/id6756506175
+
+Driver’s email + temporary password (first-time login)
+
+Clear steps: Website first → upload documents → download app → login with same email/password → change password.
+
+1) Backend (Approval → Create account → Send email)
+
+When Admin updates drivers.status = "approved":
+
+Create or confirm Auth account
+
+If driver does not have auth_user_id, create Supabase Auth user using driver email.
+
+Generate a temporary password (strong random).
+
+Set:
+
+drivers.auth_user_id = <new auth uid>
+
+drivers.must_change_password = true
+
+drivers.approved_at = now()
+
+Do not store the temp password in plain text.
+
+Send the “Approved” email
+
+Use email provider (Resend / SendGrid / SMTP).
+
+Email should include:
+
+Portal login: https://runcourier.co.uk/driver/login
+
+iPhone app: https://apps.apple.com/gb/app/run-courier/id6756506175
+
+Include driver’s login email and the temporary password.
+
+Logging & resend
+
+Save email status to email_logs (sent/failed + error message).
+
+Provide Admin “Resend approval email” button.
+
+2) Driver Portal (Web) required behavior
+
+Login page: https://runcourier.co.uk/driver/login
+
+After login:
+
+If must_change_password = true → force redirect to /driver/change-password
+
+Driver must change password before accessing documents or profile.
+
+Documents page:
+
+Upload all required documents (Supabase Storage)
+
+Save uploaded file paths in driver record
+
+Show checklist + completion status
+
+3) Mobile App required behavior (same login details)
+
+Driver logs into the iPhone app using the same email/password.
+
+If must_change_password = true:
+
+show “Change Password” screen before letting them use the app.
+
+After successful password change:
+
+set must_change_password = false
+
+4) Email template (Detailed instructions)
+
+Subject: Run Courier – Driver Application Approved (Next Steps)
+
+Email body (plain text version):
+
+Hello {{driverName}},
+
+Your Run Courier driver application has been approved ✅
+
+Here’s what you need to do next (important: please complete Step 1 first):
+
+STEP 1 — Login to the Driver Portal (Website) and upload documents
+Login link: https://runcourier.co.uk/driver/login
+
+Your login details:
+Email: {{email}}
+Temporary Password: {{tempPassword}}
+
+When you log in for the first time, you must change your password immediately for security.
+
+STEP 2 — Complete your profile and upload all required documents
+Inside the portal, please:
+
+Confirm your personal details
+
+Upload your required documents
+
+Make sure every document shows as “Uploaded/Complete”
+
+STEP 3 — Download the Run Courier Driver App (iPhone)
+App Store link: https://apps.apple.com/gb/app/run-courier/id6756506175
+
+STEP 4 — Login to the mobile app using the SAME email and password
+Use the same email and the same password you set after changing it on the website.
+
+If you have any issues logging in or uploading documents, reply to this email and we will help.
+
+Kind regards,
+Run Courier Team
+
+5) Security rules
+
+Temporary password expires after X days OR allow “Forgot password” on login page.
+
+Never save temp password in database.
+
+Always force password change on first login.

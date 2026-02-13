@@ -1285,73 +1285,84 @@ export async function sendDriverApprovalEmail(
   tempPassword: string
 ): Promise<boolean> {
   const content = `
-    <h2 style="color: #333;">Congratulations ${fullName}!</h2>
+    <h2 style="color: #333;">Hello ${fullName},</h2>
     <p style="color: #666; font-size: 16px;">
-      Your driver application has been <strong style="color: #28a745;">approved</strong>. Welcome to the Run Courier team!
+      Your Run Courier driver application has been <span style="color: #28a745; font-weight: bold;">&#10004; approved</span>.
     </p>
     <p style="color: #666; font-size: 16px;">
       Your Driver ID is: <strong style="color: #007BFF; font-size: 18px;">${driverCode}</strong>
     </p>
 
-    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 2px solid #007BFF;">
-      <h3 style="color: #333; margin-top: 0;">Your Login Details</h3>
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 120px;"><strong>Email:</strong></td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-size: 16px;">${email}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Password:</strong></td>
-          <td style="padding: 10px 0; color: #333; font-size: 16px; font-family: monospace; letter-spacing: 1px;">${tempPassword}</td>
-        </tr>
-      </table>
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #007BFF;">
+      <h3 style="color: #007BFF; margin-top: 0;">STEP 1 - Login to the Driver Portal (Website) and upload documents</h3>
+      <p style="color: #666; font-size: 15px;">
+        Go to the Driver Portal to complete your setup:
+      </p>
+      <div style="text-align: center; margin: 15px 0;">
+        <a href="https://runcourier.co.uk/driver/login" style="background-color: #007BFF; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 15px; display: inline-block;">
+          Login to Driver Portal
+        </a>
+      </div>
+      <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin: 15px 0;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #666; width: 120px;"><strong>Email:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 15px;">${email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666;"><strong>Temporary Password:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 15px; font-family: monospace; letter-spacing: 1px;">${tempPassword}</td>
+          </tr>
+        </table>
+      </div>
+      <div style="background-color: #fff3cd; border-radius: 8px; padding: 12px; margin: 10px 0;">
+        <p style="color: #856404; font-size: 14px; margin: 0;">
+          <strong>Important:</strong> When you log in for the first time, you must change your password immediately for security.
+        </p>
+      </div>
     </div>
 
-    <div style="background-color: #fff3cd; border-radius: 8px; padding: 15px; margin: 15px 0;">
-      <p style="color: #856404; font-size: 14px; margin: 0;">
-        <strong>Important:</strong> Please change your password after your first login for security.
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
+      <h3 style="color: #28a745; margin-top: 0;">STEP 2 - Complete your profile and upload all required documents</h3>
+      <ul style="color: #666; line-height: 1.8; margin: 0; padding-left: 20px;">
+        <li>Confirm your personal details are correct</li>
+        <li>Upload all required documents (driving licence, insurance, DBS, etc.)</li>
+        <li>Make sure every document shows as <strong>"Uploaded/Complete"</strong></li>
+      </ul>
+    </div>
+
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #6f42c1;">
+      <h3 style="color: #6f42c1; margin-top: 0;">STEP 3 - Download the Run Courier Driver App (iPhone)</h3>
+      <p style="color: #666; font-size: 15px;">
+        Download the app from the App Store:
+      </p>
+      <div style="text-align: center; margin: 15px 0;">
+        <a href="https://apps.apple.com/gb/app/run-courier/id6756506175" style="background-color: #000000; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 15px; display: inline-block;">
+          Download on App Store
+        </a>
+      </div>
+    </div>
+
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #fd7e14;">
+      <h3 style="color: #fd7e14; margin-top: 0;">STEP 4 - Login to the mobile app using the SAME email and password</h3>
+      <p style="color: #666; font-size: 15px;">
+        Use the same email and the password you set after changing it on the website to log in to the mobile app.
       </p>
     </div>
 
-    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <h3 style="color: #333; margin-top: 0;">How to Log In</h3>
-      
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #007BFF; margin-bottom: 8px;">Mobile App (Recommended for Drivers)</h4>
-        <ol style="color: #666; line-height: 1.8; margin: 0;">
-          <li>Download the <strong>Run Courier</strong> app from the App Store or Google Play</li>
-          <li>Open the app and tap <strong>"Sign In"</strong></li>
-          <li>Enter your email: <strong>${email}</strong></li>
-          <li>Enter your password shown above</li>
-          <li>Start accepting delivery jobs!</li>
-        </ol>
-      </div>
-
-      <div>
-        <h4 style="color: #007BFF; margin-bottom: 8px;">Website</h4>
-        <ol style="color: #666; line-height: 1.8; margin: 0;">
-          <li>Go to <a href="https://runcourier.co.uk/driver/login" style="color: #007BFF;">runcourier.co.uk/driver/login</a></li>
-          <li>Enter your email: <strong>${email}</strong></li>
-          <li>Enter your password shown above</li>
-        </ol>
-      </div>
-    </div>
-
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="https://runcourier.co.uk/driver/login" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
-        Log In Now
-      </a>
-    </div>
-
+    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+      If you have any issues logging in or uploading documents, reply to this email and we will help.
+    </p>
     <p style="color: #666; font-size: 14px;">
-      If you have any questions, contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call <a href="tel:+442046346100" style="color: #007BFF;">+44 20 4634 6100</a>.
+      Kind regards,<br>
+      <strong>Run Courier Team</strong>
     </p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Application Approved!');
-  const textContent = `Congratulations ${fullName}!\n\nYour driver application has been APPROVED. Welcome to the Run Courier team!\n\nYour Driver ID: ${driverCode}\n\nYOUR LOGIN DETAILS\n==================\nEmail: ${email}\nPassword: ${tempPassword}\n\nIMPORTANT: Please change your password after your first login.\n\nHOW TO LOG IN\n=============\n\nMobile App (Recommended):\n1. Download the Run Courier app from the App Store or Google Play\n2. Open the app and tap "Sign In"\n3. Enter your email: ${email}\n4. Enter your password\n5. Start accepting delivery jobs!\n\nWebsite:\n1. Go to runcourier.co.uk/driver/login\n2. Enter your email: ${email}\n3. Enter your password\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+  const textContent = `Hello ${fullName},\n\nYour Run Courier driver application has been approved.\n\nYour Driver ID: ${driverCode}\n\nSTEP 1 - Login to the Driver Portal (Website) and upload documents\n------------------------------------------------------------------\nLogin here: https://runcourier.co.uk/driver/login\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nImportant: When you log in for the first time, you must change your password immediately for security.\n\nSTEP 2 - Complete your profile and upload all required documents\n----------------------------------------------------------------\n- Confirm your personal details are correct\n- Upload all required documents (driving licence, insurance, DBS, etc.)\n- Make sure every document shows as "Uploaded/Complete"\n\nSTEP 3 - Download the Run Courier Driver App (iPhone)\n-----------------------------------------------------\nDownload from the App Store: https://apps.apple.com/gb/app/run-courier/id6756506175\n\nSTEP 4 - Login to the mobile app using the SAME email and password\n------------------------------------------------------------------\nUse the same email and the password you set after changing it on the website.\n\nIf you have any issues logging in or uploading documents, reply to this email and we will help.\n\nKind regards,\nRun Courier Team\n\nRun Courier - https://runcourier.co.uk`;
 
-  return sendEmailNotification(email, 'Application Approved - Welcome to Run Courier!', htmlContent, textContent);
+  return sendEmailNotification(email, 'Run Courier - Driver Application Approved (Next Steps)', htmlContent, textContent);
 }
 
 export async function sendDriverApprovalEmailExisting(
@@ -1360,55 +1371,70 @@ export async function sendDriverApprovalEmailExisting(
   driverCode: string
 ): Promise<boolean> {
   const content = `
-    <h2 style="color: #333;">Congratulations ${fullName}!</h2>
+    <h2 style="color: #333;">Hello ${fullName},</h2>
     <p style="color: #666; font-size: 16px;">
-      Your driver application has been <strong style="color: #28a745;">approved</strong>. Welcome to the Run Courier team!
+      Your Run Courier driver application has been <span style="color: #28a745; font-weight: bold;">&#10004; approved</span>.
     </p>
     <p style="color: #666; font-size: 16px;">
       Your Driver ID is: <strong style="color: #007BFF; font-size: 18px;">${driverCode}</strong>
     </p>
 
-    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <h3 style="color: #333; margin-top: 0;">How to Log In</h3>
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #007BFF;">
+      <h3 style="color: #007BFF; margin-top: 0;">STEP 1 - Login to the Driver Portal</h3>
       <p style="color: #666; font-size: 15px;">
-        Use your existing email <strong>${email}</strong> and password to log in.
+        Go to the Driver Portal and log in using your existing credentials:
       </p>
-      
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #007BFF; margin-bottom: 8px;">Mobile App (Recommended for Drivers)</h4>
-        <ol style="color: #666; line-height: 1.8; margin: 0;">
-          <li>Download the <strong>Run Courier</strong> app from the App Store or Google Play</li>
-          <li>Open the app and tap <strong>"Sign In"</strong></li>
-          <li>Enter your email: <strong>${email}</strong></li>
-          <li>Enter your password</li>
-          <li>Start accepting delivery jobs!</li>
-        </ol>
+      <div style="text-align: center; margin: 15px 0;">
+        <a href="https://runcourier.co.uk/driver/login" style="background-color: #007BFF; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 15px; display: inline-block;">
+          Login to Driver Portal
+        </a>
       </div>
+      <p style="color: #666; font-size: 14px;">
+        Use your existing email (<strong>${email}</strong>) and password to log in.
+      </p>
+    </div>
 
-      <div>
-        <h4 style="color: #007BFF; margin-bottom: 8px;">Website</h4>
-        <ol style="color: #666; line-height: 1.8; margin: 0;">
-          <li>Go to <a href="https://runcourier.co.uk/driver/login" style="color: #007BFF;">runcourier.co.uk/driver/login</a></li>
-          <li>Enter your email and password</li>
-        </ol>
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
+      <h3 style="color: #28a745; margin-top: 0;">STEP 2 - Complete your profile and upload all required documents</h3>
+      <ul style="color: #666; line-height: 1.8; margin: 0; padding-left: 20px;">
+        <li>Confirm your personal details are correct</li>
+        <li>Upload all required documents (driving licence, insurance, DBS, etc.)</li>
+        <li>Make sure every document shows as <strong>"Uploaded/Complete"</strong></li>
+      </ul>
+    </div>
+
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #6f42c1;">
+      <h3 style="color: #6f42c1; margin-top: 0;">STEP 3 - Download the Run Courier Driver App (iPhone)</h3>
+      <p style="color: #666; font-size: 15px;">
+        Download the app from the App Store:
+      </p>
+      <div style="text-align: center; margin: 15px 0;">
+        <a href="https://apps.apple.com/gb/app/run-courier/id6756506175" style="background-color: #000000; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 15px; display: inline-block;">
+          Download on App Store
+        </a>
       </div>
     </div>
 
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="https://runcourier.co.uk/driver/login" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
-        Log In Now
-      </a>
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #fd7e14;">
+      <h3 style="color: #fd7e14; margin-top: 0;">STEP 4 - Login to the mobile app using the SAME email and password</h3>
+      <p style="color: #666; font-size: 15px;">
+        Use the same email and password you use on the website to log in to the mobile app.
+      </p>
     </div>
 
+    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+      If you have any issues logging in or uploading documents, reply to this email and we will help.
+    </p>
     <p style="color: #666; font-size: 14px;">
-      If you have any questions, contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call <a href="tel:+442046346100" style="color: #007BFF;">+44 20 4634 6100</a>.
+      Kind regards,<br>
+      <strong>Run Courier Team</strong>
     </p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Application Approved!');
-  const textContent = `Congratulations ${fullName}!\n\nYour driver application has been APPROVED. Welcome to the Run Courier team!\n\nYour Driver ID: ${driverCode}\n\nHOW TO LOG IN\n=============\nUse your existing email ${email} and password to log in.\n\nMobile App (Recommended):\n1. Download the Run Courier app from the App Store or Google Play\n2. Open the app and tap "Sign In"\n3. Enter your email: ${email}\n4. Enter your password\n5. Start accepting delivery jobs!\n\nWebsite:\n1. Go to runcourier.co.uk/driver/login\n2. Enter your email and password\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+  const textContent = `Hello ${fullName},\n\nYour Run Courier driver application has been approved.\n\nYour Driver ID: ${driverCode}\n\nSTEP 1 - Login to the Driver Portal\n------------------------------------\nLogin here: https://runcourier.co.uk/driver/login\nUse your existing email (${email}) and password to log in.\n\nSTEP 2 - Complete your profile and upload all required documents\n----------------------------------------------------------------\n- Confirm your personal details are correct\n- Upload all required documents (driving licence, insurance, DBS, etc.)\n- Make sure every document shows as "Uploaded/Complete"\n\nSTEP 3 - Download the Run Courier Driver App (iPhone)\n-----------------------------------------------------\nDownload from the App Store: https://apps.apple.com/gb/app/run-courier/id6756506175\n\nSTEP 4 - Login to the mobile app using the SAME email and password\n------------------------------------------------------------------\nUse the same email and password you use on the website.\n\nIf you have any issues logging in or uploading documents, reply to this email and we will help.\n\nKind regards,\nRun Courier Team\n\nRun Courier - https://runcourier.co.uk`;
 
-  return sendEmailNotification(email, 'Application Approved - Welcome to Run Courier!', htmlContent, textContent);
+  return sendEmailNotification(email, 'Run Courier - Driver Application Approved (Next Steps)', htmlContent, textContent);
 }
 
 export async function sendApplicationCorrectionEmail(
