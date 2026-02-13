@@ -483,6 +483,7 @@ export async function registerRoutes(
     res.json({ status: "ok", mode, timestamp: new Date().toISOString() });
   });
 
+
   // Diagnostic endpoint to check job assignment state (admin only)
   app.get("/api/debug/job-assignment/:jobId", asyncHandler(async (req, res) => {
     const { supabaseAdmin } = await import('./supabaseAdmin');
