@@ -211,22 +211,46 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       // Look up driver record to get the driver record ID (may differ from auth UUID)
+      // Admin assigns jobs using driver record ID, mobile app authenticates with auth UUID
       const allDriverIds: string[] = [authUserId];
       try {
-        const { data: driverRecord } = await supabaseAdmin
+        // Try by user_id first
+        let { data: driverRecord } = await supabaseAdmin
           .from('drivers')
           .select('id')
           .eq('user_id', authUserId)
           .single();
+        
+        // If not found by user_id, try by id directly (some drivers have id = auth UUID)
+        if (!driverRecord) {
+          const { data: dr2 } = await supabaseAdmin
+            .from('drivers')
+            .select('id')
+            .eq('id', authUserId)
+            .single();
+          driverRecord = dr2;
+        }
+        
+        // If still not found, try by email from auth user
+        if (!driverRecord && authUser.email) {
+          const { data: dr3 } = await supabaseAdmin
+            .from('drivers')
+            .select('id')
+            .eq('email', authUser.email)
+            .single();
+          driverRecord = dr3;
+        }
+        
         if (driverRecord && driverRecord.id && driverRecord.id !== authUserId) {
           allDriverIds.push(driverRecord.id);
+          console.log(`[Job Offers API] Found driver record ID ${driverRecord.id} for auth user ${authUserId}`);
         }
       } catch (e) {
         // Non-critical - continue with auth ID only
       }
       console.log(`[Job Offers API] Looking up jobs for driver IDs: ${allDriverIds.join(', ')}`);
 
-      const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
+      const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, dropoff_address, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
 
       const { data: jobsData, error } = await supabaseAdmin
         .from('jobs')
@@ -241,7 +265,7 @@ export function registerMobileRoutes(app: Express): void {
       }
 
       const jobs = jobsData || [];
-      console.log(`[Job Offers API] Found ${jobs.length} jobs for driver ${driverId}`);
+      console.log(`[Job Offers API] Found ${jobs.length} jobs for driver IDs: ${allDriverIds.join(', ')}`);
 
       for (const job of jobs) {
         let updated = false;
@@ -265,7 +289,7 @@ export function registerMobileRoutes(app: Express): void {
 
         const hasDeliveryCoords = job.delivery_latitude && job.delivery_longitude;
         if (!hasDeliveryCoords) {
-          const addr = job.delivery_address || job.delivery_postcode;
+          const addr = job.delivery_address || job.dropoff_address || job.delivery_postcode;
           if (addr) {
             const geo = await geocodeAddress(addr);
             if (geo) {
@@ -292,6 +316,8 @@ export function registerMobileRoutes(app: Express): void {
 
       const parsedJobs = jobs.map(job => ({
         ...job,
+        dropoff_address: job.dropoff_address || job.delivery_address || null,
+        delivery_address: job.delivery_address || job.dropoff_address || null,
         pickup_latitude: job.pickup_latitude ? parseFloat(String(job.pickup_latitude)) : null,
         pickup_longitude: job.pickup_longitude ? parseFloat(String(job.pickup_longitude)) : null,
         delivery_latitude: job.delivery_latitude ? parseFloat(String(job.delivery_latitude)) : null,

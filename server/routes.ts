@@ -1602,6 +1602,7 @@ export async function registerRoutes(
           pickup_contact_phone: finalJob.pickupContactPhone || null,
           pickup_instructions: finalJob.pickupInstructions || null,
           // Delivery details with geocoded coordinates
+          dropoff_address: finalJob.deliveryAddress || finalJob.dropoffAddress || 'Not specified',
           delivery_address: finalJob.deliveryAddress || '',
           delivery_postcode: finalJob.deliveryPostcode || null,
           delivery_latitude: finalJob.deliveryLatitude || geocodeUpdates.deliveryLatitude || null,
