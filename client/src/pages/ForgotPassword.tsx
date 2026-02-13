@@ -44,11 +44,15 @@ export default function ForgotPassword() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-  const [sentEmail, setSentEmail] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const savedEmail = sessionStorage.getItem('resetEmail');
+  const savedTimestamp = sessionStorage.getItem('resetEmailTimestamp');
+  const isStillValid = savedTimestamp && (Date.now() - parseInt(savedTimestamp)) < 60 * 60 * 1000;
+  const [emailSent, setEmailSent] = useState(!!savedEmail && !!isStillValid);
+  const [sentEmail, setSentEmail] = useState(savedEmail && isStillValid ? savedEmail : '');
 
   const form = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -108,6 +112,8 @@ export default function ForgotPassword() {
     if (success) {
       setEmailSent(true);
       setSentEmail(data.email);
+      sessionStorage.setItem('resetEmail', data.email);
+      sessionStorage.setItem('resetEmailTimestamp', Date.now().toString());
     }
   };
 
@@ -140,6 +146,8 @@ export default function ForgotPassword() {
         });
       } else {
         setIsSuccess(true);
+        sessionStorage.removeItem('resetEmail');
+        sessionStorage.removeItem('resetEmailTimestamp');
         toast({
           title: 'Password Updated',
           description: 'Your password has been successfully reset.',
@@ -359,8 +367,11 @@ export default function ForgotPassword() {
                       className="w-full"
                       onClick={() => {
                         setEmailSent(false);
+                        setSentEmail('');
                         form.reset();
                         resetForm.reset();
+                        sessionStorage.removeItem('resetEmail');
+                        sessionStorage.removeItem('resetEmailTimestamp');
                       }}
                       data-testid="button-try-different-email"
                     >
