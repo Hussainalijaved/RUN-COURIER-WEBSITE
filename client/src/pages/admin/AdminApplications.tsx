@@ -549,7 +549,7 @@ export default function AdminApplications() {
               Resend Email
             </Button>
           )}
-          {application.status === 'rejected' && (
+          {(application.status === 'rejected' || application.status === 'corrections_needed') && (
             <Button
               size="sm"
               variant="destructive"
@@ -1092,7 +1092,7 @@ export default function AdminApplications() {
                       Approve
                     </Button>
                   </div>
-                ) : selectedApplication.status === 'rejected' ? (
+                ) : (selectedApplication.status === 'rejected' || selectedApplication.status === 'corrections_needed') ? (
                   <div className="flex flex-wrap items-center gap-2 w-full justify-end">
                     <Button onClick={() => setIsReviewDialogOpen(false)}>
                       Close
@@ -1105,7 +1105,7 @@ export default function AdminApplications() {
                         }
                       }}
                       disabled={deleteApplicationMutation.isPending}
-                      data-testid="button-delete-rejected-application"
+                      data-testid="button-delete-application-action"
                     >
                       {deleteApplicationMutation.isPending ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

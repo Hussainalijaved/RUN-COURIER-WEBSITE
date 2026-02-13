@@ -6452,8 +6452,8 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Application not found" });
     }
 
-    if (application.status !== 'rejected') {
-      return res.status(400).json({ error: "Only rejected applications can be deleted" });
+    if (application.status !== 'rejected' && application.status !== 'corrections_needed') {
+      return res.status(400).json({ error: "Only rejected or corrections needed applications can be deleted" });
     }
 
     const deleted = await storage.deleteDriverApplication(req.params.id);
