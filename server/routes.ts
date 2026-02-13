@@ -7798,7 +7798,34 @@ export async function registerRoutes(
     }
   }));
 
-  const passwordResetTokens = new Map<string, { email: string; userId: string; expiresAt: number }>();
+  const RESET_TOKENS_FILE = path.resolve(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'data', 'reset-tokens.json'));
+  function loadResetTokens(): Map<string, { email: string; userId: string; expiresAt: number }> {
+    try {
+      if (fs.existsSync(RESET_TOKENS_FILE)) {
+        const data = JSON.parse(fs.readFileSync(RESET_TOKENS_FILE, 'utf-8'));
+        const map = new Map<string, { email: string; userId: string; expiresAt: number }>();
+        for (const [k, v] of Object.entries(data)) {
+          const val = v as any;
+          if (val.expiresAt > Date.now()) map.set(k, val);
+        }
+        return map;
+      }
+    } catch {}
+    return new Map();
+  }
+  function saveResetTokens(tokens: Map<string, { email: string; userId: string; expiresAt: number }>) {
+    try {
+      const dir = path.dirname(RESET_TOKENS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const obj: any = {};
+      for (const [k, v] of tokens) {
+        if (v.expiresAt > Date.now()) obj[k] = v;
+      }
+      fs.writeFileSync(RESET_TOKENS_FILE, JSON.stringify(obj, null, 2));
+    } catch (e) {
+      console.error('[ResetTokens] Failed to save:', e);
+    }
+  }
 
   app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
     const { email, redirectUrl } = req.body;
@@ -7825,11 +7852,9 @@ export async function registerRoutes(
       const token = crypto.randomBytes(32).toString('hex');
       const expiresAt = Date.now() + 60 * 60 * 1000;
 
-      passwordResetTokens.set(token, { email: email.toLowerCase(), userId: user.id, expiresAt });
-
-      for (const [k, v] of passwordResetTokens) {
-        if (v.expiresAt < Date.now()) passwordResetTokens.delete(k);
-      }
+      const tokens = loadResetTokens();
+      tokens.set(token, { email: email.toLowerCase(), userId: user.id, expiresAt });
+      saveResetTokens(tokens);
 
       const baseUrl = redirectUrl?.replace('/reset-password', '') || process.env.APP_URL || 'https://runcourier.co.uk';
       const resetLink = `${baseUrl}/reset-password?token=${token}`;
@@ -7841,7 +7866,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to send password reset email. Please try again later." });
       }
 
-      console.log('Password reset email sent successfully to:', email, 'link:', resetLink);
+      console.log('Password reset email sent successfully to:', email);
 
       res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
     } catch (error) {
@@ -7861,20 +7886,23 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
 
-    const resetData = passwordResetTokens.get(token);
-    if (!resetData) {
-      return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
-    }
-
-    if (resetData.expiresAt < Date.now()) {
-      passwordResetTokens.delete(token);
-      return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
-    }
-
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       if (!supabaseAdmin) {
         return res.status(500).json({ error: "Authentication service not configured" });
+      }
+
+      const tokens = loadResetTokens();
+      const resetData = tokens.get(token);
+
+      if (!resetData) {
+        return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+      }
+
+      if (resetData.expiresAt < Date.now()) {
+        tokens.delete(token);
+        saveResetTokens(tokens);
+        return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
       }
 
       const { error } = await supabaseAdmin.auth.admin.updateUserById(resetData.userId, {
@@ -7886,7 +7914,8 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to update password. Please try again." });
       }
 
-      passwordResetTokens.delete(token);
+      tokens.delete(token);
+      saveResetTokens(tokens);
       console.log(`Password reset successfully for: ${resetData.email}`);
 
       res.json({ success: true, message: "Password has been reset successfully." });
