@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Link } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,6 +38,87 @@ const resetWithCodeSchema = z.object({
 
 type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 type ResetWithCodeInput = z.infer<typeof resetWithCodeSchema>;
+
+function CodeInput({ value, onChange, ...props }: { value: string; onChange: (val: string) => void; 'data-testid'?: string }) {
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const digits = value.padEnd(6, '').split('').slice(0, 6);
+
+  const handleChange = useCallback((index: number, digitValue: string) => {
+    if (digitValue.length > 1) {
+      const pasted = digitValue.replace(/\D/g, '').slice(0, 6);
+      if (pasted.length > 0) {
+        const newDigits = [...digits];
+        for (let i = 0; i < pasted.length && index + i < 6; i++) {
+          newDigits[index + i] = pasted[i];
+        }
+        onChange(newDigits.join(''));
+        const focusIndex = Math.min(index + pasted.length, 5);
+        inputRefs.current[focusIndex]?.focus();
+        return;
+      }
+    }
+
+    const char = digitValue.replace(/\D/g, '').slice(-1);
+    const newDigits = [...digits];
+    newDigits[index] = char;
+    onChange(newDigits.join('').replace(/ /g, ''));
+
+    if (char && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  }, [digits, onChange]);
+
+  const handleKeyDown = useCallback((index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (digits[index]) {
+        const newDigits = [...digits];
+        newDigits[index] = '';
+        onChange(newDigits.join('').replace(/ /g, ''));
+      } else if (index > 0) {
+        inputRefs.current[index - 1]?.focus();
+        const newDigits = [...digits];
+        newDigits[index - 1] = '';
+        onChange(newDigits.join('').replace(/ /g, ''));
+      }
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  }, [digits, onChange]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted) {
+      onChange(pasted);
+      inputRefs.current[Math.min(pasted.length, 5)]?.focus();
+    }
+  }, [onChange]);
+
+  return (
+    <div className="flex justify-center gap-2" data-testid={props['data-testid']}>
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <input
+          key={i}
+          ref={(el) => { inputRefs.current[i] = el; }}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={digits[i]?.trim() || ''}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          onFocus={(e) => e.target.select()}
+          className="w-11 h-12 text-center text-xl font-semibold border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          data-testid={`input-code-digit-${i}`}
+          autoComplete="one-time-code"
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function ForgotPassword() {
   const { toast } = useToast();
@@ -213,13 +294,9 @@ export default function ForgotPassword() {
                       <FormItem>
                         <FormLabel>Verification Code</FormLabel>
                         <FormControl>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={6}
-                            placeholder="000000"
-                            className="text-center text-2xl tracking-widest font-mono"
-                            {...field}
+                          <CodeInput
+                            value={field.value}
+                            onChange={field.onChange}
                             data-testid="input-reset-code"
                           />
                         </FormControl>
