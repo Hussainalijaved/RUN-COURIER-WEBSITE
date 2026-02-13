@@ -5880,6 +5880,30 @@ export async function registerRoutes(
                 }
               }
 
+              const docMappings = [
+                { url: application.profilePictureUrl, type: 'profilePicture', label: 'Profile Picture' },
+                { url: application.drivingLicenceFrontUrl, type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
+                { url: application.drivingLicenceBackUrl, type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
+                { url: application.dbsCertificateUrl, type: 'dbsCertificate', label: 'DBS Certificate' },
+                { url: application.goodsInTransitInsuranceUrl, type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
+                { url: application.hireAndRewardUrl, type: 'hireAndReward', label: 'Hire & Reward Insurance' },
+              ];
+              for (const mapping of docMappings) {
+                if (!mapping.url) continue;
+                try {
+                  await storage.createDocument({
+                    driverId: driver.id,
+                    type: mapping.type as any,
+                    fileName: mapping.label,
+                    fileUrl: mapping.url,
+                    status: 'approved',
+                  });
+                  console.log(`[Driver Application] Created document record: ${mapping.type} for driver ${driver.driver_code}`);
+                } catch (docErr) {
+                  console.error(`[Driver Application] Failed to create document record ${mapping.type}:`, docErr);
+                }
+              }
+
               const { sendDriverApprovalEmailExisting } = await import('./emailService');
               sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code)
                 .then(sent => {
@@ -5989,6 +6013,30 @@ export async function registerRoutes(
                   console.error(`[Driver Application] Failed to create driver record:`, insertError);
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email}`);
+
+                  const newDocMappings = [
+                    { url: application.profilePictureUrl, type: 'profilePicture', label: 'Profile Picture' },
+                    { url: application.drivingLicenceFrontUrl, type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
+                    { url: application.drivingLicenceBackUrl, type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
+                    { url: application.dbsCertificateUrl, type: 'dbsCertificate', label: 'DBS Certificate' },
+                    { url: application.goodsInTransitInsuranceUrl, type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
+                    { url: application.hireAndRewardUrl, type: 'hireAndReward', label: 'Hire & Reward Insurance' },
+                  ];
+                  for (const mapping of newDocMappings) {
+                    if (!mapping.url) continue;
+                    try {
+                      await storage.createDocument({
+                        driverId: userId,
+                        type: mapping.type as any,
+                        fileName: mapping.label,
+                        fileUrl: mapping.url,
+                        status: 'approved',
+                      });
+                      console.log(`[Driver Application] Created document record: ${mapping.type} for new driver ${driverCode}`);
+                    } catch (docErr) {
+                      console.error(`[Driver Application] Failed to create document record ${mapping.type}:`, docErr);
+                    }
+                  }
 
                   const { sendDriverApprovalEmail } = await import('./emailService');
                   sendDriverApprovalEmail(application.email, application.fullName, driverCode, tempPassword)

@@ -375,7 +375,39 @@ export default function AdminDrivers() {
   };
 
   const getDriverDocuments = (driverId: string) => {
-    return documents?.filter((d) => d.driverId === driverId) || [];
+    const existingDocs = documents?.filter((d) => d.driverId === driverId) || [];
+    if (existingDocs.length > 0) return existingDocs;
+
+    const sbDriver = supabaseDrivers?.find((d: any) => d.id === driverId);
+    if (!sbDriver) return [];
+    const raw = sbDriver as any;
+    const fallbackDocs: any[] = [];
+    const colMap = [
+      { col: 'driving_licence_front_url', type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
+      { col: 'driving_licence_back_url', type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
+      { col: 'dbs_certificate_url', type: 'dbsCertificate', label: 'DBS Certificate' },
+      { col: 'goods_in_transit_insurance_url', type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
+      { col: 'hire_reward_insurance_url', type: 'hireAndReward', label: 'Hire & Reward Insurance' },
+      { col: 'profile_picture_url', type: 'profilePicture', label: 'Profile Picture' },
+    ];
+    for (const m of colMap) {
+      const url = raw[m.col];
+      if (url) {
+        fallbackDocs.push({
+          id: `${driverId}-${m.type}`,
+          driverId,
+          type: m.type,
+          fileName: m.label,
+          fileUrl: url,
+          status: 'approved',
+          uploadedAt: raw.created_at ? new Date(raw.created_at) : new Date(),
+          expiryDate: null,
+          reviewedBy: null,
+          reviewNotes: null,
+        });
+      }
+    }
+    return fallbackDocs;
   };
 
   const normalizeDocType = (type: string): string => {
@@ -1491,7 +1523,18 @@ export default function AdminDrivers() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(doc.fileUrl, '_blank')}
+                            onClick={() => {
+                              let viewUrl = doc.fileUrl;
+                              if (viewUrl.startsWith('/uploads/')) {
+                                viewUrl = '/api' + viewUrl;
+                              } else {
+                                const supabaseMatch = viewUrl.match(/\/storage\/v1\/object\/public\/driver-documents\/(.+)/);
+                                if (supabaseMatch) {
+                                  viewUrl = '/api/uploads/' + supabaseMatch[1];
+                                }
+                              }
+                              window.open(viewUrl, '_blank');
+                            }}
                           >
                             <ExternalLink className="h-4 w-4 mr-1" />
                             View
