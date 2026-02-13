@@ -377,6 +377,7 @@ export default function AdminJobs() {
   
   // POD upload state
   const [uploadingPod, setUploadingPod] = useState(false);
+  const [deletingPodUrl, setDeletingPodUrl] = useState<string | null>(null);
   const podFileInputRef = useRef<HTMLInputElement>(null);
   
   // Loading timeout detection (show message if loading takes > 10 seconds)
@@ -736,7 +737,7 @@ export default function AdminJobs() {
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       
       if (selectedJob?.id === jobId) {
-        setSelectedJob({ ...selectedJob, podPhotoUrl: result.podPhotoUrl });
+        setSelectedJob({ ...selectedJob, podPhotoUrl: result.podPhotoUrl, podPhotos: result.podPhotos });
       }
     } catch (error: any) {
       console.error('[POD Upload] Error:', error);
@@ -1802,73 +1803,139 @@ export default function AdminJobs() {
                         ) : (
                           <Upload className="h-4 w-4 mr-1" />
                         )}
-                        {selectedJob.podPhotoUrl ? 'Replace Photo' : 'Upload Photo'}
+                        {(selectedJob.podPhotos?.length || selectedJob.podPhotoUrl) ? 'Add Photo' : 'Upload Photo'}
                       </Button>
                     </div>
                   </div>
                   
-                  {(selectedJob.podPhotoUrl || selectedJob.podSignatureUrl || selectedJob.podRecipientName) ? (
-                    <>
-                      {/* Recipient Name */}
-                      {selectedJob.podRecipientName && (
-                        <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Received By</p>
-                          <p className="font-medium text-green-700 dark:text-green-400" data-testid="text-pod-recipient">
-                            {selectedJob.podRecipientName}
-                          </p>
+                  {(() => {
+                    const allPhotos: string[] = [];
+                    if (selectedJob.podPhotos?.length) {
+                      allPhotos.push(...selectedJob.podPhotos);
+                    }
+                    if (selectedJob.podPhotoUrl && !allPhotos.includes(selectedJob.podPhotoUrl)) {
+                      allPhotos.push(selectedJob.podPhotoUrl);
+                    }
+                    const hasContent = allPhotos.length > 0 || selectedJob.podSignatureUrl || selectedJob.podRecipientName;
+                    
+                    if (!hasContent) {
+                      return (
+                        <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 p-4 rounded-lg">
+                          <Camera className="h-5 w-5" />
+                          <p className="text-sm">No proof of delivery photo uploaded yet. Click "Upload Photo" to add one.</p>
                         </div>
-                      )}
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        {selectedJob.podPhotoUrl && (
-                          <div>
-                            <p className="text-sm text-muted-foreground mb-2">Delivery Photo</p>
-                            <a 
-                              href={selectedJob.podPhotoUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="block"
-                            >
-                              <img 
-                                src={selectedJob.podPhotoUrl} 
-                                alt="Proof of Delivery" 
-                                className="rounded-lg border max-h-48 object-cover hover:opacity-90 transition-opacity cursor-pointer"
-                                data-testid="img-pod-photo"
-                              />
-                            </a>
+                      );
+                    }
+                    
+                    return (
+                      <>
+                        {selectedJob.podRecipientName && (
+                          <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                            <p className="text-sm text-muted-foreground">Received By</p>
+                            <p className="font-medium text-green-700 dark:text-green-400" data-testid="text-pod-recipient">
+                              {selectedJob.podRecipientName}
+                            </p>
                           </div>
                         )}
-                        {selectedJob.podSignatureUrl && (
+                        
+                        {allPhotos.length > 0 && (
                           <div>
+                            <p className="text-sm text-muted-foreground mb-2">Delivery Photos ({allPhotos.length})</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                              {allPhotos.map((photoUrl, index) => (
+                                <div key={photoUrl} className="relative group">
+                                  <a
+                                    href={photoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                    data-testid={`link-pod-photo-${index}`}
+                                  >
+                                    <img
+                                      src={photoUrl}
+                                      alt={`Proof of Delivery ${index + 1}`}
+                                      className="rounded-lg border max-h-48 w-full object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                      data-testid={`img-pod-photo-${index}`}
+                                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                  </a>
+                                  <Button
+                                    size="icon"
+                                    variant="destructive"
+                                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    style={{ visibility: 'visible' }}
+                                    disabled={deletingPodUrl === photoUrl}
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setDeletingPodUrl(photoUrl);
+                                      try {
+                                        const { data: { session } } = await supabase.auth.getSession();
+                                        if (!session?.access_token) return;
+                                        const resp = await fetch(`/api/jobs/${selectedJob.id}/pod/photo`, {
+                                          method: 'DELETE',
+                                          headers: {
+                                            'Authorization': `Bearer ${session.access_token}`,
+                                            'Content-Type': 'application/json',
+                                          },
+                                          body: JSON.stringify({ photoUrl }),
+                                        });
+                                        if (resp.ok) {
+                                          const result = await resp.json();
+                                          setSelectedJob({ ...selectedJob, podPhotoUrl: result.podPhotoUrl, podPhotos: result.podPhotos });
+                                          queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+                                          toast({ title: 'Photo removed', description: 'POD photo has been removed' });
+                                        } else {
+                                          toast({ title: 'Error', description: 'Failed to remove photo', variant: 'destructive' });
+                                        }
+                                      } catch (err) {
+                                        toast({ title: 'Error', description: 'Failed to remove photo', variant: 'destructive' });
+                                      } finally {
+                                        setDeletingPodUrl(null);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-pod-photo-${index}`}
+                                  >
+                                    {deletingPodUrl === photoUrl ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <X className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {selectedJob.podSignatureUrl && (
+                          <div className="mt-4">
                             <p className="text-sm text-muted-foreground mb-2">Recipient Signature</p>
-                            <a 
-                              href={selectedJob.podSignatureUrl} 
-                              target="_blank" 
+                            <a
+                              href={selectedJob.podSignatureUrl}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="block"
                             >
-                              <img 
-                                src={selectedJob.podSignatureUrl} 
-                                alt="Recipient Signature" 
+                              <img
+                                src={selectedJob.podSignatureUrl}
+                                alt="Recipient Signature"
                                 className="rounded-lg border bg-white p-2 max-h-32 object-contain hover:opacity-90 transition-opacity cursor-pointer"
                                 data-testid="img-pod-signature"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                               />
                             </a>
                           </div>
                         )}
-                      </div>
-                      {selectedJob.deliveredAt && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Delivered on {formatDate(selectedJob.deliveredAt)}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 p-4 rounded-lg">
-                      <Camera className="h-5 w-5" />
-                      <p className="text-sm">No proof of delivery photo uploaded yet. Click "Upload Photo" to add one.</p>
-                    </div>
-                  )}
+                        
+                        {selectedJob.deliveredAt && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Delivered on {formatDate(selectedJob.deliveredAt)}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
