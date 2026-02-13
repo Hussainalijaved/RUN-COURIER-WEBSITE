@@ -1,0 +1,98 @@
+You are a senior Supabase engineer. Fix my Run Courier driver documents system.
+
+SYMPTOMS (CURRENT BUGS)
+1) Admin can see uploaded docs in the Pending list, but when opening “Preview Document” the preview often shows broken (image not loading) even though file name exists.
+2) After approving a driver, admin cannot review documents again.
+3) Documents do not appear in the driver profile on the website and mobile app; drivers are asked to upload again.
+This is wrong. Documents must be uploaded once and remain accessible forever across Admin + Website + Mobile.
+
+TECH
+- Supabase Auth + Postgres + Storage
+- Web app + Mobile app share the same Supabase project.
+
+ROOT CAUSES TO CHECK (MOST LIKELY)
+A) We are saving a SIGNED URL in DB (expires) instead of saving the STORAGE PATH.
+B) Approval flow creates a new driver row / new id, so documents stay linked to the old application id (or old driver id).
+C) RLS policies allow reading before approval but block after status change.
+D) Preview uses public URL for a private bucket (or does not createSignedUrl).
+E) We store only file_name, but not bucket + full storage_path.
+
+REQUIRED FIX (IMPLEMENT)
+1) Create a stable table to store documents by auth user id:
+
+Table: driver_documents
+- id uuid PK default gen_random_uuid()
+- auth_user_id uuid NOT NULL  (the driver's Supabase auth uid)
+- doc_type text NOT NULL (profile_picture, driving_licence_front, driving_licence_back, insurance, v5, proof_of_address, rtw, bank_doc, etc.)
+- bucket text NOT NULL default 'driver-documents'
+- storage_path text NOT NULL   <-- IMPORTANT: store path, not signed url
+- file_name text
+- mime_type text
+- size_bytes bigint
+- uploaded_at timestamptz default now()
+- status text default 'pending'  (pending/approved/rejected)
+- admin_notes text
+
+Unique constraint: (auth_user_id, doc_type) so each doc_type has one latest file.
+
+2) Storage path must be stable and never depend on application id:
+bucket = 'driver-documents' (PRIVATE)
+path format = 'drivers/{auth_user_id}/{doc_type}/{timestamp}_{originalFilename}'
+
+3) Upload flow (web + mobile):
+- Upload file to Storage using the stable path above.
+- Then UPSERT into driver_documents:
+  on conflict(auth_user_id, doc_type)
+  do update set storage_path = excluded.storage_path,
+              file_name = excluded.file_name,
+              mime_type = excluded.mime_type,
+              size_bytes = excluded.size_bytes,
+              uploaded_at = now(),
+              status = 'pending'
+
+4) Preview flow (Admin + Driver):
+- NEVER render a stored signed URL from DB.
+- When user clicks “Preview Document”, generate a signed URL at runtime:
+  supabase.storage.from(bucket).createSignedUrl(storage_path, 60*10)
+- Use that returned signed url to load <img> or <iframe>.
+- If the file is pdf, show PDF viewer; if image, show image.
+- Add error handling: if signed url fails, show message “Access denied / file missing” and log error.
+
+5) Approval flow MUST NOT break links:
+- When admin approves driver, only update drivers.status='approved'
+- DO NOT create a new driver profile row with a different identifier.
+- DO NOT move files to a different folder based on new id.
+- The canonical linkage is auth_user_id everywhere.
+
+6) Make documents visible everywhere:
+- Driver profile page (web) and driver profile page (mobile) must read:
+  select * from driver_documents where auth_user_id = auth.uid()
+- Admin page must read:
+  select * from driver_documents order by uploaded_at desc
+- Approved documents must still show in admin forever (filter by status if needed).
+
+7) RLS (critical)
+- driver_documents:
+  - drivers can select their own rows where auth_user_id = auth.uid()
+  - drivers can insert/update their own rows
+  - admins can select/update all rows
+- If you use roles, implement admin check using a profiles table or custom claims.
+- Storage bucket is private; signed URLs are used for preview.
+
+8) Data migration (do not lose old files)
+- If existing docs are stored against an application id:
+  - map each application -> auth_user_id
+  - create driver_documents rows with correct storage_path.
+- If you only have file_name currently:
+  - find actual object path in storage and backfill storage_path.
+
+DELIVERABLES
+- SQL migration for driver_documents + indexes + constraints
+- Updated RLS policies SQL
+- Updated upload code for web + mobile
+- Updated admin preview code: createSignedUrl on open
+- Fix approval logic so it never overwrites doc fields with null or changes the linking id
+- Tests:
+  1) upload doc -> logout/login -> preview works
+  2) approve driver -> admin can still preview docs
+  3) mobile shows same uploaded docs without reupload
