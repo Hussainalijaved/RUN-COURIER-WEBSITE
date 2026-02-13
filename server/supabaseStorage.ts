@@ -566,7 +566,6 @@ export class SupabaseStorage implements IStorage {
     if (data.payLaterEnabled !== undefined) dbData.pay_later_enabled = data.payLaterEnabled;
     if (data.completedBookingsCount !== undefined) dbData.completed_bookings_count = data.completedBookingsCount;
     if (data.isActive !== undefined) dbData.is_active = data.isActive;
-    if (data.deactivatedAt !== undefined) dbData.deactivated_at = data.deactivatedAt;
     
     // First try to update by auth_id (Supabase Auth UUID)
     const { data: updated, error } = await supabase
@@ -609,11 +608,11 @@ export class SupabaseStorage implements IStorage {
   }
 
   async deactivateUser(id: string): Promise<User | undefined> {
-    return this.updateUser(id, { isActive: false, deactivatedAt: new Date() });
+    return this.updateUser(id, { isActive: false });
   }
 
   async reactivateUser(id: string): Promise<User | undefined> {
-    return this.updateUser(id, { isActive: true, deactivatedAt: null });
+    return this.updateUser(id, { isActive: true });
   }
 
   async deleteUser(id: string): Promise<boolean> {
@@ -786,7 +785,6 @@ export class SupabaseStorage implements IStorage {
     if (data.sortCode !== undefined) dbData.sort_code = data.sortCode;
     if (data.accountNumber !== undefined) dbData.account_number = data.accountNumber;
     if (data.isActive !== undefined) dbData.is_active = data.isActive;
-    if (data.deactivatedAt !== undefined) dbData.deactivated_at = data.deactivatedAt;
     
     const { data: updated, error } = await supabase
       .from('drivers')
@@ -825,15 +823,13 @@ export class SupabaseStorage implements IStorage {
   async deactivateDriver(id: string): Promise<Driver | undefined> {
     return this.updateDriver(id, { 
       isActive: false, 
-      deactivatedAt: new Date(),
       isAvailable: false 
     });
   }
 
   async reactivateDriver(id: string): Promise<Driver | undefined> {
     return this.updateDriver(id, { 
-      isActive: true, 
-      deactivatedAt: null 
+      isActive: true 
     });
   }
 
