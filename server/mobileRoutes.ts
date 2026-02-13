@@ -204,18 +204,34 @@ export function registerMobileRoutes(app: Express): void {
     requireSupabaseAuth,
     asyncHandler(async (req, res) => {
       const authUser = req.auth!;
-      const driverId = authUser.id;
+      const authUserId = authUser.id;
 
       if (!supabaseAdmin) {
         return res.status(500).json({ error: "Server not configured", code: "NO_SUPABASE" });
       }
+
+      // Look up driver record to get the driver record ID (may differ from auth UUID)
+      const allDriverIds: string[] = [authUserId];
+      try {
+        const { data: driverRecord } = await supabaseAdmin
+          .from('drivers')
+          .select('id')
+          .eq('user_id', authUserId)
+          .single();
+        if (driverRecord && driverRecord.id && driverRecord.id !== authUserId) {
+          allDriverIds.push(driverRecord.id);
+        }
+      } catch (e) {
+        // Non-critical - continue with auth ID only
+      }
+      console.log(`[Job Offers API] Looking up jobs for driver IDs: ${allDriverIds.join(', ')}`);
 
       const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
 
       const { data: jobsData, error } = await supabaseAdmin
         .from('jobs')
         .select(driverSafeColumns)
-        .eq('driver_id', driverId)
+        .in('driver_id', allDriverIds)
         .in('status', ['assigned', 'offered'])
         .order('created_at', { ascending: false });
 
