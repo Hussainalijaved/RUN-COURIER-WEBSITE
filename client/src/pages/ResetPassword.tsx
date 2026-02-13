@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,45 +35,28 @@ type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isValidSession, setIsValidSession] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
+  const [isValidToken, setIsValidToken] = useState(false);
+  const [checkingToken, setCheckingToken] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setIsValidSession(true);
-        } else {
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
-          
-          if (accessToken && refreshToken) {
-            const { error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            
-            if (!error) {
-              setIsValidSession(true);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Session check error:', error);
-      } finally {
-        setCheckingSession(false);
-      }
-    };
+    const params = new URLSearchParams(searchString);
+    const urlToken = params.get('token');
 
-    checkSession();
-  }, []);
+    if (urlToken) {
+      setToken(urlToken);
+      setIsValidToken(true);
+      setCheckingToken(false);
+    } else {
+      setCheckingToken(false);
+    }
+  }, [searchString]);
 
   const form = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
@@ -85,16 +67,21 @@ export default function ResetPassword() {
   });
 
   const onSubmit = async (data: ResetPasswordInput) => {
+    if (!token) return;
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: data.password,
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword: data.password }),
       });
 
-      if (error) {
+      const result = await response.json();
+
+      if (!response.ok) {
         toast({
           title: 'Error',
-          description: error.message,
+          description: result.error || 'Failed to reset password',
           variant: 'destructive',
         });
       } else {
@@ -103,7 +90,6 @@ export default function ResetPassword() {
           title: 'Password Updated',
           description: 'Your password has been successfully reset.',
         });
-        await supabase.auth.signOut();
       }
     } catch (error) {
       toast({
@@ -116,7 +102,7 @@ export default function ResetPassword() {
     }
   };
 
-  if (checkingSession) {
+  if (checkingToken) {
     return (
       <PublicLayout>
         <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
@@ -131,13 +117,13 @@ export default function ResetPassword() {
     );
   }
 
-  if (!isValidSession && !isSuccess) {
+  if (!isValidToken && !isSuccess) {
     return (
       <PublicLayout>
         <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl text-destructive">Invalid or Expired Link</CardTitle>
+              <CardTitle className="text-2xl text-destructive" data-testid="text-invalid-link">Invalid or Expired Link</CardTitle>
               <CardDescription>
                 This password reset link is invalid or has expired.
               </CardDescription>
@@ -174,7 +160,7 @@ export default function ResetPassword() {
                   <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
               </div>
-              <CardTitle className="text-2xl">Password Reset Complete</CardTitle>
+              <CardTitle className="text-2xl" data-testid="text-reset-complete">Password Reset Complete</CardTitle>
               <CardDescription>
                 Your password has been successfully updated.
               </CardDescription>

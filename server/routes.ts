@@ -7798,7 +7798,8 @@ export async function registerRoutes(
     }
   }));
 
-  // Password reset endpoint using Resend for reliable email delivery
+  const passwordResetTokens = new Map<string, { email: string; userId: string; expiresAt: number }>();
+
   app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
     const { email, redirectUrl } = req.body;
     
@@ -7813,36 +7814,84 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Authentication service not configured" });
       }
 
-      // Generate password reset link using Supabase Admin
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email: email,
-        options: {
-          redirectTo: redirectUrl || 'https://www.runcourier.co.uk/reset-password'
-        }
-      });
+      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      const user = users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
-      if (error) {
-        console.error('Supabase generate link error:', error);
-        // Don't reveal if email exists or not for security
+      if (!user) {
         return res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
       }
 
-      if (data?.properties?.action_link) {
-        // Send email using Resend
-        const emailSent = await sendPasswordResetEmail(email, data.properties.action_link);
-        
-        if (!emailSent) {
-          console.error('Failed to send password reset email via Resend');
-          return res.status(500).json({ error: "Failed to send password reset email. Please try again later." });
-        }
+      const crypto = await import('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = Date.now() + 60 * 60 * 1000;
 
-        console.log('Password reset email sent successfully to:', email);
+      passwordResetTokens.set(token, { email: email.toLowerCase(), userId: user.id, expiresAt });
+
+      for (const [k, v] of passwordResetTokens) {
+        if (v.expiresAt < Date.now()) passwordResetTokens.delete(k);
       }
+
+      const baseUrl = redirectUrl?.replace('/reset-password', '') || process.env.APP_URL || 'https://runcourier.co.uk';
+      const resetLink = `${baseUrl}/reset-password?token=${token}`;
+
+      const emailSent = await sendPasswordResetEmail(email, resetLink);
+      
+      if (!emailSent) {
+        console.error('Failed to send password reset email via Resend');
+        return res.status(500).json({ error: "Failed to send password reset email. Please try again later." });
+      }
+
+      console.log('Password reset email sent successfully to:', email, 'link:', resetLink);
 
       res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a password reset link." });
     } catch (error) {
       console.error('Password reset error:', error);
+      res.status(500).json({ error: "An error occurred. Please try again later." });
+    }
+  }));
+
+  app.post("/api/auth/reset-password", asyncHandler(async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: "Token and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    const resetData = passwordResetTokens.get(token);
+    if (!resetData) {
+      return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+    }
+
+    if (resetData.expiresAt < Date.now()) {
+      passwordResetTokens.delete(token);
+      return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
+    }
+
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Authentication service not configured" });
+      }
+
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(resetData.userId, {
+        password: newPassword
+      });
+
+      if (error) {
+        console.error('Password update error:', error);
+        return res.status(500).json({ error: "Failed to update password. Please try again." });
+      }
+
+      passwordResetTokens.delete(token);
+      console.log(`Password reset successfully for: ${resetData.email}`);
+
+      res.json({ success: true, message: "Password has been reset successfully." });
+    } catch (error) {
+      console.error('Reset password error:', error);
       res.status(500).json({ error: "An error occurred. Please try again later." });
     }
   }));
