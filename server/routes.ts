@@ -4024,19 +4024,16 @@ export async function registerRoutes(
     
     allDocuments.forEach(doc => {
       if (doc.fileUrl && typeof doc.fileUrl === 'string') {
-        if (doc.fileUrl.startsWith('/uploads/')) {
+        if (doc.fileUrl.startsWith('/api/uploads/')) {
+          // already resolved
+        } else if (doc.fileUrl.startsWith('/uploads/')) {
           doc.fileUrl = '/api' + doc.fileUrl;
-        } else if (doc.fileUrl.includes('supabase.co/storage/v1/object/public/driver-documents/')) {
-          const storagePath = doc.fileUrl.split('/driver-documents/')[1];
-          if (storagePath) {
-            doc.fileUrl = `/api/uploads/documents/${storagePath}`;
+        } else if (doc.fileUrl.includes('supabase.co/storage/v1/object/')) {
+          const match = doc.fileUrl.match(/\/(?:driver-documents|DRIVER-DOCUMENTS)\/(.+?)(?:\?.*)?$/i);
+          if (match && match[1]) {
+            doc.fileUrl = `/api/uploads/documents/${decodeURIComponent(match[1])}`;
           }
-        } else if (doc.fileUrl.includes('supabase.co/storage/v1/object/') && !doc.fileUrl.includes('/public/')) {
-          const storagePath = doc.fileUrl.split('/driver-documents/')[1];
-          if (storagePath) {
-            doc.fileUrl = `/api/uploads/documents/${storagePath}`;
-          }
-        } else if (!doc.fileUrl.startsWith('/api/') && !doc.fileUrl.startsWith('http') && !doc.fileUrl.startsWith('text:')) {
+        } else if (!doc.fileUrl.startsWith('http') && !doc.fileUrl.startsWith('text:')) {
           doc.fileUrl = `/api/uploads/documents/${doc.fileUrl}`;
         }
       }
@@ -5760,11 +5757,11 @@ export async function registerRoutes(
     }
 
     const fileName = path.basename(filePath);
-    const BUCKET = 'driver-documents';
+    const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
     const cleanPath = filePath.replace(/^documents\//, '');
     const possiblePaths = [
-      filePath,
       cleanPath,
+      filePath,
       `applications/pending/${fileName}`,
       `applications/${cleanPath}`,
       fileName,
@@ -5773,21 +5770,25 @@ export async function registerRoutes(
     try {
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (supabaseAdmin) {
-        for (const storagePath of possiblePaths) {
-          const { data, error } = await supabaseAdmin.storage
-            .from(BUCKET)
-            .download(storagePath);
-          if (!error && data) {
-            const ext = path.extname(fileName).toLowerCase();
-            const mimeTypes: Record<string, string> = {
-              '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-              '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
-            };
-            const contentType = mimeTypes[ext] || 'application/octet-stream';
-            const buffer = Buffer.from(await data.arrayBuffer());
-            res.set('Content-Type', contentType);
-            res.set('Cache-Control', 'public, max-age=3600');
-            return res.send(buffer);
+        for (const bucket of BUCKETS) {
+          for (const storagePath of possiblePaths) {
+            try {
+              const { data, error } = await supabaseAdmin.storage
+                .from(bucket)
+                .download(storagePath);
+              if (!error && data) {
+                const ext = path.extname(fileName).toLowerCase();
+                const mimeTypes: Record<string, string> = {
+                  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+                  '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
+                };
+                const contentType = mimeTypes[ext] || 'application/octet-stream';
+                const buffer = Buffer.from(await data.arrayBuffer());
+                res.set('Content-Type', contentType);
+                res.set('Cache-Control', 'public, max-age=3600');
+                return res.send(buffer);
+              }
+            } catch (_) {}
           }
         }
       }
