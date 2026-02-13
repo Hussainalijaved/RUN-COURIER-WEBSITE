@@ -5558,6 +5558,29 @@ export async function registerRoutes(
           break;
         }
       }
+      if (!found) {
+        try {
+          const { supabaseAdmin } = await import('./supabaseAdmin');
+          if (supabaseAdmin) {
+            const possiblePaths = [
+              `applications/pending/${fileName}`,
+              cleanUrl.replace(/^\/uploads\/documents\//, 'applications/'),
+              cleanUrl.replace(/^\/uploads\//, ''),
+            ];
+            for (const sp of possiblePaths) {
+              const { data, error } = await supabaseAdmin.storage
+                .from('driver-documents')
+                .download(sp);
+              if (!error && data) {
+                found = true;
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[check-files] Supabase direct check failed:', e);
+        }
+      }
       results[url] = found;
     }
 

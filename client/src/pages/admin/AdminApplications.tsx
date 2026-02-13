@@ -427,15 +427,6 @@ export default function AdminApplications() {
       );
     }
 
-    if (!isAvailable || imgError) {
-      return (
-        <div className="flex items-center gap-2 text-sm text-amber-600" data-testid={`doc-status-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}>
-          <AlertCircle className="h-4 w-4" />
-          {label}: File lost - use upload button to replace, or send back to driver
-        </div>
-      );
-    }
-
     return (
       <div className="flex flex-col gap-1">
         <a 
@@ -449,7 +440,13 @@ export default function AdminApplications() {
           {label}
           <ExternalLink className="h-3 w-3" />
         </a>
-        {isImage && (
+        {(!isAvailable && !imgError) && (
+          <div className="flex items-center gap-1 text-xs text-amber-600">
+            <AlertCircle className="h-3 w-3" />
+            May only be available on production server
+          </div>
+        )}
+        {isImage && !imgError && (
           <img 
             src={resolvedUrl} 
             alt={label} 
@@ -458,6 +455,12 @@ export default function AdminApplications() {
             onError={() => setImgError(true)}
             data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
           />
+        )}
+        {imgError && (
+          <div className="flex items-center gap-1 text-xs text-amber-600">
+            <AlertCircle className="h-3 w-3" />
+            Preview unavailable - click link to try viewing
+          </div>
         )}
         {isPdf && (
           <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
