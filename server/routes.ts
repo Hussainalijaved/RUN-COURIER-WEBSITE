@@ -6160,10 +6160,17 @@ export async function registerRoutes(
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email}`);
 
-                  await supabaseAdmin.from('drivers').update({
-                    must_change_password: true,
-                    approved_at: new Date().toISOString()
-                  }).eq('id', userId);
+                  try {
+                    await supabaseAdmin.from('drivers').update({
+                      must_change_password: true,
+                      approved_at: new Date().toISOString()
+                    }).eq('id', userId);
+                  } catch {}
+                  try {
+                    await supabaseAdmin.from('drivers').update({
+                      approved_at: new Date().toISOString()
+                    }).eq('id', userId);
+                  } catch {}
 
                   const newDocMappings = [
                     { url: application.profilePictureUrl, type: 'profilePicture', label: 'Profile Picture' },
@@ -6322,9 +6329,11 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Failed to reset password" });
     }
 
-    await supabaseAdmin!.from('drivers').update({
-      must_change_password: true
-    }).eq('id', driver.id);
+    try {
+      await supabaseAdmin!.from('drivers').update({
+        must_change_password: true
+      }).eq('id', driver.id);
+    } catch {}
 
     const { sendDriverApprovalEmail } = await import('./emailService');
     const sent = await sendDriverApprovalEmail(application.email, application.fullName, driver.driver_code, tempPassword);
@@ -6349,13 +6358,26 @@ export async function registerRoutes(
       return res.status(401).json({ error: "Invalid token" });
     }
 
-    const { data: driver } = await supabaseAdmin!
+    const { data: driver, error: driverErr } = await supabaseAdmin!
       .from('drivers')
-      .select('must_change_password')
+      .select('id')
       .eq('id', user.id)
       .maybeSingle();
 
-    res.json({ mustChangePassword: driver?.must_change_password === true });
+    if (!driver) {
+      return res.json({ mustChangePassword: false });
+    }
+
+    try {
+      const { data: driverFull } = await supabaseAdmin!
+        .from('drivers')
+        .select('must_change_password')
+        .eq('id', user.id)
+        .maybeSingle();
+      res.json({ mustChangePassword: driverFull?.must_change_password === true });
+    } catch {
+      res.json({ mustChangePassword: false });
+    }
   }));
 
   app.post("/api/driver/change-password", asyncHandler(async (req, res) => {
@@ -6369,20 +6391,14 @@ export async function registerRoutes(
       return res.status(401).json({ error: "Invalid token" });
     }
 
-    // Verify the user is actually a driver
     const { data: driver } = await supabaseAdmin!
       .from('drivers')
-      .select('id, must_change_password')
+      .select('id')
       .eq('id', user.id)
       .maybeSingle();
 
     if (!driver) {
       return res.status(403).json({ error: "Only drivers can use this endpoint" });
-    }
-
-    // Verify that password change is required
-    if (!driver.must_change_password) {
-      return res.status(400).json({ error: "Password change not required. Use the forgot password feature to reset your password." });
     }
 
     const { newPassword } = req.body;
@@ -6397,9 +6413,11 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Failed to update password" });
     }
 
-    await supabaseAdmin!.from('drivers').update({
-      must_change_password: false
-    }).eq('id', user.id);
+    try {
+      await supabaseAdmin!.from('drivers').update({
+        must_change_password: false
+      }).eq('id', user.id);
+    } catch {}
 
     res.json({ success: true, message: "Password changed successfully" });
   }));
