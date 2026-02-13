@@ -7866,8 +7866,12 @@ export async function registerRoutes(
       console.log('Password reset code sent successfully to:', email);
 
       res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a reset code." });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Password reset error:', error);
+      const msg = error?.message?.toLowerCase?.() || '';
+      if (msg.includes('rate') || msg.includes('limit') || msg.includes('too many')) {
+        return res.status(429).json({ error: "Too many requests. Please wait a few minutes before trying again." });
+      }
       res.status(500).json({ error: "An error occurred. Please try again later." });
     }
   }));
