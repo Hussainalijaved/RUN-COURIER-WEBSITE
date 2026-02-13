@@ -3986,13 +3986,15 @@ export async function registerRoutes(
     const isPendingApplication = rawDriverId === 'application-pending';
     let fileUrl = '';
 
+    const fileBuffer = fs.readFileSync(file.path);
+
     const driverDir = path.join(uploadsDir, safeDriverId);
     if (!fs.existsSync(driverDir)) {
       fs.mkdirSync(driverDir, { recursive: true });
     }
     const finalPath = path.join(driverDir, finalFilename);
     try {
-      fs.copyFileSync(file.path, finalPath);
+      fs.writeFileSync(finalPath, fileBuffer);
     } catch (copyErr) {
       console.error('[Documents] Local copy failed:', copyErr);
     }
@@ -4003,40 +4005,49 @@ export async function registerRoutes(
       ? `applications/pending/${finalFilename}`
       : `applications/${safeDriverId}/${finalFilename}`;
 
+    const extLower = ext.toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+      '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
+    };
+    const contentType = mimeMap[extLower] || file.mimetype || 'application/octet-stream';
+
     let supabaseUploadSuccess = false;
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (supabaseAdmin) {
-        const fileBuffer = fs.readFileSync(finalPath);
-        const extLower = ext.toLowerCase();
-        const mimeMap: Record<string, string> = {
-          '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-          '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
-        };
-        const contentType = mimeMap[extLower] || file.mimetype || 'application/octet-stream';
-
-        const { error: uploadErr } = await supabaseAdmin.storage
-          .from(BUCKET)
-          .upload(storagePath, fileBuffer, { contentType, upsert: true });
-
-        if (!uploadErr) {
-          const { data: urlData } = supabaseAdmin.storage
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const { supabaseAdmin } = await import('./supabaseAdmin');
+        if (supabaseAdmin) {
+          const { error: uploadErr } = await supabaseAdmin.storage
             .from(BUCKET)
-            .getPublicUrl(storagePath);
-          fileUrl = urlData.publicUrl;
-          supabaseUploadSuccess = true;
-          console.log(`[Documents] Uploaded to Supabase Storage: ${storagePath}`);
+            .upload(storagePath, fileBuffer, { contentType, upsert: true });
+
+          if (!uploadErr) {
+            const { data: urlData } = supabaseAdmin.storage
+              .from(BUCKET)
+              .getPublicUrl(storagePath);
+            fileUrl = urlData.publicUrl;
+            supabaseUploadSuccess = true;
+            console.log(`[Documents] Uploaded to Supabase Storage: ${storagePath} (attempt ${attempt})`);
+            break;
+          } else {
+            console.error(`[Documents] Supabase upload error (attempt ${attempt}/${maxRetries}):`, uploadErr.message);
+          }
         } else {
-          console.error('[Documents] Supabase Storage upload error:', uploadErr.message);
+          console.error('[Documents] supabaseAdmin not available');
+          break;
         }
+      } catch (supaErr) {
+        console.error(`[Documents] Supabase upload failed (attempt ${attempt}/${maxRetries}):`, supaErr);
       }
-    } catch (supaErr) {
-      console.error('[Documents] Supabase Storage upload failed:', supaErr);
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
     }
 
     if (!supabaseUploadSuccess) {
       fileUrl = localUrl;
-      console.log(`[Documents] Using local storage: ${fileUrl}`);
+      console.warn(`[Documents] WARNING: Supabase upload failed after ${maxRetries} attempts. Using local storage only: ${fileUrl}`);
     }
 
     if (file.path && fs.existsSync(file.path)) {
