@@ -1,0 +1,132 @@
+You are a senior full-stack engineer. Fix my RunCourier driver document system so documents are saved permanently and visible across Website + Mobile App, and Admin can review them anytime.
+
+CURRENT BUG
+- Drivers submit application + upload documents.
+- Admin can see them initially, but after approving the driver:
+  1) Admin cannot review the documents again.
+  2) Documents are not saved/linked in the driver profile on website.
+  3) Mobile app does not show them; driver is forced to upload again.
+This is wrong. Documents must be uploaded once and then available everywhere (driver profile web, driver profile mobile, admin panel) forever unless replaced.
+
+TECH STACK
+- Supabase Auth
+- Supabase Postgres
+- Supabase Storage
+- Web + Mobile use the same Supabase project.
+
+REQUIRED OUTCOME (MUST)
+1) Single source of truth:
+   - The driver uploads documents once.
+   - The document file references are stored in the database and tied to the driver (auth user id).
+2) Approval does NOT delete or break any links.
+3) Admin can open and review documents at any time (before or after approval).
+4) Driver can see status + uploaded docs on:
+   - Website Driver Profile
+   - Mobile Driver Profile
+5) If driver replaces a document, system updates the reference (and optionally keeps history).
+
+ROOT CAUSE TO INVESTIGATE
+- The app might be storing file URLs only in the “application” record and not copying/relating them to the “drivers” profile.
+- Approval might be creating a new driver record with a different id, so old uploads become orphaned.
+- Storage paths might be based on an “application id” that changes, rather than stable “auth user id”.
+- RLS policies may block reads after status changes.
+- Signed URLs may be expiring and mistaken for “not saved”.
+
+FIX DESIGN (IMPLEMENT THIS)
+A) Database schema (stable linkage)
+- drivers table (one row per auth user):
+  - id (uuid primary key) OR use auth.uid as primary
+  - auth_user_id (uuid unique NOT NULL)  <-- stable identifier
+  - status (pending/approved/rejected)
+  - ...driver profile fields
+- driver_documents table (recommended) OR a JSON column on drivers.
+  Preferred table:
+  - id uuid PK
+  - auth_user_id uuid NOT NULL references auth.users(id)
+  - doc_type text NOT NULL  (e.g. "driving_license_front", "insurance", "v5", "proof_of_address", "rtw", "bank_doc", etc.)
+  - storage_bucket text NOT NULL
+  - storage_path text NOT NULL   (do NOT store temporary signed URL)
+  - file_name text
+  - mime_type text
+  - size_bytes bigint
+  - uploaded_at timestamptz default now()
+  - uploaded_by uuid (auth uid)
+  - status text default 'uploaded' (optional: 'approved','rejected','needs_resubmission')
+  - admin_notes text nullable
+  Unique constraint: (auth_user_id, doc_type) so each doc type has one current file.
+  Optional: create driver_document_versions for history.
+
+B) Storage path convention (stable forever)
+- Store files under a stable folder:
+  bucket: driver-documents (private)
+  path: drivers/{auth_user_id}/{doc_type}/{timestamp}_{original_filename}
+- Never store under application id.
+- Never rely on public URL; use private bucket + signed URL generated on demand.
+
+C) Upload flow (web + mobile identical)
+- On upload success:
+  1) Upload file to storage bucket using above path
+  2) Upsert row into driver_documents with storage_path and metadata
+     (on conflict auth_user_id+doc_type do update set storage_path=excluded.storage_path, uploaded_at=now(), etc.)
+- UI should read documents by querying driver_documents where auth_user_id = current auth user.
+
+D) Approval flow (do not break anything)
+- When admin approves:
+  - Only update drivers.status = 'approved'
+  - DO NOT create a brand new driver profile row with a different identifier.
+  - DO NOT delete application/doc records.
+  - If you currently copy application → driver profile, keep the SAME auth_user_id, and do not overwrite documents with null.
+- If you have “applications” table:
+  - Keep it for onboarding, but driver_documents must be keyed to auth_user_id so it survives approval.
+
+E) Admin review
+- Admin panel page:
+  - Search driver → open driver detail
+  - Show checklist of required doc_types with status + preview link
+  - Generate signed URL at runtime:
+    supabase.storage.from(bucket).createSignedUrl(storage_path, expiresInSeconds)
+  - Allow admin to mark each doc approved/rejected + admin_notes.
+- Admin must be able to review documents at any time after approval too.
+
+F) RLS Policies (critical)
+- Storage bucket should be private.
+- Table RLS:
+  - drivers: user can select/update their own row where auth_user_id = auth.uid()
+  - driver_documents:
+    - user can select their own rows where auth_user_id = auth.uid()
+    - user can insert/update only their own rows
+    - admin role can select/update all rows
+- Admin detection:
+  - use custom claim/role table (e.g. profiles.role = 'admin') and RLS using exists() checks.
+- Storage access:
+  - Users can read their own files via signed URLs generated by server or client with proper auth.
+  - If using client-side signed URLs, ensure policy allows authenticated user to read only their own folder paths.
+
+G) Frontend changes (website + mobile)
+- Driver Profile screen should:
+  - fetch driver_documents and show list + statuses
+  - show “uploaded” if exists, “missing” if not
+  - never ask for re-upload unless missing/rejected
+- Fix any code that:
+  - stores signed URL in DB (wrong)
+  - overwrites driver profile doc fields with null on approval
+  - uses application_id instead of auth_user_id
+- Ensure the same queries are used across web and mobile.
+
+DELIVERABLES
+1) Updated schema migration SQL (tables + constraints + indexes).
+2) Updated RLS policies SQL.
+3) Updated upload function code for web + mobile.
+4) Updated admin review UI query logic + signed URL generation.
+5) Fix approval logic so it never breaks document links.
+6) A test plan:
+   - Upload docs → logout/login → docs still shown
+   - Approve driver → admin can still review docs
+   - Mobile login → docs appear without reupload
+   - Replace one doc → it updates everywhere
+
+IMPORTANT
+- Do not lose existing uploaded files: write a small migration script to map old application-based storage paths into driver_documents (or keep paths but link them).
+- If documents currently exist only on application table, migrate them into driver_documents keyed by auth_user_id.
+
+Start by identifying why docs disappear after approval (id mismatch / overwrite / RLS / signed URL expiration), then implement the design above.

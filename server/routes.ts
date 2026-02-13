@@ -3016,8 +3016,6 @@ export async function registerRoutes(
       console.error("Failed to sync driver verification to Supabase:", e);
     }
     
-    // When approving a driver, migrate their application documents to Supabase Storage
-    // and create driver_documents records so the mobile app can see them
     if (isVerified === true) {
       try {
         const { supabaseAdmin } = await import("./supabaseAdmin");
@@ -3027,200 +3025,179 @@ export async function registerRoutes(
             .select('profile_picture_url, driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url, right_to_work_share_code, vehicle_type')
             .eq('id', driverId)
             .single();
-          
-          if (driverData) {
-            const fs = await import("fs");
-            const path = await import("path");
-            const BUCKET = 'driver-documents';
-            
-            const docMappings = [
-              { dbColumn: 'profile_picture_url', url: driverData.profile_picture_url, storageName: 'profile_picture', docType: null },
-              { dbColumn: 'driving_licence_front_url', url: driverData.driving_licence_front_url, storageName: 'driving_licence_front', docType: 'driving_licence_front' },
-              { dbColumn: 'driving_licence_back_url', url: driverData.driving_licence_back_url, storageName: 'driving_licence_back', docType: 'driving_licence_back' },
-              { dbColumn: 'dbs_certificate_url', url: driverData.dbs_certificate_url, storageName: 'dbs_certificate', docType: 'dbs_certificate' },
-              { dbColumn: 'goods_in_transit_insurance_url', url: driverData.goods_in_transit_insurance_url, storageName: 'goods_in_transit', docType: 'goods_in_transit' },
-              { dbColumn: 'hire_reward_insurance_url', url: driverData.hire_reward_insurance_url, storageName: 'hire_and_reward', docType: 'hire_and_reward' },
-            ];
-            
-            // Handle share code (right to work) - text code, not a file
-            if (driverData.right_to_work_share_code) {
-              await supabaseAdmin
-                .from('driver_documents')
+
+          let appData: any = null;
+          if (existingDriver.email) {
+            const { data: appResult } = await supabaseAdmin
+              .from('driver_applications')
+              .select('*')
+              .eq('email', existingDriver.email)
+              .eq('status', 'approved')
+              .order('submitted_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            appData = appResult;
+          }
+
+          const docMappings = [
+            {
+              docType: 'driving_licence_front' as string | null,
+              url: driverData?.driving_licence_front_url || appData?.driving_licence_front_url,
+              dbColumn: 'driving_licence_front_url'
+            },
+            {
+              docType: 'driving_licence_back' as string | null,
+              url: driverData?.driving_licence_back_url || appData?.driving_licence_back_url,
+              dbColumn: 'driving_licence_back_url'
+            },
+            {
+              docType: 'dbs_certificate' as string | null,
+              url: driverData?.dbs_certificate_url || appData?.dbs_certificate_url,
+              dbColumn: 'dbs_certificate_url'
+            },
+            {
+              docType: 'goods_in_transit' as string | null,
+              url: driverData?.goods_in_transit_insurance_url || appData?.goods_in_transit_insurance_url,
+              dbColumn: 'goods_in_transit_insurance_url'
+            },
+            {
+              docType: 'hire_and_reward' as string | null,
+              url: driverData?.hire_reward_insurance_url || appData?.hire_and_reward_url,
+              dbColumn: 'hire_reward_insurance_url'
+            },
+            {
+              docType: null,
+              url: driverData?.profile_picture_url || appData?.profile_picture_url,
+              dbColumn: 'profile_picture_url'
+            },
+          ];
+
+          if (driverData?.right_to_work_share_code) {
+            await supabaseAdmin.from('driver_documents')
+              .delete()
+              .eq('driver_id', driverId)
+              .eq('doc_type', 'share_code');
+
+            await supabaseAdmin.from('driver_documents')
+              .insert({
+                driver_id: driverId,
+                doc_type: 'share_code',
+                file_url: `text:${driverData.right_to_work_share_code}`,
+                status: 'approved',
+                uploaded_at: new Date().toISOString(),
+              });
+            console.log(`[Drivers] Created share_code record for driver ${driverId}`);
+          }
+
+          const updateData: Record<string, string> = {};
+
+          for (const mapping of docMappings) {
+            if (!mapping.url) continue;
+
+            const newUrl = await copyApplicationFileToDriver(mapping.url, driverId, supabaseAdmin);
+
+            if (newUrl && newUrl !== mapping.url) {
+              updateData[mapping.dbColumn] = newUrl;
+              console.log(`[Drivers] Copied ${mapping.docType || mapping.dbColumn} to driver folder`);
+            }
+
+            const finalUrl = newUrl || normalizeDocumentUrl(mapping.url) || mapping.url;
+
+            if (mapping.docType) {
+              await supabaseAdmin.from('driver_documents')
                 .delete()
                 .eq('driver_id', driverId)
-                .eq('doc_type', 'share_code');
-              
-              await supabaseAdmin
-                .from('driver_documents')
+                .eq('doc_type', mapping.docType);
+
+              const { error: insertErr } = await supabaseAdmin.from('driver_documents')
                 .insert({
                   driver_id: driverId,
-                  doc_type: 'share_code',
-                  file_url: `text:${driverData.right_to_work_share_code}`,
+                  doc_type: mapping.docType,
+                  file_url: finalUrl,
                   status: 'approved',
                   uploaded_at: new Date().toISOString(),
                 });
-              console.log(`[Drivers] Created share_code driver_documents record for driver ${driverId}`);
+
+              if (insertErr) {
+                console.error(`[Drivers] Failed to create driver_documents record for ${mapping.docType}:`, insertErr.message);
+              } else {
+                console.log(`[Drivers] Created driver_documents record for ${mapping.docType}`);
+              }
             }
-            
-            // Handle vehicle photos from local uploads
-            const vehicleType = driverData.vehicle_type || 'car';
-            const vehiclePhotoTypes: Record<string, string[]> = {
-              'motorbike': ['front', 'back'],
-              'car': ['front', 'back'],
-              'small_van': ['front', 'back', 'left', 'right', 'load_space'],
-              'medium_van': ['front', 'back', 'left', 'right', 'load_space'],
-            };
-            const photoLabels = vehiclePhotoTypes[vehicleType] || ['front', 'back'];
-            
-            const searchDirs = [
-              `uploads/documents/${driverId}`,
-              `uploads/documents/application-pending`,
-            ];
-            
-            for (const label of photoLabels) {
-              const searchPatterns = [`vehicle_photo_${label}`, `vehicle_${label}`, `vehiclePhoto_${label}`];
-              
+          }
+
+          const vehicleType = driverData?.vehicle_type || existingDriver.vehicleType || 'car';
+          const BUCKET = 'driver-documents';
+          const searchFolders = [driverId, 'applications/pending'];
+          const vehiclePhotoTypes: Record<string, string[]> = {
+            'motorbike': ['front', 'back'],
+            'car': ['front', 'back'],
+            'small_van': ['front', 'back', 'left', 'right', 'load_space'],
+            'medium_van': ['front', 'back', 'left', 'right', 'load_space'],
+          };
+          const photoLabels = vehiclePhotoTypes[vehicleType] || ['front', 'back'];
+
+          for (const label of photoLabels) {
+            const searchPatterns = [`vehicle_photo_${label}`, `vehicle_photos_${label}`, `vehiclephoto${label}`];
+            let found = false;
+
+            for (const folder of searchFolders) {
               try {
-                let foundFile: string | null = null;
-                let foundDir: string | null = null;
-                
-                for (const dir of searchDirs) {
-                  if (!fs.existsSync(dir)) continue;
-                  const files = fs.readdirSync(dir);
-                  for (const pattern of searchPatterns) {
-                    const match = files.find((f: string) => f.toLowerCase().startsWith(pattern.toLowerCase()));
-                    if (match) {
-                      foundFile = match;
-                      foundDir = dir;
-                      break;
-                    }
-                  }
-                  if (foundFile) break;
-                }
-                
-                if (foundFile && foundDir) {
-                  const localPath = `${foundDir}/${foundFile}`;
-                  const fileBuffer = fs.readFileSync(localPath);
-                  const ext = path.extname(localPath) || '.jpeg';
-                  const contentType = ext === '.png' ? 'image/png' : ext === '.pdf' ? 'application/pdf' : 'image/jpeg';
-                  const storagePath = `${driverId}/vehicle_photos_${label}${ext}`;
-                  
-                  const { error: uploadErr } = await supabaseAdmin.storage
-                    .from(BUCKET)
-                    .upload(storagePath, fileBuffer, { contentType, upsert: true });
-                  
-                  if (!uploadErr) {
-                    const { data: urlData } = supabaseAdmin.storage
-                      .from(BUCKET)
-                      .getPublicUrl(storagePath);
-                    
-                    await supabaseAdmin
-                      .from('driver_documents')
-                      .delete()
-                      .eq('driver_id', driverId)
-                      .eq('doc_type', `vehicle_photos_${label}`);
-                    
-                    await supabaseAdmin
-                      .from('driver_documents')
-                      .insert({
+                const { data: files } = await supabaseAdmin.storage.from(BUCKET).list(folder, { limit: 200 });
+                if (!files) continue;
+
+                for (const file of files) {
+                  const nameWithoutExt = file.name.replace(/\.[^.]+$/, '').replace(/_\d{10,}$/, '').toLowerCase();
+                  if (searchPatterns.some(p => nameWithoutExt === p.toLowerCase() || nameWithoutExt.startsWith(p.toLowerCase()))) {
+                    if (folder !== driverId) {
+                      const { data: fileData } = await supabaseAdmin.storage.from(BUCKET).download(`${folder}/${file.name}`);
+                      if (fileData) {
+                        const arrayBuf = await fileData.arrayBuffer();
+                        const ext = file.name.match(/\.[^.]+$/)?.[0] || '.jpg';
+                        const destPath = `${driverId}/vehicle_photos_${label}${ext}`;
+                        await supabaseAdmin.storage.from(BUCKET).upload(destPath, Buffer.from(arrayBuf), { upsert: true });
+
+                        await supabaseAdmin.from('driver_documents').delete()
+                          .eq('driver_id', driverId).eq('doc_type', `vehicle_photos_${label}`);
+                        await supabaseAdmin.from('driver_documents').insert({
+                          driver_id: driverId,
+                          doc_type: `vehicle_photos_${label}`,
+                          file_url: `/api/uploads/documents/${driverId}/vehicle_photos_${label}${ext}`,
+                          status: 'approved',
+                          uploaded_at: new Date().toISOString(),
+                        });
+                        console.log(`[Drivers] Copied vehicle_photos_${label} from ${folder} to driver folder`);
+                        found = true;
+                        break;
+                      }
+                    } else {
+                      const ext = file.name.match(/\.[^.]+$/)?.[0] || '.jpg';
+                      await supabaseAdmin.from('driver_documents').delete()
+                        .eq('driver_id', driverId).eq('doc_type', `vehicle_photos_${label}`);
+                      await supabaseAdmin.from('driver_documents').insert({
                         driver_id: driverId,
                         doc_type: `vehicle_photos_${label}`,
-                        file_url: urlData.publicUrl,
+                        file_url: `/api/uploads/documents/${driverId}/${file.name}`,
                         status: 'approved',
                         uploaded_at: new Date().toISOString(),
                       });
-                    console.log(`[Drivers] Uploaded vehicle_photos_${label} from ${foundDir}`);
-                  } else {
-                    console.error(`[Drivers] Failed to upload vehicle_photos_${label}:`, uploadErr.message);
+                      found = true;
+                      break;
+                    }
                   }
                 }
-              } catch (vpErr: any) {
-                console.error(`[Drivers] Error handling vehicle photo ${label}:`, vpErr.message);
+                if (found) break;
+              } catch (e: any) {
+                console.error(`[Drivers] Error searching vehicle photos in ${folder}:`, e.message);
               }
             }
-            
-            const updateData: Record<string, string> = {};
-            
-            const getContentType = (filePath: string) => {
-              const ext = path.extname(filePath).toLowerCase();
-              if (ext === '.png') return 'image/png';
-              if (ext === '.pdf') return 'application/pdf';
-              if (ext === '.gif') return 'image/gif';
-              if (ext === '.webp') return 'image/webp';
-              return 'image/jpeg';
-            };
-            
-            for (const mapping of docMappings) {
-              if (!mapping.url) continue;
-              
-              let finalUrl = mapping.url;
-              
-              // If not already a Supabase Storage URL, try to upload
-              if (!mapping.url.includes('supabase.co/storage/')) {
-                const urlPath = mapping.url.replace(/^https?:\/\/[^/]+/, '');
-                const localPath = urlPath.startsWith('/') ? urlPath.substring(1) : urlPath;
-                
-                if (fs.existsSync(localPath)) {
-                  const fileBuffer = fs.readFileSync(localPath);
-                  const ext = path.extname(localPath) || '.jpeg';
-                  const storagePath = `${driverId}/${mapping.storageName}${ext}`;
-                  
-                  const { error: uploadErr } = await supabaseAdmin.storage
-                    .from(BUCKET)
-                    .upload(storagePath, fileBuffer, {
-                      contentType: getContentType(localPath),
-                      upsert: true
-                    });
-                  
-                  if (!uploadErr) {
-                    const { data: urlData } = supabaseAdmin.storage
-                      .from(BUCKET)
-                      .getPublicUrl(storagePath);
-                    
-                    finalUrl = urlData.publicUrl;
-                    updateData[mapping.dbColumn] = finalUrl;
-                    console.log(`[Drivers] Uploaded ${mapping.storageName} to Supabase Storage`);
-                  } else {
-                    console.error(`[Drivers] Failed to upload ${mapping.storageName}:`, uploadErr.message);
-                  }
-                }
-              }
-              
-              // Always ensure a driver_documents record exists for document types
-              if (mapping.docType) {
-                // Upsert: delete existing record for this doc_type, then insert
-                await supabaseAdmin
-                  .from('driver_documents')
-                  .delete()
-                  .eq('driver_id', driverId)
-                  .eq('doc_type', mapping.docType);
-                
-                const { error: insertErr } = await supabaseAdmin
-                  .from('driver_documents')
-                  .insert({
-                    driver_id: driverId,
-                    doc_type: mapping.docType,
-                    file_url: finalUrl,
-                    status: 'approved',
-                    uploaded_at: new Date().toISOString(),
-                  });
-                
-                if (insertErr) {
-                  console.error(`[Drivers] Failed to create driver_documents record for ${mapping.docType}:`, insertErr.message);
-                } else {
-                  console.log(`[Drivers] Ensured driver_documents record for ${mapping.docType}`);
-                }
-              }
-            }
-            
-            // Update drivers table with new Supabase Storage URLs
-            if (Object.keys(updateData).length > 0) {
-              await supabaseAdmin
-                .from('drivers')
-                .update(updateData)
-                .eq('id', driverId);
-              console.log(`[Drivers] Updated ${Object.keys(updateData).length} document URLs to Supabase Storage for driver ${driverId}`);
-            }
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            await supabaseAdmin.from('drivers')
+              .update(updateData)
+              .eq('id', driverId);
+            console.log(`[Drivers] Updated ${Object.keys(updateData).length} document URLs for driver ${driverId}`);
           }
         }
       } catch (docMigrationErr: any) {
@@ -4234,7 +4211,7 @@ export async function registerRoutes(
     const BUCKET = 'driver-documents';
     const storagePath = isPendingApplication
       ? `applications/pending/${finalFilename}`
-      : `applications/${safeDriverId}/${finalFilename}`;
+      : `${safeDriverId}/${finalFilename}`;
 
     const extLower = ext.toLowerCase();
     const mimeMap: Record<string, string> = {
@@ -4272,7 +4249,7 @@ export async function registerRoutes(
       }
     }
 
-    fileUrl = localUrl;
+    fileUrl = `/api/uploads/documents/${safeDriverId}/${finalFilename}`;
     if (!supabaseUploadSuccess) {
       console.warn(`[Documents] WARNING: Supabase upload failed after ${maxRetries} attempts. Using local storage only: ${fileUrl}`);
     }
@@ -4400,6 +4377,29 @@ export async function registerRoutes(
       }
     } catch (e) {
       console.error("Failed to sync document to PostgreSQL:", e);
+    }
+
+    // Always ensure driver_documents record exists in Supabase for non-pending uploads
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin && supabaseUploadSuccess) {
+        await supabaseAdmin.from('driver_documents')
+          .delete()
+          .eq('driver_id', rawDriverId)
+          .eq('doc_type', rawDocumentType);
+
+        await supabaseAdmin.from('driver_documents')
+          .insert({
+            driver_id: rawDriverId,
+            doc_type: rawDocumentType,
+            file_url: fileUrl,
+            status: 'pending',
+            uploaded_at: new Date().toISOString(),
+          });
+        console.log(`[Documents] Created driver_documents record for ${rawDocumentType}`);
+      }
+    } catch (e) {
+      console.error('[Documents] Failed to create driver_documents record:', e);
     }
 
     // Get driver name for email notification
@@ -10111,6 +10111,113 @@ export async function registerRoutes(
     
     console.log(`[Admin] Force verified driver ${driver.driverCode || driverId}`);
     res.json({ success: true, driver });
+  }));
+
+  app.post("/api/admin/backfill-driver-documents", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
+
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not available" });
+
+    const results: any[] = [];
+
+    const { data: drivers } = await supabaseAdmin.from('drivers').select('*');
+    const { data: applications } = await supabaseAdmin.from('driver_applications').select('*');
+
+    if (!drivers) return res.json({ message: "No drivers found", results: [] });
+
+    for (const driver of drivers) {
+      const { count } = await supabaseAdmin.from('driver_documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('driver_id', driver.id);
+
+      const app = applications?.find((a: any) => a.email === driver.email);
+
+      const docMappings = [
+        { docType: 'driving_licence_front', url: driver.driving_licence_front_url || app?.driving_licence_front_url },
+        { docType: 'driving_licence_back', url: driver.driving_licence_back_url || app?.driving_licence_back_url },
+        { docType: 'dbs_certificate', url: driver.dbs_certificate_url || app?.dbs_certificate_url },
+        { docType: 'goods_in_transit', url: driver.goods_in_transit_insurance_url || app?.goods_in_transit_insurance_url },
+        { docType: 'hire_and_reward', url: driver.hire_reward_insurance_url || app?.hire_and_reward_url },
+        { docType: 'profile_picture', url: driver.profile_picture_url || app?.profile_picture_url },
+      ];
+
+      let migrated = 0;
+      let skipped = 0;
+
+      for (const mapping of docMappings) {
+        if (!mapping.url) { skipped++; continue; }
+
+        const { data: existing } = await supabaseAdmin.from('driver_documents')
+          .select('id')
+          .eq('driver_id', driver.id)
+          .eq('doc_type', mapping.docType)
+          .maybeSingle();
+
+        if (existing) { skipped++; continue; }
+
+        const newUrl = await copyApplicationFileToDriver(mapping.url, driver.id, supabaseAdmin);
+        const finalUrl = newUrl || normalizeDocumentUrl(mapping.url) || mapping.url;
+
+        await supabaseAdmin.from('driver_documents').insert({
+          driver_id: driver.id,
+          doc_type: mapping.docType,
+          file_url: finalUrl,
+          status: driver.status === 'approved' ? 'approved' : 'pending',
+          uploaded_at: new Date().toISOString(),
+        });
+        migrated++;
+      }
+
+      if (driver.right_to_work_share_code) {
+        const { data: existing } = await supabaseAdmin.from('driver_documents')
+          .select('id').eq('driver_id', driver.id).eq('doc_type', 'share_code').maybeSingle();
+        if (!existing) {
+          await supabaseAdmin.from('driver_documents').insert({
+            driver_id: driver.id,
+            doc_type: 'share_code',
+            file_url: `text:${driver.right_to_work_share_code}`,
+            status: 'approved',
+            uploaded_at: new Date().toISOString(),
+          });
+          migrated++;
+        }
+      }
+
+      const BUCKET = 'driver-documents';
+      const vehicleLabels = ['front', 'back', 'left', 'right', 'load_space'];
+      for (const label of vehicleLabels) {
+        const docType = `vehicle_photos_${label}`;
+        const { data: existing } = await supabaseAdmin.from('driver_documents')
+          .select('id').eq('driver_id', driver.id).eq('doc_type', docType).maybeSingle();
+        if (existing) continue;
+
+        try {
+          const { data: files } = await supabaseAdmin.storage.from(BUCKET).list(driver.id, { limit: 200 });
+          if (files) {
+            const match = files.find((f: any) => {
+              const base = f.name.replace(/\.[^.]+$/, '').replace(/_\d{10,}$/, '').toLowerCase();
+              return base === `vehicle_photos_${label}` || base === `vehicle_photo_${label}` || base.startsWith(`vehicle_photos_${label}_`);
+            });
+            if (match) {
+              await supabaseAdmin.from('driver_documents').insert({
+                driver_id: driver.id,
+                doc_type: docType,
+                file_url: `/api/uploads/documents/${driver.id}/${match.name}`,
+                status: driver.status === 'approved' ? 'approved' : 'pending',
+                uploaded_at: new Date().toISOString(),
+              });
+              migrated++;
+            }
+          }
+        } catch {}
+      }
+
+      results.push({ driverId: driver.id, email: driver.email, migrated, skipped, existingDocs: count || 0 });
+    }
+
+    console.log(`[Admin] Backfill driver documents complete: ${results.length} drivers processed`);
+    res.json({ message: "Backfill complete", results });
   }));
 
   return httpServer;

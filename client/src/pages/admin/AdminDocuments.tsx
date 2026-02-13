@@ -101,6 +101,48 @@ export default function AdminDocuments() {
     return driverId.length > 20 ? `Driver: ${driverId.substring(0, 8)}...` : `Driver: ${driverId}`;
   };
 
+  const getDocTypeName = (type: string) => {
+    const names: Record<string, string> = {
+      id_passport: 'ID / Passport',
+      driving_licence: 'Driving Licence',
+      driving_license: 'Driving Licence',
+      driving_licence_front: 'Driving Licence (Front)',
+      driving_licence_back: 'Driving Licence (Back)',
+      driving_license_front: 'Driving Licence (Front)',
+      driving_license_back: 'Driving Licence (Back)',
+      drivingLicenceFront: 'Driving Licence (Front)',
+      drivingLicenceBack: 'Driving Licence (Back)',
+      right_to_work: 'Right to Work',
+      share_code: 'Right to Work Share Code',
+      vehicle_photo: 'Vehicle Photo',
+      vehicle_photo_front: 'Vehicle Photo (Front)',
+      vehicle_photo_back: 'Vehicle Photo (Back)',
+      vehicle_photo_left: 'Vehicle Photo (Left)',
+      vehicle_photo_right: 'Vehicle Photo (Right)',
+      vehicle_photo_load_space: 'Vehicle Photo (Load Space)',
+      vehicle_photos_front: 'Vehicle Photo (Front)',
+      vehicle_photos_back: 'Vehicle Photo (Back)',
+      vehicle_photos_left: 'Vehicle Photo (Left)',
+      vehicle_photos_right: 'Vehicle Photo (Right)',
+      vehicle_photos_load: 'Vehicle Photo (Load Space)',
+      insurance: 'Insurance',
+      goods_in_transit: 'Goods in Transit Insurance',
+      goods_in_transit_insurance: 'Goods in Transit Insurance',
+      goodsInTransitInsurance: 'Goods in Transit Insurance',
+      hire_reward: 'Hire & Reward Insurance',
+      hire_and_reward: 'Hire & Reward Insurance',
+      hire_and_reward_insurance: 'Hire & Reward Insurance',
+      hireAndReward: 'Hire & Reward Insurance',
+      proof_of_identity: 'Proof of Identity',
+      proof_of_address: 'Proof of Address',
+      profile_picture: 'Profile Picture',
+      profilePicture: 'Profile Picture',
+      dbs_certificate: 'DBS Certificate',
+      dbsCertificate: 'DBS Certificate',
+    };
+    return names[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
@@ -166,7 +208,7 @@ export default function AdminDocuments() {
                     {pendingDocs.map((doc) => (
                       <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
                         <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
-                        <TableCell className="capitalize">{doc.type.replace(/_/g, ' ')}</TableCell>
+                        <TableCell>{getDocTypeName(doc.type)}</TableCell>
                         <TableCell className="text-sm">{doc.fileName}</TableCell>
                         <TableCell>{getStatusBadge(doc.status)}</TableCell>
                         <TableCell>
@@ -245,7 +287,7 @@ export default function AdminDocuments() {
                     {approvedDocs.map((doc) => (
                       <TableRow key={doc.id} data-testid={`row-approved-document-${doc.id}`}>
                         <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
-                        <TableCell className="capitalize">{doc.type.replace(/_/g, ' ')}</TableCell>
+                        <TableCell>{getDocTypeName(doc.type)}</TableCell>
                         <TableCell className="text-sm">{doc.fileName}</TableCell>
                         <TableCell>{getStatusBadge(doc.status)}</TableCell>
                         <TableCell>
@@ -298,7 +340,7 @@ export default function AdminDocuments() {
                 <div className="border-b border-border pb-4">
                   <div className="space-y-2">
                     <div><strong>Driver:</strong> {getDriverName(selectedDoc.driverId)}</div>
-                    <div><strong>Type:</strong> {selectedDoc.type.replace(/_/g, ' ')}</div>
+                    <div><strong>Type:</strong> {getDocTypeName(selectedDoc.type)}</div>
                     <div><strong>File:</strong> {selectedDoc.fileName}</div>
                   </div>
                 </div>
