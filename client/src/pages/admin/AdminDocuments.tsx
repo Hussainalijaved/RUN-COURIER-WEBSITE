@@ -34,8 +34,45 @@ export default function AdminDocuments() {
   const queryClient = useQueryClient();
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   useRealtimeDocuments();
+
+  useEffect(() => {
+    if (!selectedDoc || !viewDialogOpen) {
+      setPreviewUrl(null);
+      setPreviewError(null);
+      return;
+    }
+    
+    const fetchSignedUrl = async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        const response = await fetch(`/api/documents/${selectedDoc.id}/signed-url`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.isText) {
+            setPreviewUrl(null);
+          } else {
+            setPreviewUrl(data.signedUrl);
+          }
+        } else {
+          setPreviewUrl(normalizeDocUrl(selectedDoc.fileUrl));
+        }
+      } catch (err) {
+        console.error('Failed to get signed URL:', err);
+        setPreviewUrl(normalizeDocUrl(selectedDoc.fileUrl));
+        setPreviewError('Could not load document preview. The file may be missing or inaccessible.');
+      } finally {
+        setPreviewLoading(false);
+      }
+    };
+    
+    fetchSignedUrl();
+  }, [selectedDoc, viewDialogOpen]);
 
   const { data: documents, isLoading: docsLoading, isError: docsError, refetch: refetchDocs } = useQuery<Document[]>({
     queryKey: ['/api/documents'],
@@ -345,44 +382,52 @@ export default function AdminDocuments() {
                   </div>
                 </div>
                 <div>
-                  {(() => {
-                    const docUrl = normalizeDocUrl(selectedDoc.fileUrl);
-                    if (docUrl.toLowerCase().endsWith('.pdf')) {
-                      return (
-                        <iframe
-                          src={docUrl}
-                          className="w-full h-96 border rounded"
-                          title="Document Preview"
-                          data-testid="iframe-document-preview"
-                        />
-                      );
-                    } else if (docUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-                      return (
-                        <img
-                          src={docUrl}
-                          alt="Document Preview"
-                          className="max-w-full h-auto max-h-96 rounded border"
-                          data-testid="img-document-preview"
-                        />
-                      );
-                    } else {
-                      return (
-                        <div className="flex flex-col items-center justify-center h-48 bg-muted rounded">
-                          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                          <p className="text-muted-foreground">Preview not available for this file type</p>
-                          <a
-                            href={docUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-4 text-primary hover:underline"
-                            data-testid="link-document-open"
-                          >
-                            Open in new tab
-                          </a>
-                        </div>
-                      );
-                    }
-                  })()}
+                  {previewLoading ? (
+                    <div className="flex items-center justify-center h-64">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : previewError ? (
+                    <div className="flex items-center justify-center h-64 text-muted-foreground">
+                      <div className="text-center">
+                        <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>{previewError}</p>
+                      </div>
+                    </div>
+                  ) : previewUrl ? (
+                    (() => {
+                      if (previewUrl.toLowerCase().match(/\.pdf/i) || (selectedDoc.fileName || '').toLowerCase().endsWith('.pdf')) {
+                        return (
+                          <iframe
+                            src={previewUrl}
+                            className="w-full h-96 border rounded"
+                            title="Document Preview"
+                            data-testid="iframe-document-preview"
+                          />
+                        );
+                      } else {
+                        return (
+                          <img
+                            src={previewUrl}
+                            alt={selectedDoc.fileName || 'Document'}
+                            className="max-w-full max-h-96 mx-auto rounded"
+                            data-testid="img-document-preview"
+                            onError={(e) => {
+                              setPreviewError('Failed to load image. The file may be missing or inaccessible.');
+                            }}
+                          />
+                        );
+                      }
+                    })()
+                  ) : selectedDoc.fileUrl?.startsWith('text:') ? (
+                    <div className="p-4 bg-muted rounded text-center">
+                      <p className="font-mono text-lg">{selectedDoc.fileUrl.replace('text:', '')}</p>
+                      <p className="text-sm text-muted-foreground mt-2">Text/Code Value</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 text-muted-foreground">
+                      <p>No preview available</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

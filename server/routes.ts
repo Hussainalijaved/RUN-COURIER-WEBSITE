@@ -255,6 +255,17 @@ function normalizeDocumentUrl(url: string | null | undefined): string | null | u
   return url;
 }
 
+function extractStoragePath(fileUrl: string): string | null {
+  if (!fileUrl) return null;
+  const supabaseMatch = fileUrl.match(/\/storage\/v1\/object\/(?:public\/)?(?:driver-documents|DRIVER-DOCUMENTS)\/(.+?)(?:\?.*)?$/i);
+  if (supabaseMatch) return decodeURIComponent(supabaseMatch[1]);
+  const proxyMatch = fileUrl.match(/^\/api\/uploads\/documents\/(.+)$/);
+  if (proxyMatch) return proxyMatch[1];
+  const uploadsMatch = fileUrl.match(/^\/uploads\/documents\/(.+)$/);
+  if (uploadsMatch) return uploadsMatch[1];
+  return null;
+}
+
 async function copyApplicationFileToDriver(
   originalUrl: string,
   driverUUID: string,
@@ -4024,13 +4035,18 @@ export async function registerRoutes(
               allDocuments.push({
                 id: doc.id,
                 driverId: doc.driver_id,
+                authUserId: doc.auth_user_id || doc.driver_id,
                 type: doc.doc_type || doc.document_type || doc.type || 'unknown',
-                fileName: fileUrl.split('/').pop() || 'document',
+                fileName: doc.file_name || fileUrl.split('/').pop() || 'document',
                 fileUrl: fileUrl,
+                storagePath: doc.storage_path || null,
+                bucket: doc.bucket || 'driver-documents',
+                mimeType: doc.mime_type || null,
+                sizeBytes: doc.size_bytes || null,
                 status: doc.status || 'pending',
                 expiryDate: doc.expiry_date ? new Date(doc.expiry_date) : null,
                 reviewedBy: doc.reviewed_by,
-                reviewNotes: doc.review_notes,
+                reviewNotes: doc.review_notes || doc.admin_notes || null,
                 uploadedAt: doc.uploaded_at ? new Date(doc.uploaded_at) : (doc.updated_at ? new Date(doc.updated_at) : null),
                 reviewedAt: doc.reviewed_at ? new Date(doc.reviewed_at) : (doc.updated_at ? new Date(doc.updated_at) : null),
               });
@@ -4379,24 +4395,38 @@ export async function registerRoutes(
       console.error("Failed to sync document to PostgreSQL:", e);
     }
 
-    // Always ensure driver_documents record exists in Supabase for non-pending uploads
+    // Always ensure driver_documents record exists in Supabase with storage_path
     try {
       const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (supabaseAdmin && supabaseUploadSuccess) {
+      if (supabaseAdmin) {
+        const docRecord: any = {
+          driver_id: rawDriverId,
+          auth_user_id: rawDriverId,
+          doc_type: safeDocumentType,
+          file_url: fileUrl,
+          bucket: 'driver-documents',
+          storage_path: storagePath,
+          file_name: file.originalname,
+          mime_type: contentType,
+          size_bytes: fileBuffer.length,
+          status: 'pending',
+          uploaded_at: new Date().toISOString(),
+        };
+        
+        // Delete existing then insert (upsert on auth_user_id, doc_type)
         await supabaseAdmin.from('driver_documents')
           .delete()
           .eq('driver_id', rawDriverId)
-          .eq('doc_type', rawDocumentType);
+          .eq('doc_type', safeDocumentType);
 
-        await supabaseAdmin.from('driver_documents')
-          .insert({
-            driver_id: rawDriverId,
-            doc_type: rawDocumentType,
-            file_url: fileUrl,
-            status: 'pending',
-            uploaded_at: new Date().toISOString(),
-          });
-        console.log(`[Documents] Created driver_documents record for ${rawDocumentType}`);
+        const { error: insertErr } = await supabaseAdmin.from('driver_documents')
+          .insert(docRecord);
+          
+        if (insertErr) {
+          console.error('[Documents] Failed to upsert driver_documents:', insertErr);
+        } else {
+          console.log(`[Documents] Created driver_documents record with storage_path: ${storagePath}`);
+        }
       }
     } catch (e) {
       console.error('[Documents] Failed to create driver_documents record:', e);
@@ -4850,6 +4880,71 @@ export async function registerRoutes(
     }
     
     res.json(document);
+  }));
+
+  app.get("/api/documents/:id/signed-url", asyncHandler(async (req, res) => {
+    const docId = req.params.id;
+    
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) {
+        return res.status(500).json({ error: "Storage service unavailable" });
+      }
+      
+      const { data: doc, error } = await supabaseAdmin
+        .from('driver_documents')
+        .select('*')
+        .eq('id', docId)
+        .single();
+      
+      if (error || !doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      const fileUrl = doc.file_url || '';
+      
+      if (fileUrl.startsWith('text:')) {
+        return res.json({ signedUrl: fileUrl, expiresIn: 0, isText: true });
+      }
+      
+      if (doc.storage_path && doc.bucket) {
+        try {
+          const { data: signedData, error: signError } = await supabaseAdmin.storage
+            .from(doc.bucket)
+            .createSignedUrl(doc.storage_path, 600);
+          
+          if (!signError && signedData?.signedUrl) {
+            return res.json({ signedUrl: signedData.signedUrl, expiresIn: 600 });
+          }
+          console.error(`[Documents] Signed URL failed for ${doc.storage_path}:`, signError?.message);
+        } catch (signErr) {
+          console.error(`[Documents] Signed URL error:`, signErr);
+        }
+      }
+      
+      const storagePath = extractStoragePath(fileUrl);
+      if (storagePath) {
+        const buckets = [doc.bucket || 'driver-documents', 'DRIVER-DOCUMENTS'];
+        for (const bucket of buckets) {
+          try {
+            const { data: signedData, error: signError } = await supabaseAdmin.storage
+              .from(bucket)
+              .createSignedUrl(storagePath, 600);
+            
+            if (!signError && signedData?.signedUrl) {
+              return res.json({ signedUrl: signedData.signedUrl, expiresIn: 600 });
+            }
+          } catch (_) {}
+        }
+      }
+      
+      const normalizedUrl = normalizeDocumentUrl(fileUrl);
+      return res.json({ signedUrl: normalizedUrl || fileUrl, expiresIn: 0, fallback: true });
+      
+    } catch (e) {
+      console.error('[Documents] Signed URL endpoint error:', e);
+      return res.status(500).json({ error: "Failed to generate signed URL" });
+    }
   }));
 
   app.get("/api/pricing", asyncHandler(async (req, res) => {
@@ -6412,11 +6507,15 @@ export async function registerRoutes(
               .map(d => {
                 const docStatus = documentStatuses?.[d.field] || 'pending';
                 const normalizedUrl = normalizeDocumentUrl(d.url);
+                const derivedStoragePath = extractStoragePath(normalizedUrl || d.url || '');
                 return {
                   driver_id: driver.id,
-                  type: d.type,
+                  auth_user_id: driver.id,
+                  doc_type: d.type,
                   file_name: d.url!.split('/').pop() || d.type,
                   file_url: normalizedUrl || d.url,
+                  storage_path: derivedStoragePath,
+                  bucket: 'driver-documents',
                   status: docStatus,
                   uploaded_at: new Date().toISOString(),
                   reviewed_at: new Date().toISOString(),
@@ -6427,7 +6526,7 @@ export async function registerRoutes(
             if (docRecords.length > 0) {
               const { error: docError } = await supabaseAdmin
                 .from('driver_documents')
-                .upsert(docRecords, { onConflict: 'driver_id,type', ignoreDuplicates: false });
+                .upsert(docRecords, { onConflict: 'auth_user_id,doc_type', ignoreDuplicates: false });
 
               if (docError) {
                 console.error('[Driver Application] Failed to create document records:', docError);
