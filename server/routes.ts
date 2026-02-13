@@ -483,6 +483,28 @@ export async function registerRoutes(
     res.json({ status: "ok", mode, timestamp: new Date().toISOString() });
   });
 
+  app.get("/api/debug/supabase-files", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.json({ error: 'No supabase' });
+    const allFiles: string[] = [];
+    const dirs = ['applications/pending'];
+    const { data: appDirs } = await supabaseAdmin.storage.from('driver-documents').list('applications', { limit: 200 });
+    if (appDirs) {
+      for (const d of appDirs) {
+        if (d.id && d.name !== '.emptyFolderPlaceholder') dirs.push(`applications/${d.name}`);
+      }
+    }
+    for (const dir of dirs) {
+      const { data: files } = await supabaseAdmin.storage.from('driver-documents').list(dir, { limit: 500 });
+      if (files) {
+        for (const f of files) {
+          if (f.name && f.name !== '.emptyFolderPlaceholder') allFiles.push(`${dir}/${f.name}`);
+        }
+      }
+    }
+    res.json({ totalFiles: allFiles.length, files: allFiles });
+  }));
+
 
   // Diagnostic endpoint to check job assignment state (admin only)
   app.get("/api/debug/job-assignment/:jobId", asyncHandler(async (req, res) => {
@@ -4109,10 +4131,6 @@ export async function registerRoutes(
             .upload(storagePath, fileBuffer, { contentType, upsert: true });
 
           if (!uploadErr) {
-            const { data: urlData } = supabaseAdmin.storage
-              .from(BUCKET)
-              .getPublicUrl(storagePath);
-            fileUrl = urlData.publicUrl;
             supabaseUploadSuccess = true;
             console.log(`[Documents] Uploaded to Supabase Storage: ${storagePath} (attempt ${attempt})`);
             break;
@@ -4131,8 +4149,8 @@ export async function registerRoutes(
       }
     }
 
+    fileUrl = localUrl;
     if (!supabaseUploadSuccess) {
-      fileUrl = localUrl;
       console.warn(`[Documents] WARNING: Supabase upload failed after ${maxRetries} attempts. Using local storage only: ${fileUrl}`);
     }
 
@@ -5447,8 +5465,14 @@ export async function registerRoutes(
     const resolved = { ...app };
     for (const field of docUrlFields) {
       const url = resolved[field];
-      if (url && typeof url === 'string' && url.startsWith('/uploads/')) {
+      if (!url || typeof url !== 'string') continue;
+      if (url.startsWith('/uploads/')) {
         resolved[field] = '/api' + url;
+      } else if (url.includes('supabase.co/storage/v1/object/public/driver-documents/')) {
+        const storagePath = url.split('/driver-documents/')[1];
+        if (storagePath) {
+          resolved[field] = `/api/uploads/documents/${storagePath}`;
+        }
       }
     }
     return resolved;
@@ -5720,6 +5744,7 @@ export async function registerRoutes(
     const possiblePaths = [
       `applications/pending/${fileName}`,
       `applications/${filePath.replace('documents/', '')}`,
+      filePath.replace('documents/', ''),
       filePath,
     ];
 
