@@ -1,0 +1,86 @@
+You are a senior Supabase engineer. Implement this with ZERO Replit filesystem usage.
+
+NON-NEGOTIABLE RULES
+1) Do not save ANY documents on Replit disk/server folders.
+2) Do not use /api/uploads or any local upload route for storage.
+3) All documents must be stored ONLY in Supabase Storage.
+4) All document references must be stored ONLY in Supabase Postgres tables.
+5) Website + Mobile must show the same documents without re-upload.
+6) Admin must be able to review any driver document at any time (before and after approval).
+
+CURRENT BUG
+Blue document links open URLs like:
+.../api/uploads/documents/application-pending/filename.jpg
+and return {"error":"File not found"}.
+This proves documents are tied to Replit local uploads. Remove this completely.
+
+IMPLEMENTATION REQUIREMENTS
+
+A) Supabase Storage
+- Create bucket: driver-documents (PRIVATE)
+- Upload path must be stable (based on auth user id, not application status):
+  drivers/{auth_user_id}/{doc_type}/{timestamp}_{originalFilename}
+
+B) Database (single source of truth)
+Create table driver_documents (or refactor existing) with:
+- id uuid PK default gen_random_uuid()
+- auth_user_id uuid NOT NULL
+- doc_type text NOT NULL (profile_picture, driving_licence_front, driving_licence_back, insurance, v5, proof_of_address, rtw, bank_doc, etc.)
+- bucket text NOT NULL default 'driver-documents'
+- storage_path text NOT NULL   (FULL path in the bucket)
+- file_name text
+- mime_type text
+- size_bytes bigint
+- uploaded_at timestamptz default now()
+- status text default 'pending' (pending/approved/rejected)
+- admin_notes text
+Unique constraint: (auth_user_id, doc_type)
+
+IMPORTANT:
+- Never store signed URLs in DB.
+- Never store only file_name without storage_path.
+
+C) Upload logic (Web + Mobile)
+For each document upload:
+1) Upload file directly to Supabase Storage bucket driver-documents using the stable path.
+2) Upsert into driver_documents (auth_user_id + doc_type):
+   update storage_path + metadata and set status='pending'
+
+D) Preview / Blue links fix (Admin + Driver)
+Replace all existing preview logic that opens /api/uploads URLs.
+Instead:
+- Fetch bucket + storage_path from driver_documents.
+- Create signed URL at runtime:
+  supabase.storage.from(bucket).createSignedUrl(storage_path, 600)
+- Use returned signedUrl for <img> or download link.
+- If createSignedUrl fails, show the exact error and log it.
+
+E) Approval must not break anything
+When admin approves a driver:
+- ONLY update drivers.status='approved'
+- DO NOT create a new driver id that breaks document linkage.
+- DO NOT move documents into different folders (no application-pending/application-approved paths).
+Documents remain linked by auth_user_id forever.
+
+F) RLS / Security
+- driver_documents: drivers can select/insert/update their own rows (auth_user_id = auth.uid()).
+- admin can select/update all rows.
+- bucket private; use signed URLs for viewing.
+If needed, implement an Edge Function:
+- adminCreateSignedUrl(storage_path) -> checks admin role -> returns signed url.
+
+G) Migration
+- Remove and delete any code or routes that store files locally on Replit.
+- If old docs were stored only on Replit, they may be unrecoverable; in that case show “Missing – please re-upload once”.
+- After re-upload, it must persist forever in Supabase.
+
+DELIVERABLES
+1) SQL migration for driver_documents + indexes + constraints
+2) RLS policies SQL for driver_documents
+3) Updated upload code (web + mobile) storing in Supabase Storage only
+4) Updated admin preview/download logic using createSignedUrl
+5) Updated approval logic (no data loss, no id mismatch)
+6) Test plan:
+   - upload -> logout/login -> still visible
+   - approve -> admin can still preview
+   - mobile login -> same docs visible without reupload

@@ -328,7 +328,7 @@ async function copyApplicationFileToDriver(
     }
 
     console.log(`[FileCopy] Copied ${sourcePath} -> ${destPath}`);
-    return `/api/uploads/documents/${destPath}`;
+    return destPath;
   } catch (err) {
     console.error(`[FileCopy] Error copying file:`, err);
     return normalized;
@@ -337,28 +337,13 @@ async function copyApplicationFileToDriver(
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
 const tempUploadsDir = path.join(process.cwd(), 'uploads', 'temp');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-if (!fs.existsSync(tempUploadsDir)) {
-  fs.mkdirSync(tempUploadsDir, { recursive: true });
-}
+// Local filesystem storage removed - all documents stored in Supabase Storage only
 
 function sanitizePath(input: string): string {
   return input.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
 }
 
-const documentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, tempUploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
-    cb(null, `temp_${timestamp}_${random}${ext}`);
-  }
-});
+const documentStorage = multer.memoryStorage();
 
 const uploadDocument = multer({
   storage: documentStorage,
@@ -2342,62 +2327,44 @@ export async function registerRoutes(
       return res.status(400).json({ error: "No file uploaded" });
     }
     
-    const podDir = path.join(process.cwd(), 'uploads', 'pod', String(jobId));
-    if (!fs.existsSync(podDir)) {
-      fs.mkdirSync(podDir, { recursive: true });
-    }
-    
     const timestamp = Date.now();
     const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `pod_${timestamp}${ext}`;
-    const finalPath = path.join(podDir, finalFilename);
-    
-    const fileBuffer = fs.readFileSync(req.file.path);
-    fs.writeFileSync(finalPath, fileBuffer);
-    
-    const localUrl = `/uploads/pod/${jobId}/${finalFilename}`;
-    let fileUrl = localUrl;
-    
-    if (supabaseAdmin) {
-      const BUCKET = 'driver-documents';
-      const storagePath = `pod/${jobId}/${finalFilename}`;
-      const contentType = req.file.mimetype || 'image/jpeg';
-      
-      let uploaded = false;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-            .from(BUCKET)
-            .upload(storagePath, fileBuffer, {
-              contentType,
-              upsert: true,
-            });
-          
-          if (!uploadError && uploadData) {
-            const { data: publicUrlData } = supabaseAdmin.storage
-              .from(BUCKET)
-              .getPublicUrl(storagePath);
-            
-            if (publicUrlData?.publicUrl) {
-              fileUrl = publicUrlData.publicUrl;
-              uploaded = true;
-              console.log(`[POD Upload] Uploaded to Supabase Storage: ${fileUrl}`);
-            }
-            break;
-          } else {
-            console.warn(`[POD Upload] Supabase upload attempt ${attempt}/3 failed:`, uploadError?.message);
-          }
-        } catch (err: any) {
-          console.warn(`[POD Upload] Supabase upload attempt ${attempt}/3 error:`, err.message);
+    const BUCKET = 'driver-documents';
+    const storagePath = `pod/${jobId}/${finalFilename}`;
+    const contentType = req.file.mimetype || 'image/jpeg';
+    const fileBuffer = req.file.buffer;
+
+    const { supabaseAdmin: supAdmin } = await import('./supabaseAdmin');
+    if (!supAdmin) {
+      return res.status(500).json({ error: "Storage service unavailable" });
+    }
+
+    let fileUrl = storagePath;
+    let uploaded = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const { error: uploadError } = await supAdmin.storage
+          .from(BUCKET)
+          .upload(storagePath, fileBuffer, { contentType, upsert: true });
+        
+        if (!uploadError) {
+          uploaded = true;
+          console.log(`[POD Upload] Uploaded to Supabase Storage: ${BUCKET}/${storagePath}`);
+          break;
+        } else {
+          console.warn(`[POD Upload] Supabase upload attempt ${attempt}/3 failed:`, uploadError.message);
         }
-        if (attempt < 3) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
+      } catch (err: any) {
+        console.warn(`[POD Upload] Supabase upload attempt ${attempt}/3 error:`, err.message);
       }
-      
-      if (!uploaded) {
-        console.warn(`[POD Upload] All Supabase upload attempts failed, using local URL: ${localUrl}`);
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
+    }
+    
+    if (!uploaded) {
+      return res.status(500).json({ error: "Failed to upload POD photo to storage" });
     }
     
     const existingPhotos = Array.isArray(job.podPhotos) ? [...job.podPhotos] : [];
@@ -2411,28 +2378,18 @@ export async function registerRoutes(
       existingPhotos
     );
     
-    if (supabaseAdmin) {
-      const { error: updateError } = await supabaseAdmin
-        .from('jobs')
-        .update({
-          pod_photo_url: fileUrl,
-          pod_photos: existingPhotos,
-        })
-        .eq('id', jobId);
-      
-      if (updateError) {
-        console.error('[POD Upload] Failed to sync POD to Supabase:', updateError);
-      } else {
-        console.log(`[POD Upload] POD photo uploaded for job ${jobId}: ${fileUrl} (${existingPhotos.length} total photos)`);
-      }
-    }
+    const { error: updateError } = await supAdmin
+      .from('jobs')
+      .update({
+        pod_photo_url: fileUrl,
+        pod_photos: existingPhotos,
+      })
+      .eq('id', jobId);
     
-    try {
-      if (req.file?.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-    } catch (cleanupErr) {
-      console.warn('[POD Upload] Failed to clean up temp file:', cleanupErr);
+    if (updateError) {
+      console.error('[POD Upload] Failed to sync POD to Supabase:', updateError);
+    } else {
+      console.log(`[POD Upload] POD photo uploaded for job ${jobId}: ${fileUrl} (${existingPhotos.length} total photos)`);
     }
     
     res.json({ 
@@ -3172,8 +3129,12 @@ export async function registerRoutes(
                           .eq('driver_id', driverId).eq('doc_type', `vehicle_photos_${label}`);
                         await supabaseAdmin.from('driver_documents').insert({
                           driver_id: driverId,
+                          auth_user_id: driverId,
                           doc_type: `vehicle_photos_${label}`,
-                          file_url: `/api/uploads/documents/${driverId}/vehicle_photos_${label}${ext}`,
+                          file_url: destPath,
+                          bucket: BUCKET,
+                          storage_path: destPath,
+                          file_name: file.name,
                           status: 'approved',
                           uploaded_at: new Date().toISOString(),
                         });
@@ -3187,8 +3148,12 @@ export async function registerRoutes(
                         .eq('driver_id', driverId).eq('doc_type', `vehicle_photos_${label}`);
                       await supabaseAdmin.from('driver_documents').insert({
                         driver_id: driverId,
+                        auth_user_id: driverId,
                         doc_type: `vehicle_photos_${label}`,
-                        file_url: `/api/uploads/documents/${driverId}/${file.name}`,
+                        file_url: `${driverId}/${file.name}`,
+                        bucket: BUCKET,
+                        storage_path: `${driverId}/${file.name}`,
+                        file_name: file.name,
                         status: 'approved',
                         uploaded_at: new Date().toISOString(),
                       });
@@ -4185,77 +4150,47 @@ export async function registerRoutes(
     }
 
     if (!rawDriverId) {
-      // Clean up temp file
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
       return res.status(400).json({ error: "Driver ID is required" });
     }
 
     if (!rawDocumentType) {
-      // Clean up temp file
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
       return res.status(400).json({ error: "Document type is required" });
     }
 
-    const safeDriverId = sanitizePath(rawDriverId);
     const safeDocumentType = sanitizePath(rawDocumentType);
-    
     const timestamp = Date.now();
     const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
-    const finalFilename = `${safeDocumentType}_${timestamp}${ext}`;
+    const safeOrigName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 80);
+    const finalFilename = `${safeDocumentType}_${timestamp}_${safeOrigName}`;
 
     const isPendingApplication = rawDriverId === 'application-pending';
-    let fileUrl = '';
-
-    const fileBuffer = fs.readFileSync(file.path);
-
-    const driverDir = path.join(uploadsDir, safeDriverId);
-    if (!fs.existsSync(driverDir)) {
-      fs.mkdirSync(driverDir, { recursive: true });
-    }
-    const finalPath = path.join(driverDir, finalFilename);
-    try {
-      fs.writeFileSync(finalPath, fileBuffer);
-    } catch (copyErr) {
-      console.error('[Documents] Local copy failed:', copyErr);
-    }
-    const localUrl = `/uploads/documents/${safeDriverId}/${finalFilename}`;
-
     const BUCKET = 'driver-documents';
     const storagePath = isPendingApplication
-      ? `applications/pending/${finalFilename}`
-      : `${safeDriverId}/${finalFilename}`;
+      ? `drivers/pending/${safeDocumentType}/${finalFilename}`
+      : `drivers/${rawDriverId}/${safeDocumentType}/${finalFilename}`;
 
-    const extLower = ext.toLowerCase();
-    const mimeMap: Record<string, string> = {
-      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-      '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
-    };
-    const contentType = mimeMap[extLower] || file.mimetype || 'application/octet-stream';
+    const contentType = file.mimetype || 'application/octet-stream';
+    const fileBuffer = file.buffer;
+
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Storage service unavailable" });
+    }
 
     let supabaseUploadSuccess = false;
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const { supabaseAdmin } = await import('./supabaseAdmin');
-        if (supabaseAdmin) {
-          const { error: uploadErr } = await supabaseAdmin.storage
-            .from(BUCKET)
-            .upload(storagePath, fileBuffer, { contentType, upsert: true });
+        const { error: uploadErr } = await supabaseAdmin.storage
+          .from(BUCKET)
+          .upload(storagePath, fileBuffer, { contentType, upsert: true });
 
-          if (!uploadErr) {
-            supabaseUploadSuccess = true;
-            console.log(`[Documents] Uploaded to Supabase Storage: ${storagePath} (attempt ${attempt})`);
-            break;
-          } else {
-            console.error(`[Documents] Supabase upload error (attempt ${attempt}/${maxRetries}):`, uploadErr.message);
-          }
-        } else {
-          console.error('[Documents] supabaseAdmin not available');
+        if (!uploadErr) {
+          supabaseUploadSuccess = true;
+          console.log(`[Documents] Uploaded to Supabase Storage: ${BUCKET}/${storagePath} (attempt ${attempt})`);
           break;
+        } else {
+          console.error(`[Documents] Supabase upload error (attempt ${attempt}/${maxRetries}):`, uploadErr.message);
         }
       } catch (supaErr) {
         console.error(`[Documents] Supabase upload failed (attempt ${attempt}/${maxRetries}):`, supaErr);
@@ -4265,48 +4200,71 @@ export async function registerRoutes(
       }
     }
 
-    fileUrl = `/api/uploads/documents/${safeDriverId}/${finalFilename}`;
     if (!supabaseUploadSuccess) {
-      console.warn(`[Documents] WARNING: Supabase upload failed after ${maxRetries} attempts. Using local storage only: ${fileUrl}`);
+      return res.status(500).json({ error: "Failed to upload document to storage. Please try again." });
     }
 
-    if (file.path && fs.existsSync(file.path)) {
-      try { fs.unlinkSync(file.path); } catch {}
-    }
-    
     if (isPendingApplication) {
       console.log(`[Documents] Uploaded document for pending application: ${safeDocumentType}`);
       return res.status(201).json({
         success: true,
-        fileUrl,
+        storagePath,
+        bucket: BUCKET,
         fileName: file.originalname,
         type: safeDocumentType,
         message: "Document uploaded successfully for application"
       });
     }
 
-    // Check for existing documents in both memory and database
+    // Upsert driver_documents record in Supabase
+    try {
+      const docRecord: any = {
+        driver_id: rawDriverId,
+        auth_user_id: rawDriverId,
+        doc_type: safeDocumentType,
+        file_url: storagePath,
+        bucket: BUCKET,
+        storage_path: storagePath,
+        file_name: file.originalname,
+        mime_type: contentType,
+        size_bytes: fileBuffer.length,
+        status: 'pending',
+        uploaded_at: new Date().toISOString(),
+      };
+
+      await supabaseAdmin.from('driver_documents')
+        .delete()
+        .eq('driver_id', rawDriverId)
+        .eq('doc_type', safeDocumentType);
+
+      const { error: insertErr } = await supabaseAdmin.from('driver_documents')
+        .insert(docRecord);
+
+      if (insertErr) {
+        console.error('[Documents] Failed to upsert driver_documents:', insertErr);
+      } else {
+        console.log(`[Documents] Created driver_documents record with storage_path: ${storagePath}`);
+      }
+    } catch (e) {
+      console.error('[Documents] Failed to create driver_documents record:', e);
+    }
+
+    // Check for existing documents in memory/database for backward compat
     let existingDocId: string | null = null;
-    
-    // First check in-memory storage
     const memoryDocs = await storage.getDocuments({ driverId: rawDriverId, type: rawDocumentType as any });
     if (memoryDocs && memoryDocs.length > 0) {
       existingDocId = memoryDocs[0].id;
     }
-    
-    // If not in memory, check database
     if (!existingDocId) {
       try {
         const { db } = await import("./db");
         const { documents: documentsTable } = await import("@shared/schema");
         const { eq, and } = await import("drizzle-orm");
-        
         const dbDocs = await db.select().from(documentsTable)
           .where(and(
             eq(documentsTable.driverId, rawDriverId),
             eq(documentsTable.type, rawDocumentType as any)
           ));
-        
         if (dbDocs && dbDocs.length > 0) {
           existingDocId = dbDocs[0].id;
         }
@@ -4314,16 +4272,15 @@ export async function registerRoutes(
         console.error("Failed to check existing documents in database:", e);
       }
     }
-    
+
     let document;
     const uploadedAt = new Date();
     const expiryDate = rawExpiryDate ? new Date(rawExpiryDate) : null;
-    
+
     if (existingDocId) {
-      // Update existing document in memory
       document = await storage.updateDocument(existingDocId, {
         fileName: file.originalname,
-        fileUrl,
+        fileUrl: storagePath,
         status: 'pending' as const,
         uploadedAt,
         expiryDate,
@@ -4331,18 +4288,15 @@ export async function registerRoutes(
         reviewNotes: null,
         reviewedAt: null,
       });
-      
-      // If not in memory, create in memory with existing ID
       if (!document) {
         document = await storage.createDocument({
           driverId: rawDriverId,
           type: safeDocumentType,
           fileName: file.originalname,
-          fileUrl,
+          fileUrl: storagePath,
           status: 'pending',
           expiryDate,
         });
-        // Override ID to match existing
         if (document) {
           (document as any).id = existingDocId;
         }
@@ -4352,107 +4306,61 @@ export async function registerRoutes(
         driverId: rawDriverId,
         type: safeDocumentType,
         fileName: file.originalname,
-        fileUrl,
+        fileUrl: storagePath,
         status: 'pending',
         expiryDate,
       });
     }
 
-    // Sync document to PostgreSQL database
-    try {
-      const { db } = await import("./db");
-      const { documents } = await import("@shared/schema");
-      
-      if (document) {
-        await db.insert(documents).values({
-          id: document.id,
-          driverId: document.driverId,
-          type: document.type,
-          fileName: document.fileName,
-          fileUrl: document.fileUrl,
-          status: document.status,
-          reviewedBy: document.reviewedBy,
-          reviewNotes: document.reviewNotes,
-          expiryDate: document.expiryDate,
-          uploadedAt: document.uploadedAt,
-          reviewedAt: document.reviewedAt,
-        }).onConflictDoUpdate({
-          target: documents.id,
-          set: {
-            fileName: document.fileName,
-            fileUrl: document.fileUrl,
-            status: document.status,
-            reviewedBy: document.reviewedBy,
-            reviewNotes: document.reviewNotes,
-            expiryDate: document.expiryDate,
-            uploadedAt: document.uploadedAt,
-            reviewedAt: document.reviewedAt,
-          }
-        });
-        console.log("Document successfully synced to PostgreSQL:", document.id);
-      }
-    } catch (e) {
-      console.error("Failed to sync document to PostgreSQL:", e);
-    }
-
-    // Always ensure driver_documents record exists in Supabase with storage_path
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (supabaseAdmin) {
-        const docRecord: any = {
-          driver_id: rawDriverId,
-          auth_user_id: rawDriverId,
-          doc_type: safeDocumentType,
-          file_url: fileUrl,
-          bucket: 'driver-documents',
-          storage_path: storagePath,
-          file_name: file.originalname,
-          mime_type: contentType,
-          size_bytes: fileBuffer.length,
-          status: 'pending',
-          uploaded_at: new Date().toISOString(),
-        };
-        
-        // Delete existing then insert (upsert on auth_user_id, doc_type)
-        await supabaseAdmin.from('driver_documents')
-          .delete()
-          .eq('driver_id', rawDriverId)
-          .eq('doc_type', safeDocumentType);
-
-        const { error: insertErr } = await supabaseAdmin.from('driver_documents')
-          .insert(docRecord);
-          
-        if (insertErr) {
-          console.error('[Documents] Failed to upsert driver_documents:', insertErr);
+    // Update in PostgreSQL if needed
+    if (document) {
+      try {
+        const { db } = await import("./db");
+        const { documents: documentsTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        const [existingPgDoc] = await db.select().from(documentsTable).where(eq(documentsTable.id, document.id));
+        if (existingPgDoc) {
+          await db.update(documentsTable).set({
+            fileName: file.originalname,
+            fileUrl: storagePath,
+            status: 'pending',
+            uploadedAt,
+            expiryDate,
+          }).where(eq(documentsTable.id, document.id));
         } else {
-          console.log(`[Documents] Created driver_documents record with storage_path: ${storagePath}`);
+          await db.insert(documentsTable).values({
+            id: document.id,
+            driverId: rawDriverId,
+            type: safeDocumentType,
+            fileName: file.originalname,
+            fileUrl: storagePath,
+            status: 'pending',
+            expiryDate,
+            uploadedAt,
+          });
         }
+      } catch (e) {
+        console.error('[Documents] Failed to sync document to PostgreSQL:', e);
       }
-    } catch (e) {
-      console.error('[Documents] Failed to create driver_documents record:', e);
     }
 
-    // Get driver name for email notification
+    // Get driver info for notification
     let driverName = rawDriverId;
     try {
       const driver = await storage.getDriver(rawDriverId);
-      if (driver?.fullName) {
-        driverName = driver.fullName;
-      } else if (driver?.email) {
-        driverName = driver.email;
-      }
-    } catch (e) {
-      console.error('Failed to get driver name for notification:', e);
-    }
-    
-    // Format document type for email
-    const formattedDocType = safeDocumentType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    
-    await sendDocumentUploadNotification(driverName, formattedDocType).catch(err => 
+      if (driver?.fullName) driverName = driver.fullName;
+    } catch {}
+
+    const formattedDocType = rawDocumentType
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (l: string) => l.toUpperCase())
+      .trim();
+
+    await sendDocumentUploadNotification(driverName, formattedDocType).catch(err =>
       console.error('Failed to send document upload notification:', err)
     );
 
-    // Broadcast real-time update to admin dashboard
     if (document) {
       broadcastDocumentPending({
         id: document.id,
@@ -4489,97 +4397,101 @@ export async function registerRoutes(
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Validate file is an image
     const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedImageTypes.includes(file.mimetype)) {
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
       return res.status(400).json({ error: "Only image files are allowed for profile pictures" });
     }
 
-    const safeDriverId = sanitizePath(driverId);
-    
-    // Create driver-specific directory
-    const driverDir = path.join(uploadsDir, safeDriverId);
-    if (!fs.existsSync(driverDir)) {
-      fs.mkdirSync(driverDir, { recursive: true });
-    }
-    
-    // Generate final filename
     const timestamp = Date.now();
     const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `profile_picture_${timestamp}${ext}`;
-    const finalPath = path.join(driverDir, finalFilename);
-    
-    // Move file from temp to final location
-    try {
-      fs.renameSync(file.path, finalPath);
-    } catch (moveError) {
-      fs.copyFileSync(file.path, finalPath);
-      fs.unlinkSync(file.path);
+    const BUCKET = 'driver-documents';
+    const storagePath = `drivers/${driverId}/profile_picture/${finalFilename}`;
+    const contentType = file.mimetype || 'image/jpeg';
+    const fileBuffer = file.buffer;
+
+    const { supabaseAdmin: supAdmin } = await import('./supabaseAdmin');
+    if (!supAdmin) {
+      return res.status(500).json({ error: "Storage service unavailable" });
     }
-    
-    // Use relative path for website internal storage
-    // Use full URL for Supabase (mobile app needs absolute URLs)
-    const relativePath = `/uploads/documents/${safeDriverId}/${finalFilename}`;
-    const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
-    const fullUrl = `${baseUrl}${relativePath}`;
-    // Website uses relative path, mobile gets full URL from Supabase
-    const profilePictureUrl = relativePath;
-    
-    console.log(`[Profile Picture] Relative: ${relativePath}, Full: ${fullUrl}`);
 
-    // Update driver profile with profile picture URL in storage
-    await storage.updateDriver(driverId, { profilePictureUrl });
+    const { error: uploadErr } = await supAdmin.storage
+      .from(BUCKET)
+      .upload(storagePath, fileBuffer, { contentType, upsert: true });
 
-    // Update driver in PostgreSQL database
+    if (uploadErr) {
+      console.error('[Profile Picture] Supabase upload failed:', uploadErr);
+      return res.status(500).json({ error: "Failed to upload profile picture" });
+    }
+
+    console.log(`[Profile Picture] Uploaded to Supabase: ${BUCKET}/${storagePath}`);
+
+    const { data: signedData } = await supAdmin.storage
+      .from(BUCKET)
+      .createSignedUrl(storagePath, 3600);
+    const signedUrl = signedData?.signedUrl || '';
+
+    try {
+      await supAdmin.from('driver_documents')
+        .delete()
+        .eq('driver_id', driverId)
+        .eq('doc_type', 'profile_picture');
+
+      await supAdmin.from('driver_documents')
+        .insert({
+          driver_id: driverId,
+          auth_user_id: driverId,
+          doc_type: 'profile_picture',
+          file_url: storagePath,
+          bucket: BUCKET,
+          storage_path: storagePath,
+          file_name: file.originalname,
+          mime_type: contentType,
+          size_bytes: fileBuffer.length,
+          status: 'approved',
+          uploaded_at: new Date().toISOString(),
+        });
+    } catch (e) {
+      console.error('[Profile Picture] Failed to upsert driver_documents:', e);
+    }
+
+    await storage.updateDriver(driverId, { profilePictureUrl: storagePath });
+
     try {
       const { db } = await import("./db");
       const { drivers } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
-      
       await db.update(drivers).set({
-        profilePictureUrl: profilePictureUrl,
+        profilePictureUrl: storagePath,
       }).where(eq(drivers.id, driverId));
-      console.log("Profile picture URL updated in PostgreSQL for driver:", driverId);
     } catch (e) {
       console.error("Failed to update profile picture in PostgreSQL:", e);
     }
 
-    // Update Supabase with FULL URL (mobile app needs absolute URLs)
     try {
-      if (supabaseAdmin) {
-        const { error: supabaseError, data: supabaseData } = await supabaseAdmin
-          .from('drivers')
-          .update({ 
-            profile_picture_url: fullUrl,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', driverId)
-          .select('profile_picture_url')
-          .single();
-        
-        if (supabaseError) {
-          console.error("[Profile Picture] Supabase update failed:", supabaseError);
-        } else {
-          console.log("[Profile Picture] Supabase updated successfully:", supabaseData?.profile_picture_url);
-        }
-      }
+      await supAdmin
+        .from('drivers')
+        .update({
+          profile_picture_url: storagePath,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', driverId);
     } catch (e) {
-      console.error("[Profile Picture] Exception updating Supabase:", e);
+      console.error("[Profile Picture] Supabase driver update failed:", e);
     }
 
-    // Broadcast profile picture update to mobile app for real-time sync
     broadcastProfileUpdate(driverId, {
-      profilePictureUrl: fullUrl,
-      profile_picture_url: fullUrl,
+      profilePictureUrl: storagePath,
+      profile_picture_url: storagePath,
     });
 
-    res.status(200).json({ 
-      success: true, 
-      profilePictureUrl,
-      message: "Profile picture uploaded successfully" 
+    res.status(200).json({
+      success: true,
+      storagePath,
+      bucket: BUCKET,
+      signedUrl,
+      profilePictureUrl: storagePath,
+      message: "Profile picture uploaded successfully"
     });
   }));
 
@@ -5941,16 +5853,30 @@ export async function registerRoutes(
     if (!filePath || filePath.includes('..')) {
       return res.status(400).end();
     }
-    const fullPath = path.join(process.cwd(), 'uploads', filePath);
-    if (fs.existsSync(fullPath)) {
-      return res.status(200).end();
-    }
+
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.status(404).end();
 
     const fileName = path.basename(filePath);
-    const supabaseFiles = await getSupabaseFileSet();
-    for (const storagePath of supabaseFiles) {
-      if (storagePath.endsWith('/' + fileName)) {
-        return res.status(200).end();
+    const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
+    const cleanPath = filePath.replace(/^documents\//, '');
+    const appPendingConverted = cleanPath.replace(/^application-pending\//, 'applications/pending/');
+    const possiblePaths = [
+      cleanPath,
+      appPendingConverted,
+      `drivers/${cleanPath}`,
+      filePath,
+      `applications/pending/${fileName}`,
+      `applications/${cleanPath}`,
+      fileName,
+    ];
+
+    for (const bucket of BUCKETS) {
+      for (const sp of possiblePaths) {
+        try {
+          const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(sp, 60);
+          if (!error && data?.signedUrl) return res.status(200).end();
+        } catch (_) {}
       }
     }
 
@@ -5962,108 +5888,86 @@ export async function registerRoutes(
     if (!filePath || filePath.includes('..')) {
       return res.status(400).json({ error: "Invalid path" });
     }
-    const fullPath = path.join(process.cwd(), 'uploads', filePath);
-    if (fs.existsSync(fullPath)) {
-      return res.sendFile(fullPath);
+
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Storage service unavailable" });
     }
 
     const fileName = path.basename(filePath);
     const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
     const cleanPath = filePath.replace(/^documents\//, '');
     const appPendingConverted = cleanPath.replace(/^application-pending\//, 'applications/pending/');
+    
     const possiblePaths = [
       cleanPath,
       appPendingConverted,
+      `drivers/${cleanPath}`,
       filePath,
       `applications/pending/${fileName}`,
       `applications/${cleanPath}`,
       fileName,
     ];
 
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (supabaseAdmin) {
-        for (const bucket of BUCKETS) {
-          for (const storagePath of possiblePaths) {
-            try {
-              const { data, error } = await supabaseAdmin.storage
-                .from(bucket)
-                .download(storagePath);
-              if (!error && data) {
-                const ext = path.extname(fileName).toLowerCase();
-                const mimeTypes: Record<string, string> = {
-                  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-                  '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
-                };
-                const contentType = mimeTypes[ext] || 'application/octet-stream';
-                const buffer = Buffer.from(await data.arrayBuffer());
-                res.set('Content-Type', contentType);
-                res.set('Cache-Control', 'public, max-age=3600');
-                return res.send(buffer);
-              }
-            } catch (_) {}
-          }
-        }
-
-        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        const pathParts = cleanPath.split('/');
-        const driverUUID = pathParts.length >= 2 ? pathParts[0] : null;
-        
-        if (driverUUID && uuidPattern.test(driverUUID)) {
-          const docPrefixes = findDocTypeMatch(fileName);
-          console.log(`[Uploads] Exact path not found for ${fileName}, trying doc-type fallback with prefixes: ${docPrefixes.join(', ')}`);
+    for (const bucket of BUCKETS) {
+      for (const storagePath of possiblePaths) {
+        try {
+          const { data: signedData, error: signError } = await supabaseAdmin.storage
+            .from(bucket)
+            .createSignedUrl(storagePath, 600);
           
-          const searchFolders = [
-            driverUUID,
-            `applications/${driverUUID}`,
-            'applications/pending',
-          ];
-          
-          for (const folder of searchFolders) {
-            for (const bucket of BUCKETS) {
-              try {
-                const { data: folderFiles, error: listErr } = await supabaseAdmin.storage
-                  .from(bucket)
-                  .list(folder, { limit: 200 });
-                
-                if (listErr || !folderFiles) continue;
-                
-                for (const storageFile of folderFiles) {
-                  if (!storageFile.name || storageFile.name === '.emptyFolderPlaceholder') continue;
-                  const storageBaseName = storageFile.name.replace(/\.[^.]+$/, '');
-                  const storageWithoutTs = storageBaseName.replace(/_\d{10,}$/, '');
-                  
-                  for (const prefix of docPrefixes) {
-                    if (storageWithoutTs === prefix || storageWithoutTs.startsWith(prefix + '_')) {
-                      console.log(`[Uploads] Doc-type match found: ${storageFile.name} in ${bucket}/${folder} for requested ${fileName}`);
-                      const { data: matchData, error: matchErr } = await supabaseAdmin.storage
-                        .from(bucket)
-                        .download(`${folder}/${storageFile.name}`);
-                      if (!matchErr && matchData) {
-                        const matchExt = path.extname(storageFile.name).toLowerCase();
-                        const mimeTypes: Record<string, string> = {
-                          '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-                          '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf',
-                        };
-                        const contentType = mimeTypes[matchExt] || 'application/octet-stream';
-                        const buffer = Buffer.from(await matchData.arrayBuffer());
-                        res.set('Content-Type', contentType);
-                        res.set('Cache-Control', 'public, max-age=3600');
-                        return res.send(buffer);
-                      }
-                    }
-                  }
-                }
-              } catch (_) {}
-            }
+          if (!signError && signedData?.signedUrl) {
+            return res.redirect(signedData.signedUrl);
           }
-        }
+        } catch (_) {}
       }
-    } catch (err) {
-      console.error('[Uploads] Supabase Storage fallback error:', err);
     }
 
-    return res.status(404).json({ error: "File not found" });
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const pathParts = cleanPath.split('/');
+    const driverUUID = pathParts.length >= 2 ? pathParts[0] : null;
+    
+    if (driverUUID && uuidPattern.test(driverUUID)) {
+      const docPrefixes = findDocTypeMatch(fileName);
+      
+      const searchFolders = [
+        driverUUID,
+        `drivers/${driverUUID}`,
+        `applications/${driverUUID}`,
+        'applications/pending',
+      ];
+      
+      for (const folder of searchFolders) {
+        for (const bucket of BUCKETS) {
+          try {
+            const { data: folderFiles, error: listErr } = await supabaseAdmin.storage
+              .from(bucket)
+              .list(folder, { limit: 200 });
+            
+            if (listErr || !folderFiles) continue;
+            
+            for (const storageFile of folderFiles) {
+              if (!storageFile.name || storageFile.name === '.emptyFolderPlaceholder') continue;
+              const storageBaseName = storageFile.name.replace(/\.[^.]+$/, '');
+              const storageWithoutTs = storageBaseName.replace(/_\d{10,}$/, '');
+              
+              for (const prefix of docPrefixes) {
+                if (storageWithoutTs === prefix || storageWithoutTs.startsWith(prefix + '_')) {
+                  const { data: signedData, error: signErr } = await supabaseAdmin.storage
+                    .from(bucket)
+                    .createSignedUrl(`${folder}/${storageFile.name}`, 600);
+                  if (!signErr && signedData?.signedUrl) {
+                    return res.redirect(signedData.signedUrl);
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    return res.status(404).json({ error: "File not found in storage" });
   }));
 
   app.post("/api/driver-applications/:id/upload-document", requireAdminAccessStrict, (req, res, next) => {
@@ -6084,10 +5988,6 @@ export async function registerRoutes(
     const { documentField } = req.body;
     const file = req.file;
 
-    const cleanupTemp = () => {
-      if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
-    };
-
     if (!file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
@@ -6097,7 +5997,6 @@ export async function registerRoutes(
       'dbsCertificateUrl', 'goodsInTransitInsuranceUrl', 'hireAndRewardUrl'
     ];
     if (!documentField || !allowedFields.includes(documentField)) {
-      cleanupTemp();
       return res.status(400).json({ error: "Invalid document field" });
     }
 
@@ -6112,8 +6011,7 @@ export async function registerRoutes(
 
     const { supabaseAdmin } = await import('./supabaseAdmin');
     if (!supabaseAdmin) {
-      cleanupTemp();
-      return res.status(500).json({ error: "Database unavailable" });
+      return res.status(500).json({ error: "Storage service unavailable" });
     }
 
     const { data: appExists, error: checkErr } = await supabaseAdmin
@@ -6123,7 +6021,6 @@ export async function registerRoutes(
       .maybeSingle();
 
     if (checkErr || !appExists) {
-      cleanupTemp();
       return res.status(404).json({ error: "Application not found" });
     }
 
@@ -6133,52 +6030,23 @@ export async function registerRoutes(
     const safeField = sanitizePath(documentField);
     const finalFilename = `${safeField}_${timestamp}${ext}`;
 
-    let fileUrl = '';
     const BUCKET = 'driver-documents';
     const storagePath = `applications/${safeId}/${finalFilename}`;
+    const contentType = file.mimetype || 'application/octet-stream';
+    const fileBuffer = file.buffer;
 
-    let supabaseUploadSuccess = false;
-    try {
-      const fileBuffer = fs.readFileSync(file.path);
-      const contentType = file.mimetype || 'application/octet-stream';
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .upload(storagePath, fileBuffer, { contentType, upsert: true });
 
-      const { error: uploadErr } = await supabaseAdmin.storage
-        .from(BUCKET)
-        .upload(storagePath, fileBuffer, { contentType, upsert: true });
-
-      if (!uploadErr) {
-        const { data: urlData } = supabaseAdmin.storage
-          .from(BUCKET)
-          .getPublicUrl(storagePath);
-        fileUrl = urlData.publicUrl;
-        supabaseUploadSuccess = true;
-        console.log(`[Admin Doc Upload] Uploaded to Supabase Storage: ${storagePath}`);
-      } else {
-        console.error('[Admin Doc Upload] Supabase Storage upload error:', uploadErr.message);
-      }
-    } catch (supaErr) {
-      console.error('[Admin Doc Upload] Supabase Storage upload failed:', supaErr);
+    if (uploadErr) {
+      console.error('[Admin Doc Upload] Supabase Storage upload error:', uploadErr.message);
+      return res.status(500).json({ error: "Failed to upload document to storage" });
     }
 
-    if (!supabaseUploadSuccess) {
-      const appDir = path.join(uploadsDir, `application-${safeId}`);
-      if (!fs.existsSync(appDir)) {
-        fs.mkdirSync(appDir, { recursive: true });
-      }
-      const finalPath = path.join(appDir, finalFilename);
-      try {
-        fs.renameSync(file.path, finalPath);
-      } catch (moveError) {
-        fs.copyFileSync(file.path, finalPath);
-        fs.unlinkSync(file.path);
-      }
-      fileUrl = `/uploads/documents/application-${safeId}/${finalFilename}`;
-      console.log(`[Admin Doc Upload] Fell back to local storage: ${fileUrl}`);
-    } else {
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
-    }
+    console.log(`[Admin Doc Upload] Uploaded to Supabase Storage: ${BUCKET}/${storagePath}`);
+
+    const fileUrl = storagePath;
 
     const columnName = fieldToColumn[documentField];
     const { error: updateErr } = await supabaseAdmin
@@ -6188,12 +6056,11 @@ export async function registerRoutes(
 
     if (updateErr) {
       console.error('[Admin Doc Upload] Failed to update application:', updateErr);
-      try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch {}
       return res.status(500).json({ error: "Failed to update application record" });
     }
 
     console.log(`[Admin Doc Upload] Updated ${documentField} for application ${applicationId}`);
-    res.json({ success: true, fileUrl, documentField });
+    res.json({ success: true, storagePath, bucket: BUCKET, fileUrl, documentField });
   }));
 
   app.patch("/api/driver-applications/:id/review", asyncHandler(async (req, res) => {
@@ -6325,6 +6192,26 @@ export async function registerRoutes(
                     fileUrl: copiedUrl,
                     status: 'approved',
                   });
+
+                  await supabaseAdmin.from('driver_documents')
+                    .delete()
+                    .eq('driver_id', driver.id)
+                    .eq('doc_type', mapping.type);
+                  await supabaseAdmin.from('driver_documents')
+                    .insert({
+                      driver_id: driver.id,
+                      auth_user_id: driver.id,
+                      doc_type: mapping.type,
+                      file_url: copiedUrl,
+                      bucket: 'driver-documents',
+                      storage_path: copiedUrl,
+                      file_name: mapping.label,
+                      status: 'approved',
+                      uploaded_at: new Date().toISOString(),
+                      reviewed_by: reviewedBy,
+                      reviewed_at: new Date().toISOString(),
+                    });
+
                   console.log(`[Driver Application] Created document record: ${mapping.type} for driver ${driver.driver_code}`);
                 } catch (docErr) {
                   console.error(`[Driver Application] Failed to create document record ${mapping.type}:`, docErr);
@@ -6455,6 +6342,26 @@ export async function registerRoutes(
                         fileUrl: copiedUrl,
                         status: 'approved',
                       });
+
+                      await supabaseAdmin.from('driver_documents')
+                        .delete()
+                        .eq('driver_id', userId)
+                        .eq('doc_type', mapping.type);
+                      await supabaseAdmin.from('driver_documents')
+                        .insert({
+                          driver_id: userId,
+                          auth_user_id: userId,
+                          doc_type: mapping.type,
+                          file_url: copiedUrl,
+                          bucket: 'driver-documents',
+                          storage_path: copiedUrl,
+                          file_name: mapping.label,
+                          status: 'approved',
+                          uploaded_at: new Date().toISOString(),
+                          reviewed_by: reviewedBy,
+                          reviewed_at: new Date().toISOString(),
+                        });
+
                       console.log(`[Driver Application] Created document record: ${mapping.type} for new driver ${driverCode}`);
                     } catch (docErr) {
                       console.error(`[Driver Application] Failed to create document record ${mapping.type}:`, docErr);
@@ -10301,8 +10208,12 @@ export async function registerRoutes(
             if (match) {
               await supabaseAdmin.from('driver_documents').insert({
                 driver_id: driver.id,
+                auth_user_id: driver.id,
                 doc_type: docType,
-                file_url: `/api/uploads/documents/${driver.id}/${match.name}`,
+                file_url: `${driver.id}/${match.name}`,
+                bucket: BUCKET,
+                storage_path: `${driver.id}/${match.name}`,
+                file_name: match.name,
                 status: driver.status === 'approved' ? 'approved' : 'pending',
                 uploaded_at: new Date().toISOString(),
               });
