@@ -1,0 +1,157 @@
+You are a senior full-stack engineer (Supabase + Expo/React Native). Fix ALL issues below without saving anything on Replit. Everything must be saved and served ONLY from Supabase (Postgres + Storage). Do not change UI/flows unless required for the fixes.
+
+========================
+A) DRIVER DOCUMENTS (MAIN ISSUE)
+========================
+CURRENT BUG
+1) When driver submits application + uploads documents, admin can preview them while the application is pending.
+2) After admin APPROVES the driver, if admin tries to preview the same documents again it shows “File not found / missing or inaccessible”.
+3) Documents do not reliably appear in the driver profile on website and in the Expo mobile app; drivers are sometimes asked to upload again.
+4) Some document links still point to /api/uploads/... (Replit filesystem) and fail.
+
+NON-NEGOTIABLE REQUIREMENTS
+- NOTHING is stored on Replit disk. Remove/disable any /api/uploads or local upload storage.
+- All files are stored in Supabase Storage ONLY.
+- Database stores bucket + storage_path (NOT signed URLs, NOT only filenames).
+- Paths must be stable and NEVER depend on status (pending/approved).
+- Admin must be able to review any driver docs at any time (before/after approval).
+- Web + Mobile must show the same documents from the same Supabase backend (synced).
+
+ROOT CAUSE TO FIX
+- You currently use status-based paths/folders (e.g., application-pending/application-approved) OR you overwrite storage paths on approval without moving the file in Supabase Storage, causing broken references.
+- You also generate preview links using /api/uploads or expired URLs.
+
+IMPLEMENTATION (MUST DO)
+1) Supabase Storage
+- Create/use private bucket: driver-documents
+- Upload path format (stable forever):
+  drivers/{auth_user_id}/{doc_type}/{timestamp}_{originalFilename}
+- NEVER use application-pending/application-approved folders.
+- NEVER move/rename files on driver approval.
+
+2) Database schema (single source of truth)
+Create table driver_documents (or refactor existing) with:
+- id uuid PK default gen_random_uuid()
+- auth_user_id uuid NOT NULL
+- doc_type text NOT NULL (profile_picture, driving_licence_front, insurance, v5, proof_of_address, rtw, bank_doc, etc.)
+- bucket text NOT NULL default 'driver-documents'
+- storage_path text NOT NULL (full path inside bucket)
+- file_name text
+- mime_type text
+- size_bytes bigint
+- uploaded_at timestamptz default now()
+- status text default 'pending' (pending/approved/rejected)  <-- status of doc review, not folder
+- admin_notes text
+Unique constraint: (auth_user_id, doc_type)
+
+IMPORTANT:
+- Do NOT store signed URLs in DB.
+- Do NOT store only filename.
+
+3) Upload logic (Website + Expo mobile)
+For each document upload:
+- Upload directly to Supabase Storage bucket driver-documents using the stable path above.
+- Upsert driver_documents row using (auth_user_id, doc_type) with bucket + storage_path + metadata.
+- Ensure driver profile and application both reference auth_user_id (stable). Do not create a new id on approval.
+
+4) Preview logic (Admin + Driver)
+Replace any preview that opens /api/uploads or any direct file URL.
+To preview:
+- Fetch driver_documents.bucket + storage_path
+- Generate signed URL at runtime:
+  createSignedUrl(storage_path, 600)
+- Use the signed URL in modal/new tab.
+- Add logging for failures: bucket, storage_path, error message.
+
+5) Approval logic (critical fix for “file not found after approval”)
+When admin approves driver:
+- ONLY update drivers.status='approved'
+- DO NOT modify driver_documents.storage_path
+- DO NOT overwrite doc fields with null
+- DO NOT create a new driver record with a different identifier
+Approval must never break file references.
+
+6) Migration / backfill (must preserve existing docs if possible)
+- Identify any stored paths containing "application-pending" or "application-approved" or any status folders.
+- Verify which objects actually exist in Storage.
+- Fix DB storage_path to match the real existing object path.
+- If old docs were stored only on Replit filesystem and cannot be recovered, mark them as missing and request ONE re-upload; after that, it must persist forever.
+
+7) RLS / Permissions
+- driver_documents: drivers can select/insert/update their own rows where auth_user_id = auth.uid()
+- admin can select/update all rows (admin role check via profiles/roles table or custom claim)
+- Storage bucket is private; viewing uses signed URLs.
+If client-side admin signed URLs are blocked, create an Edge Function:
+  adminCreateSignedUrl(bucket, storage_path) -> checks admin role -> returns signed URL.
+
+8) Sync requirement
+- Website Driver Profile and Expo Driver Profile must query:
+  select * from driver_documents where auth_user_id = auth.uid()
+- Admin view must query all docs by driver (auth_user_id) and show checklist/status.
+
+Deliverables for Part A:
+- SQL migrations (driver_documents table + indexes + constraints)
+- RLS policies SQL
+- Updated upload code (web + mobile) using Supabase Storage only
+- Updated admin preview/download logic using createSignedUrl
+- Fixed approval logic
+- Migration script/steps to fix old paths
+
+========================
+B) JOB WITHDRAW SOUND (EXPO APP)
+========================
+CURRENT BUG
+- When a job is assigned, driver receives it in Expo app and an alarm sound starts (triggered by Supabase events).
+- When admin withdraws/unassigns the job, job disappears from the app (correct) BUT the alarm sound continues (wrong).
+- The sound is NOT a native iOS/Android notification; it is in-app audio.
+
+REQUIREMENT
+Alarm MUST stop immediately when:
+- job is withdrawn/cancelled/unassigned
+- job is no longer assigned to this driver (assigned_driver_id changes or becomes null)
+- job is accepted/rejected/expired/completed
+- job is deleted
+Also prevent multiple alarms stacking.
+
+IMPLEMENTATION (MUST DO)
+1) Create AlarmService singleton using expo-av:
+- One Audio.Sound instance only
+- start(jobId): stop any existing alarm, set currentJobId, play loop
+- stop(reason): stop/unload sound, clear currentJobId
+- add safety timeout (auto-stop after 90s)
+
+2) Fix Supabase realtime subscription logic:
+IMPORTANT: If your realtime subscription is filtered by assigned_driver_id=eq.<driverId>,
+you may NOT receive the update when the job becomes null (withdraw). Therefore:
+- Subscribe to ALL job updates (no filter), then locally decide to start/stop based on driverId and job changes.
+Rules:
+- Start when newAssigned == myDriverId AND status in ['assigned','pending'].
+- Stop when AlarmService.currentJobId matches jobId AND (newAssigned != myDriverId OR status in stopStatuses).
+Stop statuses: withdrawn, cancelled, unassigned, expired, accepted, rejected, completed.
+- Stop on DELETE when deleted jobId == currentJobId.
+
+3) Ensure backend withdraw updates the job row:
+- assigned_driver_id = null
+- status = 'withdrawn' (or 'cancelled')
+- updated_at = now()
+This guarantees an UPDATE event.
+
+4) Add logs:
+- ALARM START/STOP with jobId and reason
+- realtime payload eventType + jobId + oldAssigned/newAssigned + status
+
+Deliverables for Part B:
+- AlarmService.ts using expo-av
+- Updated realtime subscription code to stop alarm on withdraw/unassign/reassign
+- Verified tests: assign -> ring, withdraw -> stop immediately, accept/reject -> stop, reassign -> stop for old driver
+
+========================
+FINAL ACCEPTANCE TESTS (MUST PASS)
+1) Driver uploads documents once -> logout/login -> documents still visible (web + mobile)
+2) Admin approves driver -> admin can STILL preview all documents (no “file not found”)
+3) Driver profile (web + Expo app) shows the same uploaded documents without reupload
+4) Admin can review documents anytime (pending or approved)
+5) Assign job -> alarm starts; withdraw/unassign -> job disappears AND alarm stops immediately
+6) Reassign job to another driver -> first driver alarm stops immediately
+
+Start by identifying where file paths change on approval and removing any status-based folders. Then implement stable storage paths keyed by auth_user_id and signed URL previews. Next implement AlarmService and realtime stop logic without filtered subscriptions that miss withdraw events.

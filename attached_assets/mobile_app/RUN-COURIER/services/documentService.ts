@@ -293,33 +293,28 @@ export async function uploadDocument(
       return { success: false, error: errorMessage };
     }
 
-    const { data: urlData } = supabase.storage
-      .from('DRIVER-DOCUMENTS')
-      .getPublicUrl(filePath);
+    const BUCKET = 'DRIVER-DOCUMENTS';
 
-    const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
-
-    // Check for existing doc using authUserId (for RLS compliance)
     const existingDoc = await getDocumentByType(authUserId, documentType);
     const validColumns = await getTableColumns();
     
-    // Build document data with all possible column names
-    // Use authUserId for driver_id to comply with RLS policy (driver_id = auth.uid())
     const allDocumentData: Record<string, any> = {
       driver_id: authUserId,
+      auth_user_id: authUserId,
       doc_type: documentType,
-      document_type: documentType,
-      type: documentType,
-      file_url: publicUrl,
-      url: publicUrl,
+      file_url: filePath,
+      bucket: BUCKET,
+      storage_path: filePath,
+      file_name: `${documentType}_${Date.now()}.${fileExt}`,
+      mime_type: contentType,
+      size_bytes: fileData.byteLength,
       status: 'pending',
       expiry_date: expiryDate || null,
       updated_at: new Date().toISOString(),
     };
     
-    // Filter to only include columns that exist in the table
     const documentData = filterToValidColumns(allDocumentData, validColumns);
-    console.log('Using document data:', documentData);
+    console.log('[DOC UPLOAD] Using document data:', documentData);
 
     let result;
     if (existingDoc) {
@@ -342,7 +337,7 @@ export async function uploadDocument(
       };
       
       const insertData = filterToValidColumns(allInsertData, validColumns);
-      console.log('Using insert data:', insertData);
+      console.log('[DOC UPLOAD] Using insert data:', insertData);
 
       const { data, error } = await supabase
         .from('driver_documents')

@@ -13,6 +13,7 @@ import { supabase, Job } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { usePendingJobs } from '@/context/PendingJobsContext';
 import { useSoundAlarm } from '@/hooks/useSoundAlarm';
+import AlarmService from '@/services/AlarmService';
 import { sendJobRejectionEmail } from '@/services/emailService';
 import { JobOfferMapPreview } from '@/components/JobOfferMapPreview';
 import * as Location from 'expo-location';
@@ -471,7 +472,10 @@ export function JobOffersScreen({ navigation }: any) {
       if (fetchRequestIdRef.current !== thisRequestId) return;
 
       if (playSound && !isInitialLoadRef.current && newJobs.length > previousJobCountRef.current) {
-        startRepeatingAlarm(4000);
+        const newestJob = newJobs[0];
+        if (newestJob) {
+          AlarmService.start(String(newestJob.id));
+        }
         
         if (alarmVerifyIntervalRef.current) clearInterval(alarmVerifyIntervalRef.current);
         alarmVerifyIntervalRef.current = setInterval(() => {
@@ -479,7 +483,7 @@ export function JobOffersScreen({ navigation }: any) {
           fetchAssignedJobsSilent();
         }, 5000);
       } else if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
-        stopRepeatingAlarm();
+        AlarmService.stop('jobs reduced or empty');
         if (alarmVerifyIntervalRef.current) {
           clearInterval(alarmVerifyIntervalRef.current);
           alarmVerifyIntervalRef.current = null;
@@ -520,7 +524,7 @@ export function JobOffersScreen({ navigation }: any) {
       
       if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
         console.log('[JobOffers] Jobs withdrawn/removed - STOPPING ALARM');
-        stopRepeatingAlarm();
+        AlarmService.stop('silent fetch: jobs reduced or empty');
         if (alarmVerifyIntervalRef.current) {
           clearInterval(alarmVerifyIntervalRef.current);
           alarmVerifyIntervalRef.current = null;
@@ -537,21 +541,63 @@ export function JobOffersScreen({ navigation }: any) {
   useEffect(() => {
     fetchAssignedJobs(false);
     
-    // Subscribe to changes for ALL possible driver IDs (handles website vs mobile ID mismatch)
-    const channels: any[] = [];
-    allDriverIds.forEach((id, index) => {
-      const channel = supabase
-        .channel(`assigned-jobs-channel-${index}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: `driver_id=eq.${id}` }, () => {
-          fetchAssignedJobs(true);
-        })
-        .subscribe();
-      channels.push(channel);
-    });
+    const STOP_STATUSES = ['withdrawn', 'cancelled', 'unassigned', 'expired', 'accepted', 'rejected', 'completed'];
+    
+    const channel = supabase
+      .channel('jobs-alarm-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, (payload: any) => {
+        const eventType = payload.eventType;
+        const newRecord = payload.new;
+        const oldRecord = payload.old;
+        
+        const newAssigned = newRecord?.driver_id || newRecord?.assigned_driver_id;
+        const oldAssigned = oldRecord?.driver_id || oldRecord?.assigned_driver_id;
+        const jobId = String(newRecord?.id || oldRecord?.id || '');
+        const newStatus = newRecord?.status;
+        
+        console.log(`[JobOffers] Realtime: ${eventType} jobId=${jobId} old=${oldAssigned} new=${newAssigned} status=${newStatus}`);
+        
+        const isMyJob = allDriverIds.includes(newAssigned) || allDriverIds.includes(oldAssigned);
+        
+        if (eventType === 'DELETE') {
+          if (AlarmService.currentJobId === jobId) {
+            AlarmService.stop('job deleted');
+          }
+          if (isMyJob) fetchAssignedJobs(false);
+          return;
+        }
+        
+        if (eventType === 'UPDATE' || eventType === 'INSERT') {
+          const wasMyJob = allDriverIds.includes(oldAssigned);
+          const isNowMyJob = allDriverIds.includes(newAssigned);
+          
+          if (wasMyJob && !isNowMyJob) {
+            AlarmService.stopIfJob(jobId, 'unassigned from this driver');
+            fetchAssignedJobs(false);
+            return;
+          }
+          
+          if (wasMyJob && STOP_STATUSES.includes(newStatus)) {
+            AlarmService.stopIfJob(jobId, `status changed to ${newStatus}`);
+            fetchAssignedJobs(false);
+            return;
+          }
+          
+          if (isNowMyJob && ['assigned', 'offered'].includes(newStatus)) {
+            fetchAssignedJobs(true);
+            return;
+          }
+          
+          if (isMyJob) {
+            fetchAssignedJobs(false);
+          }
+        }
+      })
+      .subscribe();
 
     return () => { 
-      channels.forEach(ch => supabase.removeChannel(ch));
-      stopRepeatingAlarm();
+      supabase.removeChannel(channel);
+      AlarmService.stop('component unmount');
       if (alarmVerifyIntervalRef.current) {
         clearInterval(alarmVerifyIntervalRef.current);
         alarmVerifyIntervalRef.current = null;
@@ -619,6 +665,7 @@ export function JobOffersScreen({ navigation }: any) {
   };
 
   const stopAlarmAndVerification = useCallback(() => {
+    AlarmService.stop('stopAlarmAndVerification called');
     stopRepeatingAlarm();
     if (alarmVerifyIntervalRef.current) {
       clearInterval(alarmVerifyIntervalRef.current);
