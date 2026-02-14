@@ -65,6 +65,7 @@ export function JobOffersScreen({ navigation }: any) {
   const previousJobCountRef = useRef<number>(0);
   const isInitialLoadRef = useRef<boolean>(true);
   const alarmVerifyIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const knownJobIdsRef = useRef<Set<string>>(new Set());
   
   // Online/Offline status
   const [isOnline, setIsOnline] = useState(false);
@@ -481,7 +482,7 @@ export function JobOffersScreen({ navigation }: any) {
         alarmVerifyIntervalRef.current = setInterval(() => {
           console.log('[JobOffers] Alarm verify poll - re-checking jobs');
           fetchAssignedJobsSilent();
-        }, 5000);
+        }, 3000);
       } else if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
         AlarmService.stop('jobs reduced or empty');
         if (alarmVerifyIntervalRef.current) {
@@ -541,62 +542,89 @@ export function JobOffersScreen({ navigation }: any) {
   useEffect(() => {
     fetchAssignedJobs(false);
     
-    const STOP_STATUSES = ['withdrawn', 'cancelled', 'unassigned', 'expired', 'accepted', 'rejected', 'completed'];
+    const STOP_STATUSES = ['withdrawn', 'cancelled', 'unassigned', 'expired', 'accepted', 'rejected', 'completed', 'removed'];
     
-    const channel = supabase
+    // Sync knownJobIds ref with current jobs
+    knownJobIdsRef.current = new Set(jobs.map(j => String(j.id)));
+    const knownJobIds = knownJobIdsRef.current;
+    
+    const jobsChannel = supabase
       .channel('jobs-alarm-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, (payload: any) => {
         const eventType = payload.eventType;
         const newRecord = payload.new;
         const oldRecord = payload.old;
         
-        const newAssigned = newRecord?.driver_id || newRecord?.assigned_driver_id;
-        const oldAssigned = oldRecord?.driver_id || oldRecord?.assigned_driver_id;
         const jobId = String(newRecord?.id || oldRecord?.id || '');
+        const newDriverId = newRecord?.driver_id || newRecord?.assigned_driver_id;
         const newStatus = newRecord?.status;
         
-        console.log(`[JobOffers] Realtime: ${eventType} jobId=${jobId} old=${oldAssigned} new=${newAssigned} status=${newStatus}`);
-        
-        const isMyJob = allDriverIds.includes(newAssigned) || allDriverIds.includes(oldAssigned);
+        console.log(`[JobOffers] Realtime jobs: ${eventType} jobId=${jobId} driver=${newDriverId} status=${newStatus}`);
         
         if (eventType === 'DELETE') {
-          if (AlarmService.currentJobId === jobId) {
-            AlarmService.stop('job deleted');
-          }
-          if (isMyJob) fetchAssignedJobs(false);
+          AlarmService.stopIfJob(jobId, 'job deleted');
+          knownJobIds.delete(jobId);
+          fetchAssignedJobs(false);
           return;
         }
         
         if (eventType === 'UPDATE' || eventType === 'INSERT') {
-          const wasMyJob = allDriverIds.includes(oldAssigned);
-          const isNowMyJob = allDriverIds.includes(newAssigned);
+          const isNowMyJob = allDriverIds.includes(newDriverId);
+          const wasKnown = knownJobIds.has(jobId);
           
-          if (wasMyJob && !isNowMyJob) {
-            AlarmService.stopIfJob(jobId, 'unassigned from this driver');
+          if (wasKnown && !isNowMyJob) {
+            console.log(`[JobOffers] Job ${jobId} no longer assigned to me - stopping alarm`);
+            AlarmService.stopIfJob(jobId, 'driver_id no longer matches');
+            knownJobIds.delete(jobId);
             fetchAssignedJobs(false);
             return;
           }
           
-          if (wasMyJob && STOP_STATUSES.includes(newStatus)) {
+          if (wasKnown && STOP_STATUSES.includes(newStatus)) {
+            console.log(`[JobOffers] Job ${jobId} status=${newStatus} - stopping alarm`);
             AlarmService.stopIfJob(jobId, `status changed to ${newStatus}`);
+            knownJobIds.delete(jobId);
             fetchAssignedJobs(false);
             return;
           }
           
           if (isNowMyJob && ['assigned', 'offered'].includes(newStatus)) {
+            knownJobIds.add(jobId);
             fetchAssignedJobs(true);
             return;
           }
           
-          if (isMyJob) {
+          if (isNowMyJob) {
             fetchAssignedJobs(false);
           }
         }
       })
       .subscribe();
 
+    const assignmentsChannel = supabase
+      .channel('assignments-alarm-channel')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'job_assignments' }, (payload: any) => {
+        const newRecord = payload.new;
+        const assignmentStatus = newRecord?.status;
+        const assignmentDriverId = newRecord?.driver_id;
+        const assignmentJobId = String(newRecord?.job_id || '');
+        
+        console.log(`[JobOffers] Realtime assignment: status=${assignmentStatus} driver=${assignmentDriverId} job=${assignmentJobId}`);
+        
+        if (allDriverIds.includes(assignmentDriverId) && 
+            ['withdrawn', 'cancelled', 'removed', 'expired'].includes(assignmentStatus)) {
+          console.log(`[JobOffers] Assignment withdrawn/cancelled for job ${assignmentJobId} - stopping alarm`);
+          AlarmService.stopIfJob(assignmentJobId, `assignment ${assignmentStatus}`);
+          AlarmService.stop(`assignment ${assignmentStatus} for job ${assignmentJobId}`);
+          knownJobIds.delete(assignmentJobId);
+          fetchAssignedJobs(false);
+        }
+      })
+      .subscribe();
+
     return () => { 
-      supabase.removeChannel(channel);
+      supabase.removeChannel(jobsChannel);
+      supabase.removeChannel(assignmentsChannel);
       AlarmService.stop('component unmount');
       if (alarmVerifyIntervalRef.current) {
         clearInterval(alarmVerifyIntervalRef.current);
@@ -604,6 +632,11 @@ export function JobOffersScreen({ navigation }: any) {
       }
     };
   }, [fetchAssignedJobs, allDriverIds.join(',')]);
+
+  // Keep knownJobIds in sync with jobs state
+  useEffect(() => {
+    knownJobIdsRef.current = new Set(jobs.map(j => String(j.id)));
+  }, [jobs]);
 
   // Handle push notifications for job_withdrawn
   useEffect(() => {

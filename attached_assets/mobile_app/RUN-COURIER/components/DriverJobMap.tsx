@@ -5,6 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Spacing, BorderRadius } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { supabase } from '@/lib/supabase';
 
 interface RouteInfo {
   distance: string;
@@ -117,62 +118,81 @@ export function DriverJobMap({
       const origin = `${pickupLat},${pickupLng}`;
       const destination = `${dropoffLat},${dropoffLng}`;
       
-      let url: string;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      let routeFound = false;
       
       if (API_URL) {
-        url = `${API_URL}/api/mobile/v1/directions?origin=${origin}&destination=${destination}&mode=driving`;
         try {
-          const { supabase: sb } = require('@/lib/supabase');
-          const { data: { session } } = await sb.auth.getSession();
-          if (session?.access_token) {
-            headers['Authorization'] = `Bearer ${session.access_token}`;
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+          } catch (e) {
+            console.log('[DriverJobMap] Could not get auth token');
+          }
+          
+          const url = `${API_URL}/api/mobile/v1/directions?origin=${origin}&destination=${destination}&mode=driving`;
+          console.log('[DriverJobMap] Fetching route from server proxy');
+          const response = await fetch(url, { headers });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data?.routes?.length > 0) {
+              const route = data.routes[0];
+              if (route.polyline) {
+                setRouteInfo({
+                  distance: route.distance?.text || '',
+                  duration: route.duration?.text || '',
+                  polylinePoints: decodePolyline(route.polyline),
+                });
+                routeFound = true;
+              } else if (route.overview_polyline?.points) {
+                setRouteInfo({
+                  distance: route.legs?.[0]?.distance?.text || '',
+                  duration: route.legs?.[0]?.duration?.text || '',
+                  polylinePoints: decodePolyline(route.overview_polyline.points),
+                });
+                routeFound = true;
+              }
+            }
+          } else {
+            console.log('[DriverJobMap] Server proxy failed:', response.status, await response.text().catch(() => ''));
           }
         } catch (e) {
-          console.log('[DriverJobMap] Could not get auth token for directions API');
+          console.log('[DriverJobMap] Server proxy error:', e);
         }
-      } else if (GOOGLE_MAPS_API_KEY) {
-        url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
-      } else {
-        console.log('[DriverJobMap] No API URL or Maps key available for directions');
-        setLoading(false);
-        return;
       }
       
-      const response = await fetch(url, { headers });
-      const data = await response.json();
-
-      if (API_URL && data?.routes?.length > 0) {
-        const route = data.routes[0];
-        if (route.polyline) {
-          const polylinePoints = decodePolyline(route.polyline);
-          setRouteInfo({
-            distance: route.distance?.text || '',
-            duration: route.duration?.text || '',
-            polylinePoints,
-          });
-        } else if (route.overview_polyline?.points) {
-          setRouteInfo({
-            distance: route.legs?.[0]?.distance?.text || '',
-            duration: route.legs?.[0]?.duration?.text || '',
-            polylinePoints: decodePolyline(route.overview_polyline.points),
-          });
+      if (!routeFound && GOOGLE_MAPS_API_KEY) {
+        try {
+          const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+          console.log('[DriverJobMap] Falling back to direct Google Maps API');
+          const response = await fetch(url);
+          const data = await response.json();
+          
+          if (data.status === 'OK' && data.routes?.length > 0) {
+            const route = data.routes[0];
+            const leg = route.legs[0];
+            setRouteInfo({
+              distance: leg.distance.text,
+              duration: leg.duration.text,
+              polylinePoints: decodePolyline(route.overview_polyline.points),
+            });
+            routeFound = true;
+          } else {
+            console.log('[DriverJobMap] Google Maps API error:', data.status, data.error_message);
+          }
+        } catch (e) {
+          console.log('[DriverJobMap] Google Maps fallback error:', e);
         }
-      } else if (data.status === 'OK' && data.routes?.length > 0) {
-        const route = data.routes[0];
-        const leg = route.legs[0];
-        const polylineEncoded = route.overview_polyline.points;
-        
-        setRouteInfo({
-          distance: leg.distance.text,
-          duration: leg.duration.text,
-          polylinePoints: decodePolyline(polylineEncoded),
-        });
-      } else {
+      }
+      
+      if (!routeFound) {
         setError('Route unavailable');
       }
     } catch (err) {
-      console.error('Error fetching route:', err);
+      console.error('[DriverJobMap] Error fetching route:', err);
       setError('Failed to load route');
     } finally {
       setLoading(false);
