@@ -508,6 +508,13 @@ export function JobOffersScreen({ navigation }: any) {
   const fetchAssignedJobsRef = useRef(fetchAssignedJobs);
   useEffect(() => { fetchAssignedJobsRef.current = fetchAssignedJobs; }, [fetchAssignedJobs]);
 
+  useEffect(() => {
+    if (driverId && allDriverIds.length > 0) {
+      console.log('[JobOffers] Driver ID available, fetching initial jobs');
+      fetchAssignedJobs(false);
+    }
+  }, [driverId, allDriverIds.join(',')]);
+
   const fetchAssignedJobsSilent = useCallback(async () => {
     if (!driverId || allDriverIds.length === 0) return;
     try {
@@ -543,8 +550,6 @@ export function JobOffersScreen({ navigation }: any) {
   }, [driverId, allDriverIds.join(',')]);
 
   useEffect(() => {
-    fetchAssignedJobsRef.current(false);
-    
     const STOP_STATUSES = ['withdrawn', 'cancelled', 'unassigned', 'expired', 'accepted', 'rejected', 'completed', 'removed'];
     
     // Sync knownJobIds ref with current jobs
