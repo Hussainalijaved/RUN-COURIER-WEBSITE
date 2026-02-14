@@ -1,0 +1,103 @@
+You are a senior Supabase engineer. Fix my Run Courier driver documents so files NEVER become “File not found” after approval, and documents are synced across Admin + Website + Mobile.
+
+CURRENT BUG (IMPORTANT)
+- While driver application is Pending, admin can preview/download documents.
+- After admin approves the driver, trying to preview the same documents again shows: “File not found”.
+- Driver profile on website/mobile does not show the previously uploaded documents and may ask to re-upload.
+This must be fixed so documents are saved once and available forever.
+
+NON-NEGOTIABLE REQUIREMENTS
+1) All documents must be stored in Supabase Storage (no Replit/local).
+2) Database must store bucket + storage_path (NOT only filename, NOT signed URL).
+3) Document storage paths must be STABLE and NOT depend on status (pending/approved).
+4) Approving a driver must NOT change storage_path, must NOT break links.
+5) Admin can review any driver docs anytime (before and after approval).
+6) Driver can see the same uploaded docs in website profile and mobile app profile (same Supabase backend).
+
+ROOT CAUSE TO FIX (most likely)
+You are currently using status-based folders/paths such as:
+- application-pending/...
+- application-approved/...
+or you update DB paths on approval without moving the actual file.
+Result: DB points to a path that does not exist → File not found.
+
+IMPLEMENT THIS FIX
+
+A) Storage architecture (stable forever)
+- Supabase Storage bucket: driver-documents (PRIVATE)
+- All uploads must use stable path based on auth user id:
+  drivers/{auth_user_id}/{doc_type}/{timestamp}_{originalFilename}
+- NEVER use application-pending/application-approved folders.
+- NEVER move files on approval.
+
+B) Database single source of truth
+Create table driver_documents (or refactor existing) with:
+- id uuid PK default gen_random_uuid()
+- auth_user_id uuid NOT NULL
+- doc_type text NOT NULL
+- bucket text NOT NULL default 'driver-documents'
+- storage_path text NOT NULL
+- file_name text
+- status text default 'pending'   (this is approval status of doc, NOT folder)
+- uploaded_at timestamptz default now()
+Unique(auth_user_id, doc_type)
+
+Important:
+- Do not store signed URL in DB.
+- Do not store only file_name.
+- Do not change storage_path when driver status changes.
+
+C) Upload flow (web + mobile)
+When driver uploads doc:
+1) Upload to Supabase Storage bucket driver-documents at stable path.
+2) Upsert driver_documents(auth_user_id, doc_type) with bucket + storage_path + metadata.
+
+D) Preview/Download flow (admin + driver)
+- To view, generate signed URL at runtime:
+  createSignedUrl(storage_path, 600)
+- Use signed URL in modal or new tab.
+- If error occurs, log bucket, storage_path, and Supabase error.
+
+E) Approval flow (main fix for your bug)
+When admin approves the driver:
+- ONLY update drivers.status='approved'
+- DO NOT modify any driver_documents rows’ storage_path
+- DO NOT rename paths
+- DO NOT copy docs into a new “approved” folder
+If you currently do any of these, remove it.
+
+F) Migration for existing records (critical)
+We must fix current drivers whose docs break after approval:
+1) Identify all documents where DB path contains "application-approved" or "approved" or status folders.
+2) Check if file exists in storage at that path:
+   storage.list(pathPrefix) or try createSignedUrl.
+3) If file exists in another folder (like application-pending), update DB storage_path back to the real existing object path.
+4) If you need to “move” files, do it properly:
+   - copy file in Storage from old path to stable path
+   - then update DB storage_path to the stable path
+   - optionally delete old file after successful copy
+BUT preferred: stop moving and just fix references once.
+
+G) Sync Website + Mobile
+- Both must query driver_documents by auth_user_id:
+  select * from driver_documents where auth_user_id = auth.uid()
+- Admin queries all and filters by driver.
+
+H) RLS / Permissions
+- Drivers can read their own driver_documents.
+- Admin can read all driver_documents.
+- Bucket is private; use signed URLs.
+If client-side admin signed URL fails due to policies, implement an Edge Function:
+- adminCreateSignedUrl(bucket, storage_path) checks admin role then returns signed URL.
+
+DELIVERABLES
+1) SQL for driver_documents (or migrations to add bucket + storage_path columns)
+2) RLS policies
+3) Updated upload logic for web + mobile
+4) Updated preview logic (signed URL at runtime)
+5) Remove/repair approval logic that changes paths
+6) Migration script to fix old docs that become “File not found” after approval
+7) Tests:
+   - upload -> approve -> preview still works
+   - logout/login -> still works
+   - mobile shows same docs after approval without reupload

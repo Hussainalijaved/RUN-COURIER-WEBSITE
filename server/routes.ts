@@ -3062,35 +3062,51 @@ export async function registerRoutes(
           for (const mapping of docMappings) {
             if (!mapping.url) continue;
 
-            const newUrl = await copyApplicationFileToDriver(mapping.url, driverId, supabaseAdmin);
-
-            if (newUrl && newUrl !== mapping.url) {
-              updateData[mapping.dbColumn] = newUrl;
-              console.log(`[Drivers] Copied ${mapping.docType || mapping.dbColumn} to driver folder`);
-            }
-
-            const finalUrl = newUrl || normalizeDocumentUrl(mapping.url) || mapping.url;
-
             if (mapping.docType) {
-              await supabaseAdmin.from('driver_documents')
-                .delete()
+              const { data: existing } = await supabaseAdmin.from('driver_documents')
+                .select('id, storage_path, bucket')
                 .eq('driver_id', driverId)
-                .eq('doc_type', mapping.docType);
+                .eq('doc_type', mapping.docType)
+                .maybeSingle();
 
-              const { error: insertErr } = await supabaseAdmin.from('driver_documents')
-                .insert({
-                  driver_id: driverId,
-                  doc_type: mapping.docType,
-                  file_url: finalUrl,
-                  status: 'approved',
-                  uploaded_at: new Date().toISOString(),
-                });
-
-              if (insertErr) {
-                console.error(`[Drivers] Failed to create driver_documents record for ${mapping.docType}:`, insertErr.message);
+              if (existing && existing.storage_path && existing.bucket) {
+                await supabaseAdmin.from('driver_documents')
+                  .update({ status: 'approved' })
+                  .eq('id', existing.id);
+                console.log(`[Drivers] Approved existing document ${mapping.docType} for driver ${driverId}`);
+              } else if (existing) {
+                const storagePath = extractStoragePath(mapping.url) || normalizeDocumentUrl(mapping.url) || mapping.url;
+                await supabaseAdmin.from('driver_documents')
+                  .update({
+                    status: 'approved',
+                    bucket: 'driver-documents',
+                    storage_path: storagePath,
+                    file_url: storagePath,
+                  })
+                  .eq('id', existing.id);
+                console.log(`[Drivers] Approved and fixed storage_path for ${mapping.docType}: ${storagePath}`);
               } else {
-                console.log(`[Drivers] Created driver_documents record for ${mapping.docType}`);
+                const storagePath = extractStoragePath(mapping.url) || normalizeDocumentUrl(mapping.url) || mapping.url;
+                const { error: insertErr } = await supabaseAdmin.from('driver_documents')
+                  .insert({
+                    driver_id: driverId,
+                    auth_user_id: driverId,
+                    doc_type: mapping.docType,
+                    file_url: storagePath,
+                    bucket: 'driver-documents',
+                    storage_path: storagePath,
+                    status: 'approved',
+                    uploaded_at: new Date().toISOString(),
+                  });
+
+                if (insertErr) {
+                  console.error(`[Drivers] Failed to create driver_documents record for ${mapping.docType}:`, insertErr.message);
+                } else {
+                  console.log(`[Drivers] Created document record for ${mapping.docType} with storage_path: ${storagePath}`);
+                }
               }
+            } else {
+              updateData[mapping.dbColumn] = normalizeDocumentUrl(mapping.url) || mapping.url;
             }
           }
 
@@ -3106,9 +3122,24 @@ export async function registerRoutes(
           const photoLabels = vehiclePhotoTypes[vehicleType] || ['front', 'back'];
 
           for (const label of photoLabels) {
+            const docType = `vehicle_photos_${label}`;
             const searchPatterns = [`vehicle_photo_${label}`, `vehicle_photos_${label}`, `vehiclephoto${label}`];
-            let found = false;
 
+            const { data: existingVehicleDoc } = await supabaseAdmin.from('driver_documents')
+              .select('id, storage_path, bucket')
+              .eq('driver_id', driverId)
+              .eq('doc_type', docType)
+              .maybeSingle();
+
+            if (existingVehicleDoc && existingVehicleDoc.storage_path && existingVehicleDoc.bucket) {
+              await supabaseAdmin.from('driver_documents')
+                .update({ status: 'approved' })
+                .eq('id', existingVehicleDoc.id);
+              console.log(`[Drivers] Approved existing vehicle photo ${docType} for driver ${driverId}`);
+              continue;
+            }
+
+            let found = false;
             for (const folder of searchFolders) {
               try {
                 const { data: files } = await supabaseAdmin.storage.from(BUCKET).list(folder, { limit: 200 });
@@ -3117,49 +3148,34 @@ export async function registerRoutes(
                 for (const file of files) {
                   const nameWithoutExt = file.name.replace(/\.[^.]+$/, '').replace(/_\d{10,}$/, '').toLowerCase();
                   if (searchPatterns.some(p => nameWithoutExt === p.toLowerCase() || nameWithoutExt.startsWith(p.toLowerCase()))) {
+                    let destPath: string;
                     if (folder !== driverId) {
                       const { data: fileData } = await supabaseAdmin.storage.from(BUCKET).download(`${folder}/${file.name}`);
-                      if (fileData) {
-                        const arrayBuf = await fileData.arrayBuffer();
-                        const ext = file.name.match(/\.[^.]+$/)?.[0] || '.jpg';
-                        const destPath = `${driverId}/vehicle_photos_${label}${ext}`;
-                        await supabaseAdmin.storage.from(BUCKET).upload(destPath, Buffer.from(arrayBuf), { upsert: true });
-
-                        await supabaseAdmin.from('driver_documents').delete()
-                          .eq('driver_id', driverId).eq('doc_type', `vehicle_photos_${label}`);
-                        await supabaseAdmin.from('driver_documents').insert({
-                          driver_id: driverId,
-                          auth_user_id: driverId,
-                          doc_type: `vehicle_photos_${label}`,
-                          file_url: destPath,
-                          bucket: BUCKET,
-                          storage_path: destPath,
-                          file_name: file.name,
-                          status: 'approved',
-                          uploaded_at: new Date().toISOString(),
-                        });
-                        console.log(`[Drivers] Copied vehicle_photos_${label} from ${folder} to driver folder`);
-                        found = true;
-                        break;
-                      }
-                    } else {
+                      if (!fileData) continue;
+                      const arrayBuf = await fileData.arrayBuffer();
                       const ext = file.name.match(/\.[^.]+$/)?.[0] || '.jpg';
-                      await supabaseAdmin.from('driver_documents').delete()
-                        .eq('driver_id', driverId).eq('doc_type', `vehicle_photos_${label}`);
-                      await supabaseAdmin.from('driver_documents').insert({
-                        driver_id: driverId,
-                        auth_user_id: driverId,
-                        doc_type: `vehicle_photos_${label}`,
-                        file_url: `${driverId}/${file.name}`,
-                        bucket: BUCKET,
-                        storage_path: `${driverId}/${file.name}`,
-                        file_name: file.name,
-                        status: 'approved',
-                        uploaded_at: new Date().toISOString(),
-                      });
-                      found = true;
-                      break;
+                      destPath = `${driverId}/vehicle_photos_${label}${ext}`;
+                      await supabaseAdmin.storage.from(BUCKET).upload(destPath, Buffer.from(arrayBuf), { upsert: true });
+                      console.log(`[Drivers] Copied ${docType} from ${folder} to driver folder`);
+                    } else {
+                      destPath = `${driverId}/${file.name}`;
                     }
+
+                    await supabaseAdmin.from('driver_documents').delete()
+                      .eq('driver_id', driverId).eq('doc_type', docType);
+                    await supabaseAdmin.from('driver_documents').insert({
+                      driver_id: driverId,
+                      auth_user_id: driverId,
+                      doc_type: docType,
+                      file_url: destPath,
+                      bucket: BUCKET,
+                      storage_path: destPath,
+                      file_name: file.name,
+                      status: 'approved',
+                      uploaded_at: new Date().toISOString(),
+                    });
+                    found = true;
+                    break;
                   }
                 }
                 if (found) break;
@@ -4972,22 +4988,43 @@ export async function registerRoutes(
         }
       }
       
-      const storagePath = extractStoragePath(fileUrl);
+      const storagePath = extractStoragePath(fileUrl) || doc.file_url;
       if (storagePath) {
         const buckets = [doc.bucket || 'driver-documents', 'DRIVER-DOCUMENTS'];
+        const pathsToTry = [storagePath];
+
+        if (!storagePath.startsWith('drivers/')) {
+          pathsToTry.push(`drivers/${storagePath}`);
+        }
+        if (doc.driver_id) {
+          const fileName = storagePath.split('/').pop();
+          if (fileName) {
+            pathsToTry.push(`${doc.driver_id}/${fileName}`);
+            pathsToTry.push(`drivers/${doc.driver_id}/${doc.doc_type}/${fileName}`);
+            pathsToTry.push(`drivers/pending/${doc.doc_type}/${fileName}`);
+          }
+        }
+
         for (const bucket of buckets) {
-          try {
-            const { data: signedData, error: signError } = await supabaseAdmin.storage
-              .from(bucket)
-              .createSignedUrl(storagePath, 600);
-            
-            if (!signError && signedData?.signedUrl) {
-              return res.json({ signedUrl: signedData.signedUrl, expiresIn: 600 });
-            }
-          } catch (_) {}
+          for (const tryPath of pathsToTry) {
+            try {
+              const { data: signedData, error: signError } = await supabaseAdmin.storage
+                .from(bucket)
+                .createSignedUrl(tryPath, 600);
+              if (!signError && signedData?.signedUrl) {
+                if (tryPath !== doc.storage_path || bucket !== doc.bucket) {
+                  await supabaseAdmin.from('driver_documents')
+                    .update({ storage_path: tryPath, bucket, file_url: tryPath })
+                    .eq('id', doc.id);
+                  console.log(`[Documents] Auto-fixed storage_path for doc ${doc.id}: ${tryPath}`);
+                }
+                return res.json({ signedUrl: signedData.signedUrl, expiresIn: 600 });
+              }
+            } catch (_) {}
+          }
         }
       }
-      
+
       const normalizedUrl = normalizeDocumentUrl(fileUrl);
       return res.json({ signedUrl: normalizedUrl || fileUrl, expiresIn: 0, fallback: true });
       
@@ -4995,6 +5032,99 @@ export async function registerRoutes(
       console.error('[Documents] Signed URL endpoint error:', e);
       return res.status(500).json({ error: "Failed to generate signed URL" });
     }
+  }));
+
+  app.post("/api/admin/documents/repair", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.status(500).json({ error: "Storage unavailable" });
+
+    const { data: docs } = await supabaseAdmin.from('driver_documents').select('*');
+    if (!docs) return res.json({ fixed: 0, checked: 0 });
+
+    const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
+    let fixed = 0, checked = 0, failed = 0;
+
+    for (const doc of docs) {
+      checked++;
+      if (doc.file_url?.startsWith('text:')) continue;
+
+      if (doc.storage_path && doc.bucket) {
+        try {
+          const { error } = await supabaseAdmin.storage.from(doc.bucket).createSignedUrl(doc.storage_path, 60);
+          if (!error) continue;
+        } catch (_) {}
+      }
+
+      const fileUrl = doc.file_url || doc.storage_path || '';
+      const fileName = fileUrl.split('/').pop();
+      if (!fileName) { failed++; continue; }
+
+      const searchPaths: string[] = [];
+      if (doc.storage_path) searchPaths.push(doc.storage_path);
+      if (doc.file_url && doc.file_url !== doc.storage_path) {
+        const extracted = extractStoragePath(doc.file_url);
+        if (extracted) searchPaths.push(extracted);
+      }
+      if (doc.driver_id) {
+        searchPaths.push(`${doc.driver_id}/${fileName}`);
+        searchPaths.push(`drivers/${doc.driver_id}/${doc.doc_type}/${fileName}`);
+      }
+      searchPaths.push(`drivers/pending/${doc.doc_type}/${fileName}`);
+      searchPaths.push(`applications/pending/${fileName}`);
+
+      let foundPath: string | null = null;
+      let foundBucket: string | null = null;
+
+      for (const bucket of BUCKETS) {
+        for (const tryPath of searchPaths) {
+          try {
+            const { error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(tryPath, 60);
+            if (!error) {
+              foundPath = tryPath;
+              foundBucket = bucket;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (foundPath) break;
+
+        if (doc.driver_id) {
+          for (const folder of [doc.driver_id, `drivers/${doc.driver_id}`, `drivers/${doc.driver_id}/${doc.doc_type}`]) {
+            try {
+              const { data: files } = await supabaseAdmin.storage.from(bucket).list(folder, { limit: 200 });
+              if (files) {
+                for (const f of files) {
+                  if (f.name === fileName || f.name.includes(doc.doc_type)) {
+                    const testPath = `${folder}/${f.name}`;
+                    const { error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(testPath, 60);
+                    if (!error) {
+                      foundPath = testPath;
+                      foundBucket = bucket;
+                      break;
+                    }
+                  }
+                }
+              }
+            } catch (_) {}
+            if (foundPath) break;
+          }
+        }
+        if (foundPath) break;
+      }
+
+      if (foundPath && foundBucket) {
+        await supabaseAdmin.from('driver_documents')
+          .update({ storage_path: foundPath, bucket: foundBucket, file_url: foundPath })
+          .eq('id', doc.id);
+        fixed++;
+        console.log(`[DocRepair] Fixed doc ${doc.id} (${doc.doc_type}): ${foundPath}`);
+      } else {
+        failed++;
+        console.log(`[DocRepair] Could not find file for doc ${doc.id} (${doc.doc_type}): ${fileUrl}`);
+      }
+    }
+
+    res.json({ checked, fixed, failed, total: docs.length });
   }));
 
   app.get("/api/pricing", asyncHandler(async (req, res) => {
