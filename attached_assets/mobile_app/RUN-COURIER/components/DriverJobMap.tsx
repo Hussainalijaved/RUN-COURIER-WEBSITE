@@ -29,6 +29,7 @@ interface DriverJobMapProps {
 
 const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey || 
                             process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || '';
 
 function decodePolyline(encoded: string): Array<{ latitude: number; longitude: number }> {
   const points: Array<{ latitude: number; longitude: number }> = [];
@@ -96,7 +97,7 @@ export function DriverJobMap({
   const hasRoute = hasPickup && hasDropoff;
 
   useEffect(() => {
-    if (hasRoute && GOOGLE_MAPS_API_KEY) {
+    if (hasRoute) {
       fetchRoute();
     } else {
       setLoading(false);
@@ -104,7 +105,7 @@ export function DriverJobMap({
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng]);
 
   const fetchRoute = async () => {
-    if (!hasPickup || !hasDropoff || !GOOGLE_MAPS_API_KEY) {
+    if (!hasPickup || !hasDropoff) {
       setLoading(false);
       return;
     }
@@ -116,12 +117,48 @@ export function DriverJobMap({
       const origin = `${pickupLat},${pickupLng}`;
       const destination = `${dropoffLat},${dropoffLng}`;
       
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+      let url: string;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       
-      const response = await fetch(url);
+      if (API_URL) {
+        url = `${API_URL}/api/mobile/v1/directions?origin=${origin}&destination=${destination}&mode=driving`;
+        try {
+          const { supabase: sb } = require('@/lib/supabase');
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+          }
+        } catch (e) {
+          console.log('[DriverJobMap] Could not get auth token for directions API');
+        }
+      } else if (GOOGLE_MAPS_API_KEY) {
+        url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+      } else {
+        console.log('[DriverJobMap] No API URL or Maps key available for directions');
+        setLoading(false);
+        return;
+      }
+      
+      const response = await fetch(url, { headers });
       const data = await response.json();
 
-      if (data.status === 'OK' && data.routes.length > 0) {
+      if (API_URL && data?.routes?.length > 0) {
+        const route = data.routes[0];
+        if (route.polyline) {
+          const polylinePoints = decodePolyline(route.polyline);
+          setRouteInfo({
+            distance: route.distance?.text || '',
+            duration: route.duration?.text || '',
+            polylinePoints,
+          });
+        } else if (route.overview_polyline?.points) {
+          setRouteInfo({
+            distance: route.legs?.[0]?.distance?.text || '',
+            duration: route.legs?.[0]?.duration?.text || '',
+            polylinePoints: decodePolyline(route.overview_polyline.points),
+          });
+        }
+      } else if (data.status === 'OK' && data.routes?.length > 0) {
         const route = data.routes[0];
         const leg = route.legs[0];
         const polylineEncoded = route.overview_polyline.points;

@@ -76,9 +76,49 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     // Include multi-drop stops for the driver to see all delivery points
     multiDropStops: mappedStops,
     staticMapUrl: staticMapUrl,
+    routePolyline: null as string | null,
+    routeDistance: null as string | null,
+    routeDuration: null as string | null,
     createdAt: job.created_at,
     updatedAt: job.updated_at,
   };
+}
+
+async function fetchRouteDataForJob(pickupLat: string | null, pickupLng: string | null, deliveryLat: string | null, deliveryLng: string | null): Promise<{
+  routePolyline: string | null;
+  routeDistance: string | null;
+  routeDuration: string | null;
+  staticMapUrl: string | null;
+} | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey || !pickupLat || !pickupLng || !deliveryLat || !deliveryLng) return null;
+  
+  try {
+    const origin = `${pickupLat},${pickupLng}`;
+    const destination = `${deliveryLat},${deliveryLng}`;
+    
+    const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}`;
+    const response = await fetch(directionsUrl);
+    const data = await response.json();
+    
+    const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${pickupLat},${pickupLng}&markers=color:red|label:D|${deliveryLat},${deliveryLng}&path=color:0x007BFF|weight:4|${pickupLat},${pickupLng}|${deliveryLat},${deliveryLng}&key=${apiKey}`;
+    
+    if (data.status === 'OK' && data.routes?.length > 0) {
+      const route = data.routes[0];
+      const leg = route.legs?.[0];
+      return {
+        routePolyline: route.overview_polyline?.points || null,
+        routeDistance: leg?.distance?.text || null,
+        routeDuration: leg?.duration?.text || null,
+        staticMapUrl,
+      };
+    }
+    
+    return { routePolyline: null, routeDistance: null, routeDuration: null, staticMapUrl };
+  } catch (err) {
+    console.error('[Mobile Maps] Error fetching route data:', err);
+    return null;
+  }
 }
 
 // POD uploads - use memory storage for Supabase upload
@@ -323,6 +363,22 @@ export function registerMobileRoutes(app: Express): void {
         delivery_latitude: job.delivery_latitude ? parseFloat(String(job.delivery_latitude)) : null,
         delivery_longitude: job.delivery_longitude ? parseFloat(String(job.delivery_longitude)) : null,
       }));
+
+      // Fetch route data for each job
+      for (const job of parsedJobs) {
+        const rd = await fetchRouteDataForJob(
+          job.pickup_latitude?.toString() || null,
+          job.pickup_longitude?.toString() || null,
+          job.delivery_latitude?.toString() || null,
+          job.delivery_longitude?.toString() || null
+        );
+        if (rd) {
+          (job as any).routePolyline = rd.routePolyline;
+          (job as any).routeDistance = rd.routeDistance;
+          (job as any).routeDuration = rd.routeDuration;
+          (job as any).staticMapUrl = rd.staticMapUrl;
+        }
+      }
 
       res.json({ success: true, jobs: parsedJobs });
     })
@@ -1640,6 +1696,22 @@ export function registerMobileRoutes(app: Express): void {
             return mapSupabaseJobToMobileFormat(j, stops);
           });
           
+          // Fetch route data for each job with coordinates
+          for (const mj of mobileJobs) {
+            const rd = await fetchRouteDataForJob(
+              mj.pickupLatitude?.toString() || null,
+              mj.pickupLongitude?.toString() || null,
+              mj.deliveryLatitude?.toString() || null,
+              mj.deliveryLongitude?.toString() || null
+            );
+            if (rd) {
+              (mj as any).routePolyline = rd.routePolyline;
+              (mj as any).routeDistance = rd.routeDistance;
+              (mj as any).routeDuration = rd.routeDuration;
+              (mj as any).staticMapUrl = rd.staticMapUrl;
+            }
+          }
+          
           return res.json({
             jobs: mobileJobs,
             count: mobileJobs.length,
@@ -2146,6 +2218,51 @@ export function registerMobileRoutes(app: Express): void {
         lastUpdate: driver.lastLocationUpdate,
       };
 
+      // Geocode missing coordinates
+      if (supabaseAdmin) {
+        const effectiveJob = job || supabaseJob;
+        const pickupAddr = effectiveJob?.pickupAddress || effectiveJob?.pickup_address || effectiveJob?.pickupPostcode || effectiveJob?.pickup_postcode;
+        const deliveryAddr = effectiveJob?.deliveryAddress || effectiveJob?.delivery_address || effectiveJob?.deliveryPostcode || effectiveJob?.delivery_postcode;
+        
+        let pickupLat = job?.pickupLatitude?.toString() || supabaseJob?.pickup_latitude?.toString() || null;
+        let pickupLng = job?.pickupLongitude?.toString() || supabaseJob?.pickup_longitude?.toString() || null;
+        let deliveryLat = job?.deliveryLatitude?.toString() || supabaseJob?.delivery_latitude?.toString() || null;
+        let deliveryLng = job?.deliveryLongitude?.toString() || supabaseJob?.delivery_longitude?.toString() || null;
+        
+        if (!pickupLat || !pickupLng) {
+          if (pickupAddr) {
+            const geo = await geocodeAddress(pickupAddr);
+            if (geo) {
+              pickupLat = String(geo.lat);
+              pickupLng = String(geo.lng);
+              await supabaseAdmin.from('jobs').update({ pickup_latitude: pickupLat, pickup_longitude: pickupLng }).eq('id', jobId);
+              if (job) { (job as any).pickupLatitude = pickupLat; (job as any).pickupLongitude = pickupLng; }
+              if (supabaseJob) { supabaseJob.pickup_latitude = pickupLat; supabaseJob.pickup_longitude = pickupLng; }
+            }
+          }
+        }
+        
+        if (!deliveryLat || !deliveryLng) {
+          if (deliveryAddr) {
+            const geo = await geocodeAddress(deliveryAddr);
+            if (geo) {
+              deliveryLat = String(geo.lat);
+              deliveryLng = String(geo.lng);
+              await supabaseAdmin.from('jobs').update({ delivery_latitude: deliveryLat, delivery_longitude: deliveryLng }).eq('id', jobId);
+              if (job) { (job as any).deliveryLatitude = deliveryLat; (job as any).deliveryLongitude = deliveryLng; }
+              if (supabaseJob) { supabaseJob.delivery_latitude = deliveryLat; supabaseJob.delivery_longitude = deliveryLng; }
+            }
+          }
+        }
+      }
+
+      // Fetch route data from Google Directions
+      const pLat = job?.pickupLatitude?.toString() || supabaseJob?.pickup_latitude?.toString() || null;
+      const pLng = job?.pickupLongitude?.toString() || supabaseJob?.pickup_longitude?.toString() || null;
+      const dLat = job?.deliveryLatitude?.toString() || supabaseJob?.delivery_latitude?.toString() || null;
+      const dLng = job?.deliveryLongitude?.toString() || supabaseJob?.delivery_longitude?.toString() || null;
+      const routeData = await fetchRouteDataForJob(pLat, pLng, dLat, dLng);
+
       // Build response from either source
       if (job) {
         // Use assignment driver_price if job.driverPrice is null
@@ -2186,6 +2303,10 @@ export function registerMobileRoutes(app: Express): void {
           deliveredAt: job.deliveredAt,
           createdAt: job.createdAt,
           updatedAt: job.updatedAt,
+          routePolyline: routeData?.routePolyline || null,
+          routeDistance: routeData?.routeDistance || null,
+          routeDuration: routeData?.routeDuration || null,
+          staticMapUrl: routeData?.staticMapUrl || null,
           driverLocation,
         });
       } else {
@@ -2231,6 +2352,10 @@ export function registerMobileRoutes(app: Express): void {
           deliveredAt: supabaseJob.delivered_at,
           createdAt: supabaseJob.created_at,
           updatedAt: supabaseJob.updated_at,
+          routePolyline: routeData?.routePolyline || null,
+          routeDistance: routeData?.routeDistance || null,
+          routeDuration: routeData?.routeDuration || null,
+          staticMapUrl: routeData?.staticMapUrl || null,
           driverLocation,
         });
       }

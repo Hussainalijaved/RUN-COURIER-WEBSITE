@@ -10,6 +10,7 @@ import Constants from 'expo-constants';
 
 const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey || 
                             process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || '';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -119,7 +120,7 @@ export function InAppNavigationScreen({ route, navigation }: any) {
   };
 
   const fetchRoute = useCallback(async (originLat: number, originLng: number) => {
-    if (!GOOGLE_MAPS_API_KEY || !destinationLat || !destinationLng) {
+    if (!destinationLat || !destinationLng) {
       setLoading(false);
       return;
     }
@@ -128,12 +129,48 @@ export function InAppNavigationScreen({ route, navigation }: any) {
       const origin = `${originLat},${originLng}`;
       const destination = `${destinationLat},${destinationLng}`;
       
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+      let url: string;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       
-      const response = await fetch(url);
+      if (API_URL) {
+        url = `${API_URL}/api/mobile/v1/directions?origin=${origin}&destination=${destination}&mode=driving`;
+        try {
+          const { supabase: sb } = require('@/lib/supabase');
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+          }
+        } catch (e) {
+          console.log('[Navigation] Could not get auth token for directions API');
+        }
+      } else if (GOOGLE_MAPS_API_KEY) {
+        url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+      } else {
+        console.log('[Navigation] No API URL or Maps key available');
+        setLoading(false);
+        return;
+      }
+      
+      const response = await fetch(url, { headers });
       const data = await response.json();
 
-      if (data.status === 'OK' && data.routes.length > 0) {
+      if (API_URL && data?.routes?.length > 0) {
+        const routeData = data.routes[0];
+        if (routeData.polyline) {
+          setRouteInfo({
+            distance: routeData.distance?.text || '',
+            duration: routeData.duration?.text || '',
+            polylinePoints: decodePolyline(routeData.polyline),
+          });
+        } else if (routeData.overview_polyline?.points) {
+          const leg = routeData.legs?.[0];
+          setRouteInfo({
+            distance: leg?.distance?.text || '',
+            duration: leg?.duration?.text || '',
+            polylinePoints: decodePolyline(routeData.overview_polyline.points),
+          });
+        }
+      } else if (data.status === 'OK' && data.routes?.length > 0) {
         const routeData = data.routes[0];
         const leg = routeData.legs[0];
         const polylineEncoded = routeData.overview_polyline.points;
