@@ -4135,13 +4135,19 @@ export async function registerRoutes(
         if (doc.fileUrl && doc.fileUrl.startsWith('text:')) continue;
 
         const storagePath = doc.storagePath;
+        const docBucket = doc.bucket;
         const driverId = doc.driverId || doc.authUserId;
         const docType = (doc.type || '').toLowerCase().replace(/_/g, '');
 
         let matchedBucket = '';
         let matchedPath = '';
 
-        if (driverId) {
+        if (storagePath && docBucket && !storagePath.startsWith('/api/') && !storagePath.startsWith('/uploads/') && !storagePath.startsWith('application-pending/')) {
+          matchedBucket = docBucket;
+          matchedPath = storagePath;
+        }
+
+        if (!matchedPath && driverId) {
           for (const bucket of BUCKETS) {
             const files = folderListCache.get(`${bucket}:${driverId}`) || [];
             if (files.length === 0) continue;
@@ -4171,12 +4177,6 @@ export async function registerRoutes(
                 bestMatch = files.find((f: any) => f.name.toLowerCase().replace(/_/g, '').includes(altType));
               }
             }
-            if (!bestMatch && docType) {
-              const altType2 = docType.replace('proofof', '');
-              if (altType2 !== docType) {
-                bestMatch = files.find((f: any) => f.name.toLowerCase().replace(/_/g, '').includes(altType2));
-              }
-            }
 
             if (bestMatch) {
               matchedBucket = bucket;
@@ -4189,7 +4189,7 @@ export async function registerRoutes(
         }
 
         if (!matchedPath && storagePath) {
-          matchedBucket = BUCKETS[0];
+          matchedBucket = docBucket || BUCKETS[0];
           matchedPath = storagePath;
         }
 
