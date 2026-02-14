@@ -3945,10 +3945,37 @@ export async function registerRoutes(
     res.json({ success: true, message: "Account reactivated successfully", user: reactivatedUser });
   }));
 
+  const documentsCache = {
+    data: null as any[] | null,
+    timestamp: 0,
+    ttl: 120_000,
+    isResolving: false,
+    invalidate() { this.data = null; this.timestamp = 0; },
+    isValid() { return this.data && (Date.now() - this.timestamp) < this.ttl; },
+  };
+
   app.get("/api/documents", asyncHandler(async (req, res) => {
     const { driverId, status, type } = req.query;
+    const hasFilters = driverId || status || type;
     
-    // Collect documents from all sources and merge (deduplicate by id)
+    if (!hasFilters && documentsCache.isValid()) {
+      console.log(`[Documents] Returning ${documentsCache.data!.length} cached documents`);
+      return res.json(documentsCache.data);
+    }
+    
+    if (!hasFilters && documentsCache.isResolving) {
+      const waitStart = Date.now();
+      while (documentsCache.isResolving && (Date.now() - waitStart) < 60_000) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+      if (documentsCache.isValid()) {
+        console.log(`[Documents] Returning ${documentsCache.data!.length} cached documents (waited)`);
+        return res.json(documentsCache.data);
+      }
+    }
+    
+    if (!hasFilters) documentsCache.isResolving = true;
+    
     let allDocuments: any[] = [];
     const seenIds = new Set<string>();
     
@@ -4195,32 +4222,16 @@ export async function registerRoutes(
               }
             } catch (_) {}
           })(),
-          (async () => {
-            const docTypes = docTypesPerDriver.get(dId) || new Set();
-            for (const dt of docTypes) {
-              try {
-                const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/${dId}/${dt}`, { limit: 200 });
-                if (data && data.length > 0) {
-                  const existing = folderListCache.get(`${bucket}:${dId}`) || [];
-                  const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/${dId}/${dt}` }));
-                  folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
-                }
-              } catch (_) {}
-            }
-          })(),
-          (async () => {
-            const docTypes = docTypesPerDriver.get(dId) || new Set();
-            for (const dt of docTypes) {
-              try {
-                const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/pending/${dt}`, { limit: 200 });
-                if (data && data.length > 0) {
-                  const existing = folderListCache.get(`${bucket}:${dId}`) || [];
-                  const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/pending/${dt}` }));
-                  folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
-                }
-              } catch (_) {}
-            }
-          })(),
+          ...([...(docTypesPerDriver.get(dId) || [])].map(dt => (async () => {
+            try {
+              const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/${dId}/${dt}`, { limit: 200 });
+              if (data && data.length > 0) {
+                const existing = folderListCache.get(`${bucket}:${dId}`) || [];
+                const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/${dId}/${dt}` }));
+                folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
+              }
+            } catch (_) {}
+          })())),
         ])
       ));
 
@@ -4367,37 +4378,7 @@ export async function registerRoutes(
         const doc = allDocuments[i];
         if (doc.signedUrl || (doc.fileUrl && doc.fileUrl.startsWith('http')) || (doc.fileUrl && doc.fileUrl.startsWith('text:'))) continue;
         if (!doc.storagePath) continue;
-        
-        const sp = doc.storagePath;
-        const dId = doc.driverId || doc.authUserId;
-        const pathsToTry = [sp];
-        
-        if (sp.startsWith('application-pending/')) {
-          pathsToTry.push(sp.replace('application-pending/', 'applications/pending/'));
-          pathsToTry.push(`drivers/pending/${sp.replace('application-pending/', '')}`);
-        }
-        if (dId && !sp.includes(dId)) {
-          pathsToTry.push(`${dId}/${sp.split('/').pop()}`);
-          pathsToTry.push(`drivers/${dId}/${sp.split('/').pop()}`);
-        }
-        
-        let found = false;
-        for (const bucket of BUCKETS) {
-          for (const tryPath of pathsToTry) {
-            try {
-              const { data, error } = await supabaseAdminClient.storage.from(bucket).createSignedUrl(tryPath, 3600);
-              if (!error && data?.signedUrl) {
-                allDocuments[i].fileUrl = data.signedUrl;
-                allDocuments[i].signedUrl = data.signedUrl;
-                allDocuments[i].storagePath = tryPath;
-                allDocuments[i].bucket = bucket;
-                found = true;
-                break;
-              }
-            } catch (_) {}
-          }
-          if (found) break;
-        }
+        doc.fileMissing = true;
       }
 
       for (const doc of allDocuments) {
@@ -4432,6 +4413,13 @@ export async function registerRoutes(
     });
     
     console.log(`[Documents] Returning ${allDocuments.length} total documents from all sources`);
+    
+    if (!hasFilters) {
+      documentsCache.data = allDocuments;
+      documentsCache.timestamp = Date.now();
+      documentsCache.isResolving = false;
+    }
+    
     res.json(allDocuments);
   }));
 
@@ -4527,6 +4515,7 @@ export async function registerRoutes(
 
     if (isPendingApplication) {
       console.log(`[Documents] Uploaded document for pending application: ${safeDocumentType}`);
+      documentsCache.invalidate();
       return res.status(201).json({
         success: true,
         storagePath,
@@ -4701,6 +4690,7 @@ export async function registerRoutes(
       });
     }
 
+    documentsCache.invalidate();
     res.status(201).json(document);
   }));
 
@@ -5120,6 +5110,7 @@ export async function registerRoutes(
       }
     }
     
+    documentsCache.invalidate();
     res.json(document);
   }));
 
@@ -5211,6 +5202,7 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Document not found" });
     }
     
+    documentsCache.invalidate();
     res.json({ success: true, message: "Document deleted" });
   }));
 
