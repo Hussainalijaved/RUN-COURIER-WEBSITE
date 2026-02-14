@@ -445,22 +445,39 @@ export default function AdminInvoices() {
         <thead>
           <tr style="background: #f8f9fa;">
             <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Job No.</th>
-            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Pickup</th>
-            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Delivery</th>
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Route Details</th>
             <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Date</th>
             <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Amount</th>
           </tr>
         </thead>
         <tbody>
-          ${jobDetails.map((job: any) => `
-            <tr>
-              <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.jobNumber || job.trackingNumber || 'N/A'}</td>
-              <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 200px;">${job.pickupAddress || 'N/A'}</td>
-              <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 200px;">${job.deliveryAddress || job.recipientName || 'N/A'}</td>
-              <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.scheduledDate || 'N/A'}</td>
-              <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">£${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}</td>
-            </tr>
-          `).join('')}
+          ${jobDetails.map((job: any) => {
+            const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
+            const stopsHtml = isMultiDrop ? `
+              <div style="margin-top: 4px;">
+                <div style="font-weight: 600; color: #333; margin-bottom: 4px;">Multi-drop (${job.multiDropStops.length} stops)</div>
+                <div style="color: #555; font-size: 12px; margin-bottom: 2px;">Pickup: ${job.pickupAddress || 'N/A'}</div>
+                ${job.multiDropStops.map((stop: any) => `
+                  <div style="color: #555; font-size: 12px; padding-left: 12px; border-left: 2px solid #007BFF40; margin: 2px 0;">
+                    Stop ${stop.stopOrder}: ${stop.address || stop.postcode}${stop.recipientName ? ` (${stop.recipientName})` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div>
+                <div style="color: #555; font-size: 12px;">Pickup: ${job.pickupAddress || 'N/A'}</div>
+                <div style="color: #555; font-size: 12px;">Delivery: ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
+              </div>
+            `;
+            return `
+              <tr style="vertical-align: top;">
+                <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.jobNumber || job.trackingNumber || 'N/A'}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 300px;">${stopsHtml}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.scheduledDate || 'N/A'}</td>
+                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">£${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     ` : '';
@@ -1082,20 +1099,39 @@ export default function AdminInvoices() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Job No.</TableHead>
-                            <TableHead>Pickup</TableHead>
-                            <TableHead>Delivery</TableHead>
+                            <TableHead>Route Details</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-mono text-sm">{job.jobNumber || job.trackingNumber || 'N/A'}</TableCell>
-                              <TableCell className="text-sm max-w-[200px] break-words">{job.pickupAddress || 'N/A'}</TableCell>
-                              <TableCell className="text-sm max-w-[200px] break-words">{job.deliveryAddress || job.recipientName || 'N/A'}</TableCell>
-                              <TableCell className="text-right font-medium">{formatPrice(job.price)}</TableCell>
-                            </TableRow>
-                          ))}
+                          {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => {
+                            const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
+                            return (
+                              <TableRow key={idx} className="align-top">
+                                <TableCell className="font-mono text-sm">{job.jobNumber || job.trackingNumber || 'N/A'}</TableCell>
+                                <TableCell className="text-sm max-w-[300px] break-words">
+                                  {isMultiDrop ? (
+                                    <div>
+                                      <div className="font-medium mb-1">Multi-drop ({job.multiDropStops.length} stops)</div>
+                                      <div className="text-xs text-muted-foreground mb-1">Pickup: {job.pickupAddress || 'N/A'}</div>
+                                      {job.multiDropStops.map((stop: any, stopIdx: number) => (
+                                        <div key={stopIdx} className="text-xs text-muted-foreground pl-3 py-0.5 border-l-2 border-primary/30">
+                                          Stop {stop.stopOrder}: {stop.address || stop.postcode}
+                                          {stop.recipientName && <span className="ml-1">({stop.recipientName})</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div className="text-xs text-muted-foreground">Pickup: {job.pickupAddress || 'N/A'}</div>
+                                      <div className="text-xs text-muted-foreground">Delivery: {job.deliveryAddress || job.recipientName || 'N/A'}</div>
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">{formatPrice(job.price)}</TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>

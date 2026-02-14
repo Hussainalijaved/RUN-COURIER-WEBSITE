@@ -1738,12 +1738,41 @@ export class SupabaseStorage implements IStorage {
     const invoice = await this.getInvoice(id);
     if (!invoice) return undefined;
     
-    // Fetch all jobs in parallel for better performance
     let jobs: Job[] = [];
     if (invoice.jobIds && Array.isArray(invoice.jobIds) && invoice.jobIds.length > 0) {
       const jobPromises = invoice.jobIds.map(jobId => this.getJob(jobId));
       const results = await Promise.all(jobPromises);
       jobs = results.filter((job): job is Job => job !== undefined);
+      
+      const multiDropJobIds = jobs.filter(j => j.isMultiDrop).map(j => j.id);
+      if (multiDropJobIds.length > 0) {
+        const supabase = this.checkSupabase();
+        const { data: stops } = await supabase
+          .from('multi_drop_stops')
+          .select('*')
+          .in('job_id', multiDropJobIds)
+          .order('stop_order', { ascending: true });
+        
+        if (stops) {
+          const stopsMap: Record<string, any[]> = {};
+          for (const stop of stops) {
+            if (!stopsMap[stop.job_id]) stopsMap[stop.job_id] = [];
+            stopsMap[stop.job_id].push({
+              stopOrder: stop.stop_order,
+              address: stop.address,
+              postcode: stop.postcode,
+              recipientName: stop.recipient_name,
+              recipientPhone: stop.recipient_phone,
+              instructions: stop.instructions,
+              status: stop.status,
+            });
+          }
+          jobs = jobs.map(j => ({
+            ...j,
+            multiDropStops: stopsMap[j.id] || [],
+          })) as any;
+        }
+      }
     }
     return { invoice, jobs };
   }

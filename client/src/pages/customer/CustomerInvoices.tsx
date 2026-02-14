@@ -257,16 +257,33 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             </tr>
           </thead>
           <tbody>
-            {jobs.length > 0 ? jobs.map((job) => (
-              <tr key={job.id} className="border-b">
-                <td className="py-3 px-4 font-mono text-xs">{(job as any).jobNumber || job.trackingNumber}</td>
-                <td className="py-3 px-4 text-gray-600 text-xs">{formatDate(job.createdAt)}</td>
-                <td className="py-3 px-4 text-gray-600 text-xs">
-                  Courier Service: {job.pickupPostcode} → {job.deliveryPostcode}
-                </td>
-                <td className="py-3 px-4 text-right font-medium text-sm">{formatPrice(job.totalPrice)}</td>
-              </tr>
-            )) : (
+            {jobs.length > 0 ? jobs.map((job) => {
+              const multiDropStops = (job as any).multiDropStops || [];
+              const isMultiDrop = (job as any).isMultiDrop && multiDropStops.length > 0;
+              return (
+                <tr key={job.id} className="border-b align-top">
+                  <td className="py-3 px-4 font-mono text-xs">{(job as any).jobNumber || job.trackingNumber}</td>
+                  <td className="py-3 px-4 text-gray-600 text-xs">{formatDate(job.createdAt)}</td>
+                  <td className="py-3 px-4 text-gray-600 text-xs">
+                    {isMultiDrop ? (
+                      <div>
+                        <div className="font-medium text-gray-800 mb-1">Multi-drop Delivery ({multiDropStops.length} stops)</div>
+                        <div className="text-xs mb-1">Pickup: {job.pickupAddress || job.pickupPostcode}</div>
+                        {multiDropStops.map((stop: any, idx: number) => (
+                          <div key={idx} className="text-xs pl-3 py-0.5 border-l-2 border-primary/30">
+                            Stop {stop.stopOrder}: {stop.address || stop.postcode}
+                            {stop.recipientName && <span className="text-gray-400 ml-1">({stop.recipientName})</span>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>Courier Service: {job.pickupPostcode} &rarr; {job.deliveryPostcode}</>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-right font-medium text-sm">{formatPrice(job.totalPrice)}</td>
+                </tr>
+              );
+            }) : (
               <tr>
                 <td colSpan={4} className="py-8 text-center text-gray-500">
                   No deliveries found for this invoice period
