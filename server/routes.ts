@@ -3137,6 +3137,13 @@ export async function registerRoutes(
                 .eq('id', existingVehicleDoc.id);
               console.log(`[Drivers] Approved existing vehicle photo ${docType} for driver ${driverId}`);
               continue;
+            } else if (existingVehicleDoc) {
+              const storagePath = existingVehicleDoc.storage_path || existingVehicleDoc.file_url || '';
+              await supabaseAdmin.from('driver_documents')
+                .update({ status: 'approved', bucket: BUCKET, storage_path: storagePath })
+                .eq('id', existingVehicleDoc.id);
+              console.log(`[Drivers] Approved and fixed vehicle photo ${docType} for driver ${driverId}`);
+              continue;
             }
 
             let found = false;
@@ -3148,32 +3155,20 @@ export async function registerRoutes(
                 for (const file of files) {
                   const nameWithoutExt = file.name.replace(/\.[^.]+$/, '').replace(/_\d{10,}$/, '').toLowerCase();
                   if (searchPatterns.some(p => nameWithoutExt === p.toLowerCase() || nameWithoutExt.startsWith(p.toLowerCase()))) {
-                    let destPath: string;
-                    if (folder !== driverId) {
-                      const { data: fileData } = await supabaseAdmin.storage.from(BUCKET).download(`${folder}/${file.name}`);
-                      if (!fileData) continue;
-                      const arrayBuf = await fileData.arrayBuffer();
-                      const ext = file.name.match(/\.[^.]+$/)?.[0] || '.jpg';
-                      destPath = `${driverId}/vehicle_photos_${label}${ext}`;
-                      await supabaseAdmin.storage.from(BUCKET).upload(destPath, Buffer.from(arrayBuf), { upsert: true });
-                      console.log(`[Drivers] Copied ${docType} from ${folder} to driver folder`);
-                    } else {
-                      destPath = `${driverId}/${file.name}`;
-                    }
+                    const originalPath = `${folder}/${file.name}`;
 
-                    await supabaseAdmin.from('driver_documents').delete()
-                      .eq('driver_id', driverId).eq('doc_type', docType);
                     await supabaseAdmin.from('driver_documents').insert({
                       driver_id: driverId,
                       auth_user_id: driverId,
                       doc_type: docType,
-                      file_url: destPath,
+                      file_url: originalPath,
                       bucket: BUCKET,
-                      storage_path: destPath,
+                      storage_path: originalPath,
                       file_name: file.name,
                       status: 'approved',
                       uploaded_at: new Date().toISOString(),
                     });
+                    console.log(`[Drivers] Created vehicle photo record ${docType} at original path: ${originalPath}`);
                     found = true;
                     break;
                   }
