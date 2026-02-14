@@ -268,7 +268,7 @@ export function shouldSwitchVehicle(vehicleType: VehicleType, distance: number):
 // Cache for fetched pricing config
 let cachedPricingConfig: PricingConfig | null = null;
 let cacheTimestamp: number = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 1000; // 30 seconds
 
 /**
  * Fetch pricing configuration from the API.

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Bike, Car, Truck, Package, Save, Clock, MapPin, Weight, Layers, RotateCcw, Loader2 } from 'lucide-react';
-import { defaultPricingConfig, type PricingConfig } from '@/lib/pricing';
+import { defaultPricingConfig, clearPricingCache, type PricingConfig } from '@/lib/pricing';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { PricingSettings, Vehicle, VehicleType } from '@shared/schema';
 
@@ -140,6 +140,10 @@ export default function AdminPricing() {
           },
         });
       }
+
+      clearPricingCache();
+      queryClient.invalidateQueries({ queryKey: ['/api/pricing'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vehicles'] });
 
       toast({
         title: 'Pricing Updated',

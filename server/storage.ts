@@ -1822,7 +1822,10 @@ async function createStorage(): Promise<IStorage> {
   if (supabaseAdmin) {
     const { SupabaseStorage } = await import('./supabaseStorage');
     console.log('[Storage] Using Supabase storage');
-    return new SupabaseStorage();
+    const store = new SupabaseStorage();
+    await store.loadPricingFromDatabase();
+    await store.loadVehiclesFromDatabase();
+    return store;
   }
   console.log('[Storage] Using Memory storage');
   return new MemStorage();

@@ -1311,12 +1311,151 @@ export class SupabaseStorage implements IStorage {
     await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId);
   }
 
+  async loadPricingFromDatabase(): Promise<void> {
+    try {
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('pricing_settings')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (!error && data) {
+        this.pricingSettings = {
+          id: data.id,
+          centralLondonSurcharge: data.central_london_surcharge ?? this.pricingSettings.centralLondonSurcharge,
+          multiDropCharge: data.multi_drop_charge ?? this.pricingSettings.multiDropCharge,
+          returnTripMultiplier: data.return_trip_multiplier ?? this.pricingSettings.returnTripMultiplier,
+          waitingTimeFreeMinutes: data.waiting_time_free_minutes ?? this.pricingSettings.waitingTimeFreeMinutes,
+          waitingTimePerMinute: data.waiting_time_per_minute ?? this.pricingSettings.waitingTimePerMinute,
+          rushHourStart: data.rush_hour_start ?? this.pricingSettings.rushHourStart,
+          rushHourEnd: data.rush_hour_end ?? this.pricingSettings.rushHourEnd,
+          rushHourStartEvening: data.rush_hour_start_evening ?? this.pricingSettings.rushHourStartEvening,
+          rushHourEndEvening: data.rush_hour_end_evening ?? this.pricingSettings.rushHourEndEvening,
+          weightSurcharges: data.weight_surcharges ?? this.pricingSettings.weightSurcharges,
+          updatedAt: data.updated_at ? new Date(data.updated_at) : new Date(),
+        };
+        console.log('[SupabaseStorage] Loaded pricing settings from database');
+      } else {
+        console.log('[SupabaseStorage] No pricing settings found in database, inserting defaults');
+        const { error: insertError } = await supabase
+          .from('pricing_settings')
+          .insert({
+            id: this.pricingSettings.id,
+            central_london_surcharge: this.pricingSettings.centralLondonSurcharge,
+            multi_drop_charge: this.pricingSettings.multiDropCharge,
+            return_trip_multiplier: this.pricingSettings.returnTripMultiplier,
+            waiting_time_free_minutes: this.pricingSettings.waitingTimeFreeMinutes,
+            waiting_time_per_minute: this.pricingSettings.waitingTimePerMinute,
+            rush_hour_start: this.pricingSettings.rushHourStart,
+            rush_hour_end: this.pricingSettings.rushHourEnd,
+            rush_hour_start_evening: this.pricingSettings.rushHourStartEvening,
+            rush_hour_end_evening: this.pricingSettings.rushHourEndEvening,
+            weight_surcharges: this.pricingSettings.weightSurcharges,
+            updated_at: new Date().toISOString(),
+          });
+        if (insertError) {
+          console.error('[SupabaseStorage] Error inserting default pricing settings:', insertError);
+        } else {
+          console.log('[SupabaseStorage] Inserted default pricing settings into database');
+        }
+      }
+    } catch (err) {
+      console.error('[SupabaseStorage] Error loading pricing from database:', err);
+    }
+  }
+
+  async loadVehiclesFromDatabase(): Promise<void> {
+    try {
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('*');
+
+      if (!error && data && data.length > 0) {
+        for (const v of data) {
+          const type = v.type as VehicleType;
+          this.vehicles.set(type, {
+            id: v.id,
+            type: type,
+            name: v.name,
+            description: v.description,
+            maxWeight: v.max_weight,
+            baseCharge: v.base_charge,
+            perMileRate: v.per_mile_rate,
+            rushHourRate: v.rush_hour_rate,
+            iconUrl: v.icon_url,
+          });
+        }
+        console.log(`[SupabaseStorage] Loaded ${data.length} vehicles from database`);
+      } else {
+        console.log('[SupabaseStorage] No vehicles found in database, inserting defaults');
+        for (const [, vehicle] of this.vehicles) {
+          const vehicleId = vehicle.id.length < 10 ? randomUUID() : vehicle.id;
+          const { error: insertError } = await supabase
+            .from('vehicles')
+            .upsert({
+              id: vehicleId,
+              type: vehicle.type,
+              name: vehicle.name,
+              description: vehicle.description,
+              max_weight: vehicle.maxWeight,
+              base_charge: vehicle.baseCharge,
+              per_mile_rate: vehicle.perMileRate,
+              rush_hour_rate: vehicle.rushHourRate,
+              icon_url: vehicle.iconUrl,
+            }, { onConflict: 'type' });
+          if (insertError) {
+            console.error(`[SupabaseStorage] Error inserting vehicle ${vehicle.type}:`, insertError);
+          } else {
+            vehicle.id = vehicleId;
+          }
+        }
+        console.log('[SupabaseStorage] Inserted default vehicles into database');
+      }
+    } catch (err) {
+      console.error('[SupabaseStorage] Error loading vehicles from database:', err);
+    }
+  }
+
   async getPricingSettings(): Promise<PricingSettings> {
     return this.pricingSettings;
   }
 
   async updatePricingSettings(data: Partial<PricingSettings>): Promise<PricingSettings> {
     this.pricingSettings = { ...this.pricingSettings, ...data, updatedAt: new Date() };
+
+    try {
+      const supabase = this.checkSupabase();
+      const dbData: any = {
+        id: this.pricingSettings.id,
+        updated_at: new Date().toISOString(),
+      };
+      if (data.centralLondonSurcharge !== undefined) dbData.central_london_surcharge = data.centralLondonSurcharge;
+      if (data.multiDropCharge !== undefined) dbData.multi_drop_charge = data.multiDropCharge;
+      if (data.returnTripMultiplier !== undefined) dbData.return_trip_multiplier = data.returnTripMultiplier;
+      if (data.waitingTimeFreeMinutes !== undefined) dbData.waiting_time_free_minutes = data.waitingTimeFreeMinutes;
+      if (data.waitingTimePerMinute !== undefined) dbData.waiting_time_per_minute = data.waitingTimePerMinute;
+      if (data.rushHourStart !== undefined) dbData.rush_hour_start = data.rushHourStart;
+      if (data.rushHourEnd !== undefined) dbData.rush_hour_end = data.rushHourEnd;
+      if (data.rushHourStartEvening !== undefined) dbData.rush_hour_start_evening = data.rushHourStartEvening;
+      if (data.rushHourEndEvening !== undefined) dbData.rush_hour_end_evening = data.rushHourEndEvening;
+      if (data.weightSurcharges !== undefined) dbData.weight_surcharges = data.weightSurcharges;
+
+      const { error } = await supabase
+        .from('pricing_settings')
+        .upsert(dbData, { onConflict: 'id' });
+
+      if (error) {
+        console.error('[SupabaseStorage] Error persisting pricing settings:', error);
+      } else {
+        console.log('[SupabaseStorage] Pricing settings persisted to database');
+        await this.loadPricingFromDatabase();
+      }
+    } catch (err) {
+      console.error('[SupabaseStorage] Error upserting pricing settings:', err);
+    }
+
     return this.pricingSettings;
   }
 
@@ -1329,6 +1468,34 @@ export class SupabaseStorage implements IStorage {
     if (!vehicle) return undefined;
     const updated = { ...vehicle, ...data };
     this.vehicles.set(type, updated);
+
+    try {
+      const supabase = this.checkSupabase();
+      const dbData: any = {
+        id: updated.id,
+        type: updated.type,
+        name: updated.name,
+        description: updated.description,
+        max_weight: updated.maxWeight,
+        base_charge: updated.baseCharge,
+        per_mile_rate: updated.perMileRate,
+        rush_hour_rate: updated.rushHourRate,
+        icon_url: updated.iconUrl,
+      };
+
+      const { error } = await supabase
+        .from('vehicles')
+        .upsert(dbData, { onConflict: 'type' });
+
+      if (error) {
+        console.error(`[SupabaseStorage] Error persisting vehicle ${type}:`, error);
+      } else {
+        console.log(`[SupabaseStorage] Vehicle ${type} persisted to database`);
+      }
+    } catch (err) {
+      console.error(`[SupabaseStorage] Error upserting vehicle ${type}:`, err);
+    }
+
     return updated;
   }
 
