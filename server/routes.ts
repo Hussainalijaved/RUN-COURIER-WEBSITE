@@ -10368,5 +10368,195 @@ export async function registerRoutes(
     res.json({ message: "Backfill complete", results });
   }));
 
+  app.post("/api/admin/migrate-local-documents", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
+
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not available" });
+
+    const BUCKET = 'driver-documents';
+    const BATCH_SIZE = 5;
+    const baseUploadsDir = path.join(process.cwd(), 'uploads');
+    const documentsDir = path.join(baseUploadsDir, 'documents');
+    const podDir = path.join(baseUploadsDir, 'pod');
+
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.pdf': 'application/pdf',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+    };
+
+    function getContentType(filePath: string): string {
+      const ext = path.extname(filePath).toLowerCase();
+      return mimeTypes[ext] || 'application/octet-stream';
+    }
+
+    function extractDocType(filename: string): string {
+      const baseName = filename.replace(/\.[^.]+$/, '');
+      const withoutTimestamp = baseName.replace(/_\d{10,}$/, '');
+      return withoutTimestamp;
+    }
+
+    function getAllFiles(dir: string): string[] {
+      const results: string[] = [];
+      if (!fs.existsSync(dir)) return results;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results.push(...getAllFiles(fullPath));
+        } else if (entry.isFile()) {
+          results.push(fullPath);
+        }
+      }
+      return results;
+    }
+
+    interface FileTask {
+      localPath: string;
+      storagePath: string;
+      driverId: string | null;
+      docType: string | null;
+      category: string;
+    }
+
+    const tasks: FileTask[] = [];
+
+    const documentFiles = getAllFiles(documentsDir);
+    for (const filePath of documentFiles) {
+      const relativePath = path.relative(documentsDir, filePath);
+      const parts = relativePath.split(path.sep);
+      const filename = parts[parts.length - 1];
+
+      if (parts.length < 2) continue;
+
+      const folder = parts[0];
+
+      if (folder === 'application-pending') {
+        tasks.push({
+          localPath: filePath,
+          storagePath: `applications/pending/${filename}`,
+          driverId: null,
+          docType: null,
+          category: 'application-pending',
+        });
+      } else if (folder.startsWith('application-')) {
+        const uuid = folder.replace('application-', '');
+        tasks.push({
+          localPath: filePath,
+          storagePath: `applications/${uuid}/${filename}`,
+          driverId: null,
+          docType: null,
+          category: 'application',
+        });
+      } else if (folder === 'temp' || folder === 'unknown') {
+        tasks.push({
+          localPath: filePath,
+          storagePath: `misc/${folder}/${filename}`,
+          driverId: null,
+          docType: null,
+          category: folder,
+        });
+      } else {
+        const driverId = folder;
+        const docType = extractDocType(filename);
+        tasks.push({
+          localPath: filePath,
+          storagePath: `drivers/${driverId}/${docType}/${filename}`,
+          driverId,
+          docType,
+          category: 'driver-document',
+        });
+      }
+    }
+
+    const podFiles = getAllFiles(podDir);
+    for (const filePath of podFiles) {
+      const relativePath = path.relative(podDir, filePath);
+      tasks.push({
+        localPath: filePath,
+        storagePath: `pod/${relativePath.split(path.sep).join('/')}`,
+        driverId: null,
+        docType: null,
+        category: 'pod',
+      });
+    }
+
+    let migrated = 0;
+    let failed = 0;
+    let alreadyExisted = 0;
+    const errors: Array<{ file: string; error: string }> = [];
+
+    async function processTask(task: FileTask): Promise<void> {
+      try {
+        const fileBuffer = fs.readFileSync(task.localPath);
+        const contentType = getContentType(task.localPath);
+
+        const { data, error } = await supabaseAdmin!.storage
+          .from(BUCKET)
+          .upload(task.storagePath, fileBuffer, {
+            contentType,
+            upsert: true,
+          });
+
+        if (error) {
+          if (error.message?.includes('already exists')) {
+            alreadyExisted++;
+            return;
+          }
+          failed++;
+          errors.push({ file: task.storagePath, error: error.message });
+          return;
+        }
+
+        if (task.driverId && task.docType && task.category === 'driver-document') {
+          const matchDocTypes = findDocTypeMatch(path.basename(task.localPath));
+
+          const { data: docRecord } = await supabaseAdmin!
+            .from('driver_documents')
+            .select('id')
+            .eq('driver_id', task.driverId)
+            .in('doc_type', matchDocTypes)
+            .limit(1)
+            .maybeSingle();
+
+          if (docRecord) {
+            await supabaseAdmin!
+              .from('driver_documents')
+              .update({
+                file_url: task.storagePath,
+                storage_path: task.storagePath,
+                bucket: BUCKET,
+              })
+              .eq('id', docRecord.id);
+          }
+        }
+
+        migrated++;
+      } catch (err: any) {
+        failed++;
+        errors.push({ file: task.storagePath, error: err.message || String(err) });
+      }
+    }
+
+    for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+      const batch = tasks.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(processTask));
+    }
+
+    console.log(`[Admin] Migrate local documents complete: ${migrated} migrated, ${failed} failed, ${alreadyExisted} already existed, ${tasks.length} total files`);
+    res.json({
+      message: "Migration complete",
+      totalFiles: tasks.length,
+      migrated,
+      failed,
+      alreadyExisted,
+      errors: errors.slice(0, 50),
+    });
+  }));
+
   return httpServer;
 }
