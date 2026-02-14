@@ -47,10 +47,21 @@ export default function AdminDocuments() {
       return;
     }
     
-    const fetchSignedUrl = async () => {
+    const resolvePreview = async () => {
       setPreviewLoading(true);
       setPreviewError(null);
       try {
+        const docAny = selectedDoc as any;
+        if (docAny.signedUrl) {
+          setPreviewUrl(docAny.signedUrl);
+          setPreviewLoading(false);
+          return;
+        }
+        if (selectedDoc.fileUrl?.startsWith('http')) {
+          setPreviewUrl(selectedDoc.fileUrl);
+          setPreviewLoading(false);
+          return;
+        }
         const response = await fetch(`/api/documents/${selectedDoc.id}/signed-url`);
         if (response.ok) {
           const data = await response.json();
@@ -71,7 +82,7 @@ export default function AdminDocuments() {
       }
     };
     
-    fetchSignedUrl();
+    resolvePreview();
   }, [selectedDoc, viewDialogOpen]);
 
   const { data: documents, isLoading: docsLoading, isError: docsError, refetch: refetchDocs } = useQuery<Document[]>({
@@ -247,7 +258,12 @@ export default function AdminDocuments() {
                         <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
                         <TableCell>{getDocTypeName(doc.type)}</TableCell>
                         <TableCell className="text-sm">{doc.fileName}</TableCell>
-                        <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {getStatusBadge(doc.status)}
+                            {(doc as any).fileMissing && <Badge variant="destructive" className="text-xs">File Missing</Badge>}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button
@@ -326,7 +342,12 @@ export default function AdminDocuments() {
                         <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
                         <TableCell>{getDocTypeName(doc.type)}</TableCell>
                         <TableCell className="text-sm">{doc.fileName}</TableCell>
-                        <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {getStatusBadge(doc.status)}
+                            {(doc as any).fileMissing && <Badge variant="destructive" className="text-xs">File Missing</Badge>}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button

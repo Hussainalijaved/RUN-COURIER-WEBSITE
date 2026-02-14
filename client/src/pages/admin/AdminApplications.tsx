@@ -384,15 +384,10 @@ export default function AdminApplications() {
 
   const resolveDocUrl = (url: string): string => {
     if (!url || url.startsWith('text:')) return url;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
     if (url.startsWith('/api/uploads/')) return url;
     if (url.startsWith('/uploads/')) return '/api' + url;
-    if (url.includes('supabase.co/storage/v1/object/') && url.includes('driver-documents/')) {
-      const storagePath = url.split('/driver-documents/')[1];
-      if (storagePath) return `/api/uploads/documents/${storagePath}`;
-    }
-    const prodMatch = url.match(/^https?:\/\/(?:www\.)?runcourier\.co\.uk\/uploads\/(.+)$/i);
-    if (prodMatch) return `/api/uploads/${prodMatch[1]}`;
-    if (!url.startsWith('http') && !url.startsWith('/')) {
+    if (!url.startsWith('/')) {
       return `/api/uploads/documents/${url}`;
     }
     return url;

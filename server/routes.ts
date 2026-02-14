@@ -4094,16 +4094,154 @@ export async function registerRoutes(
       console.error("Failed to fetch documents from memory:", e);
     }
     
-    allDocuments.forEach(doc => {
-      if (doc.fileUrl && typeof doc.fileUrl === 'string') {
-        const normalized = normalizeDocumentUrl(doc.fileUrl);
-        if (normalized && typeof normalized === 'string') {
-          doc.fileUrl = normalized;
+    const { supabaseAdmin: supabaseAdminClient } = await import('./supabaseAdmin');
+    if (supabaseAdminClient) {
+      const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
+      
+      const uniqueDriverIds = [...new Set(
+        allDocuments
+          .filter(d => d.driverId || d.authUserId)
+          .map(d => d.driverId || d.authUserId)
+      )];
+      const folderListCache = new Map<string, any[]>();
+      
+      await Promise.all(uniqueDriverIds.flatMap((dId) => 
+        BUCKETS.flatMap((bucket) => [
+          (async () => {
+            try {
+              const { data } = await supabaseAdminClient.storage.from(bucket).list(dId, { limit: 200 });
+              if (data && data.length > 0) {
+                folderListCache.set(`${bucket}:${dId}`, data.filter((f: any) => f.id));
+              }
+            } catch (_) {}
+          })(),
+          (async () => {
+            try {
+              const { data } = await supabaseAdminClient.storage.from(bucket).list(`applications/${dId}`, { limit: 200 });
+              if (data && data.length > 0) {
+                const existing = folderListCache.get(`${bucket}:${dId}`) || [];
+                folderListCache.set(`${bucket}:${dId}`, [...existing, ...data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `applications/${dId}` }))]);
+              }
+            } catch (_) {}
+          })(),
+        ])
+      ));
+
+      const bucketPathMap = new Map<string, { docIndex: number; path: string }[]>();
+      BUCKETS.forEach(b => bucketPathMap.set(b, []));
+
+      for (let i = 0; i < allDocuments.length; i++) {
+        const doc = allDocuments[i];
+        if (doc.fileUrl && doc.fileUrl.startsWith('text:')) continue;
+
+        const storagePath = doc.storagePath;
+        const driverId = doc.driverId || doc.authUserId;
+        const docType = (doc.type || '').toLowerCase().replace(/_/g, '');
+
+        let matchedBucket = '';
+        let matchedPath = '';
+
+        if (driverId) {
+          for (const bucket of BUCKETS) {
+            const files = folderListCache.get(`${bucket}:${driverId}`) || [];
+            if (files.length === 0) continue;
+
+            let bestMatch: any = null;
+            
+            if (storagePath) {
+              const spFileName = storagePath.split('/').pop() || '';
+              bestMatch = files.find((f: any) => f.name === spFileName);
+            }
+            if (!bestMatch && doc.fileName) {
+              bestMatch = files.find((f: any) => f.name === doc.fileName);
+            }
+            if (!bestMatch && storagePath && storagePath.includes('application-pending/')) {
+              const fn = storagePath.replace('application-pending/', '');
+              bestMatch = files.find((f: any) => f.name === fn);
+            }
+            if (!bestMatch && docType) {
+              bestMatch = files.find((f: any) => {
+                const lower = f.name.toLowerCase().replace(/_/g, '');
+                return lower.includes(docType) || docType.includes(lower.split(/\d/)[0].replace(/\./g, ''));
+              });
+            }
+            if (!bestMatch && docType) {
+              const altType = docType.replace('vehiclephoto', 'vehiclephotos');
+              if (altType !== docType) {
+                bestMatch = files.find((f: any) => f.name.toLowerCase().replace(/_/g, '').includes(altType));
+              }
+            }
+            if (!bestMatch && docType) {
+              const altType2 = docType.replace('proofof', '');
+              if (altType2 !== docType) {
+                bestMatch = files.find((f: any) => f.name.toLowerCase().replace(/_/g, '').includes(altType2));
+              }
+            }
+
+            if (bestMatch) {
+              matchedBucket = bucket;
+              matchedPath = bestMatch._appPrefix 
+                ? `${bestMatch._appPrefix}/${bestMatch.name}` 
+                : `${driverId}/${bestMatch.name}`;
+              break;
+            }
+          }
+        }
+
+        if (!matchedPath && storagePath) {
+          matchedBucket = BUCKETS[0];
+          matchedPath = storagePath;
+        }
+
+        if (matchedPath && matchedBucket) {
+          bucketPathMap.get(matchedBucket)!.push({ docIndex: i, path: matchedPath });
+        } else if (doc.fileUrl) {
+          doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
         }
       }
-    });
 
-    // Sort by uploadedAt descending
+      await Promise.all(BUCKETS.map(async (bucket) => {
+        const entries = bucketPathMap.get(bucket) || [];
+        if (entries.length === 0) return;
+        
+        const batchSize = 50;
+        for (let start = 0; start < entries.length; start += batchSize) {
+          const batch = entries.slice(start, start + batchSize);
+          const paths = batch.map(e => e.path);
+          try {
+            const { data } = await supabaseAdminClient.storage.from(bucket).createSignedUrls(paths, 3600);
+            if (data) {
+              data.forEach((result: any, idx: number) => {
+                if (result.signedUrl && !result.error) {
+                  const docIdx = batch[idx].docIndex;
+                  allDocuments[docIdx].fileUrl = result.signedUrl;
+                  allDocuments[docIdx].signedUrl = result.signedUrl;
+                  allDocuments[docIdx].storagePath = batch[idx].path;
+                  allDocuments[docIdx].bucket = bucket;
+                }
+              });
+            }
+          } catch (_) {}
+        }
+      }));
+
+      for (const doc of allDocuments) {
+        if (doc.fileUrl && !doc.fileUrl.startsWith('http') && !doc.fileUrl.startsWith('text:')) {
+          doc.fileMissing = true;
+          doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
+        }
+      }
+    } else {
+      allDocuments.forEach(doc => {
+        if (doc.fileUrl && typeof doc.fileUrl === 'string') {
+          const normalized = normalizeDocumentUrl(doc.fileUrl);
+          if (normalized && typeof normalized === 'string') {
+            doc.fileUrl = normalized;
+          }
+        }
+      });
+    }
+
     allDocuments.sort((a, b) => {
       const dateA = new Date(a.uploadedAt || 0).getTime();
       const dateB = new Date(b.uploadedAt || 0).getTime();

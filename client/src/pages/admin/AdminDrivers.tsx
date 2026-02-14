@@ -699,6 +699,16 @@ export default function AdminDrivers() {
         setLoadingDocUrl(null);
         return;
       }
+      if (doc.signedUrl) {
+        window.open(doc.signedUrl, '_blank');
+        setLoadingDocUrl(null);
+        return;
+      }
+      if (doc.fileUrl?.startsWith('http')) {
+        window.open(doc.fileUrl, '_blank');
+        setLoadingDocUrl(null);
+        return;
+      }
       const response = await fetch(`/api/documents/${doc.id}/signed-url`);
       if (response.ok) {
         const data = await response.json();
