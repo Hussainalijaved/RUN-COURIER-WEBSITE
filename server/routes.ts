@@ -3948,7 +3948,7 @@ export async function registerRoutes(
     const { driverId, status, type } = req.query;
     
     // Collect documents from all sources and merge (deduplicate by id)
-    const allDocuments: any[] = [];
+    let allDocuments: any[] = [];
     const seenIds = new Set<string>();
     
     // 1. Fetch documents from Supabase driver_documents table (where mobile app uploads)
@@ -4073,6 +4073,74 @@ export async function registerRoutes(
     } catch (e) {
       console.error("Failed to fetch documents from memory:", e);
     }
+
+    // 4. Deduplicate documents that point to the same physical file
+    {
+      const normalizeDocFileName = (name: string): string => {
+        if (!name) return '';
+        const base = name.replace(/\.[^.]+$/, '');
+        const withoutTs = base.replace(/_\d{10,}$/, '');
+        return withoutTs
+          .replace(/vehicle_photos_/g, 'vehicle_photo_')
+          .replace(/vehiclephotos/gi, 'vehiclephoto')
+          .toLowerCase();
+      };
+
+      const extractFileName = (doc: any): string => {
+        const sp = doc.storagePath || doc.fileUrl || '';
+        const parts = sp.split('/');
+        return parts[parts.length - 1] || '';
+      };
+
+      const dedupMap = new Map<string, any[]>();
+      for (const doc of allDocuments) {
+        const dId = doc.driverId || doc.authUserId || 'unknown';
+        const rawFileName = extractFileName(doc);
+        const normName = normalizeDocFileName(rawFileName);
+        if (!normName) continue;
+        const key = `${dId}::${normName}`;
+        if (!dedupMap.has(key)) dedupMap.set(key, []);
+        dedupMap.get(key)!.push(doc);
+      }
+
+      const keepIds = new Set<string>();
+      const noDedupDocs: any[] = [];
+      for (const [, docs] of dedupMap) {
+        if (docs.length === 1) {
+          keepIds.add(docs[0].id);
+        } else {
+          docs.sort((a: any, b: any) => {
+            const da = new Date(a.uploadedAt || 0).getTime();
+            const db = new Date(b.uploadedAt || 0).getTime();
+            return db - da;
+          });
+          keepIds.add(docs[0].id);
+        }
+      }
+      for (const doc of allDocuments) {
+        const dId = doc.driverId || doc.authUserId || 'unknown';
+        const rawFileName = extractFileName(doc);
+        const normName = normalizeDocFileName(rawFileName);
+        if (!normName) {
+          noDedupDocs.push(doc);
+          continue;
+        }
+      }
+
+      const beforeCount = allDocuments.length;
+      const deduped = allDocuments.filter(doc => {
+        const dId = doc.driverId || doc.authUserId || 'unknown';
+        const rawFileName = extractFileName(doc);
+        const normName = normalizeDocFileName(rawFileName);
+        if (!normName) return true;
+        return keepIds.has(doc.id);
+      });
+      if (deduped.length < beforeCount) {
+        console.log(`[Documents] Deduplicated: ${beforeCount} -> ${deduped.length} (removed ${beforeCount - deduped.length} duplicates)`);
+      }
+      allDocuments.length = 0;
+      allDocuments.push(...deduped);
+    }
     
     const { supabaseAdmin: supabaseAdminClient } = await import('./supabaseAdmin');
     if (supabaseAdminClient) {
@@ -4085,6 +4153,18 @@ export async function registerRoutes(
       )];
       const folderListCache = new Map<string, any[]>();
       
+      const docTypesPerDriver = new Map<string, Set<string>>();
+      for (const doc of allDocuments) {
+        const dId = doc.driverId || doc.authUserId;
+        if (!dId) continue;
+        if (!docTypesPerDriver.has(dId)) docTypesPerDriver.set(dId, new Set());
+        const dt = (doc.type || '').toLowerCase().replace(/\s+/g, '_');
+        if (dt) docTypesPerDriver.get(dId)!.add(dt);
+        const spPath = doc.storagePath || doc.fileUrl || '';
+        const spMatch = spPath.match(/drivers\/[^/]+\/([^/]+)\//);
+        if (spMatch) docTypesPerDriver.get(dId)!.add(spMatch[1]);
+      }
+
       await Promise.all(uniqueDriverIds.flatMap((dId) => 
         BUCKETS.flatMap((bucket) => [
           (async () => {
@@ -4104,8 +4184,66 @@ export async function registerRoutes(
               }
             } catch (_) {}
           })(),
+          (async () => {
+            try {
+              const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/${dId}`, { limit: 200 });
+              if (data && data.length > 0) {
+                const existing = folderListCache.get(`${bucket}:${dId}`) || [];
+                const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/${dId}` }));
+                folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
+              }
+            } catch (_) {}
+          })(),
+          (async () => {
+            const docTypes = docTypesPerDriver.get(dId) || new Set();
+            for (const dt of docTypes) {
+              try {
+                const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/${dId}/${dt}`, { limit: 200 });
+                if (data && data.length > 0) {
+                  const existing = folderListCache.get(`${bucket}:${dId}`) || [];
+                  const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/${dId}/${dt}` }));
+                  folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
+                }
+              } catch (_) {}
+            }
+          })(),
+          (async () => {
+            const docTypes = docTypesPerDriver.get(dId) || new Set();
+            for (const dt of docTypes) {
+              try {
+                const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/pending/${dt}`, { limit: 200 });
+                if (data && data.length > 0) {
+                  const existing = folderListCache.get(`${bucket}:${dId}`) || [];
+                  const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/pending/${dt}` }));
+                  folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
+                }
+              } catch (_) {}
+            }
+          })(),
         ])
       ));
+
+      for (const bucket of BUCKETS) {
+        try {
+          const { data } = await supabaseAdminClient.storage.from(bucket).list('applications/pending', { limit: 200 });
+          if (data && data.length > 0) {
+            for (const item of data) {
+              if (item.id && item.name !== '.emptyFolderPlaceholder') {
+                try {
+                  const { data: subData } = await supabaseAdminClient.storage.from(bucket).list(`applications/pending/${item.name}`, { limit: 200 });
+                  if (subData && subData.length > 0) {
+                    subData.filter((f: any) => f.id && f.name !== '.emptyFolderPlaceholder').forEach((f: any) => {
+                      const existing = folderListCache.get(`${bucket}:application-pending`) || [];
+                      existing.push({ ...f, _appPrefix: `applications/pending/${item.name}` });
+                      folderListCache.set(`${bucket}:application-pending`, existing);
+                    });
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
+      }
 
       const bucketPathMap = new Map<string, { docIndex: number; path: string }[]>();
       BUCKETS.forEach(b => bucketPathMap.set(b, []));
@@ -4168,6 +4306,25 @@ export async function registerRoutes(
           }
         }
 
+        if (!matchedPath && storagePath && storagePath.startsWith('application-pending/')) {
+          const appFileName = storagePath.replace('application-pending/', '');
+          for (const bucket of BUCKETS) {
+            const pendingFiles = folderListCache.get(`${bucket}:application-pending`) || [];
+            const pendingMatch = pendingFiles.find((f: any) => f.name === appFileName);
+            if (pendingMatch) {
+              matchedBucket = bucket;
+              matchedPath = pendingMatch._appPrefix 
+                ? `${pendingMatch._appPrefix}/${pendingMatch.name}` 
+                : `applications/pending/${pendingMatch.name}`;
+              break;
+            }
+          }
+          if (!matchedPath) {
+            matchedPath = `applications/pending/${appFileName}`;
+            matchedBucket = docBucket || BUCKETS[0];
+          }
+        }
+
         if (!matchedPath && storagePath) {
           matchedBucket = docBucket || BUCKETS[0];
           matchedPath = storagePath;
@@ -4205,12 +4362,57 @@ export async function registerRoutes(
         }
       }));
 
+      for (let i = 0; i < allDocuments.length; i++) {
+        const doc = allDocuments[i];
+        if (doc.signedUrl || (doc.fileUrl && doc.fileUrl.startsWith('http')) || (doc.fileUrl && doc.fileUrl.startsWith('text:'))) continue;
+        if (!doc.storagePath) continue;
+        
+        const sp = doc.storagePath;
+        const dId = doc.driverId || doc.authUserId;
+        const pathsToTry = [sp];
+        
+        if (sp.startsWith('application-pending/')) {
+          pathsToTry.push(sp.replace('application-pending/', 'applications/pending/'));
+          pathsToTry.push(`drivers/pending/${sp.replace('application-pending/', '')}`);
+        }
+        if (dId && !sp.includes(dId)) {
+          pathsToTry.push(`${dId}/${sp.split('/').pop()}`);
+          pathsToTry.push(`drivers/${dId}/${sp.split('/').pop()}`);
+        }
+        
+        let found = false;
+        for (const bucket of BUCKETS) {
+          for (const tryPath of pathsToTry) {
+            try {
+              const { data, error } = await supabaseAdminClient.storage.from(bucket).createSignedUrl(tryPath, 3600);
+              if (!error && data?.signedUrl) {
+                allDocuments[i].fileUrl = data.signedUrl;
+                allDocuments[i].signedUrl = data.signedUrl;
+                allDocuments[i].storagePath = tryPath;
+                allDocuments[i].bucket = bucket;
+                found = true;
+                break;
+              }
+            } catch (_) {}
+          }
+          if (found) break;
+        }
+      }
+
       for (const doc of allDocuments) {
         if (doc.fileUrl && !doc.fileUrl.startsWith('http') && !doc.fileUrl.startsWith('text:')) {
           doc.fileMissing = true;
           doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
         }
       }
+
+      allDocuments = allDocuments.filter(doc => {
+        if (!doc.fileUrl && !doc.storagePath) return false;
+        if (doc.driverId === 'application-pending' && !doc.fileUrl?.startsWith('http') && !doc.storagePath) return false;
+        if (doc.driverId?.startsWith('application') && !doc.storagePath && doc.fileMissing) return false;
+        if (!doc.storagePath && !doc.fileUrl?.startsWith('http') && !doc.fileUrl?.startsWith('text:')) return false;
+        return true;
+      });
     } else {
       allDocuments.forEach(doc => {
         if (doc.fileUrl && typeof doc.fileUrl === 'string') {
@@ -6118,6 +6320,17 @@ export async function registerRoutes(
       fileName,
     ];
 
+    const headPathParts = cleanPath.split('/');
+    if (headPathParts.length >= 2) {
+      const headDriverId = headPathParts[0];
+      const headFileName = headPathParts[headPathParts.length - 1];
+      const headDocTypeMatch = headFileName.match(/^([a-z_]+?)_\d+/);
+      if (headDocTypeMatch) {
+        possiblePaths.push(`drivers/${headDriverId}/${headDocTypeMatch[1]}/${headFileName}`);
+      }
+      possiblePaths.push(`drivers/${headDriverId}/${headFileName}`);
+    }
+
     for (const bucket of BUCKETS) {
       for (const sp of possiblePaths) {
         try {
@@ -6155,6 +6368,17 @@ export async function registerRoutes(
       `applications/${cleanPath}`,
       fileName,
     ];
+
+    const getPathParts = cleanPath.split('/');
+    if (getPathParts.length >= 2) {
+      const getDriverId = getPathParts[0];
+      const getFileName = getPathParts[getPathParts.length - 1];
+      const getDocTypeMatch = getFileName.match(/^([a-z_]+?)_\d+/);
+      if (getDocTypeMatch) {
+        possiblePaths.push(`drivers/${getDriverId}/${getDocTypeMatch[1]}/${getFileName}`);
+      }
+      possiblePaths.push(`drivers/${getDriverId}/${getFileName}`);
+    }
 
     for (const bucket of BUCKETS) {
       for (const storagePath of possiblePaths) {

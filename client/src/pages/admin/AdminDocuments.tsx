@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { FileText, CheckCircle, XCircle, Clock, Eye, X } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, Eye, X, AlertTriangle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeDocuments } from '@/hooks/useRealtimeDocuments';
@@ -206,6 +206,7 @@ export default function AdminDocuments() {
 
   const pendingDocs = documents?.filter(d => d.status === 'pending') || [];
   const approvedDocs = documents?.filter(d => d.status === 'approved') || [];
+  const rejectedDocs = documents?.filter(d => d.status === 'rejected') || [];
 
   return (
     <DashboardLayout>
@@ -213,6 +214,33 @@ export default function AdminDocuments() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Document Review</h1>
           <p className="text-muted-foreground">Review and approve driver documents</p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold" data-testid="text-total-docs">{documents?.length || 0}</div>
+              <p className="text-sm text-muted-foreground">Total Documents</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-yellow-600" data-testid="text-pending-docs">{pendingDocs.length}</div>
+              <p className="text-sm text-muted-foreground">Pending Review</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-600" data-testid="text-approved-docs">{approvedDocs.length}</div>
+              <p className="text-sm text-muted-foreground">Approved</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-red-600" data-testid="text-rejected-docs">{rejectedDocs.length}</div>
+              <p className="text-sm text-muted-foreground">Rejected</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
@@ -387,6 +415,80 @@ export default function AdminDocuments() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Rejected Documents ({rejectedDocs.length})
+            </CardTitle>
+            <CardDescription>Previously rejected documents</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {docsLoading ? (
+              <Skeleton className="h-96 w-full" />
+            ) : rejectedDocs.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Document Type</TableHead>
+                      <TableHead>File Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rejectedDocs.map((doc) => (
+                      <TableRow key={doc.id} data-testid={`row-rejected-document-${doc.id}`}>
+                        <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
+                        <TableCell>{getDocTypeName(doc.type)}</TableCell>
+                        <TableCell className="text-sm">{doc.fileName}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {getStatusBadge(doc.status)}
+                            {(doc as any).fileMissing && <Badge variant="destructive" className="text-xs">File Missing</Badge>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedDoc(doc);
+                                setViewDialogOpen(true);
+                              }}
+                              data-testid={`button-view-rejected-${doc.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-green-600"
+                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'approved' })}
+                              disabled={reviewDocumentMutation.isPending}
+                              data-testid={`button-approve-rejected-${doc.id}`}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                <p className="text-muted-foreground">No rejected documents</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
           <DialogContent className="max-w-3xl max-h-screen overflow-y-auto">
             <DialogHeader>
@@ -403,7 +505,13 @@ export default function AdminDocuments() {
                   </div>
                 </div>
                 <div>
-                  {previewLoading ? (
+                  {(selectedDoc as any)?.fileMissing ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-center">
+                      <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+                      <p className="font-semibold text-destructive">File Not Available</p>
+                      <p className="text-sm text-muted-foreground mt-2">This document file is missing from storage. The driver needs to re-upload this document.</p>
+                    </div>
+                  ) : previewLoading ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
