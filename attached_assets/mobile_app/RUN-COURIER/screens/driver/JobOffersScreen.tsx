@@ -503,7 +503,10 @@ export function JobOffersScreen({ navigation }: any) {
         setRefreshing(false);
       }
     }
-  }, [driverId, allDriverIds.join(','), startRepeatingAlarm]);
+  }, [driverId, allDriverIds.join(',')]);
+
+  const fetchAssignedJobsRef = useRef(fetchAssignedJobs);
+  useEffect(() => { fetchAssignedJobsRef.current = fetchAssignedJobs; }, [fetchAssignedJobs]);
 
   const fetchAssignedJobsSilent = useCallback(async () => {
     if (!driverId || allDriverIds.length === 0) return;
@@ -537,10 +540,10 @@ export function JobOffersScreen({ navigation }: any) {
     } catch (err) {
       console.warn('[JobOffers] Silent fetch failed:', err);
     }
-  }, [driverId, allDriverIds.join(','), stopRepeatingAlarm]);
+  }, [driverId, allDriverIds.join(',')]);
 
   useEffect(() => {
-    fetchAssignedJobs(false);
+    fetchAssignedJobsRef.current(false);
     
     const STOP_STATUSES = ['withdrawn', 'cancelled', 'unassigned', 'expired', 'accepted', 'rejected', 'completed', 'removed'];
     
@@ -564,7 +567,7 @@ export function JobOffersScreen({ navigation }: any) {
         if (eventType === 'DELETE') {
           AlarmService.stopIfJob(jobId, 'job deleted');
           knownJobIds.delete(jobId);
-          fetchAssignedJobs(false);
+          fetchAssignedJobsRef.current(false);
           return;
         }
         
@@ -576,7 +579,7 @@ export function JobOffersScreen({ navigation }: any) {
             console.log(`[JobOffers] Job ${jobId} no longer assigned to me - stopping alarm`);
             AlarmService.stopIfJob(jobId, 'driver_id no longer matches');
             knownJobIds.delete(jobId);
-            fetchAssignedJobs(false);
+            fetchAssignedJobsRef.current(false);
             return;
           }
           
@@ -584,18 +587,18 @@ export function JobOffersScreen({ navigation }: any) {
             console.log(`[JobOffers] Job ${jobId} status=${newStatus} - stopping alarm`);
             AlarmService.stopIfJob(jobId, `status changed to ${newStatus}`);
             knownJobIds.delete(jobId);
-            fetchAssignedJobs(false);
+            fetchAssignedJobsRef.current(false);
             return;
           }
           
           if (isNowMyJob && ['assigned', 'offered'].includes(newStatus)) {
             knownJobIds.add(jobId);
-            fetchAssignedJobs(true);
+            fetchAssignedJobsRef.current(true);
             return;
           }
           
           if (isNowMyJob) {
-            fetchAssignedJobs(false);
+            fetchAssignedJobsRef.current(false);
           }
         }
       })
@@ -617,7 +620,7 @@ export function JobOffersScreen({ navigation }: any) {
           AlarmService.stopIfJob(assignmentJobId, `assignment ${assignmentStatus}`);
           AlarmService.stop(`assignment ${assignmentStatus} for job ${assignmentJobId}`);
           knownJobIds.delete(assignmentJobId);
-          fetchAssignedJobs(false);
+          fetchAssignedJobsRef.current(false);
         }
       })
       .subscribe();
@@ -631,7 +634,7 @@ export function JobOffersScreen({ navigation }: any) {
         alarmVerifyIntervalRef.current = null;
       }
     };
-  }, [fetchAssignedJobs, allDriverIds.join(',')]);
+  }, [allDriverIds.join(',')]);
 
   // Keep knownJobIds in sync with jobs state
   useEffect(() => {

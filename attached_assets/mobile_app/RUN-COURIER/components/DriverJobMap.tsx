@@ -32,6 +32,44 @@ const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey ||
                             process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || '';
 
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  if (!address) return null;
+  
+  if (API_URL) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      } catch (e) {}
+      const resp = await fetch(`${API_URL}/api/mobile/v1/geocode?address=${encodeURIComponent(address)}`, { headers });
+      if (resp.ok) {
+        const geo = await resp.json();
+        if (geo.lat && geo.lng) return { lat: geo.lat, lng: geo.lng };
+      }
+    } catch (e) {
+      console.log('[DriverJobMap] Server geocode failed:', e);
+    }
+  }
+
+  if (GOOGLE_MAPS_API_KEY) {
+    try {
+      const resp = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`);
+      const data = await resp.json();
+      if (data.status === 'OK' && data.results?.length > 0) {
+        const loc = data.results[0].geometry.location;
+        return { lat: loc.lat, lng: loc.lng };
+      }
+    } catch (e) {
+      console.log('[DriverJobMap] Google geocode failed:', e);
+    }
+  }
+
+  return null;
+}
+
 function decodePolyline(encoded: string): Array<{ latitude: number; longitude: number }> {
   const points: Array<{ latitude: number; longitude: number }> = [];
   let index = 0;
@@ -91,11 +129,53 @@ export function DriverJobMap({
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [geocodedPickup, setGeocodedPickup] = useState<{ lat: number; lng: number } | null>(null);
+  const [geocodedDropoff, setGeocodedDropoff] = useState<{ lat: number; lng: number } | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
 
-  const hasPickup = typeof pickupLat === 'number' && typeof pickupLng === 'number';
-  const hasDropoff = typeof dropoffLat === 'number' && typeof dropoffLng === 'number';
+  const rawHasPickup = typeof pickupLat === 'number' && typeof pickupLng === 'number';
+  const rawHasDropoff = typeof dropoffLat === 'number' && typeof dropoffLng === 'number';
+  const hasPickup = rawHasPickup || geocodedPickup !== null;
+  const hasDropoff = rawHasDropoff || geocodedDropoff !== null;
   const hasDriver = typeof driverLat === 'number' && typeof driverLng === 'number';
   const hasRoute = hasPickup && hasDropoff;
+
+  const effectivePickupLat = rawHasPickup ? pickupLat : geocodedPickup?.lat;
+  const effectivePickupLng = rawHasPickup ? pickupLng : geocodedPickup?.lng;
+  const effectiveDropoffLat = rawHasDropoff ? dropoffLat : geocodedDropoff?.lat;
+  const effectiveDropoffLng = rawHasDropoff ? dropoffLng : geocodedDropoff?.lng;
+
+  useEffect(() => {
+    let cancelled = false;
+    const needsPickupGeocode = !rawHasPickup && !!pickupAddress && pickupAddress.length > 2;
+    const needsDropoffGeocode = !rawHasDropoff && !!deliveryAddress && deliveryAddress.length > 2;
+    
+    if (!needsPickupGeocode && !needsDropoffGeocode) return;
+    
+    const doGeocode = async () => {
+      setGeocoding(true);
+      try {
+        if (needsPickupGeocode) {
+          const result = await geocodeAddress(pickupAddress);
+          if (!cancelled && result) {
+            console.log('[DriverJobMap] Geocoded pickup address:', result.lat, result.lng);
+            setGeocodedPickup(result);
+          }
+        }
+        if (needsDropoffGeocode) {
+          const result = await geocodeAddress(deliveryAddress);
+          if (!cancelled && result) {
+            console.log('[DriverJobMap] Geocoded delivery address:', result.lat, result.lng);
+            setGeocodedDropoff(result);
+          }
+        }
+      } finally {
+        if (!cancelled) setGeocoding(false);
+      }
+    };
+    doGeocode();
+    return () => { cancelled = true; };
+  }, [pickupAddress, deliveryAddress, rawHasPickup, rawHasDropoff]);
 
   useEffect(() => {
     if (hasRoute) {
@@ -103,11 +183,18 @@ export function DriverJobMap({
     } else {
       setLoading(false);
     }
-  }, [pickupLat, pickupLng, dropoffLat, dropoffLng]);
+  }, [effectivePickupLat, effectivePickupLng, effectiveDropoffLat, effectiveDropoffLng]);
 
   const fetchRoute = async () => {
-    if (!hasPickup || !hasDropoff) {
+    const pLat = effectivePickupLat;
+    const pLng = effectivePickupLng;
+    const dLat = effectiveDropoffLat;
+    const dLng = effectiveDropoffLng;
+    const coordsAvailable = typeof pLat === 'number' && typeof pLng === 'number' && typeof dLat === 'number' && typeof dLng === 'number';
+
+    if (!coordsAvailable && (!pickupAddress || !deliveryAddress)) {
       setLoading(false);
+      setError(!pickupAddress && !deliveryAddress ? null : 'Incomplete address data');
       return;
     }
 
@@ -115,8 +202,8 @@ export function DriverJobMap({
       setLoading(true);
       setError(null);
 
-      const origin = `${pickupLat},${pickupLng}`;
-      const destination = `${dropoffLat},${dropoffLng}`;
+      const origin = coordsAvailable ? `${pLat},${pLng}` : pickupAddress;
+      const destination = coordsAvailable ? `${dLat},${dLng}` : deliveryAddress;
       
       let routeFound = false;
       
@@ -132,7 +219,7 @@ export function DriverJobMap({
             console.log('[DriverJobMap] Could not get auth token');
           }
           
-          const url = `${API_URL}/api/mobile/v1/directions?origin=${origin}&destination=${destination}&mode=driving`;
+          const url = `${API_URL}/api/mobile/v1/directions?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving`;
           console.log('[DriverJobMap] Fetching route from server proxy');
           const response = await fetch(url, { headers });
           
@@ -166,7 +253,9 @@ export function DriverJobMap({
       
       if (!routeFound && GOOGLE_MAPS_API_KEY) {
         try {
-          const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+          const gOrigin = coordsAvailable ? `${pLat},${pLng}` : encodeURIComponent(pickupAddress);
+          const gDest = coordsAvailable ? `${dLat},${dLng}` : encodeURIComponent(deliveryAddress);
+          const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${gOrigin}&destination=${gDest}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
           console.log('[DriverJobMap] Falling back to direct Google Maps API');
           const response = await fetch(url);
           const data = await response.json();
@@ -224,6 +313,18 @@ export function DriverJobMap({
   }
 
   if (!hasPickup && !hasDropoff) {
+    if (geocoding) {
+      return (
+        <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
+          <View style={styles.webPlaceholder}>
+            <ActivityIndicator size="small" color={theme.primary} />
+            <ThemedText type="body" color="secondary" style={styles.placeholderText}>
+              Loading map...
+            </ThemedText>
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
         <View style={styles.webPlaceholder}>
@@ -239,10 +340,10 @@ export function DriverJobMap({
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
       <NativeMapWithRoute
-        pickupLat={pickupLat}
-        pickupLng={pickupLng}
-        dropoffLat={dropoffLat}
-        dropoffLng={dropoffLng}
+        pickupLat={effectivePickupLat}
+        pickupLng={effectivePickupLng}
+        dropoffLat={effectiveDropoffLat}
+        dropoffLng={effectiveDropoffLng}
         driverLat={driverLat}
         driverLng={driverLng}
         routePoints={routeInfo?.polylinePoints}
