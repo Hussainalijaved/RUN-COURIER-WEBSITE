@@ -187,7 +187,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             />
             <div>
               <h1 className="text-2xl font-bold text-primary">{COMPANY_DETAILS.tradingName}</h1>
-              <div className="text-xs text-gray-600 mt-2 leading-relaxed">
+              <div className="text-xs text-gray-800 mt-2 leading-relaxed">
                 <p>{COMPANY_DETAILS.name}</p>
                 <p>{COMPANY_DETAILS.address}</p>
                 <p>{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
@@ -212,38 +212,38 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
 
         <div className="grid grid-cols-2 gap-8 mb-6">
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 pb-1 border-b">From</h3>
-            <p className="font-semibold text-sm">{COMPANY_DETAILS.name}</p>
-            <p className="text-sm text-gray-600">{COMPANY_DETAILS.address}</p>
-            <p className="text-sm text-gray-600">{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
-            <p className="text-sm text-gray-600 mt-2">Company No: {COMPANY_DETAILS.companyNumber}</p>
+            <h3 className="text-xs font-semibold text-gray-700 uppercase mb-2 pb-1 border-b">From</h3>
+            <p className="font-semibold text-sm text-gray-900">{COMPANY_DETAILS.name}</p>
+            <p className="text-sm text-gray-800">{COMPANY_DETAILS.address}</p>
+            <p className="text-sm text-gray-800">{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
+            <p className="text-sm text-gray-800 mt-2">Company No: {COMPANY_DETAILS.companyNumber}</p>
           </div>
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 pb-1 border-b">Bill To</h3>
-            <p className="font-semibold text-sm">{invoice.companyName || invoice.customerName}</p>
-            <p className="text-sm text-gray-600">{invoice.customerEmail}</p>
-            {invoice.businessAddress && <p className="text-sm text-gray-600">{invoice.businessAddress}</p>}
+            <h3 className="text-xs font-semibold text-gray-700 uppercase mb-2 pb-1 border-b">Bill To</h3>
+            <p className="font-semibold text-sm text-gray-900">{invoice.companyName || invoice.customerName}</p>
+            <p className="text-sm text-gray-800">{invoice.customerEmail}</p>
+            {invoice.businessAddress && <p className="text-sm text-gray-800">{invoice.businessAddress}</p>}
           </div>
         </div>
 
         <div className="bg-gray-50 p-4 mb-6 grid grid-cols-4 gap-4 text-center">
           <div>
-            <p className="text-xs text-gray-500 uppercase">Invoice Date</p>
-            <p className="font-semibold text-sm">{formatDate(invoice.createdAt)}</p>
+            <p className="text-xs text-gray-700 uppercase font-medium">Invoice Date</p>
+            <p className="font-semibold text-sm text-gray-900">{formatDate(invoice.createdAt)}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase">Due Date</p>
-            <p className={`font-semibold text-sm ${invoice.status === 'overdue' ? 'text-red-600' : ''}`}>
+            <p className="text-xs text-gray-700 uppercase font-medium">Due Date</p>
+            <p className={`font-semibold text-sm ${invoice.status === 'overdue' ? 'text-red-600' : 'text-gray-900'}`}>
               {formatDate(invoice.dueDate)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase">Period Start</p>
-            <p className="font-semibold text-sm">{formatDate(invoice.periodStart)}</p>
+            <p className="text-xs text-gray-700 uppercase font-medium">Period Start</p>
+            <p className="font-semibold text-sm text-gray-900">{formatDate(invoice.periodStart)}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase">Period End</p>
-            <p className="font-semibold text-sm">{formatDate(invoice.periodEnd)}</p>
+            <p className="text-xs text-gray-700 uppercase font-medium">Period End</p>
+            <p className="font-semibold text-sm text-gray-900">{formatDate(invoice.periodEnd)}</p>
           </div>
         </div>
 
@@ -262,24 +262,24 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
               const isMultiDrop = (job as any).isMultiDrop && multiDropStops.length > 0;
               return (
                 <tr key={job.id} className="border-b align-top">
-                  <td className="py-3 px-4 font-mono text-xs">{(job as any).jobNumber || job.trackingNumber}</td>
-                  <td className="py-3 px-4 text-gray-600 text-xs">{formatDate(job.createdAt)}</td>
-                  <td className="py-3 px-4 text-gray-600 text-xs">
+                  <td className="py-3 px-4 font-mono text-xs text-gray-900">{(job as any).jobNumber || job.trackingNumber}</td>
+                  <td className="py-3 px-4 text-gray-800 text-xs">{formatDate(job.createdAt)}</td>
+                  <td className="py-3 px-4 text-gray-800 text-xs">
                     {isMultiDrop ? (
                       <div>
-                        <div className="font-medium text-gray-800 mb-1">Same-Day Delivery &mdash; {multiDropStops.length} drop-offs</div>
-                        <div className="text-xs text-gray-500 mb-1">Collected from: {job.pickupAddress || job.pickupPostcode}</div>
+                        <div className="font-semibold text-gray-900 mb-1">Same-Day Delivery &mdash; {multiDropStops.length} drop-offs</div>
+                        <div className="text-xs text-gray-700 mb-1">Collected from: {job.pickupAddress || job.pickupPostcode}</div>
                         {multiDropStops.map((stop: any, idx: number) => (
-                          <div key={idx} className="text-xs pl-3 py-0.5 border-l-2 border-primary/30">
+                          <div key={idx} className="text-xs text-gray-700 pl-3 py-0.5 border-l-2 border-primary/50">
                             Delivered to: {stop.address || stop.postcode}
-                            {stop.recipientName && <span className="text-gray-400 ml-1">&mdash; {stop.recipientName}</span>}
+                            {stop.recipientName && <span className="text-gray-600 ml-1">&mdash; {stop.recipientName}</span>}
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div>
-                        <div className="font-medium text-gray-800 mb-0.5">Same-Day Delivery</div>
-                        <div className="text-xs text-gray-500">{job.pickupAddress || job.pickupPostcode} &rarr; {job.deliveryAddress || job.deliveryPostcode}</div>
+                        <div className="font-semibold text-gray-900 mb-0.5">Same-Day Delivery</div>
+                        <div className="text-xs text-gray-700">{job.pickupAddress || job.pickupPostcode} &rarr; {job.deliveryAddress || job.deliveryPostcode}</div>
                       </div>
                     )}
                   </td>
@@ -307,32 +307,32 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
 
         <div className="mt-8 pt-6 border-t-2">
           <div className="bg-gray-50 p-4">
-            <h4 className="font-semibold text-sm uppercase text-gray-800 mb-3">Payment Details</h4>
+            <h4 className="font-semibold text-sm uppercase text-gray-900 mb-3">Payment Details</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Bank:</span>
-                <span className="font-medium">{COMPANY_DETAILS.bankName}</span>
+                <span className="text-gray-700">Bank:</span>
+                <span className="font-medium text-gray-900">{COMPANY_DETAILS.bankName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Account Name:</span>
-                <span className="font-medium">{COMPANY_DETAILS.accountName}</span>
+                <span className="text-gray-700">Account Name:</span>
+                <span className="font-medium text-gray-900">{COMPANY_DETAILS.accountName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Sort Code:</span>
-                <span className="font-medium">{COMPANY_DETAILS.sortCode}</span>
+                <span className="text-gray-700">Sort Code:</span>
+                <span className="font-medium text-gray-900">{COMPANY_DETAILS.sortCode}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Account Number:</span>
-                <span className="font-medium">{COMPANY_DETAILS.accountNumber}</span>
+                <span className="text-gray-700">Account Number:</span>
+                <span className="font-medium text-gray-900">{COMPANY_DETAILS.accountNumber}</span>
               </div>
             </div>
-            <p className="mt-4 text-xs text-gray-600">
-              Please use invoice number <span className="font-bold">{invoice.invoiceNumber}</span> as your payment reference.
+            <p className="mt-4 text-xs text-gray-700">
+              Please use invoice number <span className="font-bold text-gray-900">{invoice.invoiceNumber}</span> as your payment reference.
             </p>
           </div>
         </div>
 
-        <div className="mt-6 text-center text-xs text-gray-400 leading-relaxed">
+        <div className="mt-6 text-center text-xs text-gray-600 leading-relaxed">
           <p>{COMPANY_DETAILS.name} | Registered in England & Wales | Company No: {COMPANY_DETAILS.companyNumber}</p>
           <p>Registered Office: {COMPANY_DETAILS.address}, {COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
           <p className="mt-2">Thank you for your business</p>

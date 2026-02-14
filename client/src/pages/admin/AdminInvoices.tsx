@@ -455,18 +455,18 @@ export default function AdminInvoices() {
             const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
             const stopsHtml = isMultiDrop ? `
               <div style="margin-top: 4px;">
-                <div style="font-weight: 600; color: #333; margin-bottom: 4px;">Same-Day Delivery &mdash; ${job.multiDropStops.length} drop-offs</div>
-                <div style="color: #555; font-size: 12px; margin-bottom: 2px;">Collected from: ${job.pickupAddress || 'N/A'}</div>
+                <div style="font-weight: 600; color: #111; margin-bottom: 4px;">Same-Day Delivery &mdash; ${job.multiDropStops.length} drop-offs</div>
+                <div style="color: #333; font-size: 12px; margin-bottom: 2px;">Collected from: ${job.pickupAddress || 'N/A'}</div>
                 ${job.multiDropStops.map((stop: any) => `
-                  <div style="color: #555; font-size: 12px; padding-left: 12px; border-left: 2px solid #007BFF40; margin: 2px 0;">
+                  <div style="color: #333; font-size: 12px; padding-left: 12px; border-left: 2px solid #007BFF70; margin: 2px 0;">
                     Delivered to: ${stop.address || stop.postcode}${stop.recipientName ? ` &mdash; ${stop.recipientName}` : ''}
                   </div>
                 `).join('')}
               </div>
             ` : `
               <div>
-                <div style="font-weight: 600; color: #333; margin-bottom: 2px;">Same-Day Delivery</div>
-                <div style="color: #555; font-size: 12px;">${job.pickupAddress || 'N/A'} &rarr; ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
+                <div style="font-weight: 600; color: #111; margin-bottom: 2px;">Same-Day Delivery</div>
+                <div style="color: #333; font-size: 12px;">${job.pickupAddress || 'N/A'} &rarr; ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
               </div>
             `;
             return `
@@ -488,19 +488,19 @@ export default function AdminInvoices() {
       <head>
         <title>Invoice ${invoice.invoice_number}</title>
         <style>
-          body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+          body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #111; }
           .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
           .company { font-size: 24px; font-weight: bold; color: #007BFF; }
-          .invoice-title { font-size: 28px; color: #333; text-align: right; }
-          .invoice-number { color: #666; text-align: right; }
+          .invoice-title { font-size: 28px; color: #111; text-align: right; }
+          .invoice-number { color: #333; text-align: right; font-weight: 600; }
           .details { display: flex; justify-content: space-between; margin-bottom: 30px; }
           .bill-to, .invoice-info { width: 45%; }
-          .label { color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; }
-          .value { font-size: 14px; margin-bottom: 15px; }
+          .label { color: #444; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
+          .value { font-size: 14px; margin-bottom: 15px; color: #111; }
           .total-section { background: #f8f9fa; padding: 20px; margin-top: 30px; text-align: right; }
           .total { font-size: 24px; font-weight: bold; color: #007BFF; }
-          .bank-details { margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 8px; }
-          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 12px; }
+          .bank-details { margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 8px; color: #111; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #444; font-size: 12px; }
           @media print { body { margin: 0; } }
         </style>
       </head>

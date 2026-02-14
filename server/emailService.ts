@@ -32,7 +32,7 @@ function getEmailFooter(): string {
     <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
     <div style="text-align: center;">
       <img src="${LOGO_URL}" alt="Run Courier" style="max-width: 60px; height: auto; margin-bottom: 10px;" />
-      <p style="color: #999; font-size: 12px; margin: 0;">
+      <p style="color: #555; font-size: 12px; margin: 0;">
         Run Courier - Same Day Delivery Across the UK<br>
         <a href="https://runcourier.co.uk" style="color: #007BFF; text-decoration: underline; font-weight: bold;">Visit Our Website</a> | 
         <a href="tel:+442046346100" style="color: #007BFF;">+44 20 4634 6100</a>
@@ -51,7 +51,7 @@ function getAppDownloadSection(): string {
             <h3 style="color: #333333; font-size: 18px; font-weight: 600; margin: 0 0 8px 0; font-family: Arial, sans-serif;">
               Get the Run Courier Mobile App
             </h3>
-            <p style="color: #666666; font-size: 14px; margin: 0; line-height: 1.5; font-family: Arial, sans-serif;">
+            <p style="color: #333333; font-size: 14px; margin: 0; line-height: 1.5; font-family: Arial, sans-serif;">
               Track deliveries, receive job updates, and manage your account anytime, anywhere.
             </p>
           </td>
@@ -206,12 +206,12 @@ export async function sendWelcomeEmail(
   const roleText = role === 'business' ? 'Business Account' : 'Customer Account';
   const content = `
     <h2 style="color: #333;">Hello ${name}!</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Thank you for registering with Run Courier. Your ${roleText} has been successfully created.
     </p>
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
       <h3 style="color: #333; margin-top: 0;">What you can do now:</h3>
-      <ul style="color: #666; line-height: 1.8;">
+      <ul style="color: #333; line-height: 1.8;">
         <li>Book same-day deliveries across the UK</li>
         <li>Track your parcels in real-time</li>
         <li>View your booking history</li>
@@ -224,7 +224,7 @@ export async function sendWelcomeEmail(
         Book Your First Delivery
       </a>
     </div>
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       If you have any questions, our support team is here to help 24/7.
     </p>
   `;
@@ -246,20 +246,20 @@ export async function sendNewRegistrationNotification(
     <div style="background-color: white; border-radius: 8px; padding: 20px;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 120px;"><strong>Name:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; width: 120px;"><strong>Name:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${name}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Email:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Email:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><a href="mailto:${email}" style="color: #007BFF;">${email}</a></td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Account Type:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Account Type:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${role === 'business' ? 'Business' : 'Individual'}</td>
         </tr>
         ${company ? `
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Company:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Company:</strong></td>
           <td style="padding: 10px 0; color: #333;">${company}</td>
         </tr>
         ` : ''}
@@ -309,36 +309,36 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
       <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">PICKUP DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px; vertical-align: top;"><strong>Postcode:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px; vertical-align: top;"><strong>Postcode:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.pickupPostcode || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Address:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.pickupAddress || 'N/A'}</td>
         </tr>
         ${jobDetails.pickupBuildingName ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Building:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Building:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.pickupBuildingName}</td>
         </tr>
         ` : ''}
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Contact Name:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Contact Name:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.pickupContactName || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Contact Phone:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Contact Phone:</strong></td>
           <td style="padding: 8px 0; color: #333;"><a href="tel:${jobDetails.pickupContactPhone}" style="color: #007BFF;">${jobDetails.pickupContactPhone || 'N/A'}</a></td>
         </tr>
         ${jobDetails.pickupInstructions ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Instructions:</strong></td>
           <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.pickupInstructions}</td>
         </tr>
         ` : ''}
         ${scheduledPickup ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled Time:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Scheduled Time:</strong></td>
           <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledPickup}</td>
         </tr>
         ` : ''}
@@ -352,30 +352,30 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
         <h4 style="color: #28a745; margin: 0 0 10px; font-size: 14px;">Stop ${index + 1}</h4>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="padding: 5px 0; color: #666; width: 120px; vertical-align: top;"><strong>Postcode:</strong></td>
+            <td style="padding: 5px 0; color: #333; width: 120px; vertical-align: top;"><strong>Postcode:</strong></td>
             <td style="padding: 5px 0; color: #333;">${stop.postcode || 'N/A'}</td>
           </tr>
           ${stop.address ? `
           <tr>
-            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Address:</strong></td>
+            <td style="padding: 5px 0; color: #333; vertical-align: top;"><strong>Address:</strong></td>
             <td style="padding: 5px 0; color: #333;">${stop.address}</td>
           </tr>
           ` : ''}
           ${stop.recipientName ? `
           <tr>
-            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Recipient:</strong></td>
+            <td style="padding: 5px 0; color: #333; vertical-align: top;"><strong>Recipient:</strong></td>
             <td style="padding: 5px 0; color: #333;">${stop.recipientName}</td>
           </tr>
           ` : ''}
           ${stop.recipientPhone ? `
           <tr>
-            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Phone:</strong></td>
+            <td style="padding: 5px 0; color: #333; vertical-align: top;"><strong>Phone:</strong></td>
             <td style="padding: 5px 0; color: #333;"><a href="tel:${stop.recipientPhone}" style="color: #007BFF;">${stop.recipientPhone}</a></td>
           </tr>
           ` : ''}
           ${stop.instructions ? `
           <tr>
-            <td style="padding: 5px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+            <td style="padding: 5px 0; color: #333; vertical-align: top;"><strong>Instructions:</strong></td>
             <td style="padding: 5px 0; color: #333; font-style: italic;">${stop.instructions}</td>
           </tr>
           ` : ''}
@@ -386,36 +386,36 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
       <h3 style="color: #28a745; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #28a745; padding-bottom: 8px;">DELIVERY DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px; vertical-align: top;"><strong>Postcode:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px; vertical-align: top;"><strong>Postcode:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.deliveryPostcode || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Address:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.deliveryAddress || 'N/A'}</td>
         </tr>
         ${jobDetails.deliveryBuildingName ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Building:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Building:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.deliveryBuildingName}</td>
         </tr>
         ` : ''}
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient Name:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Recipient Name:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.recipientName || 'N/A'}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient Phone:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Recipient Phone:</strong></td>
           <td style="padding: 8px 0; color: #333;"><a href="tel:${jobDetails.recipientPhone}" style="color: #007BFF;">${jobDetails.recipientPhone || 'N/A'}</a></td>
         </tr>
         ${jobDetails.deliveryInstructions ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Instructions:</strong></td>
           <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.deliveryInstructions}</td>
         </tr>
         ` : ''}
         ${scheduledDelivery ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled Time:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Scheduled Time:</strong></td>
           <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledDelivery}</td>
         </tr>
         ` : ''}
@@ -426,48 +426,48 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
       <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">DELIVERY OPTIONS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Vehicle Type:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px;"><strong>Vehicle Type:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Weight:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.weight || '0'} kg</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Distance:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.distance || '0'} miles</td>
         </tr>
         ${jobDetails.isMultiDrop ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Multi-Drop:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Multi-Drop:</strong></td>
           <td style="padding: 8px 0; color: #333;">Yes</td>
         </tr>
         ` : ''}
         ${jobDetails.isReturnTrip ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Return Trip:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Return Trip:</strong></td>
           <td style="padding: 8px 0; color: #333;">Yes</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Return To:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Return To:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.returnToSameLocation ? 'Same as Pickup' : (jobDetails.returnAddress || jobDetails.returnPostcode || 'Not specified')}</td>
         </tr>
         ${!jobDetails.returnToSameLocation && jobDetails.returnPostcode ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Return Postcode:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Return Postcode:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.returnPostcode}</td>
         </tr>
         ` : ''}
         ${!jobDetails.returnToSameLocation && jobDetails.returnAddress ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Return Address:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Return Address:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.returnAddress}</td>
         </tr>
         ` : ''}
         ` : ''}
         ${jobDetails.isCentralLondon ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Central London:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Central London:</strong></td>
           <td style="padding: 8px 0; color: #333;">Yes (Congestion charge applies)</td>
         </tr>
         ` : ''}
@@ -477,53 +477,53 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
       <h3 style="color: #dc3545; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #dc3545; padding-bottom: 8px;">PRICING BREAKDOWN</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Base Price:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px;"><strong>Base Price:</strong></td>
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.basePrice || 0).toFixed(2)}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Distance Price:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Distance Price:</strong></td>
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.distancePrice || 0).toFixed(2)}</td>
         </tr>
         ${parseFloat(jobDetails.weightSurcharge || 0) > 0 ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Weight Surcharge:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Weight Surcharge:</strong></td>
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.weightSurcharge).toFixed(2)}</td>
         </tr>
         ` : ''}
         ${parseFloat(jobDetails.multiDropCharge || 0) > 0 ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Multi-Drop Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Multi-Drop Charge:</strong></td>
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.multiDropCharge).toFixed(2)}</td>
         </tr>
         ` : ''}
         ${parseFloat(jobDetails.returnTripCharge || 0) > 0 ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Return Trip Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Return Trip Charge:</strong></td>
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.returnTripCharge).toFixed(2)}</td>
         </tr>
         ` : ''}
         ${parseFloat(jobDetails.centralLondonCharge || 0) > 0 ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Central London Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Central London Charge:</strong></td>
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.centralLondonCharge).toFixed(2)}</td>
         </tr>
         ` : ''}
         ${parseFloat(jobDetails.waitingTimeCharge || 0) > 0 ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Waiting Time Charge:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Waiting Time Charge:</strong></td>
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.waitingTimeCharge).toFixed(2)}</td>
         </tr>
         ` : ''}
       </table>
       <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: right;">
-        <span style="color: #666; font-size: 16px;">Total: </span>
+        <span style="color: #333; font-size: 16px;">Total: </span>
         <span style="color: #007BFF; font-size: 24px; font-weight: bold;">£${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}</span>
       </div>
 
       <!-- Payment & Status -->
       <table style="width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #f8f9fa; border-radius: 8px;">
         <tr>
-          <td style="padding: 15px; color: #666; width: 50%;"><strong>Payment Status:</strong></td>
+          <td style="padding: 15px; color: #333; width: 50%;"><strong>Payment Status:</strong></td>
           <td style="padding: 15px; color: #333; text-align: right;">
             <span style="background-color: ${jobDetails.paymentStatus === 'paid' ? '#28a745' : jobDetails.paymentStatus === 'pay_later' ? '#ffc107' : '#dc3545'}; color: ${jobDetails.paymentStatus === 'pay_later' ? '#333' : 'white'}; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
               ${(jobDetails.paymentStatus || 'pending').toUpperCase().replace('_', ' ')}
@@ -531,7 +531,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
           </td>
         </tr>
         <tr>
-          <td style="padding: 15px; color: #666;"><strong>Job Status:</strong></td>
+          <td style="padding: 15px; color: #333;"><strong>Job Status:</strong></td>
           <td style="padding: 15px; color: #333; text-align: right;">
             <span style="background-color: #6c757d; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
               ${(jobDetails.status || 'pending').toUpperCase()}
@@ -540,7 +540,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
         </tr>
         ${jobDetails.customerEmail ? `
         <tr>
-          <td style="padding: 15px; color: #666;"><strong>Customer Email:</strong></td>
+          <td style="padding: 15px; color: #333;"><strong>Customer Email:</strong></td>
           <td style="padding: 15px; color: #333; text-align: right;">
             <a href="mailto:${jobDetails.customerEmail}" style="color: #007BFF;">${jobDetails.customerEmail}</a>
           </td>
@@ -549,7 +549,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
       </table>
     </div>
     
-    <p style="color: #666; font-size: 14px; margin-top: 20px; text-align: center;">
+    <p style="color: #333; font-size: 14px; margin-top: 20px; text-align: center;">
       Please log in to the <a href="https://runcourier.co.uk/admin/jobs" style="color: #007BFF;">admin dashboard</a> to manage this booking.
     </p>
   `;
@@ -624,7 +624,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
   const content = `
     <h2 style="color: #333; margin-top: 0;">Thank You for Your Booking!</h2>
-    <p style="color: #666; font-size: 16px;">Your delivery has been confirmed and is being processed. Here are your booking details:</p>
+    <p style="color: #333; font-size: 16px;">Your delivery has been confirmed and is being processed. Here are your booking details:</p>
     
     <!-- Tracking Number Banner -->
     <div style="background-color: #007BFF; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
@@ -639,7 +639,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
       <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">COLLECTION DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
           <td style="padding: 8px 0; color: #333;">
             ${jobDetails.pickupBuildingName ? `${jobDetails.pickupBuildingName}<br>` : ''}
             ${jobDetails.pickupAddress || 'N/A'}<br>
@@ -647,7 +647,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
           </td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Contact:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Contact:</strong></td>
           <td style="padding: 8px 0; color: #333;">
             ${jobDetails.pickupContactName || 'N/A'}<br>
             <a href="tel:${jobDetails.pickupContactPhone}" style="color: #007BFF;">${jobDetails.pickupContactPhone || 'N/A'}</a>
@@ -655,13 +655,13 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
         </tr>
         ${jobDetails.pickupInstructions ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Instructions:</strong></td>
           <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.pickupInstructions}</td>
         </tr>
         ` : ''}
         ${scheduledPickup ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Scheduled:</strong></td>
           <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledPickup}</td>
         </tr>
         ` : ''}
@@ -671,7 +671,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
       <h3 style="color: #28a745; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #28a745; padding-bottom: 8px;">DELIVERY DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
           <td style="padding: 8px 0; color: #333;">
             ${jobDetails.deliveryBuildingName ? `${jobDetails.deliveryBuildingName}<br>` : ''}
             ${jobDetails.deliveryAddress || 'N/A'}<br>
@@ -679,7 +679,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
           </td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Recipient:</strong></td>
           <td style="padding: 8px 0; color: #333;">
             ${jobDetails.recipientName || 'N/A'}<br>
             <a href="tel:${jobDetails.recipientPhone}" style="color: #007BFF;">${jobDetails.recipientPhone || 'N/A'}</a>
@@ -687,13 +687,13 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
         </tr>
         ${jobDetails.deliveryInstructions ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Instructions:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Instructions:</strong></td>
           <td style="padding: 8px 0; color: #333; font-style: italic;">${jobDetails.deliveryInstructions}</td>
         </tr>
         ` : ''}
         ${scheduledDelivery ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Scheduled:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Scheduled:</strong></td>
           <td style="padding: 8px 0; color: #333; font-weight: bold;">${scheduledDelivery}</td>
         </tr>
         ` : ''}
@@ -703,31 +703,31 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
       <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">SERVICE DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 130px;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 130px;"><strong>Vehicle:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Weight:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.weight || '0'} kg</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Distance:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.distance || '0'} miles</td>
         </tr>
         ${jobDetails.isMultiDrop ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Service:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Service:</strong></td>
           <td style="padding: 8px 0; color: #333;">Multi-Drop Delivery</td>
         </tr>
         ` : ''}
         ${jobDetails.isReturnTrip ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Return Trip:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Return Trip:</strong></td>
           <td style="padding: 8px 0; color: #333;">Yes - Driver will return to pickup location</td>
         </tr>
         ` : ''}
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Booked:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Booked:</strong></td>
           <td style="padding: 8px 0; color: #333;">${createdAt}</td>
         </tr>
       </table>
@@ -755,7 +755,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
     <!-- Contact Info -->
     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-      <p style="color: #666; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
+      <p style="color: #333; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
       <p style="color: #333; margin: 0; font-size: 14px;">
         Call us: <a href="tel:+447311121217" style="color: #007BFF; font-weight: bold;">+44 7311 121 217</a><br>
         Email: <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a>
@@ -816,16 +816,16 @@ export async function sendDriverApplicationNotification(
     <div style="background-color: white; border-radius: 8px; padding: 20px;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 120px;"><strong>Applicant:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; width: 120px;"><strong>Applicant:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${applicantName}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Status:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Status:</strong></td>
           <td style="padding: 10px 0; color: #333;">${status}</td>
         </tr>
       </table>
     </div>
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the <a href="https://runcourier.co.uk/admin/applications" style="color: #007BFF;">admin dashboard</a> to review pending driver applications.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">Please log in to the <a href="https://runcourier.co.uk/admin/applications" style="color: #007BFF;">admin dashboard</a> to review pending driver applications.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Driver Application');
@@ -843,16 +843,16 @@ export async function sendDocumentUploadNotification(
     <div style="background-color: white; border-radius: 8px; padding: 20px;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 140px;"><strong>Driver:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; width: 140px;"><strong>Driver:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${driverName}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Document Type:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Document Type:</strong></td>
           <td style="padding: 10px 0; color: #333;">${documentType}</td>
         </tr>
       </table>
     </div>
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the <a href="https://runcourier.co.uk/admin/documents" style="color: #007BFF;">admin dashboard</a> to review and approve the document.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">Please log in to the <a href="https://runcourier.co.uk/admin/documents" style="color: #007BFF;">admin dashboard</a> to review and approve the document.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Document Upload');
@@ -871,20 +871,20 @@ export async function sendPaymentNotification(
     <div style="background-color: white; border-radius: 8px; padding: 20px;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 140px;"><strong>Invoice Number:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; width: 140px;"><strong>Invoice Number:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Amount Due:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Amount Due:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">£${amount}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Due Date:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Due Date:</strong></td>
           <td style="padding: 10px 0; color: #333;">${dueDate}</td>
         </tr>
       </table>
     </div>
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">Please log in to the customer portal to view the full invoice.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">Please log in to the customer portal to view the full invoice.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'New Invoice');
@@ -906,32 +906,32 @@ export async function sendInvoiceToCustomer(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #333; margin-top: 0;">Invoice from Run Courier</h2>
-    <p style="color: #666; font-size: 16px;">Dear ${customerName},</p>
-    <p style="color: #666; font-size: 16px;">Please find below details of your invoice:</p>
+    <p style="color: #333; font-size: 16px;">Dear ${customerName},</p>
+    <p style="color: #333; font-size: 16px;">Please find below details of your invoice:</p>
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 140px;"><strong>Invoice Number:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; width: 140px;"><strong>Invoice Number:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Amount Due:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Amount Due:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold; font-size: 18px;">£${amount}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Period:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Period:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${periodStart} - ${periodEnd}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Due Date:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Due Date:</strong></td>
           <td style="padding: 10px 0; color: #d9534f; font-weight: bold;">${dueDate}</td>
         </tr>
       </table>
     </div>
     ${notes ? `
     <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin: 20px 0;">
-      <p style="color: #666; margin: 0;"><strong>Notes:</strong></p>
-      <p style="color: #666; margin: 10px 0 0 0; white-space: pre-wrap;">${notes}</p>
+      <p style="color: #333; margin: 0;"><strong>Notes:</strong></p>
+      <p style="color: #333; margin: 10px 0 0 0; white-space: pre-wrap;">${notes}</p>
     </div>
     ` : ''}
     <div style="background-color: #e8f4fd; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -940,28 +940,28 @@ export async function sendInvoiceToCustomer(
       <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Option 1: Bank Transfer</p>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Account Name:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Account Name:</strong></td>
           <td style="padding: 5px 0; color: #333;">RUN COURIER</td>
         </tr>
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Sort Code:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Sort Code:</strong></td>
           <td style="padding: 5px 0; color: #333;">30-99-50</td>
         </tr>
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Account Number:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Account Number:</strong></td>
           <td style="padding: 5px 0; color: #333;">36113363</td>
         </tr>
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Reference:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Reference:</strong></td>
           <td style="padding: 5px 0; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
       </table>
       
       <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Option 2: Pay by Card (Stripe)</p>
-      <p style="color: #666; margin: 0;">Pay securely online via Stripe at <a href="https://runcourier.co.uk/pay" style="color: #0066cc; text-decoration: underline;">runcourier.co.uk/pay</a></p>
+      <p style="color: #333; margin: 0;">Pay securely online via Stripe at <a href="https://runcourier.co.uk/pay" style="color: #0066cc; text-decoration: underline;">runcourier.co.uk/pay</a></p>
     </div>
-    <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
-    <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
+    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
+    <p style="color: #333; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Invoice');
@@ -1027,7 +1027,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
               <div style="margin: 5px 0; padding: 5px 0; ${i < stops.length - 1 ? 'border-bottom: 1px dashed #cde1f7;' : ''}">
                 <span style="display: inline-block; background-color: #007BFF; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-right: 8px;">Drop-off ${stop.stopOrder}</span>
                 <span style="color: #333; font-size: 11px;">${stop.address || stop.postcode}</span>
-                ${stop.recipientName ? `<span style="color: #666; font-size: 10px; margin-left: 10px;">&mdash; ${stop.recipientName}</span>` : ''}
+                ${stop.recipientName ? `<span style="color: #333; font-size: 10px; margin-left: 10px;">&mdash; ${stop.recipientName}</span>` : ''}
               </div>
             `).join('')}
           </div>
@@ -1057,14 +1057,14 @@ export async function sendInvoiceToCustomerWithPaymentLink(
                 ${job.trackingNumber}
                 ${job.isMultiDrop ? '<span style="background-color: #17a2b8; color: white; padding: 2px 6px; border-radius: 3px; font-size: 9px; margin-left: 5px;">MULTIPLE DROP-OFFS</span>' : ''}
               </td>
-              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #666; max-width: 150px;">${job.pickupAddress.substring(0, 40)}${job.pickupAddress.length > 40 ? '...' : ''}</td>
-              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #666; max-width: 150px;">
+              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #333; max-width: 150px;">${job.pickupAddress.substring(0, 40)}${job.pickupAddress.length > 40 ? '...' : ''}</td>
+              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #333; max-width: 150px;">
                 ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 
                   ? `${job.multiDropStops.length} drop-off addresses below` 
                   : (job.deliveryAddress ? (job.deliveryAddress.substring(0, 40) + (job.deliveryAddress.length > 40 ? '...' : '')) : (job.recipientName || 'N/A'))}
               </td>
-              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #666;">${job.scheduledDate}</td>
-              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #666;">${formatVehicleType(job.vehicleType)}</td>
+              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #333;">${job.scheduledDate}</td>
+              <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #333;">${formatVehicleType(job.vehicleType)}</td>
               <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #333; text-align: right; font-weight: bold;">£${job.price.toFixed(2)}</td>
             </tr>
             ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? renderMultiDropStops(job.multiDropStops) : ''}
@@ -1083,16 +1083,16 @@ export async function sendInvoiceToCustomerWithPaymentLink(
   const customerInfoHtml = companyName || businessAddress ? `
     <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
       <p style="margin: 0 0 5px 0; color: #333;"><strong>Bill To:</strong></p>
-      <p style="margin: 0; color: #666;">${customerName}</p>
-      ${companyName ? `<p style="margin: 5px 0 0 0; color: #666;">${companyName}</p>` : ''}
-      ${businessAddress ? `<p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">${businessAddress}</p>` : ''}
+      <p style="margin: 0; color: #333;">${customerName}</p>
+      ${companyName ? `<p style="margin: 5px 0 0 0; color: #333;">${companyName}</p>` : ''}
+      ${businessAddress ? `<p style="margin: 5px 0 0 0; color: #333; font-size: 14px;">${businessAddress}</p>` : ''}
     </div>
   ` : '';
 
   const content = `
     <div style="text-align: center; margin-bottom: 30px;">
       <h1 style="color: #007BFF; margin: 0; font-size: 32px;">INVOICE</h1>
-      <p style="color: #666; margin: 10px 0 0 0; font-size: 14px;">RUN COURIER</p>
+      <p style="color: #333; margin: 10px 0 0 0; font-size: 14px;">RUN COURIER</p>
     </div>
     
     ${customerInfoHtml}
@@ -1100,23 +1100,23 @@ export async function sendInvoiceToCustomerWithPaymentLink(
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e1e5eb;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Invoice Number:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Invoice Number:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Invoice Date:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Invoice Date:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Period:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Period:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${periodStart} - ${periodEnd}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Due Date:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Due Date:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #e74c3c; font-weight: bold;">${dueDate}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Amount Due:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Amount Due:</strong></td>
           <td style="padding: 10px 0; color: #007BFF; font-size: 24px; font-weight: bold;">£${typeof amount === 'number' ? amount.toFixed(2) : amount}</td>
         </tr>
       </table>
@@ -1126,7 +1126,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
     
     <div style="background-color: #e8f5e9; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
       <p style="color: #2e7d32; font-size: 18px; font-weight: bold; margin-top: 0;">Pay Now with Card</p>
-      <p style="color: #666; margin-bottom: 15px;">Click the button below to pay securely with your card via Stripe:</p>
+      <p style="color: #333; margin-bottom: 15px;">Click the button below to pay securely with your card via Stripe:</p>
       <a href="${paymentUrl}" style="background-color: #007BFF; color: white; padding: 15px 40px; text-decoration: none; border-radius: 5px; font-size: 18px; font-weight: bold; display: inline-block;">
         Pay £${typeof amount === 'number' ? amount.toFixed(2) : amount} Now
       </a>
@@ -1137,26 +1137,26 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Or Pay by Bank Transfer</p>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Account Name:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Account Name:</strong></td>
           <td style="padding: 5px 0; color: #333;">RUN COURIER</td>
         </tr>
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Sort Code:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Sort Code:</strong></td>
           <td style="padding: 5px 0; color: #333;">30-99-50</td>
         </tr>
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Account Number:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Account Number:</strong></td>
           <td style="padding: 5px 0; color: #333;">36113363</td>
         </tr>
         <tr>
-          <td style="padding: 5px 0; color: #666;"><strong>Reference:</strong></td>
+          <td style="padding: 5px 0; color: #333;"><strong>Reference:</strong></td>
           <td style="padding: 5px 0; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
       </table>
     </div>
     
-    <p style="color: #666; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
-    <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
+    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
+    <p style="color: #333; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Invoice');
@@ -1180,8 +1180,8 @@ export async function sendPaymentReceivedConfirmation(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #333; margin-top: 0;">Payment Received - Thank You!</h2>
-    <p style="color: #666; font-size: 16px;">Dear ${customerName},</p>
-    <p style="color: #666; font-size: 16px;">We have received your payment. Thank you for your business!</p>
+    <p style="color: #333; font-size: 16px;">Dear ${customerName},</p>
+    <p style="color: #333; font-size: 16px;">We have received your payment. Thank you for your business!</p>
     
     <div style="background-color: #e8f5e9; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
       <div style="width: 60px; height: 60px; background-color: #4caf50; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
@@ -1193,23 +1193,23 @@ export async function sendPaymentReceivedConfirmation(
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e1e5eb;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Invoice Number:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Invoice Number:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-weight: bold;">${invoiceNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Amount Paid:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Amount Paid:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; font-size: 20px; font-weight: bold;">£${typeof amount === 'number' ? amount.toFixed(2) : amount}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Payment Reference:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Payment Reference:</strong></td>
           <td style="padding: 10px 0; color: #333; font-family: monospace;">${paymentReference}</td>
         </tr>
       </table>
     </div>
     
-    <p style="color: #666; font-size: 14px;">This email serves as your payment receipt. Please keep it for your records.</p>
-    <p style="color: #666; font-size: 14px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
-    <p style="color: #666; font-size: 14px;">Thank you for choosing Run Courier.</p>
+    <p style="color: #333; font-size: 14px;">This email serves as your payment receipt. Please keep it for your records.</p>
+    <p style="color: #333; font-size: 14px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
+    <p style="color: #333; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Payment Confirmation');
@@ -1225,10 +1225,10 @@ export async function sendEmailVerification(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #333;">Welcome to Run Courier!</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Hi ${fullName},
     </p>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Thank you for registering. Please verify your email address by clicking the button below:
     </p>
     <div style="text-align: center; margin: 30px 0;">
@@ -1236,10 +1236,10 @@ export async function sendEmailVerification(
         Verify Email Address
       </a>
     </div>
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       If you didn't create an account, you can safely ignore this email.
     </p>
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       This link will expire in 24 hours.
     </p>
   `;
@@ -1256,11 +1256,11 @@ export async function sendPasswordResetEmail(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #333;">Reset Your Password</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       You requested to reset your password. Use the verification code below to create a new password:
     </p>
     <div style="text-align: center; margin: 30px 0; padding: 25px; background-color: #f0f4f8; border-radius: 8px;">
-      <p style="color: #666; font-size: 14px; margin: 0 0 10px 0;">Your verification code:</p>
+      <p style="color: #333; font-size: 14px; margin: 0 0 10px 0;">Your verification code:</p>
       <div style="font-size: 36px; font-weight: bold; color: #007BFF; font-family: 'Courier New', monospace; padding: 10px 0;">
         ${code}
       </div>
@@ -1268,10 +1268,10 @@ export async function sendPasswordResetEmail(
     <p style="color: #333; font-size: 15px; text-align: center; font-weight: 500;">
       Enter this code on the password reset page to create your new password.
     </p>
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       If you didn't request this, you can safely ignore this email.
     </p>
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       This code will expire in 1 hour.
     </p>
   `;
@@ -1290,16 +1290,16 @@ export async function sendDriverApprovalEmail(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #333;">Hello ${fullName},</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Your Run Courier driver application has been <span style="color: #28a745; font-weight: bold;">&#10004; approved</span>.
     </p>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Your Driver ID is: <strong style="color: #007BFF; font-size: 18px;">${driverCode}</strong>
     </p>
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #007BFF;">
       <h3 style="color: #007BFF; margin-top: 0;">STEP 1 - Login to the Driver Portal (Website) and upload documents</h3>
-      <p style="color: #666; font-size: 15px;">
+      <p style="color: #333; font-size: 15px;">
         Go to the Driver Portal to complete your setup:
       </p>
       <div style="text-align: center; margin: 15px 0;">
@@ -1310,11 +1310,11 @@ export async function sendDriverApprovalEmail(
       <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin: 15px 0;">
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="padding: 8px 0; color: #666; width: 120px;"><strong>Email:</strong></td>
+            <td style="padding: 8px 0; color: #333; width: 120px;"><strong>Email:</strong></td>
             <td style="padding: 8px 0; color: #333; font-size: 15px;">${email}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #666;"><strong>Temporary Password:</strong></td>
+            <td style="padding: 8px 0; color: #333;"><strong>Temporary Password:</strong></td>
             <td style="padding: 8px 0; color: #333; font-size: 15px; font-family: monospace; letter-spacing: 1px;">${tempPassword}</td>
           </tr>
         </table>
@@ -1328,7 +1328,7 @@ export async function sendDriverApprovalEmail(
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
       <h3 style="color: #28a745; margin-top: 0;">STEP 2 - Complete your profile and upload all required documents</h3>
-      <ul style="color: #666; line-height: 1.8; margin: 0; padding-left: 20px;">
+      <ul style="color: #333; line-height: 1.8; margin: 0; padding-left: 20px;">
         <li>Confirm your personal details are correct</li>
         <li>Upload all required documents (driving licence, insurance, DBS, etc.)</li>
         <li>Make sure every document shows as <strong>"Uploaded/Complete"</strong></li>
@@ -1337,7 +1337,7 @@ export async function sendDriverApprovalEmail(
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #6f42c1;">
       <h3 style="color: #6f42c1; margin-top: 0;">STEP 3 - Download the Run Courier Driver App (iPhone)</h3>
-      <p style="color: #666; font-size: 15px;">
+      <p style="color: #333; font-size: 15px;">
         Download the app from the App Store:
       </p>
       <div style="text-align: center; margin: 15px 0;">
@@ -1349,15 +1349,15 @@ export async function sendDriverApprovalEmail(
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #fd7e14;">
       <h3 style="color: #fd7e14; margin-top: 0;">STEP 4 - Login to the mobile app using the SAME email and password</h3>
-      <p style="color: #666; font-size: 15px;">
+      <p style="color: #333; font-size: 15px;">
         Use the same email and the password you set after changing it on the website to log in to the mobile app.
       </p>
     </div>
 
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">
       If you have any issues logging in or uploading documents, reply to this email and we will help.
     </p>
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       Kind regards,<br>
       <strong>Run Courier Team</strong>
     </p>
@@ -1376,16 +1376,16 @@ export async function sendDriverApprovalEmailExisting(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #333;">Hello ${fullName},</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Your Run Courier driver application has been <span style="color: #28a745; font-weight: bold;">&#10004; approved</span>.
     </p>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Your Driver ID is: <strong style="color: #007BFF; font-size: 18px;">${driverCode}</strong>
     </p>
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #007BFF;">
       <h3 style="color: #007BFF; margin-top: 0;">STEP 1 - Login to the Driver Portal</h3>
-      <p style="color: #666; font-size: 15px;">
+      <p style="color: #333; font-size: 15px;">
         Go to the Driver Portal and log in using your existing credentials:
       </p>
       <div style="text-align: center; margin: 15px 0;">
@@ -1393,14 +1393,14 @@ export async function sendDriverApprovalEmailExisting(
           Login to Driver Portal
         </a>
       </div>
-      <p style="color: #666; font-size: 14px;">
+      <p style="color: #333; font-size: 14px;">
         Use your existing email (<strong>${email}</strong>) and password to log in.
       </p>
     </div>
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
       <h3 style="color: #28a745; margin-top: 0;">STEP 2 - Complete your profile and upload all required documents</h3>
-      <ul style="color: #666; line-height: 1.8; margin: 0; padding-left: 20px;">
+      <ul style="color: #333; line-height: 1.8; margin: 0; padding-left: 20px;">
         <li>Confirm your personal details are correct</li>
         <li>Upload all required documents (driving licence, insurance, DBS, etc.)</li>
         <li>Make sure every document shows as <strong>"Uploaded/Complete"</strong></li>
@@ -1409,7 +1409,7 @@ export async function sendDriverApprovalEmailExisting(
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #6f42c1;">
       <h3 style="color: #6f42c1; margin-top: 0;">STEP 3 - Download the Run Courier Driver App (iPhone)</h3>
-      <p style="color: #666; font-size: 15px;">
+      <p style="color: #333; font-size: 15px;">
         Download the app from the App Store:
       </p>
       <div style="text-align: center; margin: 15px 0;">
@@ -1421,15 +1421,15 @@ export async function sendDriverApprovalEmailExisting(
 
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #fd7e14;">
       <h3 style="color: #fd7e14; margin-top: 0;">STEP 4 - Login to the mobile app using the SAME email and password</h3>
-      <p style="color: #666; font-size: 15px;">
+      <p style="color: #333; font-size: 15px;">
         Use the same email and password you use on the website to log in to the mobile app.
       </p>
     </div>
 
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">
       If you have any issues logging in or uploading documents, reply to this email and we will help.
     </p>
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       Kind regards,<br>
       <strong>Run Courier Team</strong>
     </p>
@@ -1457,7 +1457,7 @@ export async function sendApplicationCorrectionEmail(
       </div>
       <p style="color: #333;">Please visit <a href="https://runcourier.co.uk/apply" style="color: #007BFF;">runcourier.co.uk/apply</a> to resubmit your application with the required corrections.</p>
     </div>
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call +44 20 4634 6100.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call +44 20 4634 6100.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Corrections Required');
@@ -1478,28 +1478,28 @@ export async function sendContactFormSubmission(
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666; width: 120px;"><strong>Name:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333; width: 120px;"><strong>Name:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${name}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Email:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Email:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><a href="mailto:${email}" style="color: #007BFF;">${email}</a></td>
         </tr>
         ${phone ? `
         <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;"><strong>Phone:</strong></td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><strong>Phone:</strong></td>
           <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;"><a href="tel:${phone}" style="color: #007BFF;">${phone}</a></td>
         </tr>
         ` : ''}
         <tr>
-          <td style="padding: 10px 0; color: #666;"><strong>Subject:</strong></td>
+          <td style="padding: 10px 0; color: #333;"><strong>Subject:</strong></td>
           <td style="padding: 10px 0; color: #333;">${subject}</td>
         </tr>
       </table>
     </div>
     <div style="background-color: white; border-radius: 8px; padding: 20px;">
       <h3 style="color: #333; margin-top: 0;">Message:</h3>
-      <p style="color: #666; line-height: 1.6; margin: 0;">${message.replace(/\n/g, '<br>')}</p>
+      <p style="color: #333; line-height: 1.6; margin: 0;">${message.replace(/\n/g, '<br>')}</p>
     </div>
     <div style="text-align: center; margin-top: 20px;">
       <a href="mailto:${email}?subject=Re: ${encodeURIComponent(subject)}" style="background-color: #007BFF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Reply to ${name}</a>
@@ -1548,10 +1548,10 @@ export async function sendPaymentLinkEmail(
   
   const content = `
     <h2 style="color: #333; margin-top: 0;">Payment Required for Your Delivery</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Dear ${data.customerName || 'Customer'},
     </p>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Your delivery booking has been created and is awaiting payment. Please complete the payment to confirm your booking.
     </p>
     
@@ -1559,19 +1559,19 @@ export async function sendPaymentLinkEmail(
       <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Booking Details</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Tracking #:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px;"><strong>Tracking #:</strong></td>
           <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Vehicle:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleName}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Weight:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.weight} kg</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Distance:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.distance} miles</td>
         </tr>
       </table>
@@ -1581,22 +1581,22 @@ export async function sendPaymentLinkEmail(
       <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Route${data.isMultiDrop ? ' (Multi-Drop)' : ''}${data.isReturnTrip ? ' + Return' : ''}</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px; vertical-align: top;"><strong>Pickup:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px; vertical-align: top;"><strong>Pickup:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.pickupAddress}<br><span style="font-family: monospace; color: #007BFF;">${data.pickupPostcode}</span></td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Drop 1:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Drop 1:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.deliveryAddress}<br><span style="font-family: monospace; color: #007BFF;">${data.deliveryPostcode}</span></td>
         </tr>
         ${data.isMultiDrop && data.multiDropStops && data.multiDropStops.length > 0 ? data.multiDropStops.map((stop, index) => `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Drop ${index + 2}:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Drop ${index + 2}:</strong></td>
           <td style="padding: 8px 0; color: #333;">${stop.address}${stop.recipientName ? ` (${stop.recipientName})` : ''}<br><span style="font-family: monospace; color: #007BFF;">${stop.postcode}</span></td>
         </tr>
         `).join('') : ''}
         ${data.isReturnTrip ? `
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Return:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Return:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.pickupAddress}<br><span style="font-family: monospace; color: #28a745;">${data.pickupPostcode}</span></td>
         </tr>
         ` : ''}
@@ -1619,7 +1619,7 @@ export async function sendPaymentLinkEmail(
       Secure payment powered by Stripe. We accept all major cards, Apple Pay, and Google Pay.
     </p>
     
-    <p style="color: #666; font-size: 14px; margin-top: 30px;">
+    <p style="color: #333; font-size: 14px; margin-top: 30px;">
       If you did not request this booking, please ignore this email or contact us.
     </p>
   `;
@@ -1677,10 +1677,10 @@ export async function sendPaymentConfirmationEmail(
   
   const content = `
     <h2 style="color: #28a745; margin-top: 0;">Payment Confirmed!</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Dear ${data.customerName || 'Customer'},
     </p>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Thank you for your payment. Your delivery booking is now confirmed and a driver will be assigned shortly.
     </p>
     
@@ -1692,19 +1692,19 @@ export async function sendPaymentConfirmationEmail(
       <h3 style="color: #333; margin-top: 0;">Booking Details</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Tracking #:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px;"><strong>Tracking #:</strong></td>
           <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Vehicle:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleName}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Pickup:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Pickup:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.pickupAddress}<br><span style="font-family: monospace;">${data.pickupPostcode}</span></td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Delivery:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Delivery:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.deliveryAddress}<br><span style="font-family: monospace;">${data.deliveryPostcode}</span></td>
         </tr>
       </table>
@@ -1717,12 +1717,12 @@ export async function sendPaymentConfirmationEmail(
     </div>
     
     ${data.stripeReceiptUrl ? `
-    <p style="color: #666; font-size: 14px; text-align: center;">
+    <p style="color: #333; font-size: 14px; text-align: center;">
       <a href="${data.stripeReceiptUrl}" style="color: #007BFF;">View Payment Receipt</a>
     </p>
     ` : ''}
     
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       We'll notify you when a driver is assigned and when your delivery is on the way.
     </p>
   `;
@@ -1759,7 +1759,7 @@ export async function sendPaymentLinkFailureNotification(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #dc3545; margin-top: 0;">Payment Link Email Failed to Send</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       The payment link email could not be delivered to the customer. Please contact them manually or resend the link.
     </p>
     
@@ -1787,7 +1787,7 @@ export async function sendPaymentLinkFailureNotification(
     
     <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
       <h3 style="color: #333; margin-top: 0;">Payment Link</h3>
-      <p style="color: #666; font-size: 14px; word-break: break-all;">
+      <p style="color: #333; font-size: 14px; word-break: break-all;">
         <a href="${data.paymentLink}" style="color: #007BFF;">${data.paymentLink}</a>
       </p>
       <p style="color: #999; font-size: 12px;">
@@ -1873,14 +1873,14 @@ export async function sendBusinessQuoteEmail(
     const toAddress = data.drops[i]?.address || leg.to;
     return `
     <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #eee; color: #666; vertical-align: top;">${i + 1}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; color: #333; vertical-align: top;">${i + 1}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; vertical-align: top;">
         <div style="color: #333; font-weight: 600;">${fromPostcode}</div>
-        <div style="color: #666; font-size: 12px; margin-top: 4px;">${fromAddress}</div>
+        <div style="color: #333; font-size: 12px; margin-top: 4px;">${fromAddress}</div>
       </td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; vertical-align: top;">
         <div style="color: #333; font-weight: 600;">${toPostcode}</div>
-        <div style="color: #666; font-size: 12px; margin-top: 4px;">${toAddress}</div>
+        <div style="color: #333; font-size: 12px; margin-top: 4px;">${toAddress}</div>
       </td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; color: #333; text-align: right; vertical-align: top;">${leg.distance.toFixed(1)} miles</td>
     </tr>
@@ -1889,12 +1889,12 @@ export async function sendBusinessQuoteEmail(
 
   const content = `
     <h2 style="color: #333; margin-top: 0;">Your Business Delivery Quote</h2>
-    ${data.customerName ? `<p style="color: #666; font-size: 16px;">Dear ${data.customerName},</p>` : ''}
-    <p style="color: #666; font-size: 16px;">
+    ${data.customerName ? `<p style="color: #333; font-size: 16px;">Dear ${data.customerName},</p>` : ''}
+    <p style="color: #333; font-size: 16px;">
       Thank you for your enquiry. Here is your personalised multi-drop delivery quote:
     </p>
     
-    ${data.companyName ? `<p style="color: #666; font-size: 14px;"><strong>Company:</strong> ${data.companyName}</p>` : ''}
+    ${data.companyName ? `<p style="color: #333; font-size: 14px;"><strong>Company:</strong> ${data.companyName}</p>` : ''}
     
     ${(data.pickupDate || data.pickupTime) ? `
     <div style="background-color: #f0f7ff; border-radius: 8px; padding: 15px; margin: 20px 0; border-left: 4px solid #007BFF;">
@@ -1912,10 +1912,10 @@ export async function sendBusinessQuoteEmail(
       <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
         <thead>
           <tr style="background-color: #f8f9fa;">
-            <th style="padding: 10px; text-align: left; color: #666; font-size: 12px;">STOP</th>
-            <th style="padding: 10px; text-align: left; color: #666; font-size: 12px;">FROM</th>
-            <th style="padding: 10px; text-align: left; color: #666; font-size: 12px;">TO</th>
-            <th style="padding: 10px; text-align: right; color: #666; font-size: 12px;">DISTANCE</th>
+            <th style="padding: 10px; text-align: left; color: #333; font-size: 12px;">STOP</th>
+            <th style="padding: 10px; text-align: left; color: #333; font-size: 12px;">FROM</th>
+            <th style="padding: 10px; text-align: left; color: #333; font-size: 12px;">TO</th>
+            <th style="padding: 10px; text-align: right; color: #333; font-size: 12px;">DISTANCE</th>
           </tr>
         </thead>
         <tbody>
@@ -1926,19 +1926,19 @@ export async function sendBusinessQuoteEmail(
       <div style="background-color: #f8f9fa; padding: 15px; margin-top: 15px; border-radius: 5px;">
         <table style="width: 100%;">
           <tr>
-            <td style="color: #666;">Total Distance:</td>
+            <td style="color: #333;">Total Distance:</td>
             <td style="text-align: right; font-weight: bold; color: #333;">${data.quote.totalDistance.toFixed(1)} miles</td>
           </tr>
           <tr>
-            <td style="color: #666;">Estimated Duration:</td>
+            <td style="color: #333;">Estimated Duration:</td>
             <td style="text-align: right; font-weight: bold; color: #333;">${data.quote.totalDuration} mins</td>
           </tr>
           <tr>
-            <td style="color: #666;">Vehicle Type:</td>
+            <td style="color: #333;">Vehicle Type:</td>
             <td style="text-align: right; font-weight: bold; color: #333;">${vehicleNames[data.vehicleType] || data.vehicleType}</td>
           </tr>
           <tr>
-            <td style="color: #666;">Number of Drops:</td>
+            <td style="color: #333;">Number of Drops:</td>
             <td style="text-align: right; font-weight: bold; color: #333;">${data.drops.length}</td>
           </tr>
         </table>
@@ -1958,7 +1958,7 @@ export async function sendBusinessQuoteEmail(
     ` : ''}
     
     <div style="text-align: center; margin: 30px 0;">
-      <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+      <p style="color: #333; font-size: 14px; margin-bottom: 20px;">
         Ready to book? Contact us to confirm your delivery:
       </p>
       <a href="tel:+442046346100" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block; margin: 5px;">
@@ -2034,10 +2034,10 @@ export async function sendJobCancellationEmail(
 ): Promise<boolean> {
   const content = `
     <h2 style="color: #dc3545; margin-top: 0;">Booking Cancelled</h2>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       Dear ${data.customerName || 'Valued Customer'},
     </p>
-    <p style="color: #666; font-size: 16px;">
+    <p style="color: #333; font-size: 16px;">
       We regret to inform you that your delivery booking has been cancelled.
     </p>
     
@@ -2045,20 +2045,20 @@ export async function sendJobCancellationEmail(
       <h3 style="color: #333; margin-top: 0;">Booking Details</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Tracking #:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 140px;"><strong>Tracking #:</strong></td>
           <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Pickup:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Pickup:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.pickupPostcode}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Delivery:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Delivery:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.deliveryPostcode}</td>
         </tr>
         ${data.totalPrice ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Amount:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Amount:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.totalPrice}</td>
         </tr>
         ` : ''}
@@ -2074,11 +2074,11 @@ export async function sendJobCancellationEmail(
     </div>
     ` : ''}
     
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       If you have already made a payment for this booking, a refund will be processed within 5-7 business days.
     </p>
     
-    <p style="color: #666; font-size: 14px;">
+    <p style="color: #333; font-size: 14px;">
       If you have any questions or would like to rebook, please don't hesitate to contact us.
     </p>
     
@@ -2159,7 +2159,7 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
 
   const content = `
     <h2 style="color: #dc3545; margin-top: 0;">Delivery Attempt Failed</h2>
-    <p style="color: #666; font-size: 16px;">We're sorry to inform you that we were unable to complete your delivery. Our driver attempted delivery but was unsuccessful.</p>
+    <p style="color: #333; font-size: 16px;">We're sorry to inform you that we were unable to complete your delivery. Our driver attempted delivery but was unsuccessful.</p>
     
     <!-- Tracking Number Banner -->
     <div style="background-color: #dc3545; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
@@ -2184,12 +2184,12 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
       <h3 style="color: #dc3545; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #dc3545; padding-bottom: 8px;">DELIVERY ATTEMPT DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 130px;"><strong>Attempted:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 130px;"><strong>Attempted:</strong></td>
           <td style="padding: 8px 0; color: #333;">${attemptedTime}</td>
         </tr>
         ${data.driverName ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Driver:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Driver:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.driverName}</td>
         </tr>
         ` : ''}
@@ -2199,7 +2199,7 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
       <h3 style="color: #007BFF; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #007BFF; padding-bottom: 8px;">COLLECTION DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
           <td style="padding: 8px 0; color: #333;">
             ${data.pickupBuildingName ? `${data.pickupBuildingName}<br>` : ''}
             ${data.pickupAddress || 'N/A'}<br>
@@ -2212,7 +2212,7 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
       <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">DELIVERY DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 130px; vertical-align: top;"><strong>Address:</strong></td>
           <td style="padding: 8px 0; color: #333;">
             ${data.deliveryBuildingName ? `${data.deliveryBuildingName}<br>` : ''}
             ${data.deliveryAddress || 'N/A'}<br>
@@ -2220,7 +2220,7 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
           </td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Recipient:</strong></td>
+          <td style="padding: 8px 0; color: #333; vertical-align: top;"><strong>Recipient:</strong></td>
           <td style="padding: 8px 0; color: #333;">
             ${data.recipientName || 'N/A'}<br>
             ${data.recipientPhone ? `<a href="tel:${data.recipientPhone}" style="color: #007BFF;">${data.recipientPhone}</a>` : 'N/A'}
@@ -2232,31 +2232,31 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
       <h3 style="color: #6c757d; margin: 0 0 15px; font-size: 16px; border-bottom: 2px solid #6c757d; padding-bottom: 8px;">SERVICE DETAILS</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 130px;"><strong>Vehicle:</strong></td>
+          <td style="padding: 8px 0; color: #333; width: 130px;"><strong>Vehicle:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
         </tr>
         ${data.weight ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Weight:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Weight:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.weight} kg</td>
         </tr>
         ` : ''}
         ${data.distance ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Distance:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Distance:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.distance} miles</td>
         </tr>
         ` : ''}
         ${data.totalPrice ? `
         <tr>
-          <td style="padding: 8px 0; color: #666;"><strong>Amount:</strong></td>
+          <td style="padding: 8px 0; color: #333;"><strong>Amount:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.totalPrice}</td>
         </tr>
         ` : ''}
       </table>
     </div>
     
-    <p style="color: #666; font-size: 14px; margin: 20px 0;">
+    <p style="color: #333; font-size: 14px; margin: 20px 0;">
       Our team will be in touch shortly to arrange a redelivery or discuss alternative options. If you'd like to speak with us immediately, please contact our customer service team.
     </p>
     
@@ -2267,7 +2267,7 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
     </div>
     
     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-      <p style="color: #666; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
+      <p style="color: #333; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
       <p style="color: #333; margin: 0; font-size: 14px;">
         Call us: <a href="tel:+447311121217" style="color: #007BFF; font-weight: bold;">+44 7311 121 217</a><br>
         Email: <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a>
@@ -2359,7 +2359,7 @@ export async function sendDriverPaymentConfirmation(
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <strong style="color: #666;">Amount Paid:</strong>
+              <strong style="color: #333;">Amount Paid:</strong>
             </td>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
               <span style="color: #28a745; font-size: 20px; font-weight: bold;">£${data.amount}</span>
@@ -2367,7 +2367,7 @@ export async function sendDriverPaymentConfirmation(
           </tr>
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <strong style="color: #666;">Description:</strong>
+              <strong style="color: #333;">Description:</strong>
             </td>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
               ${data.description}
@@ -2375,7 +2375,7 @@ export async function sendDriverPaymentConfirmation(
           </tr>
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <strong style="color: #666;">Payment Date:</strong>
+              <strong style="color: #333;">Payment Date:</strong>
             </td>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
               ${formattedDate}
@@ -2384,7 +2384,7 @@ export async function sendDriverPaymentConfirmation(
           ${data.reference ? `
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <strong style="color: #666;">Reference:</strong>
+              <strong style="color: #333;">Reference:</strong>
             </td>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
               ${data.reference}
@@ -2394,7 +2394,7 @@ export async function sendDriverPaymentConfirmation(
           ${data.bankName ? `
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <strong style="color: #666;">Bank:</strong>
+              <strong style="color: #333;">Bank:</strong>
             </td>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
               ${data.bankName}
@@ -2404,7 +2404,7 @@ export async function sendDriverPaymentConfirmation(
           ${data.sortCode ? `
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <strong style="color: #666;">Sort Code:</strong>
+              <strong style="color: #333;">Sort Code:</strong>
             </td>
             <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; text-align: right;">
               ${data.sortCode}
@@ -2413,7 +2413,7 @@ export async function sendDriverPaymentConfirmation(
           ` : ''}
           <tr>
             <td style="padding: 10px 0;">
-              <strong style="color: #666;">Account:</strong>
+              <strong style="color: #333;">Account:</strong>
             </td>
             <td style="padding: 10px 0; text-align: right;">
               ${maskedAccount}
@@ -2422,11 +2422,11 @@ export async function sendDriverPaymentConfirmation(
         </table>
       </div>
       
-      <p style="color: #666; font-size: 14px; margin-top: 20px;">
+      <p style="color: #333; font-size: 14px; margin-top: 20px;">
         This payment should appear in your bank account within 1-3 working days, depending on your bank.
       </p>
       
-      <p style="color: #666; font-size: 14px;">
+      <p style="color: #333; font-size: 14px;">
         If you have any questions about this payment, please contact our team.
       </p>
     </div>
