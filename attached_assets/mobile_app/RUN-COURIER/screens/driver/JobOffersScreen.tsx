@@ -513,7 +513,7 @@ export function JobOffersScreen({ navigation }: any) {
       console.log('[JobOffers] Driver ID available, fetching initial jobs');
       fetchAssignedJobs(false);
     }
-  }, [driverId, allDriverIds.join(',')]);
+  }, [fetchAssignedJobs]);
 
   const fetchAssignedJobsSilent = useCallback(async () => {
     if (!driverId || allDriverIds.length === 0) return;
