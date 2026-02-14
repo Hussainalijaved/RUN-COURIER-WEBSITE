@@ -333,7 +333,7 @@ export class SupabaseStorage implements IStorage {
   constructor() {
     this.pricingSettings = {
       id: "default",
-      centralLondonSurcharge: "15.00",
+      centralLondonSurcharge: "18.15",
       multiDropCharge: "5.00",
       returnTripMultiplier: "0.60",
       waitingTimeFreeMinutes: 10,
@@ -1349,10 +1349,10 @@ export class SupabaseStorage implements IStorage {
     total += weightSurcharge;
 
     if (input.pickupPostcode && this.isCentralLondon(input.pickupPostcode)) {
-      total += parseFloat(this.pricingSettings.centralLondonSurcharge || "15.00");
+      total += parseFloat(this.pricingSettings.centralLondonSurcharge || "18.15");
     }
     if (input.deliveryPostcode && this.isCentralLondon(input.deliveryPostcode)) {
-      total += parseFloat(this.pricingSettings.centralLondonSurcharge || "15.00");
+      total += parseFloat(this.pricingSettings.centralLondonSurcharge || "18.15");
     }
 
     if (input.isReturnTrip) {

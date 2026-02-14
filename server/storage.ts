@@ -180,7 +180,7 @@ export class MemStorage implements IStorage {
     
     this.pricingSettings = {
       id: "default",
-      centralLondonSurcharge: "15.00",
+      centralLondonSurcharge: "18.15",
       multiDropCharge: "5.00",
       returnTripMultiplier: "0.60",
       waitingTimeFreeMinutes: 10,
@@ -1003,7 +1003,7 @@ export class MemStorage implements IStorage {
     const weightSurcharge = this.getWeightSurcharge(input.weight);
 
     const centralLondon = this.isCentralLondon(input.pickupPostcode) || this.isCentralLondon(input.deliveryPostcode);
-    const centralLondonCharge = centralLondon ? parseFloat(this.pricingSettings.centralLondonSurcharge || "15") : 0;
+    const centralLondonCharge = centralLondon ? parseFloat(this.pricingSettings.centralLondonSurcharge || "18.15") : 0;
 
     const multiDropCount = input.multiDropStops?.length || 0;
     const multiDropCharge = input.isMultiDrop 

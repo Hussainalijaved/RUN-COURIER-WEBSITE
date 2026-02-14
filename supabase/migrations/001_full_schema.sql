@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS public.vehicles (
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.pricing_settings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    central_london_surcharge DECIMAL(10, 2) DEFAULT 15.00,
+    central_london_surcharge DECIMAL(10, 2) DEFAULT 18.15,
     multi_drop_charge DECIMAL(10, 2) DEFAULT 5.00,
     return_trip_multiplier DECIMAL(5, 2) DEFAULT 0.60,
     waiting_time_free_minutes INTEGER DEFAULT 10,

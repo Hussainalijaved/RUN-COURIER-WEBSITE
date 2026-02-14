@@ -2986,7 +2986,7 @@ export function registerMobileRoutes(app: Express): void {
       res.json({
         vehicles: vehiclesConfig,
         weightSurcharges: weightSurchargesArray,
-        centralLondonSurcharge: parseFloat(pricingSettings.centralLondonSurcharge || '15'),
+        centralLondonSurcharge: parseFloat(pricingSettings.centralLondonSurcharge || '18.15'),
         multiDropCharge: parseFloat(pricingSettings.multiDropCharge || '5'),
         returnTripMultiplier: parseFloat(pricingSettings.returnTripMultiplier || '0.60'),
         waitingTimeFreeMinutes: pricingSettings.waitingTimeFreeMinutes || 10,
