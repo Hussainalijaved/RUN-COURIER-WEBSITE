@@ -455,18 +455,18 @@ export default function AdminInvoices() {
             const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
             const stopsHtml = isMultiDrop ? `
               <div style="margin-top: 4px;">
-                <div style="font-weight: 600; color: #333; margin-bottom: 4px;">Multi-drop (${job.multiDropStops.length} stops)</div>
-                <div style="color: #555; font-size: 12px; margin-bottom: 2px;">Pickup: ${job.pickupAddress || 'N/A'}</div>
+                <div style="font-weight: 600; color: #333; margin-bottom: 4px;">Same-Day Delivery &mdash; ${job.multiDropStops.length} drop-offs</div>
+                <div style="color: #555; font-size: 12px; margin-bottom: 2px;">Collected from: ${job.pickupAddress || 'N/A'}</div>
                 ${job.multiDropStops.map((stop: any) => `
                   <div style="color: #555; font-size: 12px; padding-left: 12px; border-left: 2px solid #007BFF40; margin: 2px 0;">
-                    Stop ${stop.stopOrder}: ${stop.address || stop.postcode}${stop.recipientName ? ` (${stop.recipientName})` : ''}
+                    Delivered to: ${stop.address || stop.postcode}${stop.recipientName ? ` &mdash; ${stop.recipientName}` : ''}
                   </div>
                 `).join('')}
               </div>
             ` : `
               <div>
-                <div style="color: #555; font-size: 12px;">Pickup: ${job.pickupAddress || 'N/A'}</div>
-                <div style="color: #555; font-size: 12px;">Delivery: ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
+                <div style="font-weight: 600; color: #333; margin-bottom: 2px;">Same-Day Delivery</div>
+                <div style="color: #555; font-size: 12px;">${job.pickupAddress || 'N/A'} &rarr; ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
               </div>
             `;
             return `
@@ -1112,19 +1112,19 @@ export default function AdminInvoices() {
                                 <TableCell className="text-sm max-w-[300px] break-words">
                                   {isMultiDrop ? (
                                     <div>
-                                      <div className="font-medium mb-1">Multi-drop ({job.multiDropStops.length} stops)</div>
-                                      <div className="text-xs text-muted-foreground mb-1">Pickup: {job.pickupAddress || 'N/A'}</div>
+                                      <div className="font-medium mb-1">Same-Day Delivery &mdash; {job.multiDropStops.length} drop-offs</div>
+                                      <div className="text-xs text-muted-foreground mb-1">Collected from: {job.pickupAddress || 'N/A'}</div>
                                       {job.multiDropStops.map((stop: any, stopIdx: number) => (
                                         <div key={stopIdx} className="text-xs text-muted-foreground pl-3 py-0.5 border-l-2 border-primary/30">
-                                          Stop {stop.stopOrder}: {stop.address || stop.postcode}
-                                          {stop.recipientName && <span className="ml-1">({stop.recipientName})</span>}
+                                          Delivered to: {stop.address || stop.postcode}
+                                          {stop.recipientName && <span className="ml-1">&mdash; {stop.recipientName}</span>}
                                         </div>
                                       ))}
                                     </div>
                                   ) : (
                                     <div>
-                                      <div className="text-xs text-muted-foreground">Pickup: {job.pickupAddress || 'N/A'}</div>
-                                      <div className="text-xs text-muted-foreground">Delivery: {job.deliveryAddress || job.recipientName || 'N/A'}</div>
+                                      <div className="font-medium mb-0.5">Same-Day Delivery</div>
+                                      <div className="text-xs text-muted-foreground">{job.pickupAddress || 'N/A'} &rarr; {job.deliveryAddress || job.recipientName || 'N/A'}</div>
                                     </div>
                                   )}
                                 </TableCell>

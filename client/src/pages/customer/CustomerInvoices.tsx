@@ -267,17 +267,20 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
                   <td className="py-3 px-4 text-gray-600 text-xs">
                     {isMultiDrop ? (
                       <div>
-                        <div className="font-medium text-gray-800 mb-1">Multi-drop Delivery ({multiDropStops.length} stops)</div>
-                        <div className="text-xs mb-1">Pickup: {job.pickupAddress || job.pickupPostcode}</div>
+                        <div className="font-medium text-gray-800 mb-1">Same-Day Delivery &mdash; {multiDropStops.length} drop-offs</div>
+                        <div className="text-xs text-gray-500 mb-1">Collected from: {job.pickupAddress || job.pickupPostcode}</div>
                         {multiDropStops.map((stop: any, idx: number) => (
                           <div key={idx} className="text-xs pl-3 py-0.5 border-l-2 border-primary/30">
-                            Stop {stop.stopOrder}: {stop.address || stop.postcode}
-                            {stop.recipientName && <span className="text-gray-400 ml-1">({stop.recipientName})</span>}
+                            Delivered to: {stop.address || stop.postcode}
+                            {stop.recipientName && <span className="text-gray-400 ml-1">&mdash; {stop.recipientName}</span>}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <>Courier Service: {job.pickupPostcode} &rarr; {job.deliveryPostcode}</>
+                      <div>
+                        <div className="font-medium text-gray-800 mb-0.5">Same-Day Delivery</div>
+                        <div className="text-xs text-gray-500">{job.pickupAddress || job.pickupPostcode} &rarr; {job.deliveryAddress || job.deliveryPostcode}</div>
+                      </div>
                     )}
                   </td>
                   <td className="py-3 px-4 text-right font-medium text-sm">{formatPrice(job.totalPrice)}</td>

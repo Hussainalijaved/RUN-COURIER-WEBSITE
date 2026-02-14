@@ -1022,12 +1022,12 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       <tr>
         <td colspan="6" style="padding: 0; border-bottom: 1px solid #dee2e6;">
           <div style="background-color: #f0f7ff; padding: 10px 15px; margin: 0;">
-            <p style="margin: 0 0 8px 0; color: #495057; font-weight: bold; font-size: 11px;">MULTI-DROP STOPS (${stops.length} stops):</p>
+            <p style="margin: 0 0 8px 0; color: #495057; font-weight: bold; font-size: 11px;">DELIVERY ADDRESSES (${stops.length} drop-offs):</p>
             ${stops.map((stop, i) => `
               <div style="margin: 5px 0; padding: 5px 0; ${i < stops.length - 1 ? 'border-bottom: 1px dashed #cde1f7;' : ''}">
-                <span style="display: inline-block; background-color: #007BFF; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-right: 8px;">Stop ${stop.stopOrder}</span>
+                <span style="display: inline-block; background-color: #007BFF; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-right: 8px;">Drop-off ${stop.stopOrder}</span>
                 <span style="color: #333; font-size: 11px;">${stop.address || stop.postcode}</span>
-                ${stop.recipientName ? `<span style="color: #666; font-size: 10px; margin-left: 10px;">(${stop.recipientName})</span>` : ''}
+                ${stop.recipientName ? `<span style="color: #666; font-size: 10px; margin-left: 10px;">&mdash; ${stop.recipientName}</span>` : ''}
               </div>
             `).join('')}
           </div>
@@ -1043,8 +1043,8 @@ export async function sendInvoiceToCustomerWithPaymentLink(
         <thead>
           <tr style="background-color: #f8f9fa;">
             <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Tracking</th>
-            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Pickup</th>
-            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Delivery</th>
+            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Collected From</th>
+            <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Delivered To</th>
             <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Date</th>
             <th style="padding: 10px 8px; text-align: left; border-bottom: 2px solid #dee2e6; color: #495057;">Vehicle</th>
             <th style="padding: 10px 8px; text-align: right; border-bottom: 2px solid #dee2e6; color: #495057;">Amount</th>
@@ -1055,12 +1055,12 @@ export async function sendInvoiceToCustomerWithPaymentLink(
             <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
               <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #333; font-weight: bold;">
                 ${job.trackingNumber}
-                ${job.isMultiDrop ? '<span style="background-color: #17a2b8; color: white; padding: 2px 6px; border-radius: 3px; font-size: 9px; margin-left: 5px;">MULTI-DROP</span>' : ''}
+                ${job.isMultiDrop ? '<span style="background-color: #17a2b8; color: white; padding: 2px 6px; border-radius: 3px; font-size: 9px; margin-left: 5px;">MULTIPLE DROP-OFFS</span>' : ''}
               </td>
               <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #666; max-width: 150px;">${job.pickupAddress.substring(0, 40)}${job.pickupAddress.length > 40 ? '...' : ''}</td>
               <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #666; max-width: 150px;">
                 ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 
-                  ? `See ${job.multiDropStops.length} stops below` 
+                  ? `${job.multiDropStops.length} drop-off addresses below` 
                   : (job.deliveryAddress ? (job.deliveryAddress.substring(0, 40) + (job.deliveryAddress.length > 40 ? '...' : '')) : (job.recipientName || 'N/A'))}
               </td>
               <td style="padding: 10px 8px; border-bottom: ${job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0 ? 'none' : '1px solid #dee2e6'}; color: #666;">${job.scheduledDate}</td>
