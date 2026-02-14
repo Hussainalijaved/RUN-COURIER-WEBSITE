@@ -2331,7 +2331,7 @@ export async function sendDriverPaymentConfirmation(
     accountNumber?: string;
     paidAt: string;
   }
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+): Promise<{ success: boolean }> {
   const formattedDate = new Date(data.paidAt).toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -2455,5 +2455,6 @@ If you have any questions about this payment, please contact our team.
 
 Run Courier - https://runcourier.co.uk`;
 
-  return sendEmailNotification(driverEmail, `Payment Confirmation - £${data.amount} - Run Courier`, wrapEmailContent(htmlContent, 'Payment Confirmation'), textContent);
+  const result = await sendEmailNotification(driverEmail, `Payment Confirmation - £${data.amount} - Run Courier`, wrapEmailContent(htmlContent, 'Payment Confirmation'), textContent);
+  return { success: result };
 }

@@ -8113,7 +8113,7 @@ export async function registerRoutes(
     }
   }));
 
-  const RESET_TOKENS_FILE = path.resolve(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'data', 'reset-tokens.json'));
+  const RESET_TOKENS_FILE = path.resolve(process.cwd(), 'data', 'reset-tokens.json');
   function loadResetTokens(): Map<string, { code: string; email: string; userId: string; expiresAt: number }> {
     try {
       if (fs.existsSync(RESET_TOKENS_FILE)) {

@@ -7,6 +7,7 @@ import { rm, readFile } from "fs/promises";
 const allowlist = [
   "@google/generative-ai",
   "@neondatabase/serverless",
+  "@supabase/supabase-js",
   "axios",
   "connect-pg-simple",
   "cors",
@@ -24,7 +25,11 @@ const allowlist = [
   "openai",
   "passport",
   "passport-local",
+  "pg",
+  "resend",
   "stripe",
+  "stripe-replit-sync",
+  "twilio",
   "uuid",
   "ws",
   "zod",
@@ -53,6 +58,8 @@ async function buildAll() {
     outfile: "dist/index.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
+      "import.meta.dirname": "__dirname",
+      "import.meta.url": "__filename",
     },
     minify: true,
     external: externals,
