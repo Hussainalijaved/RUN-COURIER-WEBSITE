@@ -528,6 +528,7 @@ export async function registerRoutes(
   app.use('/api/drivers/:id/deactivate', requireAdminAccessStrict);
   app.use('/api/drivers/:id/reactivate', requireAdminAccessStrict);
   app.use('/api/documents/:id/review', requireAdminAccessStrict);
+  app.use('/api/documents/:id', (req, res, next) => { if (req.method === 'DELETE') return requireAdminAccessStrict(req, res, next); next(); });
   app.use('/api/invoices/:id/send', requireAdminAccessStrict);
   app.use('/api/invoices/:id/resend', requireAdminAccessStrict);
   app.use('/api/invoices/bulk-send', requireAdminAccessStrict);
@@ -5120,6 +5121,97 @@ export async function registerRoutes(
     }
     
     res.json(document);
+  }));
+
+  app.delete("/api/documents/:id", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
+    
+    const docId = req.params.id;
+    console.log('[Documents] Delete request for document:', docId);
+    
+    let deleted = false;
+    let storagePath: string | null = null;
+    
+    try {
+      const { supabaseAdmin } = await import("./supabaseAdmin");
+      if (supabaseAdmin) {
+        const { data: doc } = await supabaseAdmin
+          .from('driver_documents')
+          .select('*')
+          .eq('id', docId)
+          .single();
+        
+        if (doc) {
+          if (doc.status !== 'rejected') {
+            return res.status(400).json({ error: "Only rejected documents can be deleted" });
+          }
+          storagePath = doc.file_url || doc.storage_path || null;
+          
+          const { error } = await supabaseAdmin
+            .from('driver_documents')
+            .delete()
+            .eq('id', docId);
+          
+          if (!error) {
+            deleted = true;
+            console.log('[Documents] Deleted from Supabase driver_documents:', docId);
+          }
+        }
+        
+        const { data: doc2 } = await supabaseAdmin
+          .from('documents')
+          .select('*')
+          .eq('id', docId)
+          .single();
+        
+        if (doc2) {
+          if (doc2.status !== 'rejected') {
+            return res.status(400).json({ error: "Only rejected documents can be deleted" });
+          }
+          if (!storagePath) storagePath = doc2.file_url || doc2.storage_path || null;
+          
+          const { error: error2 } = await supabaseAdmin
+            .from('documents')
+            .delete()
+            .eq('id', docId);
+          
+          if (!error2) {
+            deleted = true;
+            console.log('[Documents] Deleted from Supabase documents:', docId);
+          }
+        }
+        
+        if (storagePath && supabaseAdmin) {
+          const path = storagePath.replace(/^\/+/, '');
+          for (const bucket of ['driver-documents', 'DRIVER-DOCUMENTS']) {
+            try {
+              await supabaseAdmin.storage.from(bucket).remove([path]);
+              console.log(`[Documents] Deleted file from ${bucket}/${path}`);
+            } catch (e) {}
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[Documents] Supabase delete error:', e);
+    }
+    
+    try {
+      const { db } = await import("./db");
+      const { documents: documentsTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.delete(documentsTable).where(eq(documentsTable.id, docId));
+      deleted = true;
+      console.log('[Documents] Deleted from PostgreSQL:', docId);
+    } catch (e) {
+      console.log('[Documents] PostgreSQL delete (may not exist):', (e as any)?.message);
+    }
+    
+    if (!deleted) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+    
+    res.json({ success: true, message: "Document deleted" });
   }));
 
   app.get("/api/documents/:id/signed-url", asyncHandler(async (req, res) => {

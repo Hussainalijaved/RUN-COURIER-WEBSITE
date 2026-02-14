@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { FileText, CheckCircle, XCircle, Clock, Eye, X, AlertTriangle } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, Eye, X, AlertTriangle, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeDocuments } from '@/hooks/useRealtimeDocuments';
@@ -128,6 +128,21 @@ export default function AdminDocuments() {
     },
     onError: () => {
       toast({ title: 'Failed to review document', variant: 'destructive' });
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/documents/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'documents'] });
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'drivers'] });
+      toast({ title: 'Document deleted successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete document', variant: 'destructive' });
     },
   });
 
@@ -472,6 +487,20 @@ export default function AdminDocuments() {
                               data-testid={`button-approve-rejected-${doc.id}`}
                             >
                               <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to permanently delete this document?')) {
+                                  deleteDocumentMutation.mutate(doc.id);
+                                }
+                              }}
+                              disabled={deleteDocumentMutation.isPending}
+                              data-testid={`button-delete-rejected-${doc.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
