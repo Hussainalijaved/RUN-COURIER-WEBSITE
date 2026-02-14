@@ -648,7 +648,7 @@ export function JobOffersScreen({ navigation }: any) {
       if (data?.type === 'job_withdrawn') {
         console.log('[JobOffers] Received job_withdrawn push notification');
         stopAlarmAndVerification();
-        fetchAssignedJobs(false);
+        fetchAssignedJobsRef.current(false);
       }
     });
 
@@ -657,7 +657,7 @@ export function JobOffersScreen({ navigation }: any) {
       if (data?.type === 'job_withdrawn') {
         console.log('[JobOffers] User tapped job_withdrawn notification');
         stopAlarmAndVerification();
-        fetchAssignedJobs(false);
+        fetchAssignedJobsRef.current(false);
       }
     });
 
@@ -665,7 +665,7 @@ export function JobOffersScreen({ navigation }: any) {
       subscription.remove();
       responseSubscription.remove();
     };
-  }, [fetchAssignedJobs, stopAlarmAndVerification]);
+  }, [stopAlarmAndVerification]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

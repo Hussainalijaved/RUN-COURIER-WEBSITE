@@ -253,9 +253,7 @@ export function DriverJobMap({
       
       if (!routeFound && GOOGLE_MAPS_API_KEY) {
         try {
-          const gOrigin = coordsAvailable ? `${pLat},${pLng}` : encodeURIComponent(pickupAddress);
-          const gDest = coordsAvailable ? `${dLat},${dLng}` : encodeURIComponent(deliveryAddress);
-          const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${gOrigin}&destination=${gDest}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+          const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
           console.log('[DriverJobMap] Falling back to direct Google Maps API');
           const response = await fetch(url);
           const data = await response.json();
