@@ -194,7 +194,7 @@ export class MemStorage implements IStorage {
         "10-20": 10,
         "20-30": 15,
         "30-50": 20,
-        "50+": 40
+        "50+": 50
       },
       updatedAt: new Date(),
     };
@@ -1055,7 +1055,7 @@ export class MemStorage implements IStorage {
 
   private getWeightSurcharge(weight: number): number {
     const surcharges = this.pricingSettings.weightSurcharges as Record<string, number>;
-    if (weight >= 50) return surcharges["50+"] || 40;
+    if (weight >= 50) return surcharges["50+"] || 50;
     if (weight >= 30) return surcharges["30-50"] || 20;
     if (weight >= 20) return surcharges["20-30"] || 15;
     if (weight >= 10) return surcharges["10-20"] || 10;

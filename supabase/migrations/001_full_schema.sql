@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS public.pricing_settings (
     rush_hour_end TEXT DEFAULT '09:00',
     rush_hour_start_evening TEXT DEFAULT '17:00',
     rush_hour_end_evening TEXT DEFAULT '19:00',
-    weight_surcharges JSONB DEFAULT '{"4-10": 5, "10-20": 10, "20-30": 15, "30-50": 20, "50+": 40}',
+    weight_surcharges JSONB DEFAULT '{"4-10": 5, "10-20": 10, "20-30": 15, "30-50": 20, "50+": 50}',
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

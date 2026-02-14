@@ -113,7 +113,7 @@ export const pricingSettings = pgTable("pricing_settings", {
     "10-20": 10,
     "20-30": 15,
     "30-50": 20,
-    "50+": 40
+    "50+": 50
   }),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
