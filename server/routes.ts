@@ -4827,11 +4827,15 @@ export async function registerRoutes(
       console.error("Failed to update profile picture in PostgreSQL:", e);
     }
 
+    const { data: publicUrlData } = supAdmin.storage.from(BUCKET).getPublicUrl(storagePath);
+    const publicUrl = publicUrlData?.publicUrl || storagePath;
+    console.log(`[Profile Picture] Generated public URL: ${publicUrl}`);
+
     try {
       await supAdmin
         .from('drivers')
         .update({
-          profile_picture_url: storagePath,
+          profile_picture_url: publicUrl,
           updated_at: new Date().toISOString()
         })
         .eq('id', driverId);
@@ -4841,12 +4845,13 @@ export async function registerRoutes(
 
     broadcastProfileUpdate(driverId, {
       profilePictureUrl: storagePath,
-      profile_picture_url: storagePath,
+      profile_picture_url: publicUrl,
     });
 
     res.status(200).json({
       success: true,
       storagePath,
+      publicUrl,
       bucket: BUCKET,
       signedUrl,
       profilePictureUrl: storagePath,

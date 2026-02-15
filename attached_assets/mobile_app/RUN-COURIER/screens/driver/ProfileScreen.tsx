@@ -221,14 +221,13 @@ export function ProfileScreen({ navigation }: any) {
         throw new Error('You must be logged in to upload a photo');
       }
       
-      const fileName = `profile_${Date.now()}.${fileExt}`;
-      // Use auth.uid() for storage path to comply with RLS policy
-      const filePath = `${authUserId}/profile_pictures/${fileName}`;
+      const fileName = `profile_picture_${Date.now()}.${fileExt}`;
+      const filePath = `drivers/${authUserId}/profile_picture/${fileName}`;
 
       console.log('[PROFILE] Uploading to path:', filePath, 'Auth ID:', authUserId);
 
       const { error: uploadError } = await supabase.storage
-        .from('DRIVER-DOCUMENTS')
+        .from('driver-documents')
         .upload(filePath, fileData, { upsert: true, contentType });
 
       if (uploadError) {
@@ -236,7 +235,7 @@ export function ProfileScreen({ navigation }: any) {
         throw uploadError;
       }
 
-      const { data } = supabase.storage.from('DRIVER-DOCUMENTS').getPublicUrl(filePath);
+      const { data } = supabase.storage.from('driver-documents').getPublicUrl(filePath);
       const publicUrl = data.publicUrl + `?t=${Date.now()}`;
 
       console.log('[PROFILE] Public URL:', publicUrl);
