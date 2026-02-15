@@ -567,4 +567,84 @@ async function runBackgroundTasks() {
       console.warn("[BACKGROUND] Document reconciliation error:", e?.message);
     }
   }, 20000);
+
+  setTimeout(async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+
+      console.log("[BACKGROUND] Starting profile picture URL sync...");
+
+      const { data: drivers, error } = await supabaseAdmin
+        .from('drivers')
+        .select('id, profile_picture_url')
+        .not('profile_picture_url', 'is', null);
+
+      if (error || !drivers) {
+        if (error) console.warn("[BACKGROUND] Failed to fetch drivers for profile pic sync:", error.message);
+        return;
+      }
+
+      const BUCKET = 'driver-documents';
+      let synced = 0;
+
+      for (const driver of drivers) {
+        const url = driver.profile_picture_url as string;
+        if (!url) continue;
+        if (url.startsWith('http')) continue;
+
+        const { data: publicUrlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(url);
+        const publicUrl = publicUrlData?.publicUrl;
+        if (!publicUrl) continue;
+
+        const { error: updateErr } = await supabaseAdmin
+          .from('drivers')
+          .update({ profile_picture_url: publicUrl })
+          .eq('id', driver.id);
+
+        if (!updateErr) {
+          synced++;
+          console.log(`[BACKGROUND] Synced profile pic URL for driver ${driver.id}: ${url} -> public URL`);
+        }
+      }
+
+      const { data: driversEmpty } = await supabaseAdmin
+        .from('drivers')
+        .select('id, profile_picture_url')
+        .or('profile_picture_url.is.null,profile_picture_url.eq.');
+
+      if (driversEmpty && driversEmpty.length > 0) {
+        const { storage: localStorage } = await import('./storage');
+        for (const driver of driversEmpty) {
+          try {
+            const localDriver = await localStorage.getDriver(driver.id);
+            const localUrl = (localDriver as any)?.profilePictureUrl;
+            if (!localUrl) continue;
+
+            const storagePath = localUrl.startsWith('/api/uploads/documents/')
+              ? localUrl.replace('/api/uploads/documents/', '')
+              : localUrl;
+
+            const { data: publicUrlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(storagePath);
+            const publicUrl = publicUrlData?.publicUrl;
+            if (!publicUrl) continue;
+
+            const { error: updateErr } = await supabaseAdmin
+              .from('drivers')
+              .update({ profile_picture_url: publicUrl })
+              .eq('id', driver.id);
+
+            if (!updateErr) {
+              synced++;
+              console.log(`[BACKGROUND] Synced missing profile pic for driver ${driver.id} from local DB`);
+            }
+          } catch (_) {}
+        }
+      }
+
+      console.log(`[BACKGROUND] Profile picture URL sync complete: synced ${synced}`);
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Profile picture sync error:", e?.message);
+    }
+  }, 25000);
 }
