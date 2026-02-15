@@ -7017,12 +7017,12 @@ export async function registerRoutes(
                   } catch {}
 
                   const newDocMappings = [
-                    { url: application.profilePictureUrl, type: 'profilePicture', label: 'Profile Picture' },
-                    { url: application.drivingLicenceFrontUrl, type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
-                    { url: application.drivingLicenceBackUrl, type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
-                    { url: application.dbsCertificateUrl, type: 'dbsCertificate', label: 'DBS Certificate' },
-                    { url: application.goodsInTransitInsuranceUrl, type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
-                    { url: application.hireAndRewardUrl, type: 'hireAndReward', label: 'Hire & Reward Insurance' },
+                    { url: application.profilePictureUrl, type: 'profile_picture', label: 'Profile Picture' },
+                    { url: application.drivingLicenceFrontUrl, type: 'driving_license', label: 'Driving Licence (Front)' },
+                    { url: application.drivingLicenceBackUrl, type: 'driving_license_back', label: 'Driving Licence (Back)' },
+                    { url: application.dbsCertificateUrl, type: 'dbs_certificate', label: 'DBS Certificate' },
+                    { url: application.goodsInTransitInsuranceUrl, type: 'goods_in_transit_insurance', label: 'Goods in Transit Insurance' },
+                    { url: application.hireAndRewardUrl, type: 'hire_and_reward_insurance', label: 'Hire & Reward Insurance' },
                   ];
                   for (const mapping of newDocMappings) {
                     if (!mapping.url) continue;
