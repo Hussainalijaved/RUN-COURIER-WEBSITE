@@ -128,6 +128,45 @@ const getStatusBadge = (status: string | undefined) => {
   }
 };
 
+function compressImage(file: File, maxWidth = 1600, quality = 0.8): Promise<File> {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/') || file.type === 'application/pdf') {
+      resolve(file);
+      return;
+    }
+    if (file.size < 500 * 1024) {
+      resolve(file);
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width <= maxWidth) {
+        resolve(file);
+        return;
+      }
+      const ratio = maxWidth / width;
+      width = maxWidth;
+      height = Math.round(height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob || blob.size >= file.size) { resolve(file); return; }
+        const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+        resolve(compressed);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 export default function DriverDocuments() {
   const { data: driver, isLoading: driverLoading } = useDriver();
   const { data: documents, isLoading: docsLoading } = useDriverDocuments(driver?.id);
@@ -171,7 +210,7 @@ export default function DriverDocuments() {
     setExpiryDates(prev => ({ ...prev, [docType]: date }));
   }, []);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -184,14 +223,16 @@ export default function DriverDocuments() {
       return;
     }
 
+    const compressed = await compressImage(file);
+
     if (requiresExpiryDate(docType)) {
-      setPendingFiles(prev => ({ ...prev, [docType]: file }));
+      setPendingFiles(prev => ({ ...prev, [docType]: compressed }));
       toast({
         title: "File selected",
         description: "Please set the expiry date and click Upload to complete.",
       });
     } else {
-      uploadDocument(file, docType);
+      uploadDocument(compressed, docType);
     }
   }, [toast]);
 

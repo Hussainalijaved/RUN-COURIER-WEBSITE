@@ -4533,7 +4533,7 @@ export async function registerRoutes(
     }
 
     let supabaseUploadSuccess = false;
-    const maxRetries = 3;
+    const maxRetries = 2;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const { error: uploadErr } = await supabaseAdmin.storage
@@ -4551,7 +4551,7 @@ export async function registerRoutes(
         console.error(`[Documents] Supabase upload failed (attempt ${attempt}/${maxRetries}):`, supaErr);
       }
       if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, 1000 * attempt));
+        await new Promise(r => setTimeout(r, 500));
       }
     }
 
@@ -4573,128 +4573,105 @@ export async function registerRoutes(
       });
     }
 
-    // Upsert driver_documents record in Supabase
-    try {
-      // Backfill legacy rows: ensure auth_user_id is set for existing rows with driver_id but null auth_user_id
-      // This ensures the upsert on auth_user_id,doc_type will work correctly
-      const { error: backfillErr } = await supabaseAdmin.from('driver_documents')
-        .update({ auth_user_id: rawDriverId })
-        .eq('driver_id', rawDriverId)
-        .is('auth_user_id', null);
-      
-      if (backfillErr) {
-        console.warn('[Documents] Warning during backfill of legacy auth_user_id:', backfillErr.message);
-      } else {
-        console.log('[Documents] Backfill completed for legacy auth_user_id rows');
-      }
-
-      const docRecord: any = {
-        driver_id: rawDriverId,
-        auth_user_id: rawDriverId,
-        doc_type: safeDocumentType,
-        file_url: storagePath,
-        bucket: BUCKET,
-        storage_path: storagePath,
-        file_name: file.originalname,
-        mime_type: contentType,
-        size_bytes: fileBuffer.length,
-        status: 'pending',
-        uploaded_at: new Date().toISOString(),
-      };
-
-      const { error: upsertErr } = await supabaseAdmin.from('driver_documents')
-        .upsert(docRecord, { onConflict: 'auth_user_id,doc_type', ignoreDuplicates: false });
-
-      if (upsertErr) {
-        console.error('[Documents] Failed to upsert driver_documents:', upsertErr);
-      } else {
-        console.log(`[Documents] Upserted driver_documents record with storage_path: ${storagePath}`);
-      }
-    } catch (e) {
-      console.error('[Documents] Failed to create driver_documents record:', e);
-    }
-
-    // Check for existing documents in memory/database for backward compat
-    let existingDocId: string | null = null;
-    const memoryDocs = await storage.getDocuments({ driverId: rawDriverId, type: rawDocumentType as any });
-    if (memoryDocs && memoryDocs.length > 0) {
-      existingDocId = memoryDocs[0].id;
-    }
-    if (!existingDocId) {
-      try {
-        const { db } = await import("./db");
-        const { documents: documentsTable } = await import("@shared/schema");
-        const { eq, and } = await import("drizzle-orm");
-        const dbDocs = await db.select().from(documentsTable)
-          .where(and(
-            eq(documentsTable.driverId, rawDriverId),
-            eq(documentsTable.type, rawDocumentType as any)
-          ));
-        if (dbDocs && dbDocs.length > 0) {
-          existingDocId = dbDocs[0].id;
-        }
-      } catch (e) {
-        console.error("Failed to check existing documents in database:", e);
-      }
-    }
-
-    let document;
+    const docId = randomUUID();
     const uploadedAt = new Date();
     const expiryDate = rawExpiryDate ? new Date(rawExpiryDate) : null;
 
-    if (existingDocId) {
-      document = await storage.updateDocument(existingDocId, {
-        fileName: file.originalname,
-        fileUrl: storagePath,
-        status: 'pending' as const,
-        uploadedAt,
-        expiryDate,
-        reviewedBy: null,
-        reviewNotes: null,
-        reviewedAt: null,
-      });
-      if (!document) {
-        document = await storage.createDocument({
-          driverId: rawDriverId,
-          type: safeDocumentType,
-          fileName: file.originalname,
-          fileUrl: storagePath,
-          status: 'pending',
-          expiryDate,
-        });
-        if (document) {
-          (document as any).id = existingDocId;
-        }
-      }
-    } else {
-      document = await storage.createDocument({
-        driverId: rawDriverId,
-        type: safeDocumentType,
-        fileName: file.originalname,
-        fileUrl: storagePath,
-        status: 'pending',
-        expiryDate,
-      });
-    }
+    const immediateResponse = {
+      id: docId,
+      driverId: rawDriverId,
+      type: safeDocumentType,
+      fileName: file.originalname,
+      fileUrl: storagePath,
+      status: 'pending',
+      uploadedAt,
+      expiryDate,
+      storagePath,
+      bucket: BUCKET,
+    };
 
-    // Update in PostgreSQL if needed
-    if (document) {
+    res.status(201).json(immediateResponse);
+
+    const bgSupa = supabaseAdmin;
+    setImmediate(async () => {
       try {
-        const { db } = await import("./db");
+        await bgSupa.from('driver_documents')
+          .update({ auth_user_id: rawDriverId })
+          .eq('driver_id', rawDriverId)
+          .is('auth_user_id', null);
+
+        const docRecord: any = {
+          driver_id: rawDriverId,
+          auth_user_id: rawDriverId,
+          doc_type: safeDocumentType,
+          file_url: storagePath,
+          bucket: BUCKET,
+          storage_path: storagePath,
+          file_name: file.originalname,
+          mime_type: contentType,
+          size_bytes: fileBuffer.length,
+          status: 'pending',
+          uploaded_at: uploadedAt.toISOString(),
+        };
+
+        const { error: upsertErr } = await bgSupa.from('driver_documents')
+          .upsert(docRecord, { onConflict: 'auth_user_id,doc_type', ignoreDuplicates: false });
+
+        if (upsertErr) {
+          console.error('[Documents] Failed to upsert driver_documents:', upsertErr);
+        } else {
+          console.log(`[Documents] Upserted driver_documents record with storage_path: ${storagePath}`);
+        }
+      } catch (e) {
+        console.error('[Documents] Background upsert failed:', e);
+      }
+
+      try {
+        const memoryDocs = await storage.getDocuments({ driverId: rawDriverId, type: rawDocumentType as any });
+        const existingDocId = memoryDocs?.[0]?.id || null;
+
+        if (existingDocId) {
+          await storage.updateDocument(existingDocId, {
+            fileName: file.originalname,
+            fileUrl: storagePath,
+            status: 'pending' as const,
+            uploadedAt,
+            expiryDate,
+            reviewedBy: null,
+            reviewNotes: null,
+            reviewedAt: null,
+          });
+        } else {
+          await storage.createDocument({
+            driverId: rawDriverId,
+            type: safeDocumentType,
+            fileName: file.originalname,
+            fileUrl: storagePath,
+            status: 'pending',
+            expiryDate,
+          });
+        }
+      } catch (e) {
+        console.error('[Documents] Background storage sync failed:', e);
+      }
+
+      try {
+        const { db: bgDb } = await import("./db");
         const { documents: documentsTable } = await import("@shared/schema");
-        const { eq } = await import("drizzle-orm");
-        const [existingPgDoc] = await db.select().from(documentsTable).where(eq(documentsTable.id, document.id));
+        const { eq, and } = await import("drizzle-orm");
+        const [existingPgDoc] = await bgDb.select().from(documentsTable)
+          .where(and(eq(documentsTable.driverId, rawDriverId), eq(documentsTable.type, safeDocumentType as any)));
         if (existingPgDoc) {
-          await db.update(documentsTable).set({
+          await bgDb.update(documentsTable).set({
             fileName: file.originalname,
             fileUrl: storagePath,
             status: 'pending',
             uploadedAt,
             expiryDate,
-          }).where(eq(documentsTable.id, document.id));
+          }).where(eq(documentsTable.id, existingPgDoc.id));
         } else {
-          await db.insert(documentsTable).values({
-            id: document.id,
+          await bgDb.insert(documentsTable).values({
+            id: docId,
             driverId: rawDriverId,
             type: safeDocumentType,
             fileName: file.originalname,
@@ -4702,43 +4679,39 @@ export async function registerRoutes(
             status: 'pending',
             expiryDate,
             uploadedAt,
-          });
+          }).catch(() => {});
         }
       } catch (e) {
-        console.error('[Documents] Failed to sync document to PostgreSQL:', e);
+        console.error('[Documents] Background PG sync failed:', e);
       }
-    }
 
-    // Get driver info for notification
-    let driverName = rawDriverId;
-    try {
-      const driver = await storage.getDriver(rawDriverId);
-      if (driver?.fullName) driverName = driver.fullName;
-    } catch {}
+      let driverName = rawDriverId;
+      try {
+        const d = await storage.getDriver(rawDriverId);
+        if (d?.fullName) driverName = d.fullName;
+      } catch {}
 
-    const formattedDocType = rawDocumentType
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (l: string) => l.toUpperCase())
-      .trim();
+      const formattedDocType = rawDocumentType
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (l: string) => l.toUpperCase())
+        .trim();
 
-    await sendDocumentUploadNotification(driverName, formattedDocType).catch(err =>
-      console.error('Failed to send document upload notification:', err)
-    );
-
-    if (document) {
       broadcastDocumentPending({
-        id: document.id,
-        driverId: document.driverId,
-        driverName: driverName,
-        type: document.type,
-        fileName: document.fileName,
-        uploadedAt: document.uploadedAt,
+        id: docId,
+        driverId: rawDriverId,
+        driverName,
+        type: safeDocumentType,
+        fileName: file.originalname,
+        uploadedAt,
       });
-    }
 
-    documentsCache.invalidate();
-    res.status(201).json(document);
+      sendDocumentUploadNotification(driverName, formattedDocType).catch(err =>
+        console.error('Failed to send document upload notification:', err)
+      );
+
+      documentsCache.invalidate();
+    });
   }));
 
   // Profile picture upload endpoint

@@ -362,10 +362,8 @@ export function useUploadDocument() {
 
       return response.json();
     },
-    onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['/api/documents', { driverId: variables.driverId }] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/documents', { driverId: variables.driverId }] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
     },
   });
 }

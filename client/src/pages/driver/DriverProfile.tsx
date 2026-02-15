@@ -91,6 +91,34 @@ export default function DriverProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
 
+  const compressImage = async (file: File, maxWidth = 1200, quality = 0.8): Promise<File> => {
+    if (!file.type.startsWith('image/') || file.size < 500 * 1024) return file;
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width <= maxWidth) { resolve(file); return; }
+        const ratio = maxWidth / width;
+        width = maxWidth;
+        height = Math.round(height * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob || blob.size >= file.size) { resolve(file); return; }
+          resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  };
+
   const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !driver?.id) return;
@@ -108,8 +136,9 @@ export default function DriverProfile() {
 
     setIsUploadingPicture(true);
     try {
+      const compressed = await compressImage(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressed);
 
       const response = await fetch(`/api/drivers/${driver.id}/profile-picture`, {
         method: 'POST',
@@ -123,11 +152,7 @@ export default function DriverProfile() {
       }
 
       toast({ title: 'Profile picture updated successfully' });
-      // Force immediate cache refresh with timestamp to bust browser cache
-      await queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });
-      await queryClient.refetchQueries({ queryKey: ['supabase', 'driver', user?.id] });
-      // Force page reload to ensure image cache is cleared
-      window.location.reload();
+      queryClient.invalidateQueries({ queryKey: ['supabase', 'driver', user?.id] });
     } catch (error) {
       toast({ 
         title: error instanceof Error ? error.message : 'Failed to upload profile picture', 
