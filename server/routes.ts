@@ -4220,10 +4220,15 @@ export async function registerRoutes(
         if (doc.fileUrl && doc.fileUrl.startsWith('text:')) continue;
         if (doc.fileUrl && doc.fileUrl.startsWith('http')) continue;
 
-        const storagePath = doc.storagePath || doc.fileUrl || '';
+        let storagePath = doc.storagePath || doc.fileUrl || '';
         if (!storagePath || storagePath.startsWith('/api/') || storagePath.startsWith('/uploads/')) {
           if (doc.fileUrl) doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
           continue;
+        }
+
+        if (storagePath.startsWith('application-pending/')) {
+          storagePath = `applications/pending/${storagePath.replace('application-pending/', '')}`;
+          doc.storagePath = storagePath;
         }
 
         const docBucket = doc.bucket || BUCKETS[0];
@@ -4272,9 +4277,63 @@ export async function registerRoutes(
         }
       }
 
+      if (driverId) {
+        const missingDocs = allDocuments.filter(d => d.fileMissing);
+        if (missingDocs.length > 0) {
+          const altPaths: { docIndex: number; paths: string[] }[] = [];
+          for (let i = 0; i < allDocuments.length; i++) {
+            const doc = allDocuments[i];
+            if (!doc.fileMissing) continue;
+            const sp = doc.storagePath || '';
+            const fileName = sp.split('/').pop() || doc.fileName || '';
+            if (!fileName) continue;
+            const alts = [
+              `drivers/${driverId}/${doc.type}/${fileName}`,
+              `${driverId}/${fileName}`,
+              `applications/${driverId}/${fileName}`,
+              `applications/pending/${fileName}`,
+              `application-pending/${fileName}`,
+              sp,
+            ];
+            altPaths.push({ docIndex: i, paths: [...new Set(alts)] });
+          }
+
+          for (const bucket of BUCKETS) {
+            for (const alt of altPaths) {
+              if (allDocuments[alt.docIndex].signedUrl) continue;
+              for (const tryPath of alt.paths) {
+                try {
+                  const { data } = await supabaseAdminClient.storage.from(bucket).createSignedUrl(tryPath, 3600);
+                  if (data?.signedUrl) {
+                    allDocuments[alt.docIndex].fileUrl = data.signedUrl;
+                    allDocuments[alt.docIndex].signedUrl = data.signedUrl;
+                    allDocuments[alt.docIndex].storagePath = tryPath;
+                    allDocuments[alt.docIndex].bucket = bucket;
+                    allDocuments[alt.docIndex].fileMissing = false;
+                    break;
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+        }
+      }
+
+      for (const doc of allDocuments) {
+        if (doc.fileMissing && doc.fileUrl && doc.fileUrl.startsWith('/api/uploads/')) {
+          const localPath = doc.fileUrl.replace(/^\/api\/uploads\//, '');
+          const fullPath = path.join(process.cwd(), 'uploads', localPath);
+          try {
+            if (fs.existsSync(fullPath)) {
+              doc.fileMissing = false;
+            }
+          } catch (_) {}
+        }
+      }
+
       allDocuments = allDocuments.filter(doc => {
         if (!doc.fileUrl && !doc.storagePath) return false;
-        if (doc.fileMissing && !doc.fileUrl?.startsWith('http') && !doc.fileUrl?.startsWith('text:')) return false;
+        if (doc.fileMissing && !doc.fileUrl?.startsWith('http') && !doc.fileUrl?.startsWith('text:') && !doc.fileUrl?.startsWith('/api/uploads/')) return false;
         return true;
       });
     } else {
@@ -4286,6 +4345,131 @@ export async function registerRoutes(
           }
         }
       });
+    }
+
+    if (driverId && allDocuments.length === 0) {
+      try {
+        const { supabaseAdmin: sbAdmin } = await import('./supabaseAdmin');
+        if (sbAdmin) {
+          const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
+          const searchPaths = [
+            `drivers/${driverId}`,
+            `${driverId}`,
+            `applications/${driverId}`,
+          ];
+
+          const docTypeFromPath = (folder: string): string => {
+            const map: Record<string, string> = {
+              driving_licence_front: 'driving_licence_front',
+              driving_licence_back: 'driving_licence_back',
+              driving_license_front: 'driving_licence_front',
+              driving_license_back: 'driving_licence_back',
+              dbs_certificate: 'dbs_certificate',
+              goods_in_transit_insurance: 'goods_in_transit_insurance',
+              hire_and_reward_insurance: 'hire_and_reward_insurance',
+              hire_reward_insurance: 'hire_and_reward_insurance',
+              proof_of_identity: 'proof_of_identity',
+              proof_of_address: 'proof_of_address',
+              profile_picture: 'profile_picture',
+              vehicle_photo_front: 'vehicle_photo_front',
+              vehicle_photo_back: 'vehicle_photo_back',
+              vehicle_photo_left: 'vehicle_photo_left',
+              vehicle_photo_right: 'vehicle_photo_right',
+              vehicle_photo_load_space: 'vehicle_photo_load_space',
+              vehicle_photos_front: 'vehicle_photo_front',
+              vehicle_photos_back: 'vehicle_photo_back',
+              vehicle_photos_left: 'vehicle_photo_left',
+              vehicle_photos_right: 'vehicle_photo_right',
+              'vehicle_photos_load space': 'vehicle_photo_load_space',
+              vehicle_photos_load_space: 'vehicle_photo_load_space',
+            };
+            return map[folder] || folder;
+          };
+
+          const discoveredPaths: { bucket: string; path: string; type: string; name: string }[] = [];
+
+          await Promise.all(BUCKETS.flatMap(bucket =>
+            searchPaths.map(async (basePath) => {
+              try {
+                const { data: items } = await sbAdmin.storage.from(bucket).list(basePath, { limit: 100 });
+                if (!items) return;
+                for (const item of items) {
+                  if (!item.id || item.name === '.emptyFolderPlaceholder') continue;
+                  if (item.metadata) {
+                    discoveredPaths.push({
+                      bucket,
+                      path: `${basePath}/${item.name}`,
+                      type: basePath.split('/').pop() || 'unknown',
+                      name: item.name,
+                    });
+                  } else {
+                    try {
+                      const { data: subItems } = await sbAdmin.storage.from(bucket).list(`${basePath}/${item.name}`, { limit: 100 });
+                      if (subItems) {
+                        for (const sub of subItems) {
+                          if (!sub.id || sub.name === '.emptyFolderPlaceholder') continue;
+                          discoveredPaths.push({
+                            bucket,
+                            path: `${basePath}/${item.name}/${sub.name}`,
+                            type: docTypeFromPath(item.name),
+                            name: sub.name,
+                          });
+                        }
+                      }
+                    } catch (_) {}
+                  }
+                }
+              } catch (_) {}
+            })
+          ));
+
+          if (discoveredPaths.length > 0) {
+            const dedupPaths = new Map<string, typeof discoveredPaths[0]>();
+            for (const dp of discoveredPaths) {
+              const key = `${dp.type}::${dp.name}`;
+              if (!dedupPaths.has(key)) dedupPaths.set(key, dp);
+            }
+            const uniquePaths = [...dedupPaths.values()];
+
+            const byBucket = new Map<string, typeof uniquePaths>();
+            for (const dp of uniquePaths) {
+              if (!byBucket.has(dp.bucket)) byBucket.set(dp.bucket, []);
+              byBucket.get(dp.bucket)!.push(dp);
+            }
+
+            await Promise.all([...byBucket.entries()].map(async ([bucket, paths]) => {
+              try {
+                const { data } = await sbAdmin.storage.from(bucket).createSignedUrls(
+                  paths.map(p => p.path), 3600
+                );
+                if (data) {
+                  data.forEach((result: any, idx: number) => {
+                    if (result.signedUrl && !result.error) {
+                      allDocuments.push({
+                        id: `storage-${bucket}-${paths[idx].path.replace(/\//g, '-')}`,
+                        driverId: driverId as string,
+                        authUserId: driverId as string,
+                        type: paths[idx].type,
+                        fileName: paths[idx].name,
+                        fileUrl: result.signedUrl,
+                        signedUrl: result.signedUrl,
+                        storagePath: paths[idx].path,
+                        bucket,
+                        status: 'pending',
+                        uploadedAt: new Date(),
+                      });
+                    }
+                  });
+                }
+              } catch (_) {}
+            }));
+
+            console.log(`[Documents] Storage scan for driver ${driverId}: found ${allDocuments.length} files`);
+          }
+        }
+      } catch (e) {
+        console.error('[Documents] Storage scan fallback error:', e);
+      }
     }
 
     allDocuments.sort((a, b) => {
@@ -6431,6 +6615,20 @@ export async function registerRoutes(
         }
       }
     }
+
+    const localFilePath = path.join(process.cwd(), 'uploads', filePath);
+    try {
+      if (fs.existsSync(localFilePath)) {
+        return res.sendFile(localFilePath);
+      }
+    } catch (_) {}
+
+    const localDocsPath = path.join(process.cwd(), 'uploads', 'documents', cleanPath);
+    try {
+      if (fs.existsSync(localDocsPath)) {
+        return res.sendFile(localDocsPath);
+      }
+    } catch (_) {}
 
     return res.status(404).json({ error: "File not found in storage" });
   }));

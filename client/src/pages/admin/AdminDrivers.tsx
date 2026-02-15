@@ -229,6 +229,17 @@ export default function AdminDrivers() {
     queryKey: ['/api/documents'],
   });
 
+  const { data: selectedDriverDocs } = useQuery<Document[]>({
+    queryKey: ['/api/documents', { driverId: selectedDriver?.id }],
+    queryFn: async () => {
+      if (!selectedDriver?.id) return [];
+      const res = await fetch(`/api/documents?driverId=${selectedDriver.id}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedDriver?.id && documentsDialogOpen,
+  });
+
   const { data: users } = useQuery<User[]>({
     queryKey: ['/api/users', { role: 'driver' }],
   });
@@ -376,6 +387,10 @@ export default function AdminDrivers() {
   };
 
   const getDriverDocuments = (driverId: string) => {
+    if (selectedDriver?.id === driverId && selectedDriverDocs && selectedDriverDocs.length > 0) {
+      return selectedDriverDocs;
+    }
+
     const existingDocs = documents?.filter((d) => d.driverId === driverId) || [];
     if (existingDocs.length > 0) return existingDocs;
 
