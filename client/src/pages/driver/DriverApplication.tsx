@@ -469,7 +469,7 @@ export default function DriverApplication() {
           )}
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf,.doc,.docx,.heic,.heif,.bmp,.tiff"
             capture="user"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -486,7 +486,7 @@ export default function DriverApplication() {
             Change photo
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,.doc,.docx,.heic,.heif,.bmp,.tiff"
               capture="user"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -542,7 +542,7 @@ export default function DriverApplication() {
               <span className="text-sm text-primary hover:underline">Replace</span>
               <input
                 type="file"
-                accept="image/*,.pdf"
+                accept="image/*,.pdf,.doc,.docx,.heic,.heif,.bmp,.tiff"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   e.target.value = '';
@@ -575,7 +575,7 @@ export default function DriverApplication() {
             </div>
             <input
               type="file"
-              accept="image/*,.pdf"
+              accept="image/*,.pdf,.doc,.docx,.heic,.heif,.bmp,.tiff"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = '';

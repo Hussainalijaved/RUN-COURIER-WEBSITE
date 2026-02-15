@@ -418,7 +418,7 @@ export default function DriverDocuments() {
                             )}
                             <input
                               type="file"
-                              accept="image/*,.pdf"
+                              accept="image/*,.pdf,.doc,.docx,.heic,.heif,.bmp,.tiff"
                               className="hidden"
                               ref={(el) => { fileInputRefs.current[side.type] = el; }}
                               onChange={(e) => handleFileChange(e, side.type)}
@@ -496,7 +496,7 @@ export default function DriverDocuments() {
                             ) : getStatusBadge(status)}
                             <input
                               type="file"
-                              accept="image/*,.pdf"
+                              accept="image/*,.pdf,.doc,.docx,.heic,.heif,.bmp,.tiff"
                               className="hidden"
                               ref={(el) => { fileInputRefs.current[docType.type] = el; }}
                               onChange={(e) => handleFileChange(e, docType.type)}
@@ -658,7 +658,7 @@ export default function DriverDocuments() {
                             )}
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.pdf,.doc,.docx,.heic,.heif,.bmp,.tiff"
                               className="hidden"
                               ref={(el) => { fileInputRefs.current[photo.type] = el; }}
                               onChange={(e) => handleFileChange(e, photo.type)}

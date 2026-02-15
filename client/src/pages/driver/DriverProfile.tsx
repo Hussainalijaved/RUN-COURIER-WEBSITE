@@ -123,9 +123,8 @@ export default function DriverProfile() {
     const file = event.target.files?.[0];
     if (!file || !driver?.id) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      toast({ title: 'Please upload a valid image file (JPEG, PNG, GIF, or WebP)', variant: 'destructive' });
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Profile pictures must be image files', variant: 'destructive' });
       return;
     }
 
@@ -328,7 +327,7 @@ export default function DriverProfile() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      accept="image/*"
                       onChange={handleProfilePictureUpload}
                       className="hidden"
                       data-testid="input-profile-picture"

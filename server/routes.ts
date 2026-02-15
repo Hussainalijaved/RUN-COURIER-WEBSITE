@@ -363,14 +363,6 @@ const documentStorage = multer.memoryStorage();
 const uploadDocument = multer({
   storage: documentStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only images and PDFs are allowed.'));
-    }
-  }
 });
 
 const uploadPodImage = multer({
