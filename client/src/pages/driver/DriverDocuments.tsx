@@ -175,6 +175,8 @@ export default function DriverDocuments() {
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
   const [expiryDates, setExpiryDates] = useState<{ [key: string]: string }>({});
   const [pendingFiles, setPendingFiles] = useState<{ [key: string]: File | null }>({});
+  const [uploadingTypes, setUploadingTypes] = useState<Set<string>>(new Set());
+  const [justUploaded, setJustUploaded] = useState<Set<string>>(new Set());
 
   const vehicleType = driver?.vehicleType || 'car';
   
@@ -239,10 +241,14 @@ export default function DriverDocuments() {
   const uploadDocument = useCallback((file: File, docType: string, expiryDate?: string) => {
     if (!driver?.id) return;
 
+    setUploadingTypes(prev => new Set(prev).add(docType));
+
     uploadDocumentMutation.mutate(
       { driverId: driver.id, file, documentType: docType, expiryDate },
       {
         onSuccess: () => {
+          setUploadingTypes(prev => { const s = new Set(prev); s.delete(docType); return s; });
+          setJustUploaded(prev => new Set(prev).add(docType));
           toast({
             title: "Document uploaded",
             description: "Your document has been uploaded and is pending review.",
@@ -254,6 +260,7 @@ export default function DriverDocuments() {
           setExpiryDates(prev => ({ ...prev, [docType]: '' }));
         },
         onError: (error: any) => {
+          setUploadingTypes(prev => { const s = new Set(prev); s.delete(docType); return s; });
           toast({
             title: "Upload failed",
             description: error.message || "Failed to upload document. Please try again.",
@@ -365,13 +372,16 @@ export default function DriverDocuments() {
                       { type: 'driving_license', label: 'Front', description: 'Front side' },
                       { type: 'driving_license_back', label: 'Back', description: 'Back side' },
                     ].map((side) => {
-                      const status = getDocumentStatus(side.type);
+                      const dbStatus = getDocumentStatus(side.type);
+                      const status = dbStatus || (justUploaded.has(side.type) ? 'pending' : null);
                       const doc = getDocument(side.type);
+                      const isThisUploading = uploadingTypes.has(side.type);
                       
                       return (
                         <div 
                           key={side.type} 
-                          className={`border-2 border-dashed rounded-lg p-4 text-center ${
+                          className={`border-2 border-dashed rounded-lg p-4 text-center transition-all duration-300 ${
+                            isThisUploading ? 'border-blue-500 bg-blue-50' :
                             status === 'approved' ? 'border-green-500 bg-green-50' :
                             status === 'rejected' ? 'border-red-500 bg-red-50' :
                             status === 'pending' ? 'border-yellow-500 bg-yellow-50' :
@@ -380,7 +390,9 @@ export default function DriverDocuments() {
                           data-testid={`license-upload-${side.type}`}
                         >
                           <div className="flex flex-col items-center gap-2">
-                            {status === 'approved' ? (
+                            {isThisUploading ? (
+                              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                            ) : status === 'approved' ? (
                               <CheckCircle className="h-8 w-8 text-green-500" />
                             ) : status === 'rejected' ? (
                               <XCircle className="h-8 w-8 text-red-500" />
@@ -390,7 +402,9 @@ export default function DriverDocuments() {
                               <Upload className="h-8 w-8 text-muted-foreground" />
                             )}
                             <span className="font-medium text-sm">{side.label}</span>
-                            {status === 'approved' ? (
+                            {isThisUploading ? (
+                              <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Uploading...</Badge>
+                            ) : status === 'approved' ? (
                               <Badge className="bg-green-500 text-xs"><CheckCircle className="mr-1 h-3 w-3" />Approved</Badge>
                             ) : status === 'rejected' ? (
                               <Badge variant="destructive" className="text-xs"><XCircle className="mr-1 h-3 w-3" />Rejected</Badge>
@@ -415,10 +429,10 @@ export default function DriverDocuments() {
                               size="sm"
                               className="mt-2"
                               onClick={() => handleUploadClick(side.type)}
-                              disabled={uploadDocumentMutation.isPending}
+                              disabled={isThisUploading}
                               data-testid={`button-upload-${side.type}`}
                             >
-                              {uploadDocumentMutation.isPending ? (
+                              {isThisUploading ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                               ) : null}
                               {status ? 'Re-upload' : 'Upload'}
@@ -432,11 +446,13 @@ export default function DriverDocuments() {
               </Card>
 
               {documentTypes.map((docType) => {
-                const status = getDocumentStatus(docType.type);
+                const dbStatus = getDocumentStatus(docType.type);
+                const status = dbStatus || (justUploaded.has(docType.type) ? 'pending' : null);
                 const doc = getDocument(docType.type);
                 const Icon = docType.icon;
                 const hasPendingFile = !!pendingFiles[docType.type];
                 const needsExpiryDate = docType.requiresExpiryDate;
+                const isThisUploading = uploadingTypes.has(docType.type);
                 
                 return (
                   <Card key={docType.type} data-testid={`document-${docType.type}`}>
@@ -444,13 +460,14 @@ export default function DriverDocuments() {
                       <div className="flex flex-col gap-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="flex items-start gap-4">
-                            <div className={`p-3 rounded-lg ${
+                            <div className={`p-3 rounded-lg transition-all duration-300 ${
+                              isThisUploading ? 'bg-blue-100 text-blue-600' :
                               status === 'approved' ? 'bg-green-100 text-green-600' :
                               status === 'rejected' ? 'bg-red-100 text-red-600' :
                               status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
                               'bg-muted text-muted-foreground'
                             }`}>
-                              <Icon className="h-6 w-6" />
+                              {isThisUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Icon className="h-6 w-6" />}
                             </div>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
@@ -474,7 +491,9 @@ export default function DriverDocuments() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            {getStatusBadge(status)}
+                            {isThisUploading ? (
+                              <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Uploading...</Badge>
+                            ) : getStatusBadge(status)}
                             <input
                               type="file"
                               accept="image/*,.pdf"
@@ -488,10 +507,10 @@ export default function DriverDocuments() {
                                 variant={status === 'approved' ? 'outline' : 'default'}
                                 size="sm"
                                 onClick={() => handleUploadClick(docType.type)}
-                                disabled={uploadDocumentMutation.isPending}
+                                disabled={isThisUploading}
                                 data-testid={`button-upload-${docType.type}`}
                               >
-                                {uploadDocumentMutation.isPending ? (
+                                {isThisUploading ? (
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
                                   <Upload className="mr-2 h-4 w-4" />
@@ -504,7 +523,7 @@ export default function DriverDocuments() {
                                 variant={status === 'approved' ? 'outline' : 'default'}
                                 size="sm"
                                 onClick={() => handleUploadClick(docType.type)}
-                                disabled={uploadDocumentMutation.isPending}
+                                disabled={isThisUploading}
                                 data-testid={`button-select-${docType.type}`}
                               >
                                 <Upload className="mr-2 h-4 w-4" />
@@ -536,10 +555,10 @@ export default function DriverDocuments() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleUploadWithExpiry(docType.type)}
-                                  disabled={uploadDocumentMutation.isPending || !expiryDates[docType.type]}
+                                  disabled={isThisUploading || !expiryDates[docType.type]}
                                   data-testid={`button-upload-${docType.type}`}
                                 >
-                                  {uploadDocumentMutation.isPending ? (
+                                  {isThisUploading ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   ) : (
                                     <Upload className="mr-2 h-4 w-4" />
@@ -593,13 +612,16 @@ export default function DriverDocuments() {
                 <CardContent>
                   <div className={`grid gap-4 ${vehiclePhotos.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
                     {vehiclePhotos.map((photo) => {
-                      const status = getDocumentStatus(photo.type);
+                      const dbStatus = getDocumentStatus(photo.type);
+                      const status = dbStatus || (justUploaded.has(photo.type) ? 'pending' : null);
                       const doc = getDocument(photo.type);
+                      const isThisUploading = uploadingTypes.has(photo.type);
                       
                       return (
                         <div 
                           key={photo.type} 
-                          className={`border-2 border-dashed rounded-lg p-4 text-center ${
+                          className={`border-2 border-dashed rounded-lg p-4 text-center transition-all duration-300 ${
+                            isThisUploading ? 'border-blue-500 bg-blue-50' :
                             status === 'approved' ? 'border-green-500 bg-green-50' :
                             status === 'rejected' ? 'border-red-500 bg-red-50' :
                             status === 'pending' ? 'border-yellow-500 bg-yellow-50' :
@@ -608,7 +630,9 @@ export default function DriverDocuments() {
                           data-testid={`photo-upload-${photo.type}`}
                         >
                           <div className="flex flex-col items-center gap-2">
-                            {status === 'approved' ? (
+                            {isThisUploading ? (
+                              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                            ) : status === 'approved' ? (
                               <CheckCircle className="h-8 w-8 text-green-500" />
                             ) : status === 'rejected' ? (
                               <XCircle className="h-8 w-8 text-red-500" />
@@ -618,7 +642,9 @@ export default function DriverDocuments() {
                               <Upload className="h-8 w-8 text-muted-foreground" />
                             )}
                             <span className="font-medium text-sm">{photo.label}</span>
-                            {status === 'approved' ? (
+                            {isThisUploading ? (
+                              <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Uploading...</Badge>
+                            ) : status === 'approved' ? (
                               <Badge className="bg-green-500 text-xs"><CheckCircle className="mr-1 h-3 w-3" />Approved</Badge>
                             ) : status === 'rejected' ? (
                               <Badge variant="destructive" className="text-xs"><XCircle className="mr-1 h-3 w-3" />Rejected</Badge>
@@ -643,10 +669,10 @@ export default function DriverDocuments() {
                               size="sm"
                               className="mt-2"
                               onClick={() => handleUploadClick(photo.type)}
-                              disabled={uploadDocumentMutation.isPending}
+                              disabled={isThisUploading}
                               data-testid={`button-upload-${photo.type}`}
                             >
-                              {uploadDocumentMutation.isPending ? (
+                              {isThisUploading ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                               ) : null}
                               {status ? 'Re-upload' : 'Upload'}
