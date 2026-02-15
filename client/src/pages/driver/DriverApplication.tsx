@@ -409,6 +409,100 @@ export default function DriverApplication() {
     submitApplicationMutation.mutate(data);
   };
 
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+
+  const handleFileSelect = useCallback(async (
+    file: File,
+    type: keyof typeof uploadedFiles
+  ) => {
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select a file smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrls(prev => ({ ...prev, [type]: url }));
+    }
+
+    uploadFile(file, type);
+  }, [uploadFile, toast]);
+
+  const ProfilePictureUpload = () => {
+    const isThisUploading = uploadingType === 'profilePicture';
+    const isUploaded = !!uploadedFiles.profilePicture;
+    const preview = previewUrls.profilePicture;
+
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <Label className="text-base font-medium">Profile Picture</Label>
+        <p className="text-sm text-muted-foreground text-center">A clear photo of yourself for identification</p>
+        <label className="cursor-pointer group relative">
+          <div className={cn(
+            "w-28 h-28 rounded-full overflow-visible flex items-center justify-center transition-all border-2",
+            isUploaded ? "border-green-500" : "border-dashed border-muted-foreground/40",
+            isThisUploading && "border-primary"
+          )}>
+            {preview ? (
+              <img src={preview} alt="Profile" className="w-full h-full rounded-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                {isThisUploading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                ) : (
+                  <>
+                    <User className="h-8 w-8" />
+                    <span className="text-xs">Tap to add</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          {isUploaded && !isThisUploading && (
+            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-green-500 flex items-center justify-center">
+              <CheckCircle className="h-4 w-4 text-white" />
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            capture="user"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) handleFileSelect(file, 'profilePicture');
+            }}
+            disabled={isThisUploading}
+            className="hidden"
+            data-testid="input-file-profilePicture"
+          />
+        </label>
+        {isUploaded && (
+          <label className="cursor-pointer text-xs text-primary hover:underline">
+            Change photo
+            <input
+              type="file"
+              accept="image/*"
+              capture="user"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) handleFileSelect(file, 'profilePicture');
+              }}
+              disabled={isThisUploading}
+              className="hidden"
+              data-testid="input-file-profilePicture-replace"
+            />
+          </label>
+        )}
+      </div>
+    );
+  };
+
   const FileUploadField = ({ 
     label, 
     type, 
@@ -421,29 +515,40 @@ export default function DriverApplication() {
     description?: string;
   }) => {
     const isThisUploading = uploadingType === type;
+    const isOtherUploading = isUploading && uploadingType !== type;
     const isUploaded = !!uploadedFiles[type];
     const fileName = uploadedFileNames[type];
+    const preview = previewUrls[type];
 
     return (
       <div className="space-y-2">
         <Label className="flex items-center gap-2">
           {label}
           {required && <span className="text-destructive">*</span>}
+          {isUploaded && <CheckCircle className="h-4 w-4 text-green-500" />}
         </Label>
         {description && (
           <p className="text-sm text-muted-foreground">{description}</p>
         )}
         {isUploaded ? (
           <div className="flex items-center gap-3 rounded-md border border-green-500/30 bg-green-500/10 p-3">
-            <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+            {preview ? (
+              <img src={preview} alt={label} className="h-10 w-10 rounded object-cover shrink-0" />
+            ) : (
+              <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+            )}
             <span className="text-sm text-foreground truncate flex-1">{fileName || 'File uploaded'}</span>
-            <label className="cursor-pointer">
+            <label className="cursor-pointer shrink-0">
               <span className="text-sm text-primary hover:underline">Replace</span>
               <input
                 type="file"
                 accept="image/*,.pdf"
-                onChange={(e) => handleFileChange(e, type)}
-                disabled={isUploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) handleFileSelect(file, type);
+                }}
+                disabled={isThisUploading}
                 className="hidden"
                 data-testid={`input-file-${type}-replace`}
               />
@@ -451,22 +556,32 @@ export default function DriverApplication() {
           </div>
         ) : (
           <label className={cn(
-            "flex items-center gap-3 rounded-md border border-dashed p-3 cursor-pointer transition-colors",
-            isThisUploading ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover-elevate"
+            "flex items-center gap-3 rounded-md border border-dashed p-4 cursor-pointer transition-colors",
+            isThisUploading ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover-elevate",
+            isOtherUploading && "opacity-60"
           )}>
             {isThisUploading ? (
               <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
             ) : (
               <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
             )}
-            <span className="text-sm text-muted-foreground">
-              {isThisUploading ? `Uploading ${fileName || ''}...` : 'Tap to choose a file'}
-            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-foreground">
+                {isThisUploading ? 'Uploading...' : 'Choose file'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {isThisUploading ? (fileName || '') : 'Image or PDF, max 10MB'}
+              </span>
+            </div>
             <input
               type="file"
               accept="image/*,.pdf"
-              onChange={(e) => handleFileChange(e, type)}
-              disabled={isUploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) handleFileSelect(file, type);
+              }}
+              disabled={isThisUploading}
               className="hidden"
               data-testid={`input-file-${type}`}
             />
@@ -861,11 +976,9 @@ export default function DriverApplication() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <FileUploadField
-                    label="Profile Picture"
-                    type="profilePicture"
-                    description="A clear photo of yourself for identification"
-                  />
+                  <ProfilePictureUpload />
+
+                  <div className="border-t pt-6" />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FileUploadField
