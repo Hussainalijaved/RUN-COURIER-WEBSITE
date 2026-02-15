@@ -3994,7 +3994,7 @@ export async function registerRoutes(
   const documentsCache = {
     data: null as any[] | null,
     timestamp: 0,
-    ttl: 120_000,
+    ttl: 600_000,
     isResolving: false,
     invalidate() { this.data = null; this.timestamp = 0; },
     isValid() { return this.data && (Date.now() - this.timestamp) < this.ttl; },
@@ -4219,89 +4219,6 @@ export async function registerRoutes(
     const { supabaseAdmin: supabaseAdminClient } = await import('./supabaseAdmin');
     if (supabaseAdminClient) {
       const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
-      
-      const uniqueDriverIds = [...new Set(
-        allDocuments
-          .filter(d => d.driverId || d.authUserId)
-          .map(d => d.driverId || d.authUserId)
-      )];
-      const folderListCache = new Map<string, any[]>();
-      
-      const docTypesPerDriver = new Map<string, Set<string>>();
-      for (const doc of allDocuments) {
-        const dId = doc.driverId || doc.authUserId;
-        if (!dId) continue;
-        if (!docTypesPerDriver.has(dId)) docTypesPerDriver.set(dId, new Set());
-        const dt = (doc.type || '').toLowerCase().replace(/\s+/g, '_');
-        if (dt) docTypesPerDriver.get(dId)!.add(dt);
-        const spPath = doc.storagePath || doc.fileUrl || '';
-        const spMatch = spPath.match(/drivers\/[^/]+\/([^/]+)\//);
-        if (spMatch) docTypesPerDriver.get(dId)!.add(spMatch[1]);
-      }
-
-      await Promise.all(uniqueDriverIds.flatMap((dId) => 
-        BUCKETS.flatMap((bucket) => [
-          (async () => {
-            try {
-              const { data } = await supabaseAdminClient.storage.from(bucket).list(dId, { limit: 200 });
-              if (data && data.length > 0) {
-                folderListCache.set(`${bucket}:${dId}`, data.filter((f: any) => f.id));
-              }
-            } catch (_) {}
-          })(),
-          (async () => {
-            try {
-              const { data } = await supabaseAdminClient.storage.from(bucket).list(`applications/${dId}`, { limit: 200 });
-              if (data && data.length > 0) {
-                const existing = folderListCache.get(`${bucket}:${dId}`) || [];
-                folderListCache.set(`${bucket}:${dId}`, [...existing, ...data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `applications/${dId}` }))]);
-              }
-            } catch (_) {}
-          })(),
-          (async () => {
-            try {
-              const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/${dId}`, { limit: 200 });
-              if (data && data.length > 0) {
-                const existing = folderListCache.get(`${bucket}:${dId}`) || [];
-                const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/${dId}` }));
-                folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
-              }
-            } catch (_) {}
-          })(),
-          ...([...(docTypesPerDriver.get(dId) || [])].map(dt => (async () => {
-            try {
-              const { data } = await supabaseAdminClient.storage.from(bucket).list(`drivers/${dId}/${dt}`, { limit: 200 });
-              if (data && data.length > 0) {
-                const existing = folderListCache.get(`${bucket}:${dId}`) || [];
-                const newFiles = data.filter((f: any) => f.id).map((f: any) => ({ ...f, _appPrefix: `drivers/${dId}/${dt}` }));
-                folderListCache.set(`${bucket}:${dId}`, [...existing, ...newFiles]);
-              }
-            } catch (_) {}
-          })())),
-        ])
-      ));
-
-      for (const bucket of BUCKETS) {
-        try {
-          const { data } = await supabaseAdminClient.storage.from(bucket).list('applications/pending', { limit: 200 });
-          if (data && data.length > 0) {
-            for (const item of data) {
-              if (item.id && item.name !== '.emptyFolderPlaceholder') {
-                try {
-                  const { data: subData } = await supabaseAdminClient.storage.from(bucket).list(`applications/pending/${item.name}`, { limit: 200 });
-                  if (subData && subData.length > 0) {
-                    subData.filter((f: any) => f.id && f.name !== '.emptyFolderPlaceholder').forEach((f: any) => {
-                      const existing = folderListCache.get(`${bucket}:application-pending`) || [];
-                      existing.push({ ...f, _appPrefix: `applications/pending/${item.name}` });
-                      folderListCache.set(`${bucket}:application-pending`, existing);
-                    });
-                  }
-                } catch (_) {}
-              }
-            }
-          }
-        } catch (_) {}
-      }
 
       const bucketPathMap = new Map<string, { docIndex: number; path: string }[]>();
       BUCKETS.forEach(b => bucketPathMap.set(b, []));
@@ -4309,99 +4226,34 @@ export async function registerRoutes(
       for (let i = 0; i < allDocuments.length; i++) {
         const doc = allDocuments[i];
         if (doc.fileUrl && doc.fileUrl.startsWith('text:')) continue;
+        if (doc.fileUrl && doc.fileUrl.startsWith('http')) continue;
 
-        const storagePath = doc.storagePath;
-        const docBucket = doc.bucket;
-        const driverId = doc.driverId || doc.authUserId;
-        const docType = (doc.type || '').toLowerCase().replace(/_/g, '');
-
-        let matchedBucket = '';
-        let matchedPath = '';
-
-        if (storagePath && docBucket && !storagePath.startsWith('/api/') && !storagePath.startsWith('/uploads/') && !storagePath.startsWith('application-pending/')) {
-          matchedBucket = docBucket;
-          matchedPath = storagePath;
+        const storagePath = doc.storagePath || doc.fileUrl || '';
+        if (!storagePath || storagePath.startsWith('/api/') || storagePath.startsWith('/uploads/')) {
+          if (doc.fileUrl) doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
+          continue;
         }
 
-        if (!matchedPath && driverId) {
-          for (const bucket of BUCKETS) {
-            const files = folderListCache.get(`${bucket}:${driverId}`) || [];
-            if (files.length === 0) continue;
-
-            let bestMatch: any = null;
-            
-            if (storagePath) {
-              const spFileName = storagePath.split('/').pop() || '';
-              bestMatch = files.find((f: any) => f.name === spFileName);
-            }
-            if (!bestMatch && doc.fileName) {
-              bestMatch = files.find((f: any) => f.name === doc.fileName);
-            }
-            if (!bestMatch && storagePath && storagePath.includes('application-pending/')) {
-              const fn = storagePath.replace('application-pending/', '');
-              bestMatch = files.find((f: any) => f.name === fn);
-            }
-            if (!bestMatch && docType) {
-              bestMatch = files.find((f: any) => {
-                const lower = f.name.toLowerCase().replace(/_/g, '');
-                return lower.includes(docType) || docType.includes(lower.split(/\d/)[0].replace(/\./g, ''));
-              });
-            }
-            if (!bestMatch && docType) {
-              const altType = docType.replace('vehiclephoto', 'vehiclephotos');
-              if (altType !== docType) {
-                bestMatch = files.find((f: any) => f.name.toLowerCase().replace(/_/g, '').includes(altType));
-              }
-            }
-
-            if (bestMatch) {
-              matchedBucket = bucket;
-              matchedPath = bestMatch._appPrefix 
-                ? `${bestMatch._appPrefix}/${bestMatch.name}` 
-                : `${driverId}/${bestMatch.name}`;
-              break;
-            }
-          }
-        }
-
-        if (!matchedPath && storagePath && storagePath.startsWith('application-pending/')) {
-          const appFileName = storagePath.replace('application-pending/', '');
-          for (const bucket of BUCKETS) {
-            const pendingFiles = folderListCache.get(`${bucket}:application-pending`) || [];
-            const pendingMatch = pendingFiles.find((f: any) => f.name === appFileName);
-            if (pendingMatch) {
-              matchedBucket = bucket;
-              matchedPath = pendingMatch._appPrefix 
-                ? `${pendingMatch._appPrefix}/${pendingMatch.name}` 
-                : `applications/pending/${pendingMatch.name}`;
-              break;
-            }
-          }
-          if (!matchedPath) {
-            matchedPath = `applications/pending/${appFileName}`;
-            matchedBucket = docBucket || BUCKETS[0];
-          }
-        }
-
-        if (!matchedPath && storagePath) {
-          matchedBucket = docBucket || BUCKETS[0];
-          matchedPath = storagePath;
-        }
-
-        if (matchedPath && matchedBucket) {
-          bucketPathMap.get(matchedBucket)!.push({ docIndex: i, path: matchedPath });
-        } else if (doc.fileUrl) {
-          doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
+        const docBucket = doc.bucket || BUCKETS[0];
+        bucketPathMap.get(docBucket)!.push({ docIndex: i, path: storagePath });
+        if (docBucket === BUCKETS[0]) {
+          bucketPathMap.get(BUCKETS[1])!.push({ docIndex: i, path: storagePath });
         }
       }
 
       await Promise.all(BUCKETS.map(async (bucket) => {
         const entries = bucketPathMap.get(bucket) || [];
         if (entries.length === 0) return;
+
+        const needsSigning = entries.filter(e => {
+          const doc = allDocuments[e.docIndex];
+          return !doc.signedUrl;
+        });
+        if (needsSigning.length === 0) return;
         
         const batchSize = 50;
-        for (let start = 0; start < entries.length; start += batchSize) {
-          const batch = entries.slice(start, start + batchSize);
+        for (let start = 0; start < needsSigning.length; start += batchSize) {
+          const batch = needsSigning.slice(start, start + batchSize);
           const paths = batch.map(e => e.path);
           try {
             const { data } = await supabaseAdminClient.storage.from(bucket).createSignedUrls(paths, 3600);
@@ -4420,25 +4272,17 @@ export async function registerRoutes(
         }
       }));
 
-      for (let i = 0; i < allDocuments.length; i++) {
-        const doc = allDocuments[i];
-        if (doc.signedUrl || (doc.fileUrl && doc.fileUrl.startsWith('http')) || (doc.fileUrl && doc.fileUrl.startsWith('text:'))) continue;
-        if (!doc.storagePath) continue;
-        doc.fileMissing = true;
-      }
-
       for (const doc of allDocuments) {
-        if (doc.fileUrl && !doc.fileUrl.startsWith('http') && !doc.fileUrl.startsWith('text:')) {
+        if (doc.signedUrl || (doc.fileUrl && doc.fileUrl.startsWith('http')) || (doc.fileUrl && doc.fileUrl.startsWith('text:'))) continue;
+        if (doc.storagePath || doc.fileUrl) {
           doc.fileMissing = true;
-          doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
+          if (doc.fileUrl) doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
         }
       }
 
       allDocuments = allDocuments.filter(doc => {
         if (!doc.fileUrl && !doc.storagePath) return false;
-        if (doc.driverId === 'application-pending' && !doc.fileUrl?.startsWith('http') && !doc.storagePath) return false;
-        if (doc.driverId?.startsWith('application') && !doc.storagePath && doc.fileMissing) return false;
-        if (!doc.storagePath && !doc.fileUrl?.startsWith('http') && !doc.fileUrl?.startsWith('text:')) return false;
+        if (doc.fileMissing && !doc.fileUrl?.startsWith('http') && !doc.fileUrl?.startsWith('text:')) return false;
         return true;
       });
     } else {
