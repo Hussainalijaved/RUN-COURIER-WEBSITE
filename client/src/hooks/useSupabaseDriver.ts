@@ -4,6 +4,17 @@ import { useAuth } from '@/context/AuthContext';
 import type { Driver, Document as DriverDocument } from '@shared/schema';
 import type { DriverJob } from '@/lib/data/base';
 
+function resolveProfilePictureUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('/api/uploads/')) return url;
+  if (url.startsWith('http')) {
+    const supabaseMatch = url.match(/\/storage\/v1\/object\/(?:public\/)?(?:driver-documents|DRIVER-DOCUMENTS)\/(.+?)(?:\?.*)?$/i);
+    if (supabaseMatch) return `/api/uploads/documents/${decodeURIComponent(supabaseMatch[1])}`;
+    return url;
+  }
+  return `/api/uploads/documents/${url}`;
+}
+
 export function useDriver() {
   const { user } = useAuth();
 
@@ -12,10 +23,12 @@ export function useDriver() {
     queryFn: async () => {
       if (!user?.id) return null;
       
-      // Always use REST API first - it ensures proper driver record creation and sync
       const response = await fetch(`/api/drivers/user/${user.id}`);
       if (response.ok) {
         const driver = await response.json();
+        if (driver.profilePictureUrl) {
+          driver.profilePictureUrl = resolveProfilePictureUrl(driver.profilePictureUrl);
+        }
         return driver as Driver;
       }
       
@@ -61,7 +74,7 @@ export function useDriver() {
         lastLocationUpdate: data.last_location_update,
         rating: data.rating,
         totalJobs: data.total_jobs,
-        profilePictureUrl: data.profile_picture_url,
+        profilePictureUrl: resolveProfilePictureUrl(data.profile_picture_url),
         bankName: data.bank_name,
         accountHolderName: data.account_holder_name,
         sortCode: data.sort_code,

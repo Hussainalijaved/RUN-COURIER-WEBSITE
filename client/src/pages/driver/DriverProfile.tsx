@@ -146,9 +146,19 @@ export default function DriverProfile() {
         credentials: 'include',
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload profile picture');
+        throw new Error(result.error || 'Failed to upload profile picture');
+      }
+
+      const newUrl = result.storagePath ? `/api/uploads/documents/${result.storagePath}` : '';
+
+      if (newUrl) {
+        queryClient.setQueryData(['supabase', 'driver', user?.id], (old: any) => {
+          if (!old) return old;
+          return { ...old, profilePictureUrl: newUrl };
+        });
       }
 
       toast({ title: 'Profile picture updated successfully' });
