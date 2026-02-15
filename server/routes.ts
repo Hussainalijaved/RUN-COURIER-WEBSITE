@@ -273,35 +273,81 @@ async function copyApplicationFileToDriver(
 ): Promise<{ path: string; bucket: string }> {
   if (!originalUrl) return { path: originalUrl, bucket: 'driver-documents' };
 
+  const BUCKET = 'driver-documents';
+  
+  let sourcePath = extractStoragePath(originalUrl) || originalUrl;
+  if (sourcePath.startsWith('http') || sourcePath.startsWith('/')) {
+    const normalized = normalizeDocumentUrl(originalUrl);
+    sourcePath = normalized || originalUrl;
+  }
+
+  const isPendingPath = sourcePath.includes('drivers/pending/') || sourcePath.includes('applications/');
+  
+  if (isPendingPath) {
+    try {
+      const fileName = sourcePath.split('/').pop() || `file_${Date.now()}`;
+      const docTypeMatch = sourcePath.match(/(?:drivers\/pending|applications\/[^/]+)\/([^/]+)\//);
+      const docType = docTypeMatch ? docTypeMatch[1] : 'document';
+      const destPath = `drivers/${driverUUID}/${docType}/${fileName}`;
+
+      const { data: fileData, error: downloadError } = await supabaseClient.storage
+        .from(BUCKET)
+        .download(sourcePath);
+      
+      if (downloadError || !fileData) {
+        const ALT_BUCKET = 'DRIVER-DOCUMENTS';
+        const { data: altData, error: altErr } = await supabaseClient.storage
+          .from(ALT_BUCKET)
+          .download(sourcePath);
+        if (altErr || !altData) {
+          console.warn(`[FileCopy] Could not download from pending path: ${sourcePath}, using original path`);
+          return { path: sourcePath, bucket: BUCKET };
+        }
+        const buffer = Buffer.from(await altData.arrayBuffer());
+        const { error: uploadErr } = await supabaseClient.storage
+          .from(BUCKET)
+          .upload(destPath, buffer, { upsert: true });
+        if (uploadErr) {
+          console.warn(`[FileCopy] Upload to ${destPath} failed:`, uploadErr.message);
+          return { path: sourcePath, bucket: BUCKET };
+        }
+        console.log(`[FileCopy] Copied ${sourcePath} -> ${destPath} (from ${ALT_BUCKET})`);
+        return { path: destPath, bucket: BUCKET };
+      }
+
+      const buffer = Buffer.from(await fileData.arrayBuffer());
+      const { error: uploadErr } = await supabaseClient.storage
+        .from(BUCKET)
+        .upload(destPath, buffer, { upsert: true });
+      
+      if (uploadErr) {
+        console.warn(`[FileCopy] Upload to ${destPath} failed:`, uploadErr.message);
+        return { path: sourcePath, bucket: BUCKET };
+      }
+      
+      console.log(`[FileCopy] Copied ${sourcePath} -> ${destPath}`);
+      return { path: destPath, bucket: BUCKET };
+    } catch (err: any) {
+      console.error(`[FileCopy] Error copying file:`, err.message);
+      return { path: sourcePath, bucket: BUCKET };
+    }
+  }
+
   const storagePath = extractStoragePath(originalUrl);
   if (storagePath) {
-    console.log(`[FileResolve] Extracted storage_path from URL: ${storagePath}`);
-    // Try to detect which bucket the file is actually in
-    const BUCKETS = ['driver-documents', 'DRIVER-DOCUMENTS'];
+    const BUCKETS = [BUCKET, 'DRIVER-DOCUMENTS'];
     for (const bucket of BUCKETS) {
       try {
         const { data } = await supabaseClient.storage.from(bucket).createSignedUrl(storagePath, 3600);
         if (data?.signedUrl) {
-          console.log(`[FileResolve] Detected bucket: ${bucket}`);
           return { path: storagePath, bucket };
         }
-      } catch (err) {
-        console.log(`[FileResolve] Bucket ${bucket} check failed, trying next...`);
-      }
+      } catch {}
     }
-    console.log(`[FileResolve] Could not verify bucket, defaulting to driver-documents`);
-    return { path: storagePath, bucket: 'driver-documents' };
+    return { path: storagePath, bucket: BUCKET };
   }
 
-  if (!originalUrl.startsWith('http') && !originalUrl.startsWith('/')) {
-    console.log(`[FileResolve] URL is already a storage path: ${originalUrl}`);
-    return { path: originalUrl, bucket: 'driver-documents' };
-  }
-
-  const normalized = normalizeDocumentUrl(originalUrl);
-  const fallbackPath = normalized || originalUrl;
-  console.log(`[FileResolve] Could not extract storage_path, using normalized: ${fallbackPath}`);
-  return { path: fallbackPath, bucket: 'driver-documents' };
+  return { path: sourcePath, bucket: BUCKET };
 }
 
 const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
@@ -7077,6 +7123,7 @@ export async function registerRoutes(
               if (!d.url) continue;
               try {
                 const docStatus = documentStatuses?.[d.field] || 'pending';
+                const fileResult = await copyApplicationFileToDriver(d.url, driver.id, supabaseAdmin);
 
                 const { data: existingDoc } = await supabaseAdmin.from('driver_documents')
                   .select('id, storage_path, bucket')
@@ -7094,31 +7141,27 @@ export async function registerRoutes(
                     .eq('id', existingDoc.id);
                   console.log(`[Driver Application] Updated status for existing doc ${d.type} (preserved storage_path)`);
                 } else if (existingDoc) {
-                  const normalizedUrl = normalizeDocumentUrl(d.url);
-                  const derivedStoragePath = extractStoragePath(normalizedUrl || d.url || '');
                   await supabaseAdmin.from('driver_documents')
                     .update({
-                      file_url: normalizedUrl || d.url,
-                      storage_path: derivedStoragePath,
-                      bucket: 'driver-documents',
+                      file_url: fileResult.path,
+                      storage_path: fileResult.path,
+                      bucket: fileResult.bucket,
                       status: docStatus,
                       reviewed_at: new Date().toISOString(),
                       reviewed_by: reviewedBy,
                     })
                     .eq('id', existingDoc.id);
-                  console.log(`[Driver Application] Updated doc ${d.type} with derived path`);
+                  console.log(`[Driver Application] Updated doc ${d.type} with copied path`);
                 } else {
-                  const normalizedUrl = normalizeDocumentUrl(d.url);
-                  const derivedStoragePath = extractStoragePath(normalizedUrl || d.url || '');
                   await supabaseAdmin.from('driver_documents')
                     .insert({
                       driver_id: driver.id,
                       auth_user_id: driver.id,
                       doc_type: d.type,
                       file_name: d.url!.split('/').pop() || d.type,
-                      file_url: normalizedUrl || d.url,
-                      storage_path: derivedStoragePath,
-                      bucket: 'driver-documents',
+                      file_url: fileResult.path,
+                      storage_path: fileResult.path,
+                      bucket: fileResult.bucket,
                       status: docStatus,
                       uploaded_at: new Date().toISOString(),
                       reviewed_at: new Date().toISOString(),
