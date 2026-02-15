@@ -1783,9 +1783,19 @@ export class SupabaseStorage implements IStorage {
       status: application.status || 'pending',
     };
     
-    const { data, error } = await supabase.from('driver_applications').insert(dbApp).select().single();
+    let { data, error } = await supabase.from('driver_applications').insert(dbApp).select().single();
+    if (error && error.code === 'PGRST204' && error.message?.includes('vehicle_registration')) {
+      delete dbApp.vehicle_registration;
+      const retry = await supabase.from('driver_applications').insert(dbApp).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) throw error;
-    return mapDbToDriverApplication(data);
+    const result = mapDbToDriverApplication(data);
+    if (application.vehicleRegistration) {
+      result.vehicleRegistration = application.vehicleRegistration;
+    }
+    return result;
   }
 
   async updateDriverApplication(id: string, data: Partial<DriverApplication>): Promise<DriverApplication | undefined> {
@@ -1797,7 +1807,6 @@ export class SupabaseStorage implements IStorage {
     if (data.rejectionReason !== undefined) dbData.rejection_reason = data.rejectionReason;
     if (data.reviewedAt !== undefined) dbData.reviewed_at = data.reviewedAt;
     if (data.vehicleType !== undefined) dbData.vehicle_type = data.vehicleType;
-    if (data.vehicleRegistration !== undefined) dbData.vehicle_registration = data.vehicleRegistration;
     
     const { data: updated, error } = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
     if (error || !updated) {

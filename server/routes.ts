@@ -6923,6 +6923,7 @@ export async function registerRoutes(
                   national_insurance_number: application.nationalInsuranceNumber || null,
                   right_to_work_share_code: application.rightToWorkShareCode || null,
                   vehicle_type: application.vehicleType || 'car',
+                  vehicle_registration: application.vehicleRegistration || null,
                   online_status: 'offline',
                   status: 'approved',
                   is_active: true,
