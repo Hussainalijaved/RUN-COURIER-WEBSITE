@@ -6161,6 +6161,30 @@ export async function registerRoutes(
   app.get("/api/driver-applications/check/:email", asyncHandler(async (req, res) => {
     const application = await storage.getDriverApplicationByEmail(req.params.email);
     if (application) {
+      if (application.status === 'approved') {
+        const { supabaseAdmin } = await import('./supabaseAdmin');
+        let accountStillActive = false;
+        if (supabaseAdmin) {
+          const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+          const authUser = users?.users?.find(
+            u => u.email?.toLowerCase() === req.params.email.toLowerCase()
+          );
+          if (authUser && !authUser.deleted_at) {
+            const driver = await storage.getDriverByUserId(authUser.id);
+            if (driver && driver.isActive !== false) {
+              accountStillActive = true;
+            }
+          }
+        }
+        if (!accountStillActive) {
+          res.json({ exists: false });
+          return;
+        }
+      }
+      if (application.status === 'rejected') {
+        res.json({ exists: false });
+        return;
+      }
       res.json({ exists: true, status: application.status, id: application.id });
     } else {
       res.json({ exists: false });
@@ -6170,9 +6194,39 @@ export async function registerRoutes(
   app.post("/api/driver-applications", asyncHandler(async (req, res) => {
     const existingApplication = await storage.getDriverApplicationByEmail(req.body.email);
     if (existingApplication) {
-      if (existingApplication.status === 'corrections_needed') {
+      if (existingApplication.status === 'corrections_needed' || existingApplication.status === 'rejected') {
         await storage.deleteDriverApplication(existingApplication.id);
-        console.log(`[Driver Application] Deleted corrections_needed application ${existingApplication.id} for resubmission`);
+        console.log(`[Driver Application] Deleted ${existingApplication.status} application ${existingApplication.id} for resubmission`);
+      } else if (existingApplication.status === 'approved') {
+        const { supabaseAdmin } = await import('./supabaseAdmin');
+        let accountStillActive = false;
+        if (supabaseAdmin) {
+          const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+          const authUser = users?.users?.find(
+            u => u.email?.toLowerCase() === req.body.email.toLowerCase()
+          );
+          if (authUser && !authUser.deleted_at) {
+            const driver = await storage.getDriverByUserId(authUser.id);
+            if (driver && driver.isActive !== false) {
+              accountStillActive = true;
+            }
+          }
+        }
+        if (accountStillActive) {
+          return res.status(400).json({ 
+            error: "An active driver account already exists with this email.",
+            status: existingApplication.status,
+            applicationId: existingApplication.id
+          });
+        }
+        await storage.deleteDriverApplication(existingApplication.id);
+        console.log(`[Driver Application] Deleted old approved application ${existingApplication.id} (account deleted/deactivated, allowing re-signup)`);
+      } else if (existingApplication.status === 'pending') {
+        return res.status(400).json({ 
+          error: "An application with this email is already pending review.",
+          status: existingApplication.status,
+          applicationId: existingApplication.id
+        });
       } else {
         return res.status(400).json({ 
           error: "An application with this email already exists",
@@ -6804,6 +6858,24 @@ export async function registerRoutes(
             console.log(`[Driver Application] No driver found for email ${application.email} - creating account automatically`);
             try {
               const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
+              
+              const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+              const oldAuthUser = existingUsers?.users?.find(
+                u => u.email?.toLowerCase() === application.email.toLowerCase()
+              );
+              if (oldAuthUser) {
+                console.log(`[Driver Application] Found existing auth user ${oldAuthUser.id} for ${application.email} - cleaning up for re-signup`);
+                const oldDriverRecord = await storage.getDriverByUserId(oldAuthUser.id);
+                if (!oldDriverRecord || oldDriverRecord.isActive === false) {
+                  if (oldDriverRecord) {
+                    await supabaseAdmin.from('drivers').delete().eq('id', oldAuthUser.id);
+                    console.log(`[Driver Application] Deleted old deactivated driver record ${oldAuthUser.id}`);
+                  }
+                  await supabaseAdmin.auth.admin.deleteUser(oldAuthUser.id);
+                  console.log(`[Driver Application] Deleted old auth user ${oldAuthUser.id} for re-signup`);
+                }
+              }
+
               const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
                 email: application.email,
                 password: tempPassword,
