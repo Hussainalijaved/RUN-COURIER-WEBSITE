@@ -4518,6 +4518,7 @@ export async function registerRoutes(
       documentsCache.invalidate();
       return res.status(201).json({
         success: true,
+        fileUrl: storagePath,
         storagePath,
         bucket: BUCKET,
         fileName: file.originalname,
