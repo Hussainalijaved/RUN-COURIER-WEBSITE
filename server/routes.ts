@@ -4221,7 +4221,15 @@ export async function registerRoutes(
         if (doc.fileUrl && doc.fileUrl.startsWith('http')) continue;
 
         let storagePath = doc.storagePath || doc.fileUrl || '';
-        if (!storagePath || storagePath.startsWith('/api/') || storagePath.startsWith('/uploads/')) {
+        if (storagePath.startsWith('/api/uploads/documents/')) {
+          storagePath = storagePath.replace('/api/uploads/documents/', '');
+        } else if (storagePath.startsWith('/uploads/documents/')) {
+          storagePath = storagePath.replace('/uploads/documents/', '');
+        } else if (storagePath.startsWith('/api/') || storagePath.startsWith('/uploads/')) {
+          if (doc.fileUrl) doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
+          continue;
+        }
+        if (!storagePath) {
           if (doc.fileUrl) doc.fileUrl = normalizeDocumentUrl(doc.fileUrl);
           continue;
         }
@@ -4231,10 +4239,32 @@ export async function registerRoutes(
           doc.storagePath = storagePath;
         }
 
+        const fileName = storagePath.split('/').pop() || '';
+        const docType = doc.type || '';
+        const did = doc.driverId || driverId || '';
+        const extraPaths: string[] = [];
+        if (did && docType && fileName) {
+          extraPaths.push(`drivers/${did}/${docType}/${fileName}`);
+          extraPaths.push(`drivers/pending/${docType}/${fileName}`);
+        }
+        if (did && fileName && !storagePath.startsWith(`drivers/${did}/`)) {
+          extraPaths.push(`drivers/${did}/${fileName}`);
+        }
+
         const docBucket = doc.bucket || BUCKETS[0];
         bucketPathMap.get(docBucket)!.push({ docIndex: i, path: storagePath });
+        for (const ep of extraPaths) {
+          if (ep !== storagePath) {
+            bucketPathMap.get(docBucket)!.push({ docIndex: i, path: ep });
+          }
+        }
         if (docBucket === BUCKETS[0]) {
           bucketPathMap.get(BUCKETS[1])!.push({ docIndex: i, path: storagePath });
+          for (const ep of extraPaths) {
+            if (ep !== storagePath) {
+              bucketPathMap.get(BUCKETS[1])!.push({ docIndex: i, path: ep });
+            }
+          }
         }
       }
 
@@ -4285,17 +4315,23 @@ export async function registerRoutes(
             const doc = allDocuments[i];
             if (!doc.fileMissing) continue;
             const sp = doc.storagePath || '';
-            const fileName = sp.split('/').pop() || doc.fileName || '';
+            const fileUrlStr = (doc.fileUrl || '') as string;
+            const fileName = sp.split('/').pop() || fileUrlStr.split('/').pop() || doc.fileName || '';
             if (!fileName) continue;
+            const docType = doc.type || '';
             const alts = [
-              `drivers/${driverId}/${doc.type}/${fileName}`,
+              `drivers/${driverId}/${docType}/${fileName}`,
+              `drivers/pending/${docType}/${fileName}`,
               `${driverId}/${fileName}`,
+              `${driverId}/${docType}/${fileName}`,
               `applications/${driverId}/${fileName}`,
               `applications/pending/${fileName}`,
               `application-pending/${fileName}`,
+              `drivers/${driverId}/${fileName}`,
+              `drivers/pending/${fileName}`,
               sp,
             ];
-            altPaths.push({ docIndex: i, paths: [...new Set(alts)] });
+            altPaths.push({ docIndex: i, paths: [...new Set(alts.filter(p => p && p !== ''))] });
           }
 
           for (const bucket of BUCKETS) {
@@ -4305,11 +4341,19 @@ export async function registerRoutes(
                 try {
                   const { data } = await supabaseAdminClient.storage.from(bucket).createSignedUrl(tryPath, 3600);
                   if (data?.signedUrl) {
-                    allDocuments[alt.docIndex].fileUrl = data.signedUrl;
-                    allDocuments[alt.docIndex].signedUrl = data.signedUrl;
-                    allDocuments[alt.docIndex].storagePath = tryPath;
-                    allDocuments[alt.docIndex].bucket = bucket;
-                    allDocuments[alt.docIndex].fileMissing = false;
+                    const doc = allDocuments[alt.docIndex];
+                    doc.fileUrl = data.signedUrl;
+                    doc.signedUrl = data.signedUrl;
+                    doc.storagePath = tryPath;
+                    doc.bucket = bucket;
+                    doc.fileMissing = false;
+                    if (doc.id) {
+                      supabaseAdminClient.from('driver_documents')
+                        .update({ storage_path: tryPath, bucket, file_url: tryPath })
+                        .eq('id', doc.id)
+                        .then(() => console.log(`[Documents] Fixed storage path for doc ${doc.id}: ${tryPath}`))
+                        .catch(() => {});
+                    }
                     break;
                   }
                 } catch (_) {}
@@ -4333,7 +4377,7 @@ export async function registerRoutes(
 
       allDocuments = allDocuments.filter(doc => {
         if (!doc.fileUrl && !doc.storagePath) return false;
-        if (doc.fileMissing && !doc.fileUrl?.startsWith('http') && !doc.fileUrl?.startsWith('text:') && !doc.fileUrl?.startsWith('/api/uploads/')) return false;
+        if (doc.fileMissing) return false;
         return true;
       });
     } else {
