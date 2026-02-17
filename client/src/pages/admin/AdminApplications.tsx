@@ -307,14 +307,6 @@ export default function AdminApplications() {
 
   const handleApprove = () => {
     if (!selectedApplication) return;
-    if (!allDocsReviewed()) {
-      toast({
-        title: 'Review all documents first',
-        description: 'Please approve or reject each document before approving the application.',
-        variant: 'destructive',
-      });
-      return;
-    }
     const finalDocStatuses: Record<string, 'approved' | 'rejected'> = {};
     Object.entries(documentStatuses).forEach(([key, value]) => {
       if (value === 'approved' || value === 'rejected') {
