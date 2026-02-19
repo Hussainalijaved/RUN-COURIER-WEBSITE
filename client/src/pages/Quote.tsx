@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -532,18 +531,22 @@ export default function Quote() {
                           name="weight"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Package Weight: {field.value}kg</FormLabel>
+                              <FormLabel>Package Weight (kg)</FormLabel>
                               <FormControl>
-                                <Slider
-                                  value={[field.value]}
-                                  onValueChange={(value) => field.onChange(value[0])}
-                                  min={0.5}
+                                <Input
+                                  type="number"
+                                  min={0.1}
                                   max={vehicleOptions.find(v => v.type === vehicleType)?.maxWeight || 50}
-                                  step={0.5}
-                                  className="py-4"
-                                  data-testid="slider-weight"
+                                  step={0.1}
+                                  placeholder="Enter weight in kg"
+                                  value={field.value}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  data-testid="input-weight"
                                 />
                               </FormControl>
+                              <FormDescription>
+                                Max weight for {vehicleOptions.find(v => v.type === vehicleType)?.name || 'selected vehicle'}: {vehicleOptions.find(v => v.type === vehicleType)?.maxWeight || 50}kg
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}

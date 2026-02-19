@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -815,15 +814,17 @@ export default function Book() {
                           name="weight"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Weight (kg): {field.value}</FormLabel>
+                              <FormLabel>Weight (kg)</FormLabel>
                               <FormControl>
-                                <Slider
+                                <Input
+                                  type="number"
                                   min={0.1}
                                   max={selectedVehicle?.maxWeight || 50}
-                                  step={0.5}
-                                  value={[field.value]}
-                                  onValueChange={(value) => field.onChange(value[0])}
-                                  data-testid="slider-weight"
+                                  step={0.1}
+                                  placeholder="Enter weight in kg"
+                                  value={field.value}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  data-testid="input-weight"
                                 />
                               </FormControl>
                               <FormDescription>
