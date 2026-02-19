@@ -5,7 +5,11 @@ import { cn } from "@/lib/utils"
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,
   React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
+>(({ className, onFocus, ...props }, ref) => {
+  const handleFocus = React.useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    e.target.select();
+    onFocus?.(e);
+  }, [onFocus]);
   return (
     <textarea
       className={cn(
@@ -13,6 +17,7 @@ const Textarea = React.forwardRef<
         className
       )}
       ref={ref}
+      onFocus={handleFocus}
       {...props}
     />
   )
