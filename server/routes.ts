@@ -7026,6 +7026,9 @@ export async function registerRoutes(
                   right_to_work_share_code: application.rightToWorkShareCode || null,
                   vehicle_type: application.vehicleType || 'car',
                   vehicle_registration: application.vehicleRegistration || null,
+                  vehicle_make: application.vehicleMake || null,
+                  vehicle_model: application.vehicleModel || null,
+                  vehicle_color: application.vehicleColor || null,
                   online_status: 'offline',
                   status: 'approved',
                   is_active: true,
@@ -7058,7 +7061,7 @@ export async function registerRoutes(
                 if (insertError) {
                   console.error(`[Driver Application] Failed to create driver record:`, insertError);
                 } else {
-                  console.log(`[Driver Application] Driver ${driverCode} created for ${application.email} (vehicle: ${application.vehicleType}, reg: ${application.vehicleRegistration || 'none'})`);
+                  console.log(`[Driver Application] Driver ${driverCode} created for ${application.email} (vehicle: ${application.vehicleType} ${application.vehicleMake || ''} ${application.vehicleModel || ''}, reg: ${application.vehicleRegistration || 'none'})`);
 
                   try {
                     await supabaseAdmin.from('drivers').update({

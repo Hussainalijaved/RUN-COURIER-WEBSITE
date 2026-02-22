@@ -63,6 +63,9 @@ const driverApplicationFormSchema = z.object({
   rightToWorkShareCode: z.string().optional(),
   vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van"]),
   vehicleRegistration: z.string().min(2, "Vehicle registration number is required"),
+  vehicleMake: z.string().min(1, "Vehicle make is required"),
+  vehicleModel: z.string().min(1, "Vehicle model is required"),
+  vehicleColor: z.string().min(1, "Vehicle colour is required"),
   bankName: z.string().min(2, "Bank name is required"),
   accountHolderName: z.string().min(2, "Account holder name is required"),
   sortCode: z.string().regex(/^\d{2}-?\d{2}-?\d{2}$/, "Valid sort code is required (e.g., 12-34-56)"),
@@ -126,6 +129,9 @@ export default function DriverApplication() {
       rightToWorkShareCode: "",
       vehicleType: "car",
       vehicleRegistration: "",
+      vehicleMake: "",
+      vehicleModel: "",
+      vehicleColor: "",
       bankName: "",
       accountHolderName: "",
       sortCode: "",
@@ -386,7 +392,7 @@ export default function DriverApplication() {
         }
         return true;
       case 3:
-        return form.trigger(["vehicleType", "vehicleRegistration", "bankName", "accountHolderName", "sortCode", "accountNumber"]);
+        return form.trigger(["vehicleType", "vehicleRegistration", "vehicleMake", "vehicleModel", "vehicleColor", "bankName", "accountHolderName", "sortCode", "accountNumber"]);
       default:
         return true;
     }
@@ -1077,6 +1083,62 @@ export default function DriverApplication() {
                     )}
                   />
 
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="vehicleMake"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vehicle Make *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g. Ford" 
+                              {...field}
+                              data-testid="input-vehicle-make"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="vehicleModel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vehicle Model *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g. Transit" 
+                              {...field}
+                              data-testid="input-vehicle-model"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="vehicleColor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vehicle Colour *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g. White" 
+                              {...field}
+                              data-testid="input-vehicle-color"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <div className="border-t pt-6 mt-6">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
@@ -1243,6 +1305,18 @@ export default function DriverApplication() {
                           <div className="flex justify-between">
                             <dt className="text-muted-foreground">Registration:</dt>
                             <dd className="font-medium uppercase" data-testid="text-review-registration">{form.getValues("vehicleRegistration")}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Make:</dt>
+                            <dd className="font-medium" data-testid="text-review-make">{form.getValues("vehicleMake")}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Model:</dt>
+                            <dd className="font-medium" data-testid="text-review-model">{form.getValues("vehicleModel")}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Colour:</dt>
+                            <dd className="font-medium" data-testid="text-review-color">{form.getValues("vehicleColor")}</dd>
                           </div>
                         </dl>
                       </div>

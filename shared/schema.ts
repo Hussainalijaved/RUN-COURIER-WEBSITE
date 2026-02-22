@@ -298,6 +298,9 @@ export const driverApplications = pgTable("driver_applications", {
   // Vehicle Information
   vehicleType: text("vehicle_type").$type<VehicleType>().notNull(),
   vehicleRegistration: text("vehicle_registration"),
+  vehicleMake: text("vehicle_make"),
+  vehicleModel: text("vehicle_model"),
+  vehicleColor: text("vehicle_color"),
   
   // Bank Details
   bankName: text("bank_name").notNull(),

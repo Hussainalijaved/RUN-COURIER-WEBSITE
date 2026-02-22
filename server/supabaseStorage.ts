@@ -242,6 +242,9 @@ function mapDbToDriverApplication(dbApp: any): DriverApplication {
     hireAndRewardUrl: dbApp.hire_and_reward_url,
     vehicleType: (dbApp.vehicle_type?.includes('|') ? dbApp.vehicle_type.split('|')[0] : dbApp.vehicle_type) as VehicleType,
     vehicleRegistration: dbApp.vehicle_registration || (dbApp.vehicle_type?.includes('|') ? dbApp.vehicle_type.split('|')[1] : null),
+    vehicleMake: dbApp.vehicle_make || null,
+    vehicleModel: dbApp.vehicle_model || null,
+    vehicleColor: dbApp.vehicle_color || null,
     bankName: dbApp.bank_name,
     accountHolderName: dbApp.account_holder_name,
     sortCode: dbApp.sort_code,
@@ -1776,6 +1779,9 @@ export class SupabaseStorage implements IStorage {
       hire_and_reward_url: application.hireAndRewardUrl || null,
       vehicle_type: application.vehicleType,
       vehicle_registration: application.vehicleRegistration || null,
+      vehicle_make: application.vehicleMake || null,
+      vehicle_model: application.vehicleModel || null,
+      vehicle_color: application.vehicleColor || null,
       bank_name: application.bankName,
       account_holder_name: application.accountHolderName,
       sort_code: application.sortCode,
@@ -1786,6 +1792,9 @@ export class SupabaseStorage implements IStorage {
     let { data, error } = await supabase.from('driver_applications').insert(dbApp).select().single();
     if (error && (error.message?.includes('vehicle_registration') || error.code === 'PGRST204')) {
       delete dbApp.vehicle_registration;
+      delete dbApp.vehicle_make;
+      delete dbApp.vehicle_model;
+      delete dbApp.vehicle_color;
       if (application.vehicleRegistration) {
         dbApp.vehicle_type = `${application.vehicleType}|${application.vehicleRegistration}`;
       }
@@ -1811,6 +1820,9 @@ export class SupabaseStorage implements IStorage {
     if (data.reviewedAt !== undefined) dbData.reviewed_at = data.reviewedAt;
     if (data.vehicleType !== undefined) dbData.vehicle_type = data.vehicleType;
     if (data.vehicleRegistration !== undefined) dbData.vehicle_registration = data.vehicleRegistration;
+    if (data.vehicleMake !== undefined) dbData.vehicle_make = data.vehicleMake;
+    if (data.vehicleModel !== undefined) dbData.vehicle_model = data.vehicleModel;
+    if (data.vehicleColor !== undefined) dbData.vehicle_color = data.vehicleColor;
     
     let { data: updated, error } = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
     if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('column'))) {
