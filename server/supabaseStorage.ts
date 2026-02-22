@@ -1784,8 +1784,11 @@ export class SupabaseStorage implements IStorage {
     };
     
     let { data, error } = await supabase.from('driver_applications').insert(dbApp).select().single();
-    if (error && error.code === 'PGRST204' && error.message?.includes('vehicle_registration')) {
+    if (error && (error.message?.includes('vehicle_registration') || error.code === 'PGRST204')) {
       delete dbApp.vehicle_registration;
+      if (application.vehicleRegistration) {
+        dbApp.vehicle_type = `${application.vehicleType}|${application.vehicleRegistration}`;
+      }
       const retry = await supabase.from('driver_applications').insert(dbApp).select().single();
       data = retry.data;
       error = retry.error;
@@ -1807,8 +1810,22 @@ export class SupabaseStorage implements IStorage {
     if (data.rejectionReason !== undefined) dbData.rejection_reason = data.rejectionReason;
     if (data.reviewedAt !== undefined) dbData.reviewed_at = data.reviewedAt;
     if (data.vehicleType !== undefined) dbData.vehicle_type = data.vehicleType;
+    if (data.vehicleRegistration !== undefined) dbData.vehicle_registration = data.vehicleRegistration;
     
-    const { data: updated, error } = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
+    let { data: updated, error } = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
+    if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('column'))) {
+      delete dbData.vehicle_registration;
+      if (data.vehicleRegistration && data.vehicleType) {
+        dbData.vehicle_type = `${data.vehicleType}|${data.vehicleRegistration}`;
+      } else if (data.vehicleRegistration) {
+        const existing = await supabase.from('driver_applications').select('vehicle_type').eq('id', id).single();
+        const baseType = existing.data?.vehicle_type?.split('|')[0] || 'car';
+        dbData.vehicle_type = `${baseType}|${data.vehicleRegistration}`;
+      }
+      const retry = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
+      updated = retry.data;
+      error = retry.error;
+    }
     if (error || !updated) {
       console.error('[Storage] updateDriverApplication error:', error, 'data:', updated);
       return undefined;
