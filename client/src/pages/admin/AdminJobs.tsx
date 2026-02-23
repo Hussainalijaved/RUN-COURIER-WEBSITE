@@ -158,6 +158,10 @@ interface MultiDropStop {
 function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiDrop?: boolean }) {
   const { toast } = useToast();
   const [updatingStopId, setUpdatingStopId] = useState<string | null>(null);
+  const [uploadingStopId, setUploadingStopId] = useState<string | null>(null);
+  const [deletingStopPodId, setDeletingStopPodId] = useState<string | null>(null);
+  const stopPodFileInputRef = useRef<HTMLInputElement>(null);
+  const [activeStopIdForUpload, setActiveStopIdForUpload] = useState<string | null>(null);
   const { data, isLoading } = useQuery<{ stops: MultiDropStop[] }>({
     queryKey: [`/api/jobs/${jobId}/stops`],
     enabled: !!isMultiDrop && !!jobId,
@@ -179,6 +183,76 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
       setUpdatingStopId(null);
     },
   });
+
+  const handleStopPodUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const stopId = activeStopIdForUpload;
+    if (!file || !stopId) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: 'Invalid file type', description: 'Please upload an image file (JPEG, PNG, GIF, or WebP)', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Maximum file size is 10MB', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingStopId(stopId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Authentication required');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/jobs/${jobId}/stops/${stopId}/pod/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      toast({ title: 'Stop POD uploaded', description: 'Proof of Delivery photo uploaded for this stop' });
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/stops`] });
+    } catch (error: any) {
+      toast({ title: 'Upload failed', description: error.message || 'Failed to upload POD photo', variant: 'destructive' });
+    } finally {
+      setUploadingStopId(null);
+      setActiveStopIdForUpload(null);
+      if (stopPodFileInputRef.current) stopPodFileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteStopPod = async (stopId: string) => {
+    setDeletingStopPodId(stopId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Authentication required');
+
+      const response = await fetch(`/api/jobs/${jobId}/stops/${stopId}/pod`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Delete failed');
+      }
+
+      toast({ title: 'POD removed', description: 'Stop POD photo has been removed' });
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/stops`] });
+    } catch (error: any) {
+      toast({ title: 'Delete failed', description: error.message || 'Failed to remove POD photo', variant: 'destructive' });
+    } finally {
+      setDeletingStopPodId(null);
+    }
+  };
 
   if (!isMultiDrop) return null;
   
@@ -217,8 +291,16 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
         <MapPin className="h-4 w-4 text-blue-600" />
         Multi-Drop Stops ({stops.length} stops)
       </h4>
+      <input
+        type="file"
+        ref={stopPodFileInputRef}
+        className="hidden"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        onChange={handleStopPodUpload}
+        data-testid="input-stop-pod-upload"
+      />
       <div className="space-y-3">
-        {stops.map((stop, index) => (
+        {stops.map((stop) => (
           <div 
             key={stop.id} 
             className="p-3 bg-muted/50 rounded-lg border"
@@ -272,35 +354,85 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
                   </p>
                 )}
               </div>
-              {/* POD for this stop */}
-              {(stop.podPhotoUrl || stop.podSignatureUrl) && (
-                <div className="flex gap-2">
-                  {stop.podPhotoUrl && (
-                    <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer">
-                      <img 
-                        src={stop.podPhotoUrl} 
-                        alt={`Stop ${stop.stopOrder} POD`}
-                        className="w-16 h-16 object-cover rounded border"
-                      />
-                    </a>
-                  )}
-                  {stop.podSignatureUrl && (
-                    <a href={stop.podSignatureUrl} target="_blank" rel="noopener noreferrer">
-                      <img 
-                        src={stop.podSignatureUrl} 
-                        alt={`Stop ${stop.stopOrder} Signature`}
-                        className="w-16 h-16 object-contain rounded border bg-white p-1"
-                      />
-                    </a>
-                  )}
-                </div>
-              )}
             </div>
             {stop.podRecipientName && (
               <p className="text-xs text-green-600 mt-2">
                 Signed by: {stop.podRecipientName}
               </p>
             )}
+            {/* Per-stop POD section */}
+            <div className="mt-3 pt-2 border-t border-dashed">
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Camera className="h-3 w-3" />
+                  Stop POD
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={uploadingStopId === stop.id}
+                  onClick={() => {
+                    setActiveStopIdForUpload(stop.id);
+                    stopPodFileInputRef.current?.click();
+                  }}
+                  data-testid={`button-upload-stop-pod-${stop.stopOrder}`}
+                >
+                  {uploadingStopId === stop.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <Camera className="h-3 w-3 mr-1" />
+                  )}
+                  {stop.podPhotoUrl ? 'Re-upload' : 'Upload POD'}
+                </Button>
+              </div>
+              <div className="flex gap-3 flex-wrap">
+                {stop.podPhotoUrl && (
+                  <div className="relative group">
+                    <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer" className="block">
+                      <img 
+                        src={stop.podPhotoUrl} 
+                        alt={`Stop ${stop.stopOrder} POD`}
+                        className="rounded-lg border max-h-32 w-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                        data-testid={`img-stop-pod-${stop.stopOrder}`}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </a>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ visibility: 'visible' }}
+                      disabled={deletingStopPodId === stop.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteStopPod(stop.id);
+                      }}
+                      data-testid={`button-delete-stop-pod-${stop.stopOrder}`}
+                    >
+                      {deletingStopPodId === stop.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <X className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+                {stop.podSignatureUrl && (
+                  <a href={stop.podSignatureUrl} target="_blank" rel="noopener noreferrer">
+                    <img 
+                      src={stop.podSignatureUrl} 
+                      alt={`Stop ${stop.stopOrder} Signature`}
+                      className="max-h-32 w-auto object-contain rounded-lg border bg-white p-1"
+                      data-testid={`img-stop-signature-${stop.stopOrder}`}
+                    />
+                  </a>
+                )}
+                {!stop.podPhotoUrl && !stop.podSignatureUrl && (
+                  <p className="text-xs text-muted-foreground italic">No POD uploaded for this stop</p>
+                )}
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -1822,7 +1954,11 @@ export default function AdminJobs() {
                       return (
                         <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 p-4 rounded-lg">
                           <Camera className="h-5 w-5" />
-                          <p className="text-sm">No proof of delivery photo uploaded yet. Click "Upload Photo" to add one.</p>
+                          <p className="text-sm">
+                            {selectedJob.isMultiDrop
+                              ? 'For multi-drop jobs, POD is managed per stop above. You can also upload a global POD here.'
+                              : 'No proof of delivery photo uploaded yet. Click "Upload Photo" to add one.'}
+                          </p>
                         </div>
                       );
                     }

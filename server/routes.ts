@@ -1599,7 +1599,26 @@ export async function registerRoutes(
       podRecipientName: stop.pod_recipient_name,
     }));
     
-    return res.json({ stops: mappedStops });
+    // Resolve POD URLs to signed URLs
+    const resolvedStops = await Promise.all(mappedStops.map(async (stop: any) => {
+      const resolved = { ...stop };
+      const BUCKET = 'driver-documents';
+      if (stop.podPhotoUrl && !stop.podPhotoUrl.startsWith('http')) {
+        try {
+          const { data } = await supabaseAdmin!.storage.from(BUCKET).createSignedUrl(stop.podPhotoUrl, 3600);
+          if (data?.signedUrl) resolved.podPhotoUrl = data.signedUrl;
+        } catch {}
+      }
+      if (stop.podSignatureUrl && !stop.podSignatureUrl.startsWith('http')) {
+        try {
+          const { data } = await supabaseAdmin!.storage.from(BUCKET).createSignedUrl(stop.podSignatureUrl, 3600);
+          if (data?.signedUrl) resolved.podSignatureUrl = data.signedUrl;
+        } catch {}
+      }
+      return resolved;
+    }));
+
+    return res.json({ stops: resolvedStops });
   }));
 
   // Update a multi-drop stop status (admin only)
@@ -1663,6 +1682,103 @@ export async function registerRoutes(
         deliveredAt: updatedStop.delivered_at,
       }
     });
+  }));
+
+  // Upload POD photo for a specific multi-drop stop
+  app.post("/api/jobs/:jobId/stops/:stopId/pod/upload", (req, res, next) => {
+    uploadPodImage.single('file')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "File size exceeds 10MB limit" });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  }, requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { jobId, stopId } = req.params;
+    
+    const job = await storage.getJob(jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    
+    const timestamp = Date.now();
+    const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
+    const finalFilename = `stop_${stopId}_${timestamp}${ext}`;
+    const BUCKET = 'driver-documents';
+    const storagePath = `pod/${jobId}/${finalFilename}`;
+    const contentType = req.file.mimetype || 'image/jpeg';
+    const fileBuffer = req.file.buffer;
+
+    const { supabaseAdmin: supAdmin } = await import('./supabaseAdmin');
+    if (!supAdmin) return res.status(500).json({ error: "Storage service unavailable" });
+
+    let uploaded = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const { error: uploadError } = await supAdmin.storage
+          .from(BUCKET)
+          .upload(storagePath, fileBuffer, { contentType, upsert: true });
+        if (!uploadError) { uploaded = true; break; }
+        console.warn(`[Stop POD] Upload attempt ${attempt}/3 failed:`, uploadError.message);
+      } catch (err: any) {
+        console.warn(`[Stop POD] Upload attempt ${attempt}/3 error:`, err.message);
+      }
+      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
+    
+    if (!uploaded) return res.status(500).json({ error: "Failed to upload POD photo" });
+
+    const { error: updateError } = await supAdmin
+      .from('multi_drop_stops')
+      .update({ pod_photo_url: storagePath })
+      .eq('id', stopId)
+      .eq('job_id', jobId);
+    
+    if (updateError) {
+      console.error('[Stop POD] Failed to update stop:', updateError);
+      return res.status(500).json({ error: "Failed to save POD reference" });
+    }
+
+    let signedUrl = storagePath;
+    try {
+      const { data } = await supAdmin.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
+      if (data?.signedUrl) signedUrl = data.signedUrl;
+    } catch {}
+
+    console.log(`[Stop POD] Uploaded POD for stop ${stopId} of job ${jobId}`);
+    res.json({ success: true, podPhotoUrl: signedUrl, stopId });
+  }));
+
+  // Delete POD photo for a specific multi-drop stop
+  app.delete("/api/jobs/:jobId/stops/:stopId/pod", requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { jobId, stopId } = req.params;
+    
+    const { supabaseAdmin: supAdmin } = await import('./supabaseAdmin');
+    if (!supAdmin) return res.status(500).json({ error: "Storage service unavailable" });
+    
+    const { data: stop } = await supAdmin
+      .from('multi_drop_stops')
+      .select('pod_photo_url')
+      .eq('id', stopId)
+      .eq('job_id', jobId)
+      .single();
+    
+    if (stop?.pod_photo_url) {
+      await supAdmin.storage.from('driver-documents').remove([stop.pod_photo_url]).catch(() => {});
+    }
+    
+    await supAdmin
+      .from('multi_drop_stops')
+      .update({ pod_photo_url: null })
+      .eq('id', stopId)
+      .eq('job_id', jobId);
+    
+    res.json({ success: true });
   }));
 
   app.post("/api/jobs", asyncHandler(async (req, res) => {
