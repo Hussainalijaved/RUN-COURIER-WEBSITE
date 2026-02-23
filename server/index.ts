@@ -424,6 +424,47 @@ async function runBackgroundTasks() {
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (!supabaseAdmin) return;
 
+      const { data: drivers } = await supabaseAdmin.from('drivers').select('id, email, vehicle_registration, vehicle_make, vehicle_model, vehicle_color').eq('status', 'approved');
+      if (drivers && drivers.length > 0) {
+        let backfilled = 0;
+        for (const driver of drivers) {
+          if (driver.vehicle_registration) continue;
+          const { data: app } = await supabaseAdmin.from('driver_applications')
+            .select('vehicle_type, vehicle_registration, vehicle_make, vehicle_model, vehicle_color')
+            .ilike('email', driver.email || '')
+            .eq('status', 'approved')
+            .maybeSingle();
+          if (!app) continue;
+          let reg = app.vehicle_registration;
+          let make = app.vehicle_make;
+          let model = app.vehicle_model;
+          let color = app.vehicle_color;
+          if (!reg && app.vehicle_type?.includes('|')) {
+            reg = app.vehicle_type.split('|')[1];
+          }
+          if (reg) {
+            const updateFields: Record<string, any> = { vehicle_registration: reg };
+            if (make) updateFields.vehicle_make = make;
+            if (model) updateFields.vehicle_model = model;
+            if (color) updateFields.vehicle_color = color;
+            await supabaseAdmin.from('drivers').update(updateFields).eq('id', driver.id);
+            backfilled++;
+          }
+        }
+        if (backfilled > 0) {
+          console.log(`[BACKGROUND] Backfilled vehicle details for ${backfilled} drivers`);
+        }
+      }
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Vehicle backfill error:", e?.message);
+    }
+  }, 8000);
+
+  setTimeout(async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+
       console.log("[BACKGROUND] Starting driver_documents reconciliation...");
 
       const { data: docs, error: docsErr } = await supabaseAdmin

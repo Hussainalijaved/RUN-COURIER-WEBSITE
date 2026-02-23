@@ -7104,6 +7104,21 @@ export async function registerRoutes(
             if (application.nationalInsuranceNumber) {
               updateData.national_insurance_number = application.nationalInsuranceNumber;
             }
+            if (application.vehicleType) {
+              updateData.vehicle_type = application.vehicleType;
+            }
+            if (application.vehicleRegistration) {
+              updateData.vehicle_registration = application.vehicleRegistration;
+            }
+            if (application.vehicleMake) {
+              updateData.vehicle_make = application.vehicleMake;
+            }
+            if (application.vehicleModel) {
+              updateData.vehicle_model = application.vehicleModel;
+            }
+            if (application.vehicleColor) {
+              updateData.vehicle_color = application.vehicleColor;
+            }
             if (application.bankName) {
               updateData.bank_name = application.bankName;
             }
