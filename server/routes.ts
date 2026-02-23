@@ -5137,14 +5137,13 @@ export async function registerRoutes(
           updated_at: reviewedAt.toISOString(),
         };
         
-        // Use the ID as-is (UUID or numeric)
-        const { data: updatedDoc, error } = await supabaseAdmin
+        const { data: updatedDocs, error } = await supabaseAdmin
           .from('driver_documents')
           .update(updateData)
           .eq('id', req.params.id)
-          .select()
-          .single();
+          .select();
         
+        const updatedDoc = updatedDocs?.[0];
         if (!error && updatedDoc) {
           supabaseUpdated = true;
           console.log('[Documents] Updated document status in Supabase driver_documents:', req.params.id, '->', status);
@@ -5510,12 +5509,12 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Storage service unavailable" });
       }
       
-      const { data: doc, error } = await supabaseAdmin
+      const { data: docs, error } = await supabaseAdmin
         .from('driver_documents')
         .select('*')
-        .eq('id', docId)
-        .single();
+        .eq('id', docId);
       
+      const doc = docs?.[0];
       if (error || !doc) {
         return res.status(404).json({ error: "Document not found" });
       }
