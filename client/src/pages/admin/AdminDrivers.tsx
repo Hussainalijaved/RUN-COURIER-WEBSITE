@@ -715,27 +715,31 @@ export default function AdminDrivers() {
         return;
       }
       if (doc.signedUrl) {
-        window.open(doc.signedUrl, '_blank');
+        window.open(doc.signedUrl, '_blank', 'noopener');
         setLoadingDocUrl(null);
         return;
       }
       if (doc.fileUrl?.startsWith('http')) {
-        window.open(doc.fileUrl, '_blank');
+        window.open(doc.fileUrl, '_blank', 'noopener');
         setLoadingDocUrl(null);
         return;
       }
+      const newTab = window.open('about:blank', '_blank', 'noopener');
       const response = await fetch(`/api/documents/${doc.id}/signed-url`);
       if (response.ok) {
         const data = await response.json();
         if (data.signedUrl && !data.isText) {
-          window.open(data.signedUrl, '_blank');
+          if (newTab) { newTab.location.href = data.signedUrl; } else { window.location.href = data.signedUrl; }
+        } else {
+          if (newTab) newTab.close();
         }
       } else {
-        window.open(normalizeDocUrl(doc.fileUrl), '_blank');
+        const fallback = normalizeDocUrl(doc.fileUrl);
+        if (newTab) { newTab.location.href = fallback; } else { window.open(fallback, '_blank', 'noopener'); }
       }
     } catch (err) {
       console.error('Failed to get signed URL:', err);
-      window.open(normalizeDocUrl(doc.fileUrl), '_blank');
+      window.open(normalizeDocUrl(doc.fileUrl), '_blank', 'noopener');
     } finally {
       setLoadingDocUrl(null);
     }
