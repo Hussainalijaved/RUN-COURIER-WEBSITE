@@ -707,6 +707,16 @@ export default function AdminDrivers() {
     return names[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
+  const navigateToUrl = (url: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const openDocumentPreview = async (doc: any) => {
     setLoadingDocUrl(doc.id);
     try {
@@ -715,31 +725,27 @@ export default function AdminDrivers() {
         return;
       }
       if (doc.signedUrl) {
-        window.open(doc.signedUrl, '_blank', 'noopener');
+        navigateToUrl(doc.signedUrl);
         setLoadingDocUrl(null);
         return;
       }
       if (doc.fileUrl?.startsWith('http')) {
-        window.open(doc.fileUrl, '_blank', 'noopener');
+        navigateToUrl(doc.fileUrl);
         setLoadingDocUrl(null);
         return;
       }
-      const newTab = window.open('about:blank', '_blank', 'noopener');
       const response = await fetch(`/api/documents/${doc.id}/signed-url`);
       if (response.ok) {
         const data = await response.json();
         if (data.signedUrl && !data.isText) {
-          if (newTab) { newTab.location.href = data.signedUrl; } else { window.location.href = data.signedUrl; }
-        } else {
-          if (newTab) newTab.close();
+          navigateToUrl(data.signedUrl);
         }
       } else {
-        const fallback = normalizeDocUrl(doc.fileUrl);
-        if (newTab) { newTab.location.href = fallback; } else { window.open(fallback, '_blank', 'noopener'); }
+        navigateToUrl(normalizeDocUrl(doc.fileUrl));
       }
     } catch (err) {
       console.error('Failed to get signed URL:', err);
-      window.open(normalizeDocUrl(doc.fileUrl), '_blank', 'noopener');
+      navigateToUrl(normalizeDocUrl(doc.fileUrl));
     } finally {
       setLoadingDocUrl(null);
     }
