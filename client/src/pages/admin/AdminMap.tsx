@@ -365,19 +365,41 @@ export default function AdminMap() {
 
       const existingMarker = driverMarkersRef.current.get(driver.id);
       
-      // Professional delivery truck/van icon - clean and modern
-      // This creates a recognizable delivery van silhouette
-      const vanIconPath = 'M 24 20 L 24 10 C 24 9 23 8 22 8 L 18 8 L 18 6 C 18 5 17 4 16 4 L 4 4 C 3 4 2 5 2 6 L 2 18 C 2 19 3 20 4 20 L 5 20 C 5 21.7 6.3 23 8 23 C 9.7 23 11 21.7 11 20 L 15 20 C 15 21.7 16.3 23 18 23 C 19.7 23 21 21.7 21 20 L 22 20 C 23 20 24 19 24 18 L 24 20 Z M 8 21 C 7.4 21 7 20.6 7 20 C 7 19.4 7.4 19 8 19 C 8.6 19 9 19.4 9 20 C 9 20.6 8.6 21 8 21 Z M 18 21 C 17.4 21 17 20.6 17 20 C 17 19.4 17.4 19 18 19 C 18.6 19 19 19.4 19 20 C 19 20.6 18.6 21 18 21 Z M 22 14 L 18 14 L 18 10 L 20 10 L 22 12 L 22 14 Z';
+      const vehicleIcons: Record<string, { path: string; scale: number; anchor: [number, number] }> = {
+        car: {
+          path: 'M 23 16 L 23 12 C 23 11 22.5 10 21.5 10 L 20 10 L 18 6 C 17.5 5 16.5 4 15.5 4 L 8.5 4 C 7.5 4 6.5 5 6 6 L 4 10 L 2.5 10 C 1.5 10 1 11 1 12 L 1 16 C 1 17 1.5 17.5 2 17.5 L 3 17.5 C 3 19.4 4.6 21 6.5 21 C 8.4 21 10 19.4 10 17.5 L 14 17.5 C 14 19.4 15.6 21 17.5 21 C 19.4 21 21 19.4 21 17.5 L 22 17.5 C 22.5 17.5 23 17 23 16 Z M 6.5 19 C 5.7 19 5 18.3 5 17.5 C 5 16.7 5.7 16 6.5 16 C 7.3 16 8 16.7 8 17.5 C 8 18.3 7.3 19 6.5 19 Z M 17.5 19 C 16.7 19 16 18.3 16 17.5 C 16 16.7 16.7 16 17.5 16 C 18.3 16 19 16.7 19 17.5 C 19 18.3 18.3 19 17.5 19 Z M 7 10 L 8.5 6.5 C 8.7 6.2 9 6 9.3 6 L 14.7 6 C 15 6 15.3 6.2 15.5 6.5 L 17 10 L 7 10 Z',
+          scale: 1.4,
+          anchor: [12, 12],
+        },
+        motorbike: {
+          path: 'M 20 17 C 20 19.2 18.2 21 16 21 C 13.8 21 12 19.2 12 17 C 12 14.8 13.8 13 16 13 C 18.2 13 20 14.8 20 17 Z M 16 15 C 14.9 15 14 15.9 14 17 C 14 18.1 14.9 19 16 19 C 17.1 19 18 18.1 18 17 C 18 15.9 17.1 15 16 15 Z M 12 17 C 12 19.2 10.2 21 8 21 C 5.8 21 4 19.2 4 17 C 4 14.8 5.8 13 8 13 C 10.2 13 12 14.8 12 17 Z M 8 15 C 6.9 15 6 15.9 6 17 C 6 18.1 6.9 19 8 19 C 9.1 19 10 18.1 10 17 C 10 15.9 9.1 15 8 15 Z M 16 13 L 14 8 L 16 6 L 18 6 L 17 8 L 19 10 L 17 13 Z M 8 13 L 9 10 L 12 8 L 14 8 L 12 10 L 10 13 Z',
+          scale: 1.3,
+          anchor: [12, 14],
+        },
+        small_van: {
+          path: 'M 24 20 L 24 10 C 24 9 23 8 22 8 L 18 8 L 18 6 C 18 5 17 4 16 4 L 4 4 C 3 4 2 5 2 6 L 2 18 C 2 19 3 20 4 20 L 5 20 C 5 21.7 6.3 23 8 23 C 9.7 23 11 21.7 11 20 L 15 20 C 15 21.7 16.3 23 18 23 C 19.7 23 21 21.7 21 20 L 22 20 C 23 20 24 19 24 18 L 24 20 Z M 8 21 C 7.4 21 7 20.6 7 20 C 7 19.4 7.4 19 8 19 C 8.6 19 9 19.4 9 20 C 9 20.6 8.6 21 8 21 Z M 18 21 C 17.4 21 17 20.6 17 20 C 17 19.4 17.4 19 18 19 C 18.6 19 19 19.4 19 20 C 19 20.6 18.6 21 18 21 Z M 22 14 L 18 14 L 18 10 L 20 10 L 22 12 L 22 14 Z',
+          scale: 1.4,
+          anchor: [13, 13],
+        },
+        medium_van: {
+          path: 'M 28 20 L 28 10 C 28 9 27 8 26 8 L 20 8 L 20 5 C 20 4 19 3 18 3 L 3 3 C 2 3 1 4 1 5 L 1 18 C 1 19 2 20 3 20 L 4 20 C 4 21.7 5.3 23 7 23 C 8.7 23 10 21.7 10 20 L 18 20 C 18 21.7 19.3 23 21 23 C 22.7 23 24 21.7 24 20 L 26 20 C 27 20 28 19 28 18 L 28 20 Z M 7 21 C 6.4 21 6 20.6 6 20 C 6 19.4 6.4 19 7 19 C 7.6 19 8 19.4 8 20 C 8 20.6 7.6 21 7 21 Z M 21 21 C 20.4 21 20 20.6 20 20 C 20 19.4 20.4 19 21 19 C 21.6 19 22 19.4 22 20 C 22 20.6 21.6 21 21 21 Z M 26 14 L 20 14 L 20 10 L 23 10 L 26 13 L 26 14 Z',
+          scale: 1.3,
+          anchor: [14, 13],
+        },
+      };
+      const vType = driver.vehicleType || 'car';
+      const iconData = vehicleIcons[vType] || vehicleIcons.car;
       
       const strokeColor = noGps ? (isOnlineNoGps ? '#F97316' : '#6B7280') : '#1a1a1a';
+      const baseScale = iconData.scale;
       const iconConfig = {
-        path: vanIconPath,
-        scale: noGps && isOfflineNoGps ? 1.2 : 1.5,
+        path: iconData.path,
+        scale: noGps && isOfflineNoGps ? baseScale * 0.8 : baseScale,
         fillColor,
         fillOpacity: markerOpacity,
         strokeColor,
         strokeWeight: 1.5,
-        anchor: new google.maps.Point(13, 13),
+        anchor: new google.maps.Point(iconData.anchor[0], iconData.anchor[1]),
       };
 
       if (existingMarker) {
