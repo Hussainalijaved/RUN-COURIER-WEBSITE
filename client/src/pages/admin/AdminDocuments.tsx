@@ -553,28 +553,40 @@ export default function AdminDocuments() {
                     </div>
                   ) : previewUrl ? (
                     (() => {
-                      if (previewUrl.toLowerCase().match(/\.pdf/i) || (selectedDoc.fileName || '').toLowerCase().endsWith('.pdf')) {
-                        return (
-                          <iframe
-                            src={previewUrl}
-                            className="w-full h-96 border rounded"
-                            title="Document Preview"
-                            data-testid="iframe-document-preview"
-                          />
-                        );
-                      } else {
-                        return (
-                          <img
-                            src={previewUrl}
-                            alt={selectedDoc.fileName || 'Document'}
-                            className="max-w-full max-h-96 mx-auto rounded"
-                            data-testid="img-document-preview"
-                            onError={(e) => {
-                              setPreviewError('Failed to load image. The file may be missing or inaccessible.');
-                            }}
-                          />
-                        );
-                      }
+                      const isPdf = previewUrl.toLowerCase().match(/\.pdf/i) || (selectedDoc.fileName || '').toLowerCase().endsWith('.pdf');
+                      return (
+                        <div className="space-y-3">
+                          <div className="flex justify-center">
+                            <a
+                              href={previewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-primary underline"
+                              data-testid="link-open-document"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Open in new tab
+                            </a>
+                          </div>
+                          {isPdf ? (
+                            <div className="flex flex-col items-center justify-center h-64 bg-muted rounded">
+                              <FileText className="h-16 w-16 text-muted-foreground mb-3" />
+                              <p className="text-sm text-muted-foreground">PDF Document</p>
+                              <p className="text-xs text-muted-foreground mt-1">Click "Open in new tab" above to view</p>
+                            </div>
+                          ) : (
+                            <img
+                              src={previewUrl}
+                              alt={selectedDoc.fileName || 'Document'}
+                              className="max-w-full max-h-96 mx-auto rounded"
+                              data-testid="img-document-preview"
+                              onError={() => {
+                                setPreviewError('Failed to load image. The file may be missing or inaccessible.');
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
                     })()
                   ) : selectedDoc.fileUrl?.startsWith('text:') ? (
                     <div className="p-4 bg-muted rounded text-center">
