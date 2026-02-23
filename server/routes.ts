@@ -5509,13 +5509,60 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Storage service unavailable" });
       }
       
+      // Try Supabase driver_documents first
       const { data: docs, error } = await supabaseAdmin
         .from('driver_documents')
         .select('*')
         .eq('id', docId);
       
-      const doc = docs?.[0];
-      if (error || !doc) {
+      let doc = docs?.[0];
+      
+      // If not found in Supabase driver_documents, check in-memory/PostgreSQL documents
+      if (!doc) {
+        try {
+          const memDoc = await storage.getDocument(docId);
+          if (memDoc) {
+            doc = {
+              id: memDoc.id,
+              driver_id: memDoc.driverId,
+              doc_type: memDoc.type,
+              file_url: memDoc.fileUrl,
+              storage_path: null,
+              bucket: null,
+              auth_user_id: null,
+            };
+            console.log(`[Documents] Found doc ${docId} in memory/PostgreSQL, fileUrl: ${memDoc.fileUrl}`);
+          }
+        } catch (memErr) {
+          // Not found in memory either
+        }
+        
+        // Also try PostgreSQL directly
+        if (!doc) {
+          try {
+            const { db } = await import("./db");
+            const { documents: documentsTable } = await import("@shared/schema");
+            const { eq } = await import("drizzle-orm");
+            const [pgDoc] = await db.select().from(documentsTable).where(eq(documentsTable.id, docId));
+            if (pgDoc) {
+              doc = {
+                id: pgDoc.id,
+                driver_id: pgDoc.driverId,
+                doc_type: pgDoc.type,
+                file_url: pgDoc.fileUrl,
+                storage_path: null,
+                bucket: null,
+                auth_user_id: null,
+              };
+              console.log(`[Documents] Found doc ${docId} in PostgreSQL, fileUrl: ${pgDoc.fileUrl}`);
+            }
+          } catch (pgErr) {
+            console.log(`[Documents] PostgreSQL lookup failed:`, (pgErr as any)?.message);
+          }
+        }
+      }
+      
+      if (!doc) {
         return res.status(404).json({ error: "Document not found" });
       }
       
@@ -5523,6 +5570,11 @@ export async function registerRoutes(
       
       if (fileUrl.startsWith('text:')) {
         return res.json({ signedUrl: fileUrl, expiresIn: 0, isText: true });
+      }
+      
+      // If the file URL is already an HTTP URL (e.g. public Supabase URL), return it directly
+      if (fileUrl.startsWith('http')) {
+        return res.json({ signedUrl: fileUrl, expiresIn: 0, directUrl: true });
       }
       
       if (doc.storage_path && doc.bucket) {
@@ -5571,7 +5623,7 @@ export async function registerRoutes(
                 .from(bucket)
                 .createSignedUrl(tryPath, 600);
               if (!signError && signedData?.signedUrl) {
-                if (tryPath !== doc.storage_path || bucket !== doc.bucket) {
+                if (doc.storage_path !== undefined && (tryPath !== doc.storage_path || bucket !== doc.bucket)) {
                   await supabaseAdmin.from('driver_documents')
                     .update({ storage_path: tryPath, bucket, file_url: tryPath })
                     .eq('id', doc.id);
