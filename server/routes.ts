@@ -5397,6 +5397,78 @@ export async function registerRoutes(
     }
   }));
 
+  app.get("/api/documents/:id/view", asyncHandler(async (req, res) => {
+    const docId = req.params.id;
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return res.status(500).send("Storage service unavailable");
+
+      const { data: doc, error } = await supabaseAdmin
+        .from('driver_documents')
+        .select('*')
+        .eq('id', docId)
+        .single();
+
+      if (error || !doc) return res.status(404).send("Document not found");
+
+      const fileUrl = doc.file_url || '';
+      if (fileUrl.startsWith('text:')) return res.status(400).send("Text-only document");
+
+      if (doc.storage_path && doc.bucket) {
+        const { data: signedData } = await supabaseAdmin.storage
+          .from(doc.bucket)
+          .createSignedUrl(doc.storage_path, 600);
+        if (signedData?.signedUrl) return res.redirect(signedData.signedUrl);
+      }
+
+      const storagePath = extractStoragePath(fileUrl) || doc.file_url;
+      if (storagePath) {
+        const buckets = [doc.bucket || 'driver-documents', 'DRIVER-DOCUMENTS'];
+        const pathsToTry = [storagePath];
+        if (!storagePath.startsWith('drivers/')) pathsToTry.push(`drivers/${storagePath}`);
+        if (doc.driver_id) {
+          const fileName = storagePath.split('/').pop();
+          if (fileName) {
+            pathsToTry.push(`${doc.driver_id}/${fileName}`);
+            pathsToTry.push(`drivers/${doc.driver_id}/${doc.doc_type}/${fileName}`);
+            pathsToTry.push(`drivers/pending/${doc.doc_type}/${fileName}`);
+          }
+        }
+        if (doc.auth_user_id && doc.auth_user_id !== doc.driver_id) {
+          const fileName = storagePath.split('/').pop();
+          if (fileName) {
+            pathsToTry.push(`${doc.auth_user_id}/${fileName}`);
+            pathsToTry.push(`drivers/${doc.auth_user_id}/${doc.doc_type}/${fileName}`);
+          }
+        }
+        for (const bucket of buckets) {
+          for (const tryPath of pathsToTry) {
+            try {
+              const { data: signedData, error: signError } = await supabaseAdmin.storage
+                .from(bucket)
+                .createSignedUrl(tryPath, 600);
+              if (!signError && signedData?.signedUrl) {
+                if (tryPath !== doc.storage_path || bucket !== doc.bucket) {
+                  await supabaseAdmin.from('driver_documents')
+                    .update({ storage_path: tryPath, bucket, file_url: tryPath })
+                    .eq('id', doc.id);
+                }
+                return res.redirect(signedData.signedUrl);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+
+      const normalizedUrl = normalizeDocumentUrl(fileUrl);
+      if (normalizedUrl) return res.redirect(normalizedUrl);
+      return res.status(404).send("Could not locate document file");
+    } catch (e) {
+      console.error('[Documents] View redirect error:', e);
+      return res.status(500).send("Failed to load document");
+    }
+  }));
+
   app.post("/api/admin/documents/repair", asyncHandler(async (req, res) => {
     const { supabaseAdmin } = await import('./supabaseAdmin');
     if (!supabaseAdmin) return res.status(500).json({ error: "Storage unavailable" });

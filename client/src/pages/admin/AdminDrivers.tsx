@@ -145,7 +145,6 @@ export default function AdminDrivers() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [showInactive, setShowInactive] = useState(true);
-  const [loadingDocUrl, setLoadingDocUrl] = useState<string | null>(null);
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -707,48 +706,9 @@ export default function AdminDrivers() {
     return names[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
-  const navigateToUrl = (url: string) => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
-  const openDocumentPreview = async (doc: any) => {
-    setLoadingDocUrl(doc.id);
-    try {
-      if (doc.fileUrl?.startsWith('text:')) {
-        setLoadingDocUrl(null);
-        return;
-      }
-      if (doc.signedUrl) {
-        navigateToUrl(doc.signedUrl);
-        setLoadingDocUrl(null);
-        return;
-      }
-      if (doc.fileUrl?.startsWith('http')) {
-        navigateToUrl(doc.fileUrl);
-        setLoadingDocUrl(null);
-        return;
-      }
-      const response = await fetch(`/api/documents/${doc.id}/signed-url`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.signedUrl && !data.isText) {
-          navigateToUrl(data.signedUrl);
-        }
-      } else {
-        navigateToUrl(normalizeDocUrl(doc.fileUrl));
-      }
-    } catch (err) {
-      console.error('Failed to get signed URL:', err);
-      navigateToUrl(normalizeDocUrl(doc.fileUrl));
-    } finally {
-      setLoadingDocUrl(null);
-    }
+  const getDocumentViewUrl = (doc: any) => {
+    if (doc.fileUrl?.startsWith('text:')) return null;
+    return `/api/documents/${doc.id}/view`;
   };
 
   return (
@@ -1609,15 +1569,24 @@ export default function AdminDrivers() {
                           )}
                         </div>
                         <div className="flex flex-col gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openDocumentPreview(doc)}
-                            disabled={loadingDocUrl === doc.id}
-                          >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
+                          {getDocumentViewUrl(doc) ? (
+                            <a
+                              href={getDocumentViewUrl(doc)!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              data-testid={`link-view-doc-${doc.id}`}
+                            >
+                              <Button variant="outline" size="sm" type="button">
+                                <ExternalLink className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </a>
+                          ) : (
+                            <Button variant="outline" size="sm" disabled>
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          )}
                           {doc.status === 'pending' && (
                             <>
                               <Button
