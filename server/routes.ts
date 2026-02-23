@@ -7504,6 +7504,32 @@ export async function registerRoutes(
     res.json(updated);
   }));
 
+  app.post("/api/driver-applications/:id/email", requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { message } = req.body;
+    
+    if (!message?.trim()) {
+      return res.status(400).json({ error: "Email message is required" });
+    }
+
+    const application = await storage.getDriverApplication(req.params.id);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    try {
+      const { sendDocumentRequestEmail } = await import('./emailService');
+      const sent = await sendDocumentRequestEmail(application.email, application.fullName, message.trim());
+      if (sent) {
+        res.json({ success: true, message: "Email sent successfully" });
+      } else {
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (err) {
+      console.error('[Driver Application] Failed to send document request email:', err);
+      res.status(500).json({ error: "Failed to send email" });
+    }
+  }));
+
   app.delete("/api/driver-applications/:id", asyncHandler(async (req, res) => {
     const application = await storage.getDriverApplication(req.params.id);
     if (!application) {

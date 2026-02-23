@@ -73,6 +73,9 @@ export default function AdminApplications() {
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [fileAvailability, setFileAvailability] = useState<Record<string, boolean>>({});
   const [fileCheckDone, setFileCheckDone] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailTarget, setEmailTarget] = useState<DriverApplication | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -147,6 +150,25 @@ export default function AdminApplications() {
     },
     onError: () => {
       toast({ title: 'Failed to send back application', variant: 'destructive' });
+    },
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: async ({ id, message }: { id: string; message: string }) => {
+      const response = await apiRequest("POST", `/api/driver-applications/${id}/email`, { message });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'Email Sent',
+        description: 'The driver has been emailed about the missing documents.',
+      });
+      setEmailDialogOpen(false);
+      setEmailMessage('');
+      setEmailTarget(null);
+    },
+    onError: () => {
+      toast({ title: 'Failed to send email', variant: 'destructive' });
     },
   });
 
@@ -1065,6 +1087,18 @@ export default function AdminApplications() {
                     </Button>
                     <Button
                       variant="outline"
+                      onClick={() => {
+                        setEmailTarget(selectedApplication);
+                        setEmailDialogOpen(true);
+                      }}
+                      disabled={sendEmailMutation.isPending}
+                      data-testid="button-email-driver"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Email Driver
+                    </Button>
+                    <Button
+                      variant="outline"
                       className="border-orange-500 text-orange-600"
                       onClick={handleSendBack}
                       disabled={sendBackMutation.isPending || reviewApplicationMutation.isPending}
@@ -1134,6 +1168,50 @@ export default function AdminApplications() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Email Driver - Request Documents</DialogTitle>
+            <DialogDescription>
+              Send an email to {emailTarget?.fullName} ({emailTarget?.email}) requesting missing documents. This will not change the application status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="emailMessage">Message to Driver</Label>
+              <Textarea
+                id="emailMessage"
+                placeholder={"Please upload the following missing documents:\n- Hire & Reward Insurance\n- Goods in Transit Insurance\n\nYou can reply to this email with the documents attached."}
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                className="mt-1 min-h-[150px]"
+                data-testid="input-email-message"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (emailTarget && emailMessage.trim()) {
+                  sendEmailMutation.mutate({ id: emailTarget.id, message: emailMessage });
+                }
+              }}
+              disabled={sendEmailMutation.isPending || !emailMessage.trim()}
+              data-testid="button-send-email"
+            >
+              {sendEmailMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4 mr-2" />
+              )}
+              Send Email
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardLayout>

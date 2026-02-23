@@ -1466,6 +1466,31 @@ export async function sendApplicationCorrectionEmail(
   return sendEmailNotification(email, 'Application Corrections Required - Run Courier', htmlContent, textContent);
 }
 
+export async function sendDocumentRequestEmail(
+  email: string,
+  fullName: string,
+  message: string
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #333; margin-top: 0;">Document Upload Required</h2>
+    <div style="background-color: white; border-radius: 8px; padding: 20px;">
+      <p style="color: #333; font-size: 16px;">Dear ${fullName},</p>
+      <p style="color: #333;">Thank you for your application to join Run Courier. We need you to upload some additional documents before we can complete your review.</p>
+      <div style="background-color: #EFF6FF; border-left: 4px solid #3B82F6; padding: 16px; margin: 20px 0; border-radius: 4px;">
+        <strong style="color: #1D4ED8;">Message from our team:</strong>
+        <p style="color: #333; white-space: pre-line; margin-top: 8px;">${message}</p>
+      </div>
+      <p style="color: #333;">Please reply to this email with the requested documents, or contact us if you have any questions.</p>
+    </div>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call +44 20 4634 6100.</p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Documents Required');
+  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. We need you to upload some additional documents before we can complete your review.\n\nMessage from our team:\n${message}\n\nPlease reply to this email with the requested documents, or contact us if you have any questions.\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+
+  return sendEmailNotification(email, 'Documents Required - Run Courier', htmlContent, textContent);
+}
+
 export async function sendContactFormSubmission(
   name: string,
   email: string,
