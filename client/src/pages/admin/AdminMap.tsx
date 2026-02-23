@@ -165,8 +165,7 @@ export default function AdminMap() {
       if (location) {
         bounds.extend(location);
         hasValidBounds = true;
-      } else if (driver.isAvailable) {
-        // Include default London location for online drivers without GPS
+      } else {
         bounds.extend({ lat: 51.5074, lng: -0.1278 });
         hasValidBounds = true;
       }
@@ -350,17 +349,19 @@ export default function AdminMap() {
     activeDrivers.forEach((driver) => {
       const location = getDriverLocation(driver);
       
-      // For online drivers without GPS, show them at a default UK location (London area)
-      // with an orange color to indicate missing GPS
       const isOnlineNoGps = driver.isAvailable && !location;
-      const displayLocation = location || (isOnlineNoGps ? { lat: 51.5074, lng: -0.1278 } : null);
-      
-      if (!displayLocation) return;
+      const isOfflineNoGps = !driver.isAvailable && !location;
+      const noGps = !location;
+      let displayLocation = location;
+      if (!displayLocation) {
+        const hash = driver.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+        displayLocation = { lat: 51.5074 + ((hash % 100) - 50) * 0.0003, lng: -0.1278 + ((hash % 73) - 36) * 0.0004 };
+      }
 
       currentMarkerIds.add(driver.id);
       const status = getDriverStatus(driver);
-      // Orange for online but no GPS, otherwise normal status colors
-      const fillColor = isOnlineNoGps ? '#F97316' : (status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF');
+      const fillColor = noGps ? (isOnlineNoGps ? '#F97316' : '#6B7280') : (status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF');
+      const markerOpacity = isOfflineNoGps ? 0.5 : 1;
 
       const existingMarker = driverMarkersRef.current.get(driver.id);
       
@@ -368,34 +369,30 @@ export default function AdminMap() {
       // This creates a recognizable delivery van silhouette
       const vanIconPath = 'M 24 20 L 24 10 C 24 9 23 8 22 8 L 18 8 L 18 6 C 18 5 17 4 16 4 L 4 4 C 3 4 2 5 2 6 L 2 18 C 2 19 3 20 4 20 L 5 20 C 5 21.7 6.3 23 8 23 C 9.7 23 11 21.7 11 20 L 15 20 C 15 21.7 16.3 23 18 23 C 19.7 23 21 21.7 21 20 L 22 20 C 23 20 24 19 24 18 L 24 20 Z M 8 21 C 7.4 21 7 20.6 7 20 C 7 19.4 7.4 19 8 19 C 8.6 19 9 19.4 9 20 C 9 20.6 8.6 21 8 21 Z M 18 21 C 17.4 21 17 20.6 17 20 C 17 19.4 17.4 19 18 19 C 18.6 19 19 19.4 19 20 C 19 20.6 18.6 21 18 21 Z M 22 14 L 18 14 L 18 10 L 20 10 L 22 12 L 22 14 Z';
       
+      const strokeColor = noGps ? (isOnlineNoGps ? '#F97316' : '#6B7280') : '#1a1a1a';
+      const iconConfig = {
+        path: vanIconPath,
+        scale: noGps && isOfflineNoGps ? 1.2 : 1.5,
+        fillColor,
+        fillOpacity: markerOpacity,
+        strokeColor,
+        strokeWeight: 1.5,
+        anchor: new google.maps.Point(13, 13),
+      };
+
       if (existingMarker) {
         existingMarker.setPosition(displayLocation);
-        existingMarker.setIcon({
-          path: vanIconPath,
-          scale: 1.5,
-          fillColor,
-          fillOpacity: 1,
-          strokeColor: isOnlineNoGps ? '#F97316' : '#1a1a1a',
-          strokeWeight: 1.5,
-          anchor: new google.maps.Point(13, 13),
-        });
+        existingMarker.setIcon(iconConfig);
       } else {
+        const gpsLabel = noGps ? ' (NO GPS)' : '';
         const driverLabel = driver.driverCode 
-          ? `${driver.driverCode} · ${driver.fullName || 'Driver'}${isOnlineNoGps ? ' (NO GPS)' : ''}` 
-          : (driver.fullName || driver.vehicleRegistration || 'Driver') + (isOnlineNoGps ? ' (NO GPS)' : '');
+          ? `${driver.driverCode} · ${driver.fullName || 'Driver'}${gpsLabel}` 
+          : (driver.fullName || driver.vehicleRegistration || 'Driver') + gpsLabel;
         const marker = new google.maps.Marker({
           position: displayLocation,
           map,
           title: driverLabel,
-          icon: {
-            path: vanIconPath,
-            scale: 1.5,
-            fillColor,
-            fillOpacity: 1,
-            strokeColor: isOnlineNoGps ? '#F97316' : '#1a1a1a',
-            strokeWeight: 1.5,
-            anchor: new google.maps.Point(13, 13),
-          },
+          icon: iconConfig,
         });
 
         marker.addListener('click', () => {
@@ -413,8 +410,8 @@ export default function AdminMap() {
           const driverDisplay = driver.driverCode 
             ? `${driver.driverCode} · ${driver.fullName || 'Driver'}` 
             : driver.fullName || 'Driver';
-          const noGpsWarning = isOnlineNoGps 
-            ? '<div style="font-size: 11px; color: #F97316; font-weight: 600; margin-top: 4px;">⚠ NO GPS - Location unknown</div>' 
+          const noGpsWarning = noGps 
+            ? `<div style="font-size: 11px; color: ${isOnlineNoGps ? '#F97316' : '#6B7280'}; font-weight: 600; margin-top: 4px;">NO GPS - Approximate location</div>`
             : '';
           infoWindowRef.current.setContent(`
             <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
@@ -790,18 +787,22 @@ export default function AdminMap() {
                 {getConnectionStatus()}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                    <span>Pending Job</span>
-                  </div>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded-full bg-green-500" />
-                    <span>Available Driver</span>
+                    <span>Available</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded-full bg-blue-500" />
-                    <span>Active Job/Driver</span>
+                    <span>On Delivery</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-gray-500 opacity-50" />
+                    <span>Offline</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <span>Pending Job</span>
                   </div>
                 </div>
                 <Button 
