@@ -562,6 +562,47 @@ function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => P
   };
 }
 
+async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
+  const { supabaseAdmin } = await import('./supabaseAdmin');
+  if (!supabaseAdmin) return jobs;
+
+  const BUCKET = 'driver-documents';
+
+  return Promise.all(jobs.map(async (job) => {
+    const resolved = { ...job };
+
+    if (job.podPhotoUrl && !job.podPhotoUrl.startsWith('http')) {
+      try {
+        const { data } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(job.podPhotoUrl, 3600);
+        if (data?.signedUrl) resolved.podPhotoUrl = data.signedUrl;
+      } catch {}
+    }
+
+    if (Array.isArray(job.podPhotos) && job.podPhotos.length > 0) {
+      resolved.podPhotos = await Promise.all(job.podPhotos.map(async (photoPath: string) => {
+        if (photoPath.startsWith('http')) return photoPath;
+        try {
+          const { data } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(photoPath, 3600);
+          return data?.signedUrl || photoPath;
+        } catch { return photoPath; }
+      }));
+    }
+
+    if (job.podSignatureUrl && !job.podSignatureUrl.startsWith('http')) {
+      try {
+        const { data } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(job.podSignatureUrl, 3600);
+        if (data?.signedUrl) resolved.podSignatureUrl = data.signedUrl;
+      } catch {}
+    }
+
+    return resolved;
+  }));
+}
+
+async function resolveSingleJobPodUrls(job: any): Promise<any> {
+  const resolved = (await resolveJobPodUrls([job]))[0];
+  return resolved || job;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1218,6 +1259,7 @@ export async function registerRoutes(
     
     // Auto-assign stable job numbers to jobs that don't have one
     const numberedJobs = assignStableJobNumbers(jobs);
+    const resolvedJobs = await resolveJobPodUrls(numberedJobs);
     
     // SECURITY: Check user role and identity
     let isAdmin = false;
@@ -1239,10 +1281,10 @@ export async function registerRoutes(
     }
     
     if (isAdmin || isCustomerViewingOwn) {
-      return res.json(numberedJobs);
+      return res.json(resolvedJobs);
     }
     
-    const safeJobs = numberedJobs.map(job => stripCustomerPricing(job));
+    const safeJobs = resolvedJobs.map(job => stripCustomerPricing(job));
     return res.json(safeJobs);
   }));
 
@@ -1381,7 +1423,10 @@ export async function registerRoutes(
           recipient_name,
           estimated_delivery_time,
           created_at,
-          driver_id
+          driver_id,
+          pod_photo_url,
+          pod_photos,
+          pod_signature_url
         `)
         .eq('tracking_number', trackingNumber)
         .single();
@@ -1423,8 +1468,12 @@ export async function registerRoutes(
         createdAt: job.created_at,
         driverName,
         driverPhone,
+        podPhotoUrl: (job as any).pod_photo_url || null,
+        podPhotos: (job as any).pod_photos || [],
+        podSignatureUrl: (job as any).pod_signature_url || null,
       };
-      return res.json(ensureJobNumber(trackResult));
+      const resolvedTrackResult = await resolveSingleJobPodUrls(trackResult);
+      return res.json(ensureJobNumber(resolvedTrackResult));
     }
     
     // Fallback to Drizzle if Supabase not available
@@ -1479,11 +1528,11 @@ export async function registerRoutes(
     }
     
     if (isAdmin || isOwner) {
-      return res.json(ensureJobNumber(job));
+      return res.json(ensureJobNumber(await resolveSingleJobPodUrls(job)));
     }
     
     // CRITICAL: Everyone else gets NO customer pricing
-    return res.json(ensureJobNumber(stripCustomerPricing(job)));
+    return res.json(ensureJobNumber(stripCustomerPricing(await resolveSingleJobPodUrls(job))));
   }));
 
   // Get multi-drop stops for a job (admin only - contains POD and recipient data)
@@ -2409,10 +2458,24 @@ export async function registerRoutes(
       console.log(`[POD Upload] POD photo uploaded for job ${jobId}: ${fileUrl} (${existingPhotos.length} total photos)`);
     }
     
+    let resolvedPhotoUrl = fileUrl;
+    const resolvedPhotos = [...existingPhotos];
+    try {
+      const signedResult = await supAdmin.storage.from(BUCKET).createSignedUrl(fileUrl, 3600);
+      if (signedResult.data?.signedUrl) resolvedPhotoUrl = signedResult.data.signedUrl;
+
+      for (let i = 0; i < resolvedPhotos.length; i++) {
+        if (!resolvedPhotos[i].startsWith('http')) {
+          const sr = await supAdmin.storage.from(BUCKET).createSignedUrl(resolvedPhotos[i], 3600);
+          if (sr.data?.signedUrl) resolvedPhotos[i] = sr.data.signedUrl;
+        }
+      }
+    } catch {}
+
     res.json({ 
       success: true, 
-      podPhotoUrl: fileUrl,
-      podPhotos: existingPhotos,
+      podPhotoUrl: resolvedPhotoUrl,
+      podPhotos: resolvedPhotos,
       job: updatedJob 
     });
   }));
@@ -2460,10 +2523,28 @@ export async function registerRoutes(
       }
     }
     
+    let resolvedPodPhotoUrl = newPodPhotoUrl;
+    const resolvedDeletePhotos = [...updatedPhotos];
+    if (supabaseAdmin) {
+      try {
+        const POD_BUCKET = 'driver-documents';
+        if (resolvedPodPhotoUrl && !resolvedPodPhotoUrl.startsWith('http')) {
+          const { data } = await supabaseAdmin.storage.from(POD_BUCKET).createSignedUrl(resolvedPodPhotoUrl, 3600);
+          if (data?.signedUrl) resolvedPodPhotoUrl = data.signedUrl;
+        }
+        for (let i = 0; i < resolvedDeletePhotos.length; i++) {
+          if (!resolvedDeletePhotos[i].startsWith('http')) {
+            const sr = await supabaseAdmin.storage.from(POD_BUCKET).createSignedUrl(resolvedDeletePhotos[i], 3600);
+            if (sr.data?.signedUrl) resolvedDeletePhotos[i] = sr.data.signedUrl;
+          }
+        }
+      } catch {}
+    }
+
     res.json({
       success: true,
-      podPhotoUrl: newPodPhotoUrl,
-      podPhotos: updatedPhotos,
+      podPhotoUrl: resolvedPodPhotoUrl,
+      podPhotos: resolvedDeletePhotos,
       job: updatedJob,
     });
   }));
