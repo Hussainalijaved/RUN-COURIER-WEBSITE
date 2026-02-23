@@ -339,6 +339,31 @@ export function ProfileScreen({ navigation }: any) {
             </View>
           </View>
 
+          {(driver?.vehicle_make || driver?.vehicle_model || driver?.vehicle_color || driver?.vehicle_registration) && (
+            <View style={[styles.vehicleDetailsRow, { borderTopColor: theme.border }]}>
+              {driver?.vehicle_registration && (
+                <ThemedText type="caption" color="secondary" style={styles.vehicleDetailText}>
+                  Reg: {driver.vehicle_registration}
+                </ThemedText>
+              )}
+              {driver?.vehicle_make && (
+                <ThemedText type="caption" color="secondary" style={styles.vehicleDetailText}>
+                  {driver.vehicle_make}
+                </ThemedText>
+              )}
+              {driver?.vehicle_model && (
+                <ThemedText type="caption" color="secondary" style={styles.vehicleDetailText}>
+                  {driver.vehicle_model}
+                </ThemedText>
+              )}
+              {driver?.vehicle_color && (
+                <ThemedText type="caption" color="secondary" style={styles.vehicleDetailText}>
+                  {driver.vehicle_color}
+                </ThemedText>
+              )}
+            </View>
+          )}
+
           <View style={[
             styles.statusBadge, 
             { backgroundColor: driver?.is_active ? theme.success + '15' : theme.warning + '15' }
@@ -506,6 +531,17 @@ const styles = StyleSheet.create({
     width: 1,
     height: 16,
     marginHorizontal: Spacing.lg,
+  },
+  vehicleDetailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+  },
+  vehicleDetailText: {
+    fontSize: 12,
   },
   statusBadge: {
     flexDirection: 'row',

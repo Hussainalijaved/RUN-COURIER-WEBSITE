@@ -953,6 +953,24 @@ export default function AdminApplications() {
                           <dd className="font-medium uppercase">{selectedApplication.vehicleRegistration}</dd>
                         </div>
                       )}
+                      {selectedApplication.vehicleMake && (
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Make:</dt>
+                          <dd className="font-medium">{selectedApplication.vehicleMake}</dd>
+                        </div>
+                      )}
+                      {selectedApplication.vehicleModel && (
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Model:</dt>
+                          <dd className="font-medium">{selectedApplication.vehicleModel}</dd>
+                        </div>
+                      )}
+                      {selectedApplication.vehicleColor && (
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Colour:</dt>
+                          <dd className="font-medium">{selectedApplication.vehicleColor}</dd>
+                        </div>
+                      )}
                     </div>
                   </div>
 
