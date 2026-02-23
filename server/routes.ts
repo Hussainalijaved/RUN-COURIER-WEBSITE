@@ -271,9 +271,9 @@ async function copyApplicationFileToDriver(
   driverUUID: string,
   supabaseClient: any
 ): Promise<{ path: string; bucket: string }> {
-  if (!originalUrl) return { path: originalUrl, bucket: 'driver-documents' };
+  if (!originalUrl) return { path: originalUrl, bucket: 'DRIVER-DOCUMENTS' };
 
-  const BUCKET = 'driver-documents';
+  const BUCKET = 'DRIVER-DOCUMENTS';
   
   let sourcePath = extractStoragePath(originalUrl) || originalUrl;
   if (sourcePath.startsWith('http') || sourcePath.startsWith('/')) {
@@ -288,20 +288,29 @@ async function copyApplicationFileToDriver(
       const fileName = sourcePath.split('/').pop() || `file_${Date.now()}`;
       const docTypeMatch = sourcePath.match(/(?:drivers\/pending|applications\/[^/]+)\/([^/]+)\//);
       const docType = docTypeMatch ? docTypeMatch[1] : 'document';
-      const destPath = `drivers/${driverUUID}/${docType}/${fileName}`;
+      const normalizedDocType = (() => {
+        const lower = docType.toLowerCase();
+        for (const group of DOC_TYPE_GROUPS) {
+          if (group.some(alias => alias.toLowerCase() === lower)) {
+            return group[0];
+          }
+        }
+        return docType;
+      })();
+      const destPath = `${driverUUID}/${normalizedDocType}_${Date.now()}_${fileName}`;
 
       const { data: fileData, error: downloadError } = await supabaseClient.storage
         .from(BUCKET)
         .download(sourcePath);
       
       if (downloadError || !fileData) {
-        const ALT_BUCKET = 'DRIVER-DOCUMENTS';
+        const ALT_BUCKET = 'driver-documents';
         const { data: altData, error: altErr } = await supabaseClient.storage
           .from(ALT_BUCKET)
           .download(sourcePath);
         if (altErr || !altData) {
           console.warn(`[FileCopy] Could not download from pending path: ${sourcePath}, using original path`);
-          return { path: sourcePath, bucket: BUCKET };
+          return { path: sourcePath, bucket: 'driver-documents' };
         }
         const buffer = Buffer.from(await altData.arrayBuffer());
         const { error: uploadErr } = await supabaseClient.storage
@@ -309,7 +318,7 @@ async function copyApplicationFileToDriver(
           .upload(destPath, buffer, { upsert: true });
         if (uploadErr) {
           console.warn(`[FileCopy] Upload to ${destPath} failed:`, uploadErr.message);
-          return { path: sourcePath, bucket: BUCKET };
+          return { path: sourcePath, bucket: ALT_BUCKET };
         }
         console.log(`[FileCopy] Copied ${sourcePath} -> ${destPath} (from ${ALT_BUCKET})`);
         return { path: destPath, bucket: BUCKET };
@@ -335,7 +344,7 @@ async function copyApplicationFileToDriver(
 
   const storagePath = extractStoragePath(originalUrl);
   if (storagePath) {
-    const BUCKETS = [BUCKET, 'DRIVER-DOCUMENTS'];
+    const BUCKETS = [BUCKET, 'driver-documents'];
     for (const bucket of BUCKETS) {
       try {
         const { data } = await supabaseClient.storage.from(bucket).createSignedUrl(storagePath, 3600);
@@ -519,7 +528,7 @@ async function generateJobNumber(): Promise<string> {
 }
 
 const DOC_TYPE_GROUPS: string[][] = [
-  ['driving_license', 'driving_licence_front', 'driving_license_front', 'drivingLicenceFront', 'drivingLicenseFront'],
+  ['driving_license', 'driving_licence_front', 'driving_license_front', 'drivingLicenceFront', 'drivingLicenseFront', 'driving_licence'],
   ['driving_licence_back', 'driving_license_back', 'drivingLicenceBack', 'drivingLicenseBack'],
   ['dbs_certificate', 'dbsCertificate'],
   ['goods_in_transit', 'goods_in_transit_insurance', 'goodsInTransitInsurance', 'goodsInTransit'],
@@ -3087,7 +3096,7 @@ export async function registerRoutes(
                 await supabaseAdmin.from('driver_documents')
                   .update({
                     status: 'approved',
-                    bucket: 'driver-documents',
+                    bucket: 'DRIVER-DOCUMENTS',
                     storage_path: storagePath,
                     file_url: storagePath,
                   })
@@ -3101,7 +3110,7 @@ export async function registerRoutes(
                     auth_user_id: driverId,
                     doc_type: mapping.docType,
                     file_url: storagePath,
-                    bucket: 'driver-documents',
+                    bucket: 'DRIVER-DOCUMENTS',
                     storage_path: storagePath,
                     status: 'approved',
                     uploaded_at: new Date().toISOString(),
@@ -3119,7 +3128,7 @@ export async function registerRoutes(
           }
 
           const vehicleType = driverData?.vehicle_type || existingDriver.vehicleType || 'car';
-          const BUCKET = 'driver-documents';
+          const BUCKET = 'DRIVER-DOCUMENTS';
           const searchFolders = [driverId, 'applications/pending'];
           const vehiclePhotoTypes: Record<string, string[]> = {
             'motorbike': ['front', 'back'],
@@ -4583,10 +4592,10 @@ export async function registerRoutes(
     const finalFilename = `${safeDocumentType}_${timestamp}_${safeOrigName}`;
 
     const isPendingApplication = rawDriverId === 'application-pending';
-    const BUCKET = 'driver-documents';
+    const BUCKET = isPendingApplication ? 'driver-documents' : 'DRIVER-DOCUMENTS';
     const storagePath = isPendingApplication
       ? `drivers/pending/${safeDocumentType}/${finalFilename}`
-      : `drivers/${rawDriverId}/${safeDocumentType}/${finalFilename}`;
+      : `${rawDriverId}/${safeDocumentType}_${timestamp}_${safeOrigName}`;
 
     const contentType = file.mimetype || 'application/octet-stream';
     const fileBuffer = file.buffer;
@@ -4808,8 +4817,8 @@ export async function registerRoutes(
     const timestamp = Date.now();
     const ext = path.extname(file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `profile_picture_${timestamp}${ext}`;
-    const BUCKET = 'driver-documents';
-    const storagePath = `drivers/${driverId}/profile_picture/${finalFilename}`;
+    const BUCKET = 'DRIVER-DOCUMENTS';
+    const storagePath = `${driverId}/profile_picture_${timestamp}${ext}`;
     const contentType = file.mimetype || 'image/jpeg';
     const fileBuffer = file.buffer;
 
@@ -7077,11 +7086,11 @@ export async function registerRoutes(
 
                   const newDocMappings = [
                     { url: application.profilePictureUrl, type: 'profile_picture', label: 'Profile Picture' },
-                    { url: application.drivingLicenceFrontUrl, type: 'driving_license', label: 'Driving Licence (Front)' },
-                    { url: application.drivingLicenceBackUrl, type: 'driving_license_back', label: 'Driving Licence (Back)' },
+                    { url: application.drivingLicenceFrontUrl, type: 'driving_licence', label: 'Driving Licence (Front)' },
+                    { url: application.drivingLicenceBackUrl, type: 'driving_licence_back', label: 'Driving Licence (Back)' },
                     { url: application.dbsCertificateUrl, type: 'dbs_certificate', label: 'DBS Certificate' },
-                    { url: application.goodsInTransitInsuranceUrl, type: 'goods_in_transit_insurance', label: 'Goods in Transit Insurance' },
-                    { url: application.hireAndRewardUrl, type: 'hire_and_reward_insurance', label: 'Hire & Reward Insurance' },
+                    { url: application.goodsInTransitInsuranceUrl, type: 'goods_in_transit', label: 'Goods in Transit Insurance' },
+                    { url: application.hireAndRewardUrl, type: 'hire_and_reward', label: 'Hire & Reward Insurance' },
                   ];
                   for (const mapping of newDocMappings) {
                     if (!mapping.url) continue;
@@ -7170,11 +7179,11 @@ export async function registerRoutes(
 
           if (driver) {
             const docMappings = [
-              { field: 'drivingLicenceFrontUrl', type: 'driving_license', url: application.drivingLicenceFrontUrl },
-              { field: 'drivingLicenceBackUrl', type: 'driving_license_back', url: application.drivingLicenceBackUrl },
+              { field: 'drivingLicenceFrontUrl', type: 'driving_licence', url: application.drivingLicenceFrontUrl },
+              { field: 'drivingLicenceBackUrl', type: 'driving_licence_back', url: application.drivingLicenceBackUrl },
               { field: 'dbsCertificateUrl', type: 'dbs_certificate', url: application.dbsCertificateUrl },
-              { field: 'goodsInTransitInsuranceUrl', type: 'goods_in_transit_insurance', url: application.goodsInTransitInsuranceUrl },
-              { field: 'hireAndRewardUrl', type: 'hire_and_reward_insurance', url: application.hireAndRewardUrl },
+              { field: 'goodsInTransitInsuranceUrl', type: 'goods_in_transit', url: application.goodsInTransitInsuranceUrl },
+              { field: 'hireAndRewardUrl', type: 'hire_and_reward', url: application.hireAndRewardUrl },
               { field: 'profilePictureUrl', type: 'profile_picture', url: application.profilePictureUrl },
             ];
 

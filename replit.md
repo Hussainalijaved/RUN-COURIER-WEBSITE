@@ -74,7 +74,7 @@ Jobs are automatically geocoded using Google Maps API to obtain coordinates, whi
 Admins can record payments to drivers with saved bank details. This system includes storing bank details, a payment flow with email confirmations, and payment history tracking.
 
 ### Driver Profile & Document Storage
-Drivers can update their profile and upload documents via the mobile app. Documents are stored in a Supabase Storage bucket (`driver-documents`) with specific file path patterns and RLS policies for secure access.
+Drivers can update their profile and upload documents via the mobile app or during website application. Documents are stored in Supabase Storage bucket `DRIVER-DOCUMENTS` (uppercase) with mobile-compatible path format: `{authUserId}/{docType}_{timestamp}_{filename}`. The `driver_documents` table tracks all documents with `driver_id`, `doc_type`, `file_url`, `storage_path`, and `bucket` fields. When a driver applies via the website, documents are initially uploaded to `driver-documents` bucket under `drivers/pending/{type}/{file}`, then copied to the driver's permanent path in `DRIVER-DOCUMENTS` bucket during approval. Document types use mobile-app-compatible names: `driving_licence`, `driving_licence_back`, `dbs_certificate`, `goods_in_transit`, `hire_and_reward`, `profile_picture`, `vehicle_photos_*`. The `DOC_TYPE_GROUPS` alias system in routes.ts maps between different naming conventions (e.g., `driving_license` ↔ `driving_licence`).
 
 ## External Dependencies
 
