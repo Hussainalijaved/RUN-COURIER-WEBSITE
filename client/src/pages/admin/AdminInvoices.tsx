@@ -46,6 +46,7 @@ import {
   Eye,
   Mail,
   Printer,
+  Download,
   MoreHorizontal,
   CheckCircle2,
   Clock,
@@ -558,6 +559,231 @@ export default function AdminInvoices() {
     printWindow.print();
   };
 
+  const downloadInvoicePdf = async (invoice: SavedInvoice) => {
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const jobDetails = invoice.job_details ? JSON.parse(invoice.job_details) : [];
+    const pageWidth = 210;
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
+    let y = margin;
+
+    const checkPageBreak = (needed: number) => {
+      if (y + needed > 280) {
+        doc.addPage();
+        y = margin;
+      }
+    };
+
+    doc.setFontSize(20);
+    doc.setTextColor(0, 123, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RUN COURIER', margin, y + 7);
+
+    doc.setFontSize(22);
+    doc.setTextColor(17, 17, 17);
+    doc.text('INVOICE', pageWidth - margin, y + 7, { align: 'right' });
+    y += 10;
+    doc.setFontSize(11);
+    doc.setTextColor(51, 51, 51);
+    doc.setFont('helvetica', 'bold');
+    doc.text(invoice.invoice_number, pageWidth - margin, y + 5, { align: 'right' });
+    y += 15;
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BILL TO', margin, y);
+    doc.text('INVOICE DETAILS', pageWidth / 2 + 10, y);
+    y += 6;
+
+    doc.setFontSize(11);
+    doc.setTextColor(17, 17, 17);
+    doc.setFont('helvetica', 'bold');
+    doc.text(invoice.customer_name || '', margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    if (invoice.company_name) {
+      doc.text(invoice.company_name, margin, y);
+      y += 5;
+    }
+    if (invoice.business_address) {
+      const addrLines = doc.splitTextToSize(invoice.business_address, contentWidth / 2 - 5);
+      doc.text(addrLines, margin, y);
+      y += addrLines.length * 4.5;
+    }
+    doc.setTextColor(80, 80, 80);
+    doc.text(invoice.customer_email || '', margin, y);
+
+    let detailY = y - (invoice.company_name ? 10 : 5) - (invoice.business_address ? 5 : 0);
+    const detailX = pageWidth / 2 + 10;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Invoice Date', detailX, detailY);
+    detailY += 4;
+    doc.setFontSize(10);
+    doc.setTextColor(17, 17, 17);
+    doc.text(formatDate(invoice.created_at), detailX, detailY);
+    detailY += 7;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Due Date', detailX, detailY);
+    detailY += 4;
+    doc.setFontSize(10);
+    doc.setTextColor(200, 50, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatDate(invoice.due_date), detailX, detailY);
+    detailY += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Period', detailX, detailY);
+    detailY += 4;
+    doc.setFontSize(10);
+    doc.setTextColor(17, 17, 17);
+    doc.text(`${formatDate(invoice.period_start)} - ${formatDate(invoice.period_end)}`, detailX, detailY);
+
+    y = Math.max(y, detailY) + 10;
+
+    if (jobDetails.length > 0) {
+      checkPageBreak(20);
+      doc.setFillColor(248, 249, 250);
+      doc.rect(margin, y, contentWidth, 8, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 51, 51);
+      doc.text('Job No.', margin + 2, y + 5.5);
+      doc.text('Route Details', margin + 35, y + 5.5);
+      doc.text('Date', margin + 130, y + 5.5);
+      doc.text('Amount', pageWidth - margin - 2, y + 5.5, { align: 'right' });
+      y += 10;
+
+      doc.setFont('helvetica', 'normal');
+      for (const job of jobDetails) {
+        const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
+        const rowHeight = isMultiDrop ? 12 + job.multiDropStops.length * 5 : 14;
+        checkPageBreak(rowHeight + 5);
+
+        doc.setFontSize(9);
+        doc.setTextColor(17, 17, 17);
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(job.jobNumber || job.trackingNumber || 'N/A'), margin + 2, y + 4);
+
+        if (isMultiDrop) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.text(`Same-Day Delivery \u2014 ${job.multiDropStops.length} drop-offs`, margin + 35, y + 4);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          doc.text(`Collected from: ${job.pickupAddress || 'N/A'}`, margin + 35, y + 9);
+          let stopY = y + 14;
+          for (let si = 0; si < job.multiDropStops.length; si++) {
+            const stop = job.multiDropStops[si];
+            checkPageBreak(6);
+            doc.setDrawColor(0, 123, 255);
+            doc.setLineWidth(0.5);
+            doc.line(margin + 37, stopY - 3, margin + 37, stopY + 1);
+            doc.setTextColor(51, 51, 51);
+            doc.setFontSize(8);
+            const stopText = `Stop ${stop.stopOrder || si + 1}: ${stop.address || stop.postcode}${stop.recipientName ? ` \u2014 ${stop.recipientName}` : ''}`;
+            const stopLines = doc.splitTextToSize(stopText, 85);
+            doc.text(stopLines, margin + 39, stopY);
+            stopY += stopLines.length * 4;
+          }
+          y = Math.max(y + rowHeight, stopY);
+        } else {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.text('Same-Day Delivery', margin + 35, y + 4);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          const routeText = `${job.pickupAddress || 'N/A'} \u2192 ${job.deliveryAddress || job.recipientName || 'N/A'}`;
+          const routeLines = doc.splitTextToSize(routeText, 90);
+          doc.text(routeLines, margin + 35, y + 9);
+          y += 6 + routeLines.length * 4;
+        }
+
+        doc.setFontSize(9);
+        doc.setTextColor(17, 17, 17);
+        doc.text(job.scheduledDate || 'N/A', margin + 130, y - (isMultiDrop ? rowHeight - 4 : 6) + 4);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`\u00A3${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}`, pageWidth - margin - 2, y - (isMultiDrop ? rowHeight - 4 : 6) + 4, { align: 'right' });
+
+        doc.setDrawColor(230, 230, 230);
+        doc.line(margin, y + 2, pageWidth - margin, y + 2);
+        y += 5;
+      }
+    }
+
+    if (invoice.notes) {
+      checkPageBreak(20);
+      y += 5;
+      doc.setFillColor(255, 243, 205);
+      const noteLines = doc.splitTextToSize(invoice.notes, contentWidth - 10);
+      doc.roundedRect(margin, y, contentWidth, 10 + noteLines.length * 4, 2, 2, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(17, 17, 17);
+      doc.text('Notes:', margin + 5, y + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.text(noteLines, margin + 5, y + 11);
+      y += 14 + noteLines.length * 4;
+    }
+
+    checkPageBreak(35);
+    y += 5;
+    doc.setFillColor(248, 249, 250);
+    doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'F');
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Subtotal:', pageWidth - margin - 50, y + 8);
+    doc.setTextColor(17, 17, 17);
+    doc.text(formatPrice(invoice.subtotal), pageWidth - margin - 5, y + 8, { align: 'right' });
+    doc.setTextColor(80, 80, 80);
+    doc.text('VAT:', pageWidth - margin - 50, y + 15);
+    doc.setTextColor(17, 17, 17);
+    doc.text(formatPrice(invoice.vat), pageWidth - margin - 5, y + 15, { align: 'right' });
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 123, 255);
+    doc.text('Total:', pageWidth - margin - 50, y + 25);
+    doc.text(formatPrice(invoice.total), pageWidth - margin - 5, y + 25, { align: 'right' });
+    y += 38;
+
+    checkPageBreak(35);
+    doc.setFillColor(232, 244, 253);
+    doc.roundedRect(margin, y, contentWidth, 28, 2, 2, 'F');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 17, 17);
+    doc.text('Bank Transfer Details', margin + 5, y + 7);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 51, 51);
+    doc.text(`Account Name: RUN COURIER`, margin + 5, y + 13);
+    doc.text(`Sort Code: 30-99-50`, margin + 5, y + 18);
+    doc.text(`Account Number: 36113363`, margin + 80, y + 13);
+    doc.text(`Reference: ${invoice.invoice_number}`, margin + 80, y + 18);
+    y += 35;
+
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.setFont('helvetica', 'normal');
+    doc.text('RUN COURIER | info@runcourier.co.uk | runcourier.co.uk', pageWidth / 2, 290, { align: 'center' });
+
+    doc.save(`${invoice.invoice_number}.pdf`);
+    toast({ title: 'PDF downloaded', description: `${invoice.invoice_number}.pdf saved` });
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
@@ -821,6 +1047,20 @@ export default function AdminInvoices() {
                                   <Printer className="h-4 w-4 mr-2" />
                                   Print Invoice
                                 </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    if (fullInvoice) {
+                                      downloadInvoicePdf(fullInvoice);
+                                    } else {
+                                      toast({ title: 'Loading invoice...', description: 'Please try again in a moment' });
+                                      refetchInvoices();
+                                    }
+                                  }}
+                                  data-testid={`menu-download-recent-${index}`}
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download PDF
+                                </DropdownMenuItem>
                                 {fullInvoice && fullInvoice.status !== 'paid' && (
                                   <DropdownMenuItem 
                                     onClick={() => markPaidMutation.mutate(invoice.id)}
@@ -988,6 +1228,13 @@ export default function AdminInvoices() {
                               >
                                 <Printer className="h-4 w-4 mr-2" />
                                 Print Invoice
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => downloadInvoicePdf(invoice)}
+                                data-testid={`menu-download-invoice-${invoice.id}`}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download PDF
                               </DropdownMenuItem>
                               {invoice.status !== 'paid' && (
                                 <DropdownMenuItem 
@@ -1177,6 +1424,10 @@ export default function AdminInvoices() {
               </div>
             )}
             <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => viewInvoice && downloadInvoicePdf(viewInvoice)} data-testid="button-download-pdf">
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
               <Button variant="outline" onClick={() => viewInvoice && printInvoice(viewInvoice)}>
                 <Printer className="h-4 w-4 mr-2" />
                 Print
