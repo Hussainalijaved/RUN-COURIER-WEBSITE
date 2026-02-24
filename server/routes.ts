@@ -6045,13 +6045,43 @@ export async function registerRoutes(
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (!supabaseAdmin) return res.status(500).send("Storage service unavailable");
 
-      const { data: doc, error } = await supabaseAdmin
-        .from('driver_documents')
-        .select('*')
-        .eq('id', docId)
-        .single();
+      let doc: any = null;
+      
+      if (docId.startsWith('col-')) {
+        const parts = docId.replace('col-', '').split('-');
+        const docType = parts.pop();
+        const dId = parts.join('-');
+        if (dId && docType) {
+          const colMap: Record<string, string> = {
+            drivingLicenceFront: 'driving_licence_front_url',
+            drivingLicenceBack: 'driving_licence_back_url',
+            dbsCertificate: 'dbs_certificate_url',
+            goodsInTransitInsurance: 'goods_in_transit_insurance_url',
+            hireAndReward: 'hire_reward_insurance_url',
+            profilePicture: 'profile_picture_url',
+          };
+          const col = colMap[docType];
+          if (col) {
+            const { data: driverRow } = await supabaseAdmin.from('drivers').select(col).eq('id', dId).maybeSingle();
+            if (driverRow && (driverRow as any)[col]) {
+              const url = (driverRow as any)[col];
+              const storagePath = url.startsWith('http') ? (extractStoragePath(url) || url) : url;
+              doc = { id: docId, driver_id: dId, file_url: storagePath, storage_path: storagePath, bucket: 'DRIVER-DOCUMENTS', doc_type: docType };
+            }
+          }
+        }
+      }
 
-      if (error || !doc) return res.status(404).send("Document not found");
+      if (!doc) {
+        const { data: dbDoc, error } = await supabaseAdmin
+          .from('driver_documents')
+          .select('*')
+          .eq('id', docId)
+          .single();
+        if (!error && dbDoc) doc = dbDoc;
+      }
+
+      if (!doc) return res.status(404).send("Document not found");
 
       const fileUrl = doc.file_url || '';
       if (fileUrl.startsWith('text:')) return res.status(400).send("Text-only document");

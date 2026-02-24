@@ -708,6 +708,8 @@ export default function AdminDrivers() {
 
   const getDocumentViewUrl = (doc: any) => {
     if (doc.fileUrl?.startsWith('text:')) return null;
+    if (doc.signedUrl) return doc.signedUrl;
+    if (doc.fileUrl?.startsWith('http')) return doc.fileUrl;
     return `/api/documents/${doc.id}/view`;
   };
 
