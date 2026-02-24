@@ -75,6 +75,7 @@ const AdminMap = lazy(() => import("@/pages/admin/AdminMap"));
 const AdminCreateJob = lazy(() => import("@/pages/admin/AdminCreateJob"));
 const AdminCustomers = lazy(() => import("@/pages/admin/AdminCustomers"));
 const AdminDriverPayments = lazy(() => import("@/pages/admin/AdminDriverPayments"));
+const AdminFleetFile = lazy(() => import("@/pages/admin/AdminFleetFile"));
 const AdminBusinessQuote = lazy(() => import("@/pages/admin/AdminBusinessQuote"));
 const AdminInvoices = lazy(() => import("@/pages/admin/AdminInvoices"));
 const AdminPricing = lazy(() => import("@/pages/admin/AdminPricing"));
@@ -222,6 +223,11 @@ function Router() {
         <Route path="/admin/payments">
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminDriverPayments />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/fleet-file">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminFleetFile />
           </ProtectedRoute>
         </Route>
         <Route path="/admin/analytics">
