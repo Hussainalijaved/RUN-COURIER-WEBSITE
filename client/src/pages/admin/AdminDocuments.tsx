@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
 import { normalizeDocUrl } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -22,12 +23,26 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { FileText, CheckCircle, XCircle, Clock, Eye, X, AlertTriangle, Trash2 } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { FileText, CheckCircle, XCircle, Clock, Eye, X, AlertTriangle, Trash2, ChevronRight, FolderOpen, Search, User } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeDocuments } from '@/hooks/useRealtimeDocuments';
 import type { Document, Driver, DriverApplication } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
+
+interface DriverGroup {
+  driverId: string;
+  driverName: string;
+  docs: Document[];
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+}
 
 export default function AdminDocuments() {
   const { toast } = useToast();
@@ -37,6 +52,8 @@ export default function AdminDocuments() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [openDriverIds, setOpenDriverIds] = useState<Set<string>>(new Set());
 
   useRealtimeDocuments();
 
@@ -91,7 +108,6 @@ export default function AdminDocuments() {
     retryDelay: 1000,
   });
   
-  // Loading timeout detection
   const [loadingTooLong, setLoadingTooLong] = useState(false);
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -121,7 +137,6 @@ export default function AdminDocuments() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
-      // Also invalidate Supabase queries used by dashboard
       queryClient.invalidateQueries({ queryKey: ['supabase', 'documents'] });
       queryClient.invalidateQueries({ queryKey: ['supabase', 'drivers'] });
       toast({ title: 'Document reviewed successfully' });
@@ -147,21 +162,18 @@ export default function AdminDocuments() {
   });
 
   const getDriverName = (driverId: string) => {
-    // First check registered drivers
     const driver = drivers?.find(d => d.id === driverId);
     if (driver?.fullName) return driver.fullName;
-    
-    // Then check driver applications
     const application = applications?.find(a => a.id === driverId);
     if (application?.fullName) return `${application.fullName} (Applicant)`;
-    
-    // Format the ID for display if not found
-    if (driverId.startsWith('application-')) {
-      return `Pending Application`;
-    }
-    
-    // Return formatted driver ID
+    if (driverId.startsWith('application-')) return `Pending Application`;
     return driverId.length > 20 ? `Driver: ${driverId.substring(0, 8)}...` : `Driver: ${driverId}`;
+  };
+
+  const getDriverId = (driverId: string) => {
+    const driver = drivers?.find(d => d.id === driverId);
+    if (driver?.driverCode) return driver.driverCode;
+    return null;
   };
 
   const getDocTypeName = (type: string) => {
@@ -223,6 +235,58 @@ export default function AdminDocuments() {
   const approvedDocs = documents?.filter(d => d.status === 'approved') || [];
   const rejectedDocs = documents?.filter(d => d.status === 'rejected') || [];
 
+  const driverGroups: DriverGroup[] = useMemo(() => {
+    if (!documents) return [];
+    const groupMap = new Map<string, Document[]>();
+    for (const doc of documents) {
+      const existing = groupMap.get(doc.driverId) || [];
+      existing.push(doc);
+      groupMap.set(doc.driverId, existing);
+    }
+    const groups: DriverGroup[] = [];
+    const entries = Array.from(groupMap.entries());
+    for (const [driverId, docs] of entries) {
+      const name = getDriverName(driverId);
+      if (searchQuery && !name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        continue;
+      }
+      groups.push({
+        driverId,
+        driverName: name,
+        docs,
+        pendingCount: docs.filter((d: Document) => d.status === 'pending').length,
+        approvedCount: docs.filter((d: Document) => d.status === 'approved').length,
+        rejectedCount: docs.filter((d: Document) => d.status === 'rejected').length,
+      });
+    }
+    groups.sort((a, b) => {
+      if (a.pendingCount > 0 && b.pendingCount === 0) return -1;
+      if (a.pendingCount === 0 && b.pendingCount > 0) return 1;
+      return a.driverName.localeCompare(b.driverName);
+    });
+    return groups;
+  }, [documents, drivers, applications, searchQuery]);
+
+  const toggleDriver = (driverId: string) => {
+    setOpenDriverIds(prev => {
+      const next = new Set(prev);
+      if (next.has(driverId)) {
+        next.delete(driverId);
+      } else {
+        next.add(driverId);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setOpenDriverIds(new Set(driverGroups.map(g => g.driverId)));
+  };
+
+  const collapseAll = () => {
+    setOpenDriverIds(new Set());
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -258,265 +322,198 @@ export default function AdminDocuments() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Pending Documents ({pendingDocs.length})
-            </CardTitle>
-            <CardDescription>Documents awaiting approval or rejection</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {docsError ? (
-              <ErrorState 
-                title="Failed to load documents"
-                message="We couldn't fetch the document list. Please check your connection and try again."
+        {docsError ? (
+          <ErrorState 
+            title="Failed to load documents"
+            message="We couldn't fetch the document list. Please check your connection and try again."
+            onRetry={() => refetchDocs()}
+          />
+        ) : docsLoading ? (
+          <div className="space-y-4">
+            {loadingTooLong && (
+              <LoadingTimeout 
+                message="Loading is taking longer than expected. Please wait or try refreshing."
                 onRetry={() => refetchDocs()}
               />
-            ) : docsLoading ? (
-              <div className="space-y-4">
-                {loadingTooLong && (
-                  <LoadingTimeout 
-                    message="Loading is taking longer than expected. Please wait or try refreshing."
-                    onRetry={() => refetchDocs()}
-                  />
-                )}
-                <Skeleton className="h-96 w-full" />
-              </div>
-            ) : pendingDocs.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Driver</TableHead>
-                      <TableHead>Document Type</TableHead>
-                      <TableHead>File Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pendingDocs.map((doc) => (
-                      <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
-                        <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
-                        <TableCell>{getDocTypeName(doc.type)}</TableCell>
-                        <TableCell className="text-sm">{doc.fileName}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {getStatusBadge(doc.status)}
-                            {(doc as any).fileMissing && <Badge variant="destructive" className="text-xs">File Missing</Badge>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedDoc(doc);
-                                setViewDialogOpen(true);
-                              }}
-                              data-testid={`button-view-${doc.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-green-600"
-                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'approved' })}
-                              disabled={reviewDocumentMutation.isPending}
-                              data-testid={`button-approve-${doc.id}`}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'rejected' })}
-                              disabled={reviewDocumentMutation.isPending}
-                              data-testid={`button-reject-${doc.id}`}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                <p className="text-muted-foreground">All documents have been reviewed</p>
-              </div>
             )}
-          </CardContent>
-        </Card>
+            <Skeleton className="h-96 w-full" />
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by driver name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-drivers"
+                  onFocus={(e) => e.target.select()}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={expandAll} data-testid="button-expand-all">
+                  Expand All
+                </Button>
+                <Button size="sm" variant="outline" onClick={collapseAll} data-testid="button-collapse-all">
+                  Collapse All
+                </Button>
+              </div>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Approved Documents ({approvedDocs.length})
-            </CardTitle>
-            <CardDescription>Re-review or change approval status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {docsLoading ? (
-              <Skeleton className="h-96 w-full" />
-            ) : approvedDocs.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Driver</TableHead>
-                      <TableHead>Document Type</TableHead>
-                      <TableHead>File Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {approvedDocs.map((doc) => (
-                      <TableRow key={doc.id} data-testid={`row-approved-document-${doc.id}`}>
-                        <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
-                        <TableCell>{getDocTypeName(doc.type)}</TableCell>
-                        <TableCell className="text-sm">{doc.fileName}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {getStatusBadge(doc.status)}
-                            {(doc as any).fileMissing && <Badge variant="destructive" className="text-xs">File Missing</Badge>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedDoc(doc);
-                                setViewDialogOpen(true);
-                              }}
-                              data-testid={`button-view-approved-${doc.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'rejected' })}
-                              disabled={reviewDocumentMutation.isPending}
-                              data-testid={`button-reject-approved-${doc.id}`}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            {driverGroups.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground">
+                    {searchQuery ? 'No drivers found matching your search' : 'No documents uploaded yet'}
+                  </p>
+                </CardContent>
+              </Card>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                <p className="text-muted-foreground">No approved documents to review</p>
+              <div className="space-y-3">
+                {driverGroups.map((group) => {
+                  const isOpen = openDriverIds.has(group.driverId);
+                  const rcId = getDriverId(group.driverId);
+                  return (
+                    <Collapsible
+                      key={group.driverId}
+                      open={isOpen}
+                      onOpenChange={() => toggleDriver(group.driverId)}
+                    >
+                      <Card data-testid={`card-driver-folder-${group.driverId}`}>
+                        <CollapsibleTrigger asChild>
+                          <CardHeader className="cursor-pointer flex flex-row items-center justify-between gap-2 p-4">
+                            <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
+                              <ChevronRight className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                              <FolderOpen className="h-5 w-5 text-primary shrink-0" />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold truncate" data-testid={`text-driver-name-${group.driverId}`}>
+                                    {group.driverName}
+                                  </span>
+                                  {rcId && (
+                                    <Badge variant="outline" className="text-xs shrink-0">{rcId}</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                              <Badge variant="secondary" className="text-xs">{group.docs.length} docs</Badge>
+                              {group.pendingCount > 0 && (
+                                <Badge className="bg-yellow-500 text-xs">{group.pendingCount} pending</Badge>
+                              )}
+                              {group.approvedCount > 0 && (
+                                <Badge className="bg-green-500 text-xs">{group.approvedCount} approved</Badge>
+                              )}
+                              {group.rejectedCount > 0 && (
+                                <Badge className="bg-red-500 text-xs">{group.rejectedCount} rejected</Badge>
+                              )}
+                            </div>
+                          </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <CardContent className="pt-0 pb-4">
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Document Type</TableHead>
+                                    <TableHead>File Name</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {group.docs.map((doc) => (
+                                    <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
+                                      <TableCell className="font-medium">{getDocTypeName(doc.type)}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{doc.fileName}</TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                          {getStatusBadge(doc.status)}
+                                          {(doc as any).fileMissing && <Badge variant="destructive" className="text-xs">File Missing</Badge>}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedDoc(doc);
+                                              setViewDialogOpen(true);
+                                            }}
+                                            data-testid={`button-view-${doc.id}`}
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                          </Button>
+                                          {doc.status !== 'approved' && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-green-600"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                reviewDocumentMutation.mutate({ id: doc.id, status: 'approved' });
+                                              }}
+                                              disabled={reviewDocumentMutation.isPending}
+                                              data-testid={`button-approve-${doc.id}`}
+                                            >
+                                              <CheckCircle className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                          {doc.status !== 'rejected' && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-red-600"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                reviewDocumentMutation.mutate({ id: doc.id, status: 'rejected' });
+                                              }}
+                                              disabled={reviewDocumentMutation.isPending}
+                                              data-testid={`button-reject-${doc.id}`}
+                                            >
+                                              <XCircle className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                          {doc.status === 'rejected' && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-destructive"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (window.confirm('Are you sure you want to permanently delete this document?')) {
+                                                  deleteDocumentMutation.mutate(doc.id);
+                                                }
+                                              }}
+                                              disabled={deleteDocumentMutation.isPending}
+                                              data-testid={`button-delete-${doc.id}`}
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </CardContent>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  );
+                })}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Rejected Documents ({rejectedDocs.length})
-            </CardTitle>
-            <CardDescription>Previously rejected documents</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {docsLoading ? (
-              <Skeleton className="h-96 w-full" />
-            ) : rejectedDocs.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Driver</TableHead>
-                      <TableHead>Document Type</TableHead>
-                      <TableHead>File Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rejectedDocs.map((doc) => (
-                      <TableRow key={doc.id} data-testid={`row-rejected-document-${doc.id}`}>
-                        <TableCell className="font-medium">{getDriverName(doc.driverId)}</TableCell>
-                        <TableCell>{getDocTypeName(doc.type)}</TableCell>
-                        <TableCell className="text-sm">{doc.fileName}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {getStatusBadge(doc.status)}
-                            {(doc as any).fileMissing && <Badge variant="destructive" className="text-xs">File Missing</Badge>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedDoc(doc);
-                                setViewDialogOpen(true);
-                              }}
-                              data-testid={`button-view-rejected-${doc.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-green-600"
-                              onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: 'approved' })}
-                              disabled={reviewDocumentMutation.isPending}
-                              data-testid={`button-approve-rejected-${doc.id}`}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => {
-                                if (window.confirm('Are you sure you want to permanently delete this document?')) {
-                                  deleteDocumentMutation.mutate(doc.id);
-                                }
-                              }}
-                              disabled={deleteDocumentMutation.isPending}
-                              data-testid={`button-delete-rejected-${doc.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                <p className="text-muted-foreground">No rejected documents</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </>
+        )}
 
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
           <DialogContent className="max-w-3xl max-h-screen overflow-y-auto">
@@ -604,31 +601,37 @@ export default function AdminDocuments() {
             <DialogFooter>
               {selectedDoc && (
                 <div className="flex gap-2 w-full">
-                  <Button
-                    variant="outline"
-                    className="text-green-600 flex-1"
-                    onClick={() => {
-                      reviewDocumentMutation.mutate({ id: selectedDoc.id, status: 'approved' });
-                      setViewDialogOpen(false);
-                    }}
-                    disabled={reviewDocumentMutation.isPending}
-                  >
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Approve
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="text-red-600 flex-1"
-                    onClick={() => {
-                      reviewDocumentMutation.mutate({ id: selectedDoc.id, status: 'rejected' });
-                      setViewDialogOpen(false);
-                    }}
-                    disabled={reviewDocumentMutation.isPending}
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    Reject
-                  </Button>
-                  <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+                  {selectedDoc.status !== 'approved' && (
+                    <Button
+                      variant="outline"
+                      className="text-green-600 flex-1"
+                      onClick={() => {
+                        reviewDocumentMutation.mutate({ id: selectedDoc.id, status: 'approved' });
+                        setViewDialogOpen(false);
+                      }}
+                      disabled={reviewDocumentMutation.isPending}
+                      data-testid="button-dialog-approve"
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Approve
+                    </Button>
+                  )}
+                  {selectedDoc.status !== 'rejected' && (
+                    <Button
+                      variant="outline"
+                      className="text-red-600 flex-1"
+                      onClick={() => {
+                        reviewDocumentMutation.mutate({ id: selectedDoc.id, status: 'rejected' });
+                        setViewDialogOpen(false);
+                      }}
+                      disabled={reviewDocumentMutation.isPending}
+                      data-testid="button-dialog-reject"
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Reject
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setViewDialogOpen(false)} data-testid="button-dialog-close">
                     <X className="mr-2 h-4 w-4" />
                     Close
                   </Button>
