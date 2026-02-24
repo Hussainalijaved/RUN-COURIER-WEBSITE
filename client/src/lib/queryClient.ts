@@ -8,41 +8,38 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// Get Supabase access token for authenticated API requests with timeout
+let cachedToken: string | null = null;
+let tokenExpiry = 0;
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (session?.access_token) {
+    cachedToken = session.access_token;
+    tokenExpiry = (session.expires_at || 0) * 1000;
+  } else {
+    cachedToken = null;
+    tokenExpiry = 0;
+  }
+});
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (cachedToken && Date.now() < tokenExpiry - 30000) {
+    return { "Authorization": `Bearer ${cachedToken}` };
+  }
+
   try {
-    // Add 5 second timeout to prevent hanging (increased from 3s for slow connections)
     const timeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), 5000);
+      setTimeout(() => resolve(null), 3000);
     });
-    
     const sessionPromise = supabase.auth.getSession();
     const result = await Promise.race([sessionPromise, timeoutPromise]);
-    
+
     if (result && 'data' in result && result.data.session?.access_token) {
-      console.log("[Auth] Session token available for API request");
-      return { "Authorization": `Bearer ${result.data.session.access_token}` };
+      cachedToken = result.data.session.access_token;
+      tokenExpiry = (result.data.session.expires_at || 0) * 1000;
+      return { "Authorization": `Bearer ${cachedToken}` };
     }
-    
-    // Session not available - check if we're on production domain but session is stored
-    // This can happen due to race conditions on page load
-    if (result === null) {
-      console.warn("[Auth] Session request timed out - retrying once");
-      // Retry once without timeout as a fallback
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.access_token) {
-          console.log("[Auth] Session retrieved on retry");
-          return { "Authorization": `Bearer ${data.session.access_token}` };
-        }
-      } catch (retryError) {
-        console.warn("[Auth] Retry also failed:", retryError);
-      }
-    }
-    
-    console.warn("[Auth] No session available for API request");
   } catch (error) {
-    console.warn("[Auth] Failed to get session for API request:", error);
+    console.warn("[Auth] Failed to get session:", error);
   }
   return {};
 }
@@ -51,22 +48,16 @@ function getBackendUrl(url: string): string {
   if (url.startsWith('http')) {
     return url;
   }
-  // Use same origin for all requests - custom domain handles routing
   return url;
 }
 
 export function getWebSocketUrl(path: string, baseUrl?: string): string {
-  // Handle mobile app or SSR environments where window is not available
   if (typeof window === 'undefined') {
-    // Use provided baseUrl for mobile app or fallback
     if (baseUrl) {
       return `wss://${baseUrl}${path}`;
     }
-    // Default fallback for SSR
     return `wss://runcourier.co.uk${path}`;
   }
-  
-  // Use same host for all environments - custom domain handles routing
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}${path}`;
 }
@@ -78,9 +69,7 @@ export async function apiRequest(
 ): Promise<Response> {
   const backendUrl = getBackendUrl(url);
   const authHeaders = await getAuthHeaders();
-  
-  console.log(`[API] ${method} ${backendUrl}`);
-  
+
   try {
     const res = await fetch(backendUrl, {
       method,
@@ -133,7 +122,7 @@ export const getQueryFn: <T>(options: {
     const url = buildUrlFromQueryKey(queryKey);
     const backendUrl = getBackendUrl(url);
     const authHeaders = await getAuthHeaders();
-    
+
     const res = await fetch(backendUrl, {
       headers: authHeaders,
       credentials: "include",
@@ -153,9 +142,9 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity, // Conservative default - data stays fresh until invalidated
-      gcTime: 300000, // 5 minutes - keep data in cache longer for faster navigation
-      retry: false, // No automatic retries by default
+      staleTime: Infinity,
+      gcTime: 300000,
+      retry: false,
     },
     mutations: {
       retry: false,

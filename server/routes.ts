@@ -31,79 +31,100 @@ import { sendJobOfferNotification, sendJobWithdrawalNotification } from "./pushN
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
 import { cache, CACHE_TTL } from "./cache";
 
-/**
- * Middleware to verify admin access using email-based recognition
- * Checks the Authorization header token and verifies email is in admins table
- * STRICT MODE: Rejects requests without valid admin credentials
- * 
- * SECURITY: Admin access is EXCLUSIVELY based on email in admins table
- * No JWT role fallback - this prevents bypass via stale/incorrect role claims
- */
+const adminTokenCache = new Map<string, { user: { id: string; email: string; user_metadata?: any }; isAdmin: boolean; expiry: number }>();
+
+function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: number; user_metadata?: any } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      return JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+    }
+  } catch (_) {}
+  return null;
+}
+
 async function requireAdminAccessStrict(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
-  console.log(`[Admin Access Strict] Path: ${req.path}, Method: ${req.method}, Has Auth Header: ${!!authHeader}`);
   
   if (!authHeader?.startsWith('Bearer ')) {
-    console.log(`[Admin Access Strict] No Bearer token found`);
     res.status(401).json({ error: 'Authentication required', code: 'NO_TOKEN' });
     return;
   }
 
   try {
     const token = authHeader.slice(7);
-    console.log(`[Admin Access Strict] Token length: ${token.length}, first 20 chars: ${token.substring(0, 20)}...`);
+    const tokenHash = token.slice(-16);
+    
+    const cached = adminTokenCache.get(tokenHash);
+    if (cached && Date.now() < cached.expiry) {
+      if (!cached.isAdmin) {
+        res.status(403).json({ error: 'Admin access required', code: 'NOT_ADMIN' });
+        return;
+      }
+      (req as any).isAdmin = true;
+      (req as any).adminUser = {
+        id: cached.user.id,
+        email: cached.user.email,
+        role: 'admin',
+        fullName: cached.user.user_metadata?.fullName || cached.user.user_metadata?.full_name,
+      };
+      next();
+      return;
+    }
     
     let authUser: { id: string; email: string; user_metadata?: any } | null = null;
+    let jwtExp = 0;
     
-    // First try Supabase getUser
+    const payload = decodeJwtPayload(token);
+    if (payload?.exp) {
+      jwtExp = payload.exp * 1000;
+      if (jwtExp < Date.now()) {
+        res.status(401).json({ error: 'Token expired', code: 'INVALID_TOKEN' });
+        return;
+      }
+    }
+    
     if (supabaseAdmin) {
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
       if (!error && user) {
         authUser = user;
-        console.log('[Admin Access] User verified via Supabase getUser');
-      } else {
-        console.log('[Admin Access] Supabase getUser failed:', error?.message, '- trying JWT decode fallback');
       }
     }
     
-    // Fallback: decode JWT payload to get email (JWT is signed by Supabase)
-    if (!authUser) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-          if (payload.email && payload.sub) {
-            authUser = {
-              id: payload.sub,
-              email: payload.email,
-              user_metadata: payload.user_metadata || {}
-            };
-            console.log('[Admin Access] User info extracted from JWT payload:', payload.email);
-          }
-        }
-      } catch (decodeError) {
-        console.error('[Admin Access] JWT decode failed:', decodeError);
-      }
+    if (!authUser && payload?.email && payload?.sub) {
+      authUser = {
+        id: payload.sub,
+        email: payload.email,
+        user_metadata: payload.user_metadata || {}
+      };
     }
     
     if (!authUser) {
-      console.log('[Admin Access] Could not verify user from token');
       res.status(401).json({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' });
       return;
     }
 
-    // AUTHORITATIVE CHECK: email must be in admins table
-    // This is the SINGLE SOURCE OF TRUTH for admin access per the admin identity model
     const emailIsAdmin = await isAdminByEmail(authUser.email || '');
     
+    const cacheExpiry = Math.min(jwtExp || Date.now() + 300000, Date.now() + 300000);
+    adminTokenCache.set(tokenHash, {
+      user: authUser,
+      isAdmin: emailIsAdmin,
+      expiry: cacheExpiry,
+    });
+    
+    if (adminTokenCache.size > 50) {
+      const now = Date.now();
+      for (const [key, val] of adminTokenCache.entries()) {
+        if (val.expiry < now) adminTokenCache.delete(key);
+      }
+    }
+    
     if (!emailIsAdmin) {
-      console.log(`[Admin Access] Denied for: ${authUser.email} (not in admins table)`);
       res.status(403).json({ error: 'Admin access required', code: 'NOT_ADMIN' });
       return;
     }
     
-    // Admin verified via email in admins table
-    console.log(`[Admin Access] Granted for: ${authUser.email} (verified via admins table)`);
     (req as any).isAdmin = true;
     (req as any).adminUser = {
       id: authUser.id,
@@ -135,24 +156,50 @@ async function requireAdminAccess(req: Request, res: Response, next: NextFunctio
 
   try {
     const token = authHeader.slice(7);
+    const tokenHash = token.slice(-16);
     
-    // Only use Supabase auth verification for admin status
-    if (!supabaseAdmin) {
-      (req as any).isAdmin = false;
+    const cached = adminTokenCache.get(tokenHash);
+    if (cached && Date.now() < cached.expiry) {
+      (req as any).isAdmin = cached.isAdmin;
+      if (cached.isAdmin) {
+        (req as any).adminUser = {
+          id: cached.user.id,
+          email: cached.user.email,
+          role: 'admin',
+          fullName: cached.user.user_metadata?.fullName || cached.user.user_metadata?.full_name,
+        };
+      }
       next();
       return;
     }
     
-    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    let authUser: { id: string; email: string; user_metadata?: any } | null = null;
+    let jwtExp = 0;
     
-    if (error || !authUser) {
+    const payload = decodeJwtPayload(token);
+    if (payload?.exp) {
+      jwtExp = payload.exp * 1000;
+    }
+    
+    if (supabaseAdmin) {
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && user) authUser = user;
+    }
+    
+    if (!authUser && payload?.email && payload?.sub) {
+      authUser = { id: payload.sub, email: payload.email, user_metadata: payload.user_metadata || {} };
+    }
+    
+    if (!authUser) {
       (req as any).isAdmin = false;
       next();
       return;
     }
 
-    // Admin status based ONLY on email in admins table
     const emailIsAdmin = await isAdminByEmail(authUser.email || '');
+    
+    const cacheExpiry = Math.min(jwtExp || Date.now() + 300000, Date.now() + 300000);
+    adminTokenCache.set(tokenHash, { user: authUser, isAdmin: emailIsAdmin, expiry: cacheExpiry });
     
     (req as any).isAdmin = emailIsAdmin;
     if (emailIsAdmin) {
@@ -165,7 +212,6 @@ async function requireAdminAccess(req: Request, res: Response, next: NextFunctio
     }
     next();
   } catch (error) {
-    console.error('[Admin Access] Error verifying admin status:', error);
     (req as any).isAdmin = false;
     next();
   }
