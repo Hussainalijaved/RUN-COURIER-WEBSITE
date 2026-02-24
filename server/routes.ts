@@ -1355,6 +1355,42 @@ export async function registerRoutes(
       
       const numberedJobs = assignStableJobNumbers(jobs);
       resolvedJobs = await resolveJobPodUrls(numberedJobs);
+      
+      if (supabaseAdmin) {
+        const multiDropJobIds = resolvedJobs.filter((j: any) => j.isMultiDrop).map((j: any) => j.id);
+        if (multiDropJobIds.length > 0) {
+          try {
+            const { data: stops } = await supabaseAdmin
+              .from('multi_drop_stops')
+              .select('job_id, stop_order, postcode, address, recipient_name, recipient_phone, instructions')
+              .in('job_id', multiDropJobIds)
+              .order('stop_order', { ascending: true });
+            
+            if (stops && stops.length > 0) {
+              const stopsMap: Record<string, any[]> = {};
+              for (const stop of stops) {
+                if (!stopsMap[stop.job_id]) stopsMap[stop.job_id] = [];
+                stopsMap[stop.job_id].push({
+                  stopOrder: stop.stop_order,
+                  postcode: stop.postcode,
+                  address: stop.address,
+                  recipientName: stop.recipient_name,
+                  recipientPhone: stop.recipient_phone,
+                  instructions: stop.instructions,
+                });
+              }
+              for (const job of resolvedJobs) {
+                if ((job as any).isMultiDrop && stopsMap[(job as any).id]) {
+                  (job as any).multiDropStops = stopsMap[(job as any).id];
+                }
+              }
+            }
+          } catch (err: any) {
+            console.error('[API Jobs] Error fetching multi-drop stops:', err.message);
+          }
+        }
+      }
+      
       cache.set(jobsCacheKey, resolvedJobs, CACHE_TTL.JOBS_LIST);
     }
     

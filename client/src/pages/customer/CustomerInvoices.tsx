@@ -271,7 +271,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
                         <div className="text-xs text-gray-700 mb-1">Collected from: {job.pickupAddress || job.pickupPostcode}</div>
                         {multiDropStops.map((stop: any, idx: number) => (
                           <div key={idx} className="text-xs text-gray-700 pl-3 py-0.5 border-l-2 border-primary/50">
-                            Delivered to: {stop.address || stop.postcode}
+                            Stop {stop.stopOrder || idx + 1}: {stop.address || stop.postcode}
                             {stop.recipientName && <span className="text-gray-600 ml-1">&mdash; {stop.recipientName}</span>}
                           </div>
                         ))}

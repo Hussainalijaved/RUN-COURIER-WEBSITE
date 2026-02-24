@@ -457,9 +457,9 @@ export default function AdminInvoices() {
               <div style="margin-top: 4px;">
                 <div style="font-weight: 600; color: #111; margin-bottom: 4px;">Same-Day Delivery &mdash; ${job.multiDropStops.length} drop-offs</div>
                 <div style="color: #333; font-size: 12px; margin-bottom: 2px;">Collected from: ${job.pickupAddress || 'N/A'}</div>
-                ${job.multiDropStops.map((stop: any) => `
+                ${job.multiDropStops.map((stop: any, index: number) => `
                   <div style="color: #333; font-size: 12px; padding-left: 12px; border-left: 2px solid #007BFF70; margin: 2px 0;">
-                    Delivered to: ${stop.address || stop.postcode}${stop.recipientName ? ` &mdash; ${stop.recipientName}` : ''}
+                    Stop ${stop.stopOrder || (index + 1)}: ${stop.address || stop.postcode}${stop.recipientName ? ` &mdash; ${stop.recipientName}` : ''}
                   </div>
                 `).join('')}
               </div>
@@ -1116,7 +1116,7 @@ export default function AdminInvoices() {
                                       <div className="text-xs text-muted-foreground mb-1">Collected from: {job.pickupAddress || 'N/A'}</div>
                                       {job.multiDropStops.map((stop: any, stopIdx: number) => (
                                         <div key={stopIdx} className="text-xs text-muted-foreground pl-3 py-0.5 border-l-2 border-primary/30">
-                                          Delivered to: {stop.address || stop.postcode}
+                                          Stop {stop.stopOrder || stopIdx + 1}: {stop.address || stop.postcode}
                                           {stop.recipientName && <span className="ml-1">&mdash; {stop.recipientName}</span>}
                                         </div>
                                       ))}
@@ -1653,6 +1653,11 @@ export default function AdminInvoices() {
                                 <p className="text-xs text-muted-foreground truncate max-w-[300px]">
                                   {job.pickupAddress || `${job.pickupPostcode} → ${job.deliveryPostcode}`}
                                 </p>
+                                {(job as any).isMultiDrop && (job as any).multiDropStops?.length > 0 && (
+                                  <p className="text-xs text-primary font-medium">
+                                    Multi-drop: {(job as any).multiDropStops.length} stops
+                                  </p>
+                                )}
                                 <p className="text-xs text-muted-foreground">
                                   {formatDate(job.createdAt)} - {job.status}
                                 </p>
