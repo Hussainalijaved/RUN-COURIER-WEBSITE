@@ -387,14 +387,16 @@ export default function AdminDocuments() {
                           <CardHeader className="cursor-pointer flex flex-row items-center gap-3 p-4">
                             <ChevronRight className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                             <FolderOpen className="h-5 w-5 text-primary shrink-0" />
-                            <span className="font-semibold" data-testid={`text-driver-name-${group.driverId}`}>
-                              {group.driverName}
-                            </span>
-                            {rcId && (
-                              <span className="text-muted-foreground text-sm" data-testid={`text-driver-id-${group.driverId}`}>
-                                {rcId}
+                            <div className="flex flex-col">
+                              <span className="font-semibold" data-testid={`text-driver-name-${group.driverId}`}>
+                                {group.driverName}
                               </span>
-                            )}
+                              {rcId && (
+                                <span className="text-muted-foreground text-sm" data-testid={`text-driver-id-${group.driverId}`}>
+                                  {rcId}
+                                </span>
+                              )}
+                            </div>
                           </CardHeader>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
