@@ -441,32 +441,30 @@ async function geocodePostcodesBulk(postcodes: string[]): Promise<void> {
   const unique = [...new Set(postcodes.map(p => p.trim().toUpperCase()))].filter(p => !postcodeGeoCache.has(p));
   if (unique.length === 0) return;
 
-  const batchSize = 100;
-  for (let i = 0; i < unique.length; i += batchSize) {
-    const batch = unique.slice(i, i + batchSize);
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    console.error('[PostcodeGeo] GOOGLE_MAPS_API_KEY not configured');
+    return;
+  }
+
+  for (const postcode of unique) {
     try {
-      const resp = await fetch('https://api.postcodes.io/postcodes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postcodes: batch }),
-      });
+      const resp = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode + ', UK')}&key=${apiKey}`
+      );
       if (!resp.ok) {
-        console.error(`[PostcodeGeo] API returned ${resp.status}`);
+        console.error(`[PostcodeGeo] Google API returned ${resp.status} for ${postcode}`);
         continue;
       }
       const data = await resp.json();
-      if (data.result && Array.isArray(data.result)) {
-        for (const item of data.result) {
-          if (item.result && item.result.latitude != null && item.result.longitude != null) {
-            postcodeGeoCache.set(item.query.toUpperCase(), {
-              lat: item.result.latitude,
-              lng: item.result.longitude,
-            });
-          }
-        }
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        const loc = data.results[0].geometry.location;
+        postcodeGeoCache.set(postcode, { lat: loc.lat, lng: loc.lng });
+      } else {
+        console.warn(`[PostcodeGeo] No result for ${postcode}: ${data.status}`);
       }
     } catch (err: any) {
-      console.error('[PostcodeGeo] Bulk lookup error:', err.message);
+      console.error(`[PostcodeGeo] Google geocode error for ${postcode}:`, err.message);
     }
   }
 }
