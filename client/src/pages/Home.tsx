@@ -225,7 +225,7 @@ export default function Home() {
         <div className="flex-1 flex items-center justify-center px-4 py-20">
           <div className="max-w-4xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
-              Fast. Reliable. Same-Dayy
+              Fast. Reliable. Same-Day
               <span className="block">Delivery Across the UK.</span>
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-10 max-w-2xl mx-auto">
