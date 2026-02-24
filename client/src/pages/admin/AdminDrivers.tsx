@@ -228,7 +228,7 @@ export default function AdminDrivers() {
     queryKey: ['/api/documents'],
   });
 
-  const { data: selectedDriverDocs } = useQuery<Document[]>({
+  const { data: selectedDriverDocs, isLoading: selectedDriverDocsLoading } = useQuery<Document[]>({
     queryKey: ['/api/documents', { driverId: selectedDriver?.id }],
     queryFn: async () => {
       if (!selectedDriver?.id) return [];
@@ -236,7 +236,7 @@ export default function AdminDrivers() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!selectedDriver?.id && documentsDialogOpen,
+    enabled: !!selectedDriver?.id,
   });
 
   const { data: users } = useQuery<User[]>({
@@ -391,38 +391,42 @@ export default function AdminDrivers() {
     }
 
     const existingDocs = documents?.filter((d) => d.driverId === driverId) || [];
-    if (existingDocs.length > 0) return existingDocs;
 
     const sbDriver = supabaseDrivers?.find((d: any) => d.id === driverId);
-    if (!sbDriver) return [];
     const raw = sbDriver as any;
     const fallbackDocs: any[] = [];
-    const colMap = [
-      { col: 'driving_licence_front_url', type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
-      { col: 'driving_licence_back_url', type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
-      { col: 'dbs_certificate_url', type: 'dbsCertificate', label: 'DBS Certificate' },
-      { col: 'goods_in_transit_insurance_url', type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
-      { col: 'hire_reward_insurance_url', type: 'hireAndReward', label: 'Hire & Reward Insurance' },
-      { col: 'profile_picture_url', type: 'profilePicture', label: 'Profile Picture' },
-    ];
-    for (const m of colMap) {
-      const url = raw[m.col];
-      if (url) {
-        fallbackDocs.push({
-          id: `${driverId}-${m.type}`,
-          driverId,
-          type: m.type,
-          fileName: m.label,
-          fileUrl: normalizeDocUrl(url),
-          status: 'approved',
-          uploadedAt: raw.created_at ? new Date(raw.created_at) : new Date(),
-          expiryDate: null,
-          reviewedBy: null,
-          reviewNotes: null,
-        });
+    if (raw) {
+      const colMap = [
+        { col: 'driving_licence_front_url', type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
+        { col: 'driving_licence_back_url', type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
+        { col: 'dbs_certificate_url', type: 'dbsCertificate', label: 'DBS Certificate' },
+        { col: 'goods_in_transit_insurance_url', type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
+        { col: 'hire_reward_insurance_url', type: 'hireAndReward', label: 'Hire & Reward Insurance' },
+        { col: 'profile_picture_url', type: 'profilePicture', label: 'Profile Picture' },
+      ];
+      for (const m of colMap) {
+        const url = raw[m.col];
+        if (url) {
+          fallbackDocs.push({
+            id: `${driverId}-${m.type}`,
+            driverId,
+            type: m.type,
+            fileName: m.label,
+            fileUrl: normalizeDocUrl(url),
+            signedUrl: normalizeDocUrl(url),
+            status: 'approved',
+            uploadedAt: raw.created_at ? new Date(raw.created_at) : new Date(),
+            expiryDate: null,
+            reviewedBy: null,
+            reviewNotes: null,
+          });
+        }
       }
     }
-    return fallbackDocs;
+
+    if (existingDocs.length > 0 && existingDocs.length >= fallbackDocs.length) return existingDocs;
+    if (fallbackDocs.length > 0) return fallbackDocs;
+    return existingDocs;
   };
 
   const normalizeDocType = (type: string): string => {
@@ -1542,7 +1546,12 @@ export default function AdminDrivers() {
             </DialogHeader>
             {selectedDriver && (
               <div className="space-y-4">
-                {getDriverDocuments(selectedDriver.id).length > 0 ? (
+                {selectedDriverDocsLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Loading documents...</p>
+                  </div>
+                ) : getDriverDocuments(selectedDriver.id).length > 0 ? (
                   getDriverDocuments(selectedDriver.id).map((doc) => (
                     <Card key={doc.id} className="p-4">
                       <div className="flex items-start justify-between gap-4">
