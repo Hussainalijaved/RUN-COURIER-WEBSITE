@@ -72,8 +72,8 @@ function mapDbToDriver(dbDriver: any): Driver {
     dbsChecked: dbDriver.dbs_checked,
     dbsCertificateUrl: dbDriver.dbs_certificate_url,
     dbsCheckDate: dbDriver.dbs_check_date ? new Date(dbDriver.dbs_check_date) : null,
-    vehicleType: dbDriver.vehicle_type as VehicleType,
-    vehicleRegistration: dbDriver.vehicle_registration,
+    vehicleType: (dbDriver.vehicle_type?.includes('|') ? dbDriver.vehicle_type.split('|')[0] : dbDriver.vehicle_type) as VehicleType,
+    vehicleRegistration: dbDriver.vehicle_registration || (dbDriver.vehicle_type?.includes('|') ? dbDriver.vehicle_type.split('|')[1] : null),
     vehicleMake: dbDriver.vehicle_make,
     vehicleModel: dbDriver.vehicle_model,
     vehicleColor: dbDriver.vehicle_color,
@@ -790,13 +790,32 @@ export class SupabaseStorage implements IStorage {
     if (data.accountNumber !== undefined) dbData.account_number = data.accountNumber;
     if (data.isActive !== undefined) dbData.is_active = data.isActive;
     
-    const { data: updated, error } = await supabase
+    let { data: updated, error } = await supabase
       .from('drivers')
       .update(dbData)
       .eq('id', id)
       .select()
       .single();
     
+    if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('vehicle_make') || error.message?.includes('vehicle_model') || error.message?.includes('vehicle_color') || error.message?.includes('column'))) {
+      console.warn('[SupabaseStorage] Retrying driver update without vehicle columns:', id);
+      const vehicleReg = dbData.vehicle_registration;
+      delete dbData.vehicle_registration;
+      delete dbData.vehicle_make;
+      delete dbData.vehicle_model;
+      delete dbData.vehicle_color;
+      if (vehicleReg && dbData.vehicle_type) {
+        dbData.vehicle_type = `${dbData.vehicle_type}|${vehicleReg}`;
+      } else if (vehicleReg) {
+        const existing = await supabase.from('drivers').select('vehicle_type').eq('id', id).single();
+        const baseType = existing.data?.vehicle_type?.split('|')[0] || 'car';
+        dbData.vehicle_type = `${baseType}|${vehicleReg}`;
+      }
+      const retry = await supabase.from('drivers').update(dbData).eq('id', id).select().single();
+      updated = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       console.error('[SupabaseStorage] Error updating driver:', id, error);
       return undefined;

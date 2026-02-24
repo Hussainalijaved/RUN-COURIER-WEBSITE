@@ -3167,11 +3167,32 @@ export async function registerRoutes(
         if (safeBody.rightToWorkShareCode !== undefined) supabaseUpdateData.right_to_work_share_code = safeBody.rightToWorkShareCode;
         
         if (Object.keys(supabaseUpdateData).length > 0) {
-          const { error } = await supabaseAdmin
+          let { error } = await supabaseAdmin
             .from('drivers')
             .update(supabaseUpdateData)
             .eq('id', req.params.id);
           
+          if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('vehicle_make') || error.message?.includes('column'))) {
+            const vehicleReg = supabaseUpdateData.vehicle_registration;
+            delete supabaseUpdateData.vehicle_registration;
+            delete supabaseUpdateData.vehicle_make;
+            delete supabaseUpdateData.vehicle_model;
+            delete supabaseUpdateData.vehicle_color;
+            if (vehicleReg && supabaseUpdateData.vehicle_type) {
+              supabaseUpdateData.vehicle_type = `${supabaseUpdateData.vehicle_type}|${vehicleReg}`;
+            } else if (vehicleReg) {
+              const existing = await supabaseAdmin.from('drivers').select('vehicle_type').eq('id', req.params.id).single();
+              const baseType = (existing.data?.vehicle_type as string)?.split('|')[0] || 'car';
+              supabaseUpdateData.vehicle_type = `${baseType}|${vehicleReg}`;
+            }
+            if (Object.keys(supabaseUpdateData).length > 0) {
+              const retry = await supabaseAdmin.from('drivers').update(supabaseUpdateData).eq('id', req.params.id);
+              error = retry.error;
+            } else {
+              error = null;
+            }
+          }
+
           if (error) {
             console.error("Failed to update driver in Supabase:", error);
           } else {
@@ -7446,11 +7467,28 @@ export async function registerRoutes(
               updateData.account_number = application.accountNumber;
             }
 
-            const { error: updateError } = await supabaseAdmin
+            let { error: updateError } = await supabaseAdmin
               .from('drivers')
               .update(updateData)
               .eq('id', driver.id);
             
+            if (updateError && (updateError.message?.includes('vehicle_registration') || updateError.message?.includes('vehicle_make') || updateError.message?.includes('vehicle_model') || updateError.message?.includes('vehicle_color') || updateError.message?.includes('column'))) {
+              console.warn(`[Driver Application] Retrying update without vehicle columns for driver ${driver.driver_code}`);
+              const vehicleReg = updateData.vehicle_registration;
+              delete updateData.vehicle_registration;
+              delete updateData.vehicle_make;
+              delete updateData.vehicle_model;
+              delete updateData.vehicle_color;
+              if (vehicleReg && updateData.vehicle_type) {
+                updateData.vehicle_type = `${updateData.vehicle_type}|${vehicleReg}`;
+              }
+              const retry = await supabaseAdmin.from('drivers').update(updateData).eq('id', driver.id);
+              updateError = retry.error;
+              if (retry.error) {
+                console.error(`[Driver Application] Retry also failed for driver ${driver.driver_code}:`, retry.error);
+              }
+            }
+
             if (updateError) {
               console.error(`[Driver Application] Failed to update driver ${driver.driver_code}:`, updateError);
             } else {
@@ -7661,9 +7699,23 @@ export async function registerRoutes(
                   }
                 }
 
-                const { error: insertError } = await supabaseAdmin
+                let { error: insertError } = await supabaseAdmin
                   .from('drivers')
                   .upsert(driverData, { onConflict: 'id' });
+
+                if (insertError && (insertError.message?.includes('vehicle_registration') || insertError.message?.includes('vehicle_make') || insertError.message?.includes('column'))) {
+                  console.warn(`[Driver Application] Retrying driver creation without vehicle columns`);
+                  const vehicleReg = driverData.vehicle_registration;
+                  delete driverData.vehicle_registration;
+                  delete driverData.vehicle_make;
+                  delete driverData.vehicle_model;
+                  delete driverData.vehicle_color;
+                  if (vehicleReg && driverData.vehicle_type) {
+                    driverData.vehicle_type = `${driverData.vehicle_type}|${vehicleReg}`;
+                  }
+                  const retry = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
+                  insertError = retry.error;
+                }
 
                 if (insertError) {
                   console.error(`[Driver Application] Failed to create driver record:`, insertError);
