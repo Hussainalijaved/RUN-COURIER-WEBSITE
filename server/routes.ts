@@ -4773,6 +4773,80 @@ export async function registerRoutes(
       const dateB = new Date(b.uploadedAt || 0).getTime();
       return dateB - dateA;
     });
+
+    try {
+      const uniqueDriverIds = [...new Set(allDocuments.map((d: any) => d.driverId).filter(Boolean))] as string[];
+      const { supabaseAdmin: sbClient } = await import('./supabaseAdmin');
+      if (uniqueDriverIds.length > 0 && sbClient) {
+        const { data: driverRows, error: driverErr } = await sbClient
+          .from('drivers')
+          .select('id, full_name, driver_code, email')
+          .in('id', uniqueDriverIds);
+        
+        if (driverErr) {
+          console.error('[Documents] Driver lookup error:', driverErr);
+        }
+        
+        if (driverRows && driverRows.length > 0) {
+          const driverLookup = new Map<string, { name: string; code: string }>();
+          for (const d of driverRows) {
+            driverLookup.set(d.id, {
+              name: d.full_name || d.email || '',
+              code: d.driver_code || '',
+            });
+          }
+          let enriched = 0;
+          const missingDriverIds: string[] = [];
+          for (const doc of allDocuments) {
+            const info = driverLookup.get(doc.driverId);
+            if (info) {
+              doc.driverName = info.name;
+              doc.driverCode = info.code;
+              enriched++;
+            } else if (!doc.driverName) {
+              if (!missingDriverIds.includes(doc.driverId)) {
+                missingDriverIds.push(doc.driverId);
+              }
+            }
+          }
+          
+          if (missingDriverIds.length > 0) {
+            try {
+              const { data: authUsers } = await sbClient.auth.admin.listUsers();
+              if (authUsers?.users) {
+                const authLookup = new Map<string, string>();
+                for (const u of authUsers.users) {
+                  authLookup.set(u.id, u.email || u.user_metadata?.full_name || '');
+                }
+                for (const doc of allDocuments) {
+                  if (!doc.driverName && missingDriverIds.includes(doc.driverId)) {
+                    const email = authLookup.get(doc.driverId);
+                    if (email) {
+                      doc.driverName = email;
+                      doc.driverCode = '';
+                      enriched++;
+                    } else {
+                      doc.driverName = 'Deleted Driver';
+                      doc.driverCode = doc.driverId.slice(0, 8);
+                    }
+                  }
+                }
+              }
+            } catch (authErr) {
+              for (const doc of allDocuments) {
+                if (!doc.driverName && missingDriverIds.includes(doc.driverId)) {
+                  doc.driverName = 'Deleted Driver';
+                  doc.driverCode = doc.driverId.slice(0, 8);
+                }
+              }
+            }
+          }
+          console.log(`[Documents] Enriched ${enriched}/${allDocuments.length} documents with driver info (${driverRows.length} drivers found, ${missingDriverIds.length} missing)`);
+        }
+      }
+    } catch (e) {
+      console.error('[Documents] Failed to enrich driver info:', e);
+    }
     
     console.log(`[Documents] Returning ${allDocuments.length} total documents from all sources`);
     

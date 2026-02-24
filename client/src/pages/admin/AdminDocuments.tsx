@@ -161,7 +161,9 @@ export default function AdminDocuments() {
     },
   });
 
-  const getDriverName = (driverId: string) => {
+  const getDriverName = (driverId: string, docs?: Document[]) => {
+    const docWithName = docs?.find((d: any) => d.driverName);
+    if (docWithName && (docWithName as any).driverName) return (docWithName as any).driverName;
     const driver = drivers?.find(d => d.id === driverId);
     if (driver?.fullName) return driver.fullName;
     const application = applications?.find(a => a.id === driverId);
@@ -170,7 +172,9 @@ export default function AdminDocuments() {
     return driverId.length > 20 ? `Driver: ${driverId.substring(0, 8)}...` : `Driver: ${driverId}`;
   };
 
-  const getDriverId = (driverId: string) => {
+  const getDriverId = (driverId: string, docs?: Document[]) => {
+    const docWithCode = docs?.find((d: any) => d.driverCode);
+    if (docWithCode && (docWithCode as any).driverCode) return (docWithCode as any).driverCode;
     const driver = drivers?.find(d => d.id === driverId);
     if (driver?.driverCode) return driver.driverCode;
     return null;
@@ -246,8 +250,9 @@ export default function AdminDocuments() {
     const groups: DriverGroup[] = [];
     const entries = Array.from(groupMap.entries());
     for (const [driverId, docs] of entries) {
-      const name = getDriverName(driverId);
-      if (searchQuery && !name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      const name = getDriverName(driverId, docs);
+      const code = getDriverId(driverId, docs);
+      if (searchQuery && !name.toLowerCase().includes(searchQuery.toLowerCase()) && !(code && code.toLowerCase().includes(searchQuery.toLowerCase()))) {
         continue;
       }
       groups.push({
@@ -375,7 +380,7 @@ export default function AdminDocuments() {
               <div className="space-y-3">
                 {driverGroups.map((group) => {
                   const isOpen = openDriverIds.has(group.driverId);
-                  const rcId = getDriverId(group.driverId);
+                  const rcId = getDriverId(group.driverId, group.docs);
                   return (
                     <Collapsible
                       key={group.driverId}
