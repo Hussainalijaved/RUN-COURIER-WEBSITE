@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -133,7 +133,6 @@ export default function AdminFleetFile() {
   const [viewingDoc, setViewingDoc] = useState<{ url: string; name: string; type: string } | null>(null);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();
 
   const { data: status, isLoading: statusLoading } = useQuery<FleetStatus>({
@@ -145,54 +144,47 @@ export default function AdminFleetFile() {
     enabled: !!status?.lastSync,
   });
 
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
+  const { data: progressData } = useQuery<SyncProgress>({
+    queryKey: ['/api/admin/fleet-file/sync-progress'],
+    refetchInterval: isSyncing ? 1500 : false,
+    enabled: isSyncing,
+  });
+
+  useEffect(() => {
+    if (!progressData) return;
+    setSyncProgress(progressData);
+
+    if (progressData.status === 'complete' && isSyncing) {
+      setIsSyncing(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/drivers'] });
+      toast({
+        title: 'Fleet File sync complete',
+        description: `${progressData.downloadedFiles} files downloaded${progressData.failedFiles > 0 ? `, ${progressData.failedFiles} failed` : ''}`,
+      });
+    } else if (progressData.status === 'error' && isSyncing) {
+      setIsSyncing(false);
+      toast({ title: 'Sync failed', description: progressData.error || 'Unknown error', variant: 'destructive' });
     }
-  }, []);
+  }, [progressData, isSyncing, toast]);
 
-  const pollProgress = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/fleet-file/sync-progress', { credentials: 'include' });
-      if (res.ok) {
-        const data: SyncProgress = await res.json();
-        setSyncProgress(data);
-
-        if (data.status === 'complete') {
-          stopPolling();
-          setIsSyncing(false);
-          queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/status'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/drivers'] });
-          toast({
-            title: 'Fleet File sync complete',
-            description: `${data.downloadedFiles} files downloaded${data.failedFiles > 0 ? `, ${data.failedFiles} failed` : ''}`,
-          });
-        } else if (data.status === 'error') {
-          stopPolling();
-          setIsSyncing(false);
-          toast({ title: 'Sync failed', description: data.error || 'Unknown error', variant: 'destructive' });
-        }
+  useEffect(() => {
+    fetch('/api/admin/fleet-file/sync-progress', {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    }).then(async res => {
+      if (!res.ok) {
+        const progressRes = await apiRequest('GET', '/api/admin/fleet-file/sync-progress');
+        return progressRes.json();
       }
-    } catch {}
-  }, [stopPolling, toast]);
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
-
-  useEffect(() => {
-    fetch('/api/admin/fleet-file/sync-progress', { credentials: 'include' })
-      .then(res => res.json())
-      .then((data: SyncProgress) => {
-        if (data.status === 'running') {
-          setSyncProgress(data);
-          setIsSyncing(true);
-          pollingRef.current = setInterval(pollProgress, 1500);
-        }
-      })
-      .catch(() => {});
-  }, [pollProgress]);
+      return res.json();
+    }).then((data: SyncProgress) => {
+      if (data.status === 'running') {
+        setSyncProgress(data);
+        setIsSyncing(true);
+      }
+    }).catch(() => {});
+  }, []);
 
   const startSync = async () => {
     setIsSyncing(true);
@@ -204,7 +196,6 @@ export default function AdminFleetFile() {
 
     try {
       await apiRequest('POST', '/api/admin/fleet-file/sync');
-      pollingRef.current = setInterval(pollProgress, 1500);
     } catch {
       setIsSyncing(false);
       toast({ title: 'Failed to start sync', variant: 'destructive' });
