@@ -2217,6 +2217,12 @@ export class SupabaseStorage implements IStorage {
     return mapDbToDriverPayment(updated);
   }
 
+  async deleteDriverPayment(id: string): Promise<boolean> {
+    const supabase = this.checkSupabase();
+    const { error } = await supabase.from('driver_payments').delete().eq('id', id);
+    return !error;
+  }
+
   private mapDbToPaymentLink(row: any): PaymentLink {
     return {
       id: row.id,

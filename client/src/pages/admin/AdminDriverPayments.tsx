@@ -57,6 +57,7 @@ import {
   Send,
   ArrowRight,
   Mail,
+  Trash2,
   X,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -224,6 +225,19 @@ export default function AdminDriverPayments() {
     },
     onError: () => {
       toast({ title: 'Failed to update payments', variant: 'destructive' });
+    },
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      return apiRequest('DELETE', `/api/driver-payments/${paymentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-payments'] });
+      toast({ title: 'Payment deleted' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete payment', variant: 'destructive' });
     },
   });
 
@@ -797,20 +811,35 @@ export default function AdminDriverPayments() {
                         <span className="text-sm">{formatDate(payment.paidAt || payment.createdAt)}</span>
                       </TableCell>
                       <TableCell>
-                        {payment.status === 'pending' && (
+                        <div className="flex items-center gap-1">
+                          {payment.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const reference = prompt('Enter payment reference:');
+                                if (reference) markPaidMutation.mutate({ paymentId: payment.id, reference });
+                              }}
+                              disabled={markPaidMutation.isPending}
+                              data-testid={`button-mark-paid-${payment.id}`}
+                            >
+                              {markPaidMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Mark Paid</>}
+                            </Button>
+                          )}
                           <Button
-                            size="sm"
-                            variant="outline"
+                            size="icon"
+                            variant="ghost"
                             onClick={() => {
-                              const reference = prompt('Enter payment reference:');
-                              if (reference) markPaidMutation.mutate({ paymentId: payment.id, reference });
+                              if (confirm(`Delete this ${formatPrice(payment.netAmount)} payment to ${getDriverName(payment.driverId)}?`)) {
+                                deletePaymentMutation.mutate(payment.id);
+                              }
                             }}
-                            disabled={markPaidMutation.isPending}
-                            data-testid={`button-mark-paid-${payment.id}`}
+                            disabled={deletePaymentMutation.isPending}
+                            data-testid={`button-delete-payment-${payment.id}`}
                           >
-                            {markPaidMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Mark Paid</>}
+                            <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

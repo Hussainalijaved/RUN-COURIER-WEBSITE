@@ -6514,6 +6514,15 @@ export async function registerRoutes(
     res.json(payment);
   }));
 
+  app.delete("/api/driver-payments/:id", asyncHandler(async (req, res) => {
+    const success = await storage.deleteDriverPayment(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: "Payment not found" });
+    }
+    console.log(`[Driver Payment] Deleted payment ${req.params.id}`);
+    res.json({ success: true });
+  }));
+
   app.get("/api/stripe/config", asyncHandler(async (req, res) => {
     try {
       const publishableKey = await getStripePublishableKey();

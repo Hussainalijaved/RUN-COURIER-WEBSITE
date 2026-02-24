@@ -135,6 +135,7 @@ export interface IStorage {
   getDriverPaymentStats(driverId: string): Promise<{ totalEarnings: number; pendingAmount: number; paidAmount: number; totalJobs: number }>;
   createDriverPayment(payment: InsertDriverPayment): Promise<DriverPayment>;
   updateDriverPayment(id: string, data: Partial<DriverPayment>): Promise<DriverPayment | undefined>;
+  deleteDriverPayment(id: string): Promise<boolean>;
 
   getPaymentLink(id: string): Promise<PaymentLink | undefined>;
   getPaymentLinkByToken(token: string): Promise<PaymentLink | undefined>;
@@ -1651,6 +1652,10 @@ export class MemStorage implements IStorage {
     const updatedPayment = { ...payment, ...data };
     this.driverPayments.set(id, updatedPayment);
     return updatedPayment;
+  }
+
+  async deleteDriverPayment(id: string): Promise<boolean> {
+    return this.driverPayments.delete(id);
   }
 
   async getPaymentLink(id: string): Promise<PaymentLink | undefined> {
