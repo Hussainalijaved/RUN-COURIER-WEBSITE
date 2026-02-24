@@ -501,7 +501,12 @@ export default function AdminInvoices() {
           .total { font-size: 24px; font-weight: bold; color: #007BFF; }
           .bank-details { margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 8px; color: #111; }
           .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #444; font-size: 12px; }
-          @media print { body { margin: 0; } }
+          @media print {
+            body { margin: 0; padding: 15mm 10mm; }
+            @page { margin: 10mm 10mm; size: A4; }
+            .bank-details { break-inside: avoid; }
+            .total-section { break-inside: avoid; }
+          }
         </style>
       </head>
       <body>
