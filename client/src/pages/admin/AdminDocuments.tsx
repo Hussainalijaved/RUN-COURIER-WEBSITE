@@ -384,33 +384,17 @@ export default function AdminDocuments() {
                     >
                       <Card data-testid={`card-driver-folder-${group.driverId}`}>
                         <CollapsibleTrigger asChild>
-                          <CardHeader className="cursor-pointer flex flex-row items-center justify-between gap-2 p-4">
-                            <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
-                              <ChevronRight className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-                              <FolderOpen className="h-5 w-5 text-primary shrink-0" />
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-semibold truncate" data-testid={`text-driver-name-${group.driverId}`}>
-                                    {group.driverName}
-                                  </span>
-                                  {rcId && (
-                                    <Badge variant="outline" className="text-xs shrink-0">{rcId}</Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                              <Badge variant="secondary" className="text-xs">{group.docs.length} docs</Badge>
-                              {group.pendingCount > 0 && (
-                                <Badge className="bg-yellow-500 text-xs">{group.pendingCount} pending</Badge>
-                              )}
-                              {group.approvedCount > 0 && (
-                                <Badge className="bg-green-500 text-xs">{group.approvedCount} approved</Badge>
-                              )}
-                              {group.rejectedCount > 0 && (
-                                <Badge className="bg-red-500 text-xs">{group.rejectedCount} rejected</Badge>
-                              )}
-                            </div>
+                          <CardHeader className="cursor-pointer flex flex-row items-center gap-3 p-4">
+                            <ChevronRight className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                            <FolderOpen className="h-5 w-5 text-primary shrink-0" />
+                            <span className="font-semibold" data-testid={`text-driver-name-${group.driverId}`}>
+                              {group.driverName}
+                            </span>
+                            {rcId && (
+                              <span className="text-muted-foreground text-sm" data-testid={`text-driver-id-${group.driverId}`}>
+                                {rcId}
+                              </span>
+                            )}
                           </CardHeader>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
