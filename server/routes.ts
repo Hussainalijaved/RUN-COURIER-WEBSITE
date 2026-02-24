@@ -11002,6 +11002,47 @@ export async function registerRoutes(
     return createHash('sha256').update(token).digest('hex');
   }
 
+  // Company bank details storage (simple file-based)
+  const companySettingsPath = path.join(process.cwd(), 'data', 'company-settings.json');
+  
+  const getCompanySettings = (): Record<string, any> => {
+    try {
+      if (fs.existsSync(companySettingsPath)) {
+        return JSON.parse(fs.readFileSync(companySettingsPath, 'utf8'));
+      }
+    } catch {}
+    return {};
+  };
+  
+  const saveCompanySettings = (settings: Record<string, any>) => {
+    const dir = path.dirname(companySettingsPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(companySettingsPath, JSON.stringify(settings, null, 2));
+  };
+  
+  app.get("/api/admin/company-bank-details", asyncHandler(async (req, res) => {
+    const settings = getCompanySettings();
+    res.json(settings.bankDetails || null);
+  }));
+  
+  app.put("/api/admin/company-bank-details", asyncHandler(async (req, res) => {
+    const { bankName, accountHolderName, sortCode, accountNumber } = req.body;
+    if (!bankName || !sortCode || !accountNumber) {
+      return res.status(400).json({ error: "Bank name, sort code, and account number are required" });
+    }
+    const settings = getCompanySettings();
+    settings.bankDetails = {
+      bankName,
+      accountHolderName: accountHolderName || '',
+      sortCode,
+      accountNumber,
+      updatedAt: new Date().toISOString(),
+    };
+    saveCompanySettings(settings);
+    console.log('[Admin] Company bank details saved');
+    res.json(settings.bankDetails);
+  }));
+
   // Admin: Generate and send payment link for a job
   app.post("/api/admin/payment-links", asyncHandler(async (req, res) => {
     const { jobId, adminId, customerEmail: providedEmail, customerName: providedName } = req.body;

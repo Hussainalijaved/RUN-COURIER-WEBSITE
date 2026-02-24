@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
   FormControl,
@@ -59,12 +61,27 @@ import {
   Calendar,
   MapPin,
   ChevronRight,
+  Building2,
+  Edit2,
+  Save,
+  Eye,
+  EyeOff,
+  Banknote,
+  Copy,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { insertDriverPaymentSchema } from '@shared/schema';
 import type { Driver, DriverPayment, Job } from '@shared/schema';
+
+interface CompanyBankDetails {
+  bankName: string;
+  accountHolderName: string;
+  sortCode: string;
+  accountNumber: string;
+  updatedAt?: string;
+}
 
 interface WeeklyJob {
   id: string;
@@ -113,6 +130,15 @@ export default function AdminDriverPayments() {
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<string[]>([]);
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
   const [showBankDetails, setShowBankDetails] = useState(false);
+  const [editingCompanyBank, setEditingCompanyBank] = useState(false);
+  const [showCompanyAccountNumber, setShowCompanyAccountNumber] = useState(false);
+  const [companyBankForm, setCompanyBankForm] = useState<CompanyBankDetails>({
+    bankName: '',
+    accountHolderName: '',
+    sortCode: '',
+    accountNumber: '',
+  });
+  const [prefilledAmount, setPrefilledAmount] = useState<string>('');
   const { toast } = useToast();
 
   const form = useForm<PaymentFormValues>({
@@ -145,7 +171,16 @@ export default function AdminDriverPayments() {
     queryKey: ['/api/driver-jobs/weekly'],
   });
 
-  // Group weekly jobs by driver
+  const { data: companyBankDetails, isLoading: companyBankLoading } = useQuery<CompanyBankDetails | null>({
+    queryKey: ['/api/admin/company-bank-details'],
+  });
+
+  useEffect(() => {
+    if (companyBankDetails) {
+      setCompanyBankForm(companyBankDetails);
+    }
+  }, [companyBankDetails]);
+
   const driverJobGroups: DriverJobGroup[] = (() => {
     const groupMap = new Map<string, WeeklyJob[]>();
     
@@ -200,9 +235,12 @@ export default function AdminDriverPayments() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/driver-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-jobs/weekly'] });
       toast({ title: 'Payment recorded successfully' });
       setPaymentDialogOpen(false);
       form.reset();
+      setSelectedDriverId('');
+      setPrefilledAmount('');
     },
     onError: () => {
       toast({ title: 'Failed to create payment', variant: 'destructive' });
@@ -247,6 +285,20 @@ export default function AdminDriverPayments() {
     },
   });
 
+  const saveCompanyBankMutation = useMutation({
+    mutationFn: async (data: CompanyBankDetails) => {
+      return apiRequest('PUT', '/api/admin/company-bank-details', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/company-bank-details'] });
+      toast({ title: 'Company bank details saved' });
+      setEditingCompanyBank(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to save company bank details', variant: 'destructive' });
+    },
+  });
+
   const selectedDriver = drivers.find(d => d.id === selectedDriverId);
   const hasBankDetails = selectedDriver?.bankName && selectedDriver?.sortCode && selectedDriver?.accountNumber;
 
@@ -264,6 +316,24 @@ export default function AdminDriverPayments() {
     }
   };
 
+  const openPayForDriver = (driverId: string, amount?: number) => {
+    setSelectedDriverId(driverId);
+    form.setValue('driverId', driverId);
+    if (amount) {
+      form.setValue('amount', amount.toFixed(2));
+      setPrefilledAmount(amount.toFixed(2));
+    }
+    const driver = drivers.find(d => d.id === driverId);
+    if (driver) {
+      form.setValue('bankName', driver.bankName || '');
+      form.setValue('accountHolderName', driver.accountHolderName || '');
+      form.setValue('sortCode', driver.sortCode || '');
+      form.setValue('accountNumber', driver.accountNumber || '');
+      setShowBankDetails(!driver.bankName || !driver.sortCode || !driver.accountNumber);
+    }
+    setPaymentDialogOpen(true);
+  };
+
   const handleSaveBankDetails = () => {
     const bankName = form.getValues('bankName');
     const accountHolderName = form.getValues('accountHolderName');
@@ -278,6 +348,14 @@ export default function AdminDriverPayments() {
     saveBankDetailsMutation.mutate({
       driverId: selectedDriverId,
       bankDetails: { bankName, accountHolderName: accountHolderName || '', sortCode, accountNumber },
+    });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: `${label} copied` });
+    }).catch(() => {
+      toast({ title: 'Failed to copy', variant: 'destructive' });
     });
   };
 
@@ -330,6 +408,14 @@ export default function AdminDriverPayments() {
     });
   };
 
+  const formatSortCode = (code: string) => {
+    const digits = code.replace(/\D/g, '');
+    if (digits.length === 6) {
+      return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 6)}`;
+    }
+    return code;
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -369,7 +455,12 @@ export default function AdminDriverPayments() {
             <p className="text-muted-foreground">Manage and record payments to drivers</p>
           </div>
           <Button 
-            onClick={() => setPaymentDialogOpen(true)}
+            onClick={() => {
+              setSelectedDriverId('');
+              setPrefilledAmount('');
+              form.reset();
+              setPaymentDialogOpen(true);
+            }}
             data-testid="button-new-payment"
           >
             <PoundSterling className="w-4 h-4 mr-2" />
@@ -423,6 +514,312 @@ export default function AdminDriverPayments() {
           </Card>
         </div>
 
+        <Card data-testid="card-company-bank">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>Run Courier Bank Details</CardTitle>
+            </div>
+            {!editingCompanyBank && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingCompanyBank(true)}
+                data-testid="button-edit-company-bank"
+              >
+                <Edit2 className="h-4 w-4 mr-1" />
+                {companyBankDetails ? 'Edit' : 'Add Details'}
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {companyBankLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : editingCompanyBank ? (
+              <div className="space-y-3 max-w-md">
+                <div>
+                  <Label>Bank Name</Label>
+                  <Input
+                    value={companyBankForm.bankName}
+                    onChange={(e) => setCompanyBankForm(prev => ({ ...prev, bankName: e.target.value }))}
+                    placeholder="e.g. Barclays, HSBC, Lloyds"
+                    data-testid="input-company-bank-name"
+                  />
+                </div>
+                <div>
+                  <Label>Account Holder Name</Label>
+                  <Input
+                    value={companyBankForm.accountHolderName}
+                    onChange={(e) => setCompanyBankForm(prev => ({ ...prev, accountHolderName: e.target.value }))}
+                    placeholder="Run Courier Ltd"
+                    data-testid="input-company-account-holder"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Sort Code</Label>
+                    <Input
+                      value={companyBankForm.sortCode}
+                      onChange={(e) => setCompanyBankForm(prev => ({ ...prev, sortCode: e.target.value }))}
+                      placeholder="00-00-00"
+                      data-testid="input-company-sort-code"
+                    />
+                  </div>
+                  <div>
+                    <Label>Account Number</Label>
+                    <Input
+                      value={companyBankForm.accountNumber}
+                      onChange={(e) => setCompanyBankForm(prev => ({ ...prev, accountNumber: e.target.value }))}
+                      placeholder="12345678"
+                      data-testid="input-company-account-number"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => saveCompanyBankMutation.mutate(companyBankForm)}
+                    disabled={saveCompanyBankMutation.isPending || !companyBankForm.bankName || !companyBankForm.sortCode || !companyBankForm.accountNumber}
+                    data-testid="button-save-company-bank"
+                  >
+                    {saveCompanyBankMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditingCompanyBank(false);
+                      if (companyBankDetails) setCompanyBankForm(companyBankDetails);
+                    }}
+                    data-testid="button-cancel-company-bank"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : companyBankDetails ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Bank</p>
+                  <p className="font-medium" data-testid="text-company-bank-name">{companyBankDetails.bankName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Account Holder</p>
+                  <p className="font-medium" data-testid="text-company-account-holder">{companyBankDetails.accountHolderName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Sort Code</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono font-medium" data-testid="text-company-sort-code">{formatSortCode(companyBankDetails.sortCode)}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => copyToClipboard(companyBankDetails.sortCode, 'Sort code')}
+                      data-testid="button-copy-company-sort-code"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Account Number</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono font-medium" data-testid="text-company-account-number">
+                      {showCompanyAccountNumber ? companyBankDetails.accountNumber : `****${companyBankDetails.accountNumber.slice(-4)}`}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setShowCompanyAccountNumber(!showCompanyAccountNumber)}
+                      data-testid="button-toggle-company-account"
+                    >
+                      {showCompanyAccountNumber ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => copyToClipboard(companyBankDetails.accountNumber, 'Account number')}
+                      data-testid="button-copy-company-account"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground text-sm">No company bank details saved yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Click "Add Details" to save Run Courier's bank information</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-weekly-jobs">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <CardTitle>Driver Earnings & Pay</CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Completed jobs - click Pay to make payment
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {weeklyJobsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : driverJobGroups.length > 0 ? (
+              <Accordion type="multiple" className="w-full">
+                {driverJobGroups.map((group) => {
+                  const driverHasBank = group.driver.bankName && group.driver.sortCode && group.driver.accountNumber;
+                  return (
+                  <AccordionItem key={group.driver.id} value={group.driver.id} data-testid={`accordion-driver-${group.driver.id}`}>
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex flex-1 items-center justify-between pr-4 gap-2 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{group.driver.fullName}</span>
+                            <span className="text-xs text-muted-foreground font-mono">{group.driver.driverCode || 'No ID'}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" data-testid={`badge-job-count-${group.driver.id}`}>
+                            {group.jobs.length} job{group.jobs.length !== 1 ? 's' : ''}
+                          </Badge>
+                          <span className="font-semibold text-green-600">{formatPrice(group.totalEarnings)}</span>
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openPayForDriver(group.driver.id, group.totalEarnings);
+                            }}
+                            data-testid={`button-pay-driver-${group.driver.id}`}
+                          >
+                            <Banknote className="w-4 h-4 mr-1" />
+                            Pay
+                          </Button>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {driverHasBank && (
+                        <div className="mb-4 p-3 bg-muted/50 rounded-md">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Driver Bank Details</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Bank:</span>{' '}
+                              <span className="font-medium">{group.driver.bankName}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Name:</span>{' '}
+                              <span className="font-medium">{group.driver.accountHolderName || group.driver.fullName}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">Sort:</span>{' '}
+                              <span className="font-mono font-medium">{formatSortCode(group.driver.sortCode || '')}</span>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(group.driver.sortCode || '', 'Sort code')}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">Acc:</span>{' '}
+                              <span className="font-mono font-medium">{group.driver.accountNumber}</span>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(group.driver.accountNumber || '', 'Account number')}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Job Number</TableHead>
+                              <TableHead>Pickup</TableHead>
+                              <TableHead>Delivery</TableHead>
+                              <TableHead>Date</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.jobs.map((job) => (
+                              <TableRow key={job.id} data-testid={`row-weekly-job-${job.id}`}>
+                                <TableCell>
+                                  <span className="font-mono text-sm font-medium">{job.trackingNumber}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-start gap-1">
+                                    <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-medium">{job.pickupPostcode}</span>
+                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                        {job.pickupAddress}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-start gap-1">
+                                    <ChevronRight className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-medium">{job.deliveryPostcode}</span>
+                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                        {job.deliveryAddress}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-sm">
+                                    {formatDate(job.deliveredAt || job.actualDeliveryTime || job.createdAt)}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className="font-medium text-green-600">
+                                    {formatPrice(job.driverPrice || job.totalPrice)}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-muted/50">
+                              <TableCell colSpan={4} className="font-medium text-right">
+                                Total for {group.driver.fullName}:
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-bold text-green-600">{formatPrice(group.totalEarnings)}</span>
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No completed jobs this week</p>
+                <p className="text-sm text-muted-foreground">Completed deliveries will appear here</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card data-testid="card-payments-table">
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -454,7 +851,7 @@ export default function AdminDriverPayments() {
               </div>
             </div>
             {selectedPaymentIds.length > 0 && (
-              <div className="flex items-center gap-2 mt-4 p-2 bg-muted rounded-md">
+              <div className="flex items-center gap-2 mt-4 p-2 bg-muted rounded-md flex-wrap">
                 <span className="text-sm">{selectedPaymentIds.length} selected</span>
                 <Button
                   size="sm"
@@ -598,122 +995,6 @@ export default function AdminDriverPayments() {
             )}
           </CardContent>
         </Card>
-
-        <Card data-testid="card-weekly-jobs">
-          <CardHeader>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-                <CardTitle>Weekly Job Reference</CardTitle>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Completed jobs this week for payment reference
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {weeklyJobsLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
-              </div>
-            ) : driverJobGroups.length > 0 ? (
-              <Accordion type="multiple" className="w-full">
-                {driverJobGroups.map((group) => (
-                  <AccordionItem key={group.driver.id} value={group.driver.id} data-testid={`accordion-driver-${group.driver.id}`}>
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex flex-1 items-center justify-between pr-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium">{group.driver.fullName}</span>
-                            <span className="text-xs text-muted-foreground font-mono">{group.driver.driverCode || 'No ID'}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Badge variant="outline" data-testid={`badge-job-count-${group.driver.id}`}>
-                            {group.jobs.length} job{group.jobs.length !== 1 ? 's' : ''}
-                          </Badge>
-                          <span className="font-semibold text-green-600">{formatPrice(group.totalEarnings)}</span>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Job Number</TableHead>
-                              <TableHead>Pickup</TableHead>
-                              <TableHead>Delivery</TableHead>
-                              <TableHead>Date</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {group.jobs.map((job) => (
-                              <TableRow key={job.id} data-testid={`row-weekly-job-${job.id}`}>
-                                <TableCell>
-                                  <span className="font-mono text-sm font-medium">{job.trackingNumber}</span>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-start gap-1">
-                                    <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
-                                    <div className="flex flex-col">
-                                      <span className="text-sm font-medium">{job.pickupPostcode}</span>
-                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                        {job.pickupAddress}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-start gap-1">
-                                    <ChevronRight className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
-                                    <div className="flex flex-col">
-                                      <span className="text-sm font-medium">{job.deliveryPostcode}</span>
-                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                        {job.deliveryAddress}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm">
-                                    {formatDate(job.deliveredAt || job.actualDeliveryTime || job.createdAt)}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <span className="font-medium text-green-600">
-                                    {formatPrice(job.driverPrice || job.totalPrice)}
-                                  </span>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                            <TableRow className="bg-muted/50">
-                              <TableCell colSpan={4} className="font-medium text-right">
-                                Total for {group.driver.fullName}:
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <span className="font-bold text-green-600">{formatPrice(group.totalEarnings)}</span>
-                              </TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No completed jobs this week</p>
-                <p className="text-sm text-muted-foreground">Completed deliveries will appear here</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       <Dialog open={paymentDialogOpen} onOpenChange={(open) => {
@@ -722,13 +1003,17 @@ export default function AdminDriverPayments() {
           form.reset();
           setSelectedDriverId('');
           setShowBankDetails(false);
+          setPrefilledAmount('');
         }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Record Driver Payment</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5" />
+              Record Driver Payment
+            </DialogTitle>
             <DialogDescription>
-              Select a driver, enter bank details, and record a payment
+              Select a driver, verify bank details, and record a payment
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -752,7 +1037,7 @@ export default function AdminDriverPayments() {
                             value={driver.id}
                             data-testid={`select-item-driver-${driver.id}`}
                           >
-                            {driver.fullName} ({driver.driverCode || 'No ID'})
+                            {driver.driverCode ? `${driver.driverCode} - ` : ''}{driver.fullName}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -765,7 +1050,10 @@ export default function AdminDriverPayments() {
               {selectedDriverId && (
                 <div className="rounded-lg border p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Bank Details</span>
+                    <span className="text-sm font-medium flex items-center gap-1">
+                      <CreditCard className="h-4 w-4" />
+                      Driver Bank Details
+                    </span>
                     {hasBankDetails && !showBankDetails && (
                       <Button 
                         type="button" 
@@ -774,28 +1062,39 @@ export default function AdminDriverPayments() {
                         onClick={() => setShowBankDetails(true)}
                         data-testid="button-edit-bank-details"
                       >
+                        <Edit2 className="h-3 w-3 mr-1" />
                         Edit
                       </Button>
                     )}
                   </div>
                   
                   {hasBankDetails && !showBankDetails ? (
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Bank:</span>
-                        <span data-testid="text-bank-name">{selectedDriver?.bankName}</span>
+                        <span className="font-medium" data-testid="text-bank-name">{selectedDriver?.bankName}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Account Holder:</span>
-                        <span data-testid="text-account-holder">{selectedDriver?.accountHolderName || selectedDriver?.fullName}</span>
+                        <span className="font-medium" data-testid="text-account-holder">{selectedDriver?.accountHolderName || selectedDriver?.fullName}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Sort Code:</span>
-                        <span data-testid="text-sort-code">{selectedDriver?.sortCode}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-medium" data-testid="text-sort-code">{formatSortCode(selectedDriver?.sortCode || '')}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(selectedDriver?.sortCode || '', 'Sort code')}>
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Account:</span>
-                        <span data-testid="text-account-number">****{selectedDriver?.accountNumber?.slice(-4)}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-medium" data-testid="text-account-number">{selectedDriver?.accountNumber}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(selectedDriver?.accountNumber || '', 'Account number')}>
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -861,7 +1160,9 @@ export default function AdminDriverPayments() {
                       >
                         {saveBankDetailsMutation.isPending ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : null}
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
                         Save Bank Details
                       </Button>
                     </div>
@@ -910,10 +1211,10 @@ export default function AdminDriverPayments() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Description (optional)</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Payment description..."
+                        placeholder="e.g. Weekly payment, bonus..."
                         data-testid="input-description"
                         {...field}
                       />
@@ -928,7 +1229,7 @@ export default function AdminDriverPayments() {
                     Please save bank details before recording payment
                   </p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -937,6 +1238,7 @@ export default function AdminDriverPayments() {
                       form.reset();
                       setSelectedDriverId('');
                       setShowBankDetails(false);
+                      setPrefilledAmount('');
                     }} 
                     data-testid="button-cancel"
                   >
@@ -945,6 +1247,7 @@ export default function AdminDriverPayments() {
                   <Button
                     type="submit"
                     disabled={createPaymentMutation.isPending || !selectedDriverId || !hasBankDetails}
+                    className="flex-1 sm:flex-none"
                     data-testid="button-record-payment"
                   >
                     {createPaymentMutation.isPending ? (
