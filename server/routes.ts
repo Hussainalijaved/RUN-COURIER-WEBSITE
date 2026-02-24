@@ -8851,10 +8851,12 @@ export async function registerRoutes(
       ? parseFloat(rawAmount) 
       : (rawAmount || 0);
     
-    console.log(`[Invoice Resend] Sending invoice ${invoice.invoice_number} to ${invoice.customer_email}`);
+    // Allow admin to override the recipient email
+    const targetEmail = req.body?.overrideEmail || invoice.customer_email;
+    console.log(`[Invoice Resend] Sending invoice ${invoice.invoice_number} to ${targetEmail}`);
     
     const success = await sendInvoiceToCustomerWithPaymentLink(
-      invoice.customer_email,
+      targetEmail,
       invoice.customer_name,
       invoice.invoice_number,
       totalAmount,
@@ -8871,8 +8873,8 @@ export async function registerRoutes(
     if (success) {
       res.json({ 
         success: true, 
-        message: `Invoice resent to ${invoice.customer_email}`,
-        customerEmail: invoice.customer_email 
+        message: `Invoice resent to ${targetEmail}`,
+        customerEmail: targetEmail 
       });
     } else {
       res.status(500).json({ error: "Failed to resend invoice email" });

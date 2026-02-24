@@ -166,6 +166,9 @@ export default function AdminInvoices() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bulkSendDialogOpen, setBulkSendDialogOpen] = useState(false);
   const [overrideEmail, setOverrideEmail] = useState('');
+  const [sendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
+  const [sendEmailInvoice, setSendEmailInvoice] = useState<SavedInvoice | null>(null);
+  const [sendEmailAddress, setSendEmailAddress] = useState('');
   const { toast } = useToast();
 
   const form = useForm<CreateInvoiceFormData>({
@@ -289,25 +292,50 @@ export default function AdminInvoices() {
 
   // Resend invoice mutation
   const resendInvoiceMutation = useMutation({
-    mutationFn: async (invoice: SavedInvoice) => {
-      const response = await apiRequest('POST', `/api/invoices/${invoice.id}/resend`);
+    mutationFn: async ({ invoice, overrideEmail }: { invoice: SavedInvoice; overrideEmail?: string }) => {
+      const response = await apiRequest('POST', `/api/invoices/${invoice.id}/resend`, 
+        overrideEmail ? { overrideEmail } : undefined
+      );
       return response.json();
     },
     onSuccess: (result: any) => {
       toast({ 
-        title: 'Invoice resent successfully', 
+        title: 'Invoice sent successfully', 
         description: `Invoice sent to ${result.customerEmail}`
       });
+      setSendEmailDialogOpen(false);
+      setSendEmailInvoice(null);
+      setSendEmailAddress('');
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
     },
     onError: (error: any) => {
       toast({ 
-        title: 'Failed to resend invoice', 
+        title: 'Failed to send invoice', 
         description: error?.message || 'Please try again',
         variant: 'destructive' 
       });
     },
   });
+
+  const openSendEmailDialog = (invoice: SavedInvoice) => {
+    setSendEmailInvoice(invoice);
+    setSendEmailAddress(invoice.customer_email || '');
+    setSendEmailDialogOpen(true);
+  };
+
+  const handleSendEmail = () => {
+    if (!sendEmailInvoice) return;
+    const emailToUse = sendEmailAddress.trim();
+    if (!emailToUse || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToUse)) {
+      toast({ title: 'Please enter a valid email address', variant: 'destructive' });
+      return;
+    }
+    const isOverride = emailToUse !== sendEmailInvoice.customer_email;
+    resendInvoiceMutation.mutate({ 
+      invoice: sendEmailInvoice, 
+      overrideEmail: isOverride ? emailToUse : undefined 
+    });
+  };
 
   // Bulk send invoices mutation
   const bulkSendInvoicesMutation = useMutation({
@@ -1021,17 +1049,16 @@ export default function AdminInvoices() {
                                 <DropdownMenuItem 
                                   onClick={() => {
                                     if (fullInvoice) {
-                                      resendInvoiceMutation.mutate(fullInvoice);
+                                      openSendEmailDialog(fullInvoice);
                                     } else {
                                       toast({ title: 'Loading invoice...', description: 'Please try again in a moment' });
                                       refetchInvoices();
                                     }
                                   }}
-                                  disabled={resendInvoiceMutation.isPending}
                                   data-testid={`menu-resend-recent-${index}`}
                                 >
                                   <Mail className="h-4 w-4 mr-2" />
-                                  Resend Email
+                                  Send Email
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   onClick={() => {
@@ -1215,12 +1242,11 @@ export default function AdminInvoices() {
                                 Edit Invoice
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => resendInvoiceMutation.mutate(invoice)}
-                                disabled={resendInvoiceMutation.isPending}
+                                onClick={() => openSendEmailDialog(invoice)}
                                 data-testid={`menu-resend-invoice-${invoice.id}`}
                               >
                                 <Mail className="h-4 w-4 mr-2" />
-                                Resend Email
+                                Send Email
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => printInvoice(invoice)}
@@ -1432,9 +1458,9 @@ export default function AdminInvoices() {
                 <Printer className="h-4 w-4 mr-2" />
                 Print
               </Button>
-              <Button variant="outline" onClick={() => viewInvoice && resendInvoiceMutation.mutate(viewInvoice)} disabled={resendInvoiceMutation.isPending}>
+              <Button variant="outline" onClick={() => viewInvoice && openSendEmailDialog(viewInvoice)}>
                 <Mail className="h-4 w-4 mr-2" />
-                Resend
+                Send Email
               </Button>
               {viewInvoice?.status !== 'paid' && (
                 <Button onClick={() => viewInvoice && markPaidMutation.mutate(viewInvoice.id)} disabled={markPaidMutation.isPending}>
@@ -2045,6 +2071,72 @@ export default function AdminInvoices() {
                   <Send className="h-4 w-4 mr-2" />
                 )}
                 Send Invoice{selectedInvoiceIds.length !== 1 ? 's' : ''}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* Send Email Dialog */}
+        <Dialog 
+          open={sendEmailDialogOpen} 
+          onOpenChange={(open) => {
+            setSendEmailDialogOpen(open);
+            if (!open) {
+              setSendEmailInvoice(null);
+              setSendEmailAddress('');
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Invoice</DialogTitle>
+              <DialogDescription>
+                {sendEmailInvoice?.invoice_number} - Send this invoice to any email address.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="send-email-address">Email Address</Label>
+                <Input
+                  id="send-email-address"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={sendEmailAddress}
+                  onChange={(e) => setSendEmailAddress(e.target.value)}
+                  data-testid="input-send-email-address"
+                />
+                {sendEmailAddress.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sendEmailAddress.trim()) && (
+                  <p className="text-sm text-destructive">Please enter a valid email address</p>
+                )}
+                {sendEmailInvoice && sendEmailAddress.trim() !== sendEmailInvoice.customer_email && sendEmailAddress.trim() && (
+                  <p className="text-sm text-muted-foreground">
+                    Original email: {sendEmailInvoice.customer_email}
+                  </p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSendEmailDialogOpen(false);
+                  setSendEmailInvoice(null);
+                  setSendEmailAddress('');
+                }}
+                disabled={resendInvoiceMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSendEmail}
+                disabled={resendInvoiceMutation.isPending || !sendEmailAddress.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sendEmailAddress.trim())}
+                data-testid="button-confirm-send-email"
+              >
+                {resendInvoiceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Send Invoice
               </Button>
             </DialogFooter>
           </DialogContent>
