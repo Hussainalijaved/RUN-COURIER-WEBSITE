@@ -1330,27 +1330,34 @@ export async function registerRoutes(
     }
   }));
 
+  const invalidateJobsCache = () => cache.invalidatePattern('^jobs:');
+  
   app.get("/api/jobs", asyncHandler(async (req, res) => {
     const { status, customerId, driverId, vendorId, limit = 50 } = req.query;
     if (process.env.NODE_ENV === 'development') {
       console.log(`[API Jobs] Fetching jobs with customerId: ${customerId}, driverId: ${driverId}`);
     }
-    const jobs = await storage.getJobs({
-      status: status as JobStatus | undefined,
-      customerId: customerId as string | undefined,
-      driverId: driverId as string | undefined,
-      vendorId: vendorId as string | undefined,
-      limit: Number(limit),
-    });
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API Jobs] Found ${jobs.length} jobs for customerId: ${customerId}`);
+    
+    const jobsCacheKey = `jobs:${status || 'all'}:${customerId || 'all'}:${driverId || 'all'}:${vendorId || 'all'}:${limit}`;
+    let resolvedJobs = cache.get<any[]>(jobsCacheKey);
+    
+    if (!resolvedJobs) {
+      const jobs = await storage.getJobs({
+        status: status as JobStatus | undefined,
+        customerId: customerId as string | undefined,
+        driverId: driverId as string | undefined,
+        vendorId: vendorId as string | undefined,
+        limit: Number(limit),
+      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API Jobs] Found ${jobs.length} jobs for customerId: ${customerId}`);
+      }
+      
+      const numberedJobs = assignStableJobNumbers(jobs);
+      resolvedJobs = await resolveJobPodUrls(numberedJobs);
+      cache.set(jobsCacheKey, resolvedJobs, CACHE_TTL.JOBS_LIST);
     }
     
-    // Auto-assign stable job numbers to jobs that don't have one
-    const numberedJobs = assignStableJobNumbers(jobs);
-    const resolvedJobs = await resolveJobPodUrls(numberedJobs);
-    
-    // SECURITY: Check user role and identity
     let isAdmin = false;
     let isCustomerViewingOwn = false;
     let authenticatedUserId: string | null = null;
@@ -1363,7 +1370,6 @@ export async function registerRoutes(
       isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
       authenticatedUserId = user?.id || null;
       
-      // Customer or Business viewing their own jobs - they can see their prices
       if ((user?.role === 'customer' || user?.role === 'business') && customerId && authenticatedUserId === customerId) {
         isCustomerViewingOwn = true;
       }
