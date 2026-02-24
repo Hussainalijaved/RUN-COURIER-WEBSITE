@@ -39,8 +39,11 @@ import {
   Shield,
   File,
   Calendar,
-  ChevronRight,
   Eye,
+  Image,
+  FileDown,
+  XCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -52,12 +55,16 @@ interface FleetStatus {
     totalDrivers: number;
     totalApplications: number;
     totalDocuments: number;
+    downloadedFiles?: number;
+    failedFiles?: number;
   } | null;
   syncLog: Array<{
     timestamp: string;
     drivers: number;
     applications: number;
     documents: number;
+    downloadedFiles?: number;
+    failedFiles?: number;
   }>;
   fileSize: number;
   driverFileCount: number;
@@ -76,12 +83,40 @@ interface DriverDetail {
   application: any;
   documents: any[];
   documentCount: number;
+  downloadedCount?: number;
+}
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  driving_licence_front: 'Driving Licence (Front)',
+  driving_licence_back: 'Driving Licence (Back)',
+  driving_licence: 'Driving Licence',
+  driving_license: 'Driving Licence',
+  driving_license_back: 'Driving Licence (Back)',
+  dbs_certificate: 'DBS Certificate',
+  goods_in_transit: 'Goods in Transit Insurance',
+  hire_and_reward: 'Hire & Reward Insurance',
+  profile_picture: 'Profile Picture',
+  vehicle_photos: 'Vehicle Photo',
+};
+
+function getDocLabel(docType: string): string {
+  if (!docType) return 'Unknown Document';
+  for (const [key, label] of Object.entries(DOC_TYPE_LABELS)) {
+    if (docType.includes(key)) return label;
+  }
+  return docType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function isImageFile(fileName: string): boolean {
+  if (!fileName) return false;
+  return /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
 }
 
 export default function AdminFleetFile() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDriver, setSelectedDriver] = useState<DriverDetail | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; name: string; type: string } | null>(null);
   const { toast } = useToast();
 
   const { data: status, isLoading: statusLoading } = useQuery<FleetStatus>({
@@ -103,7 +138,7 @@ export default function AdminFleetFile() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/drivers'] });
       toast({
         title: 'Fleet File synced',
-        description: `${data.drivers} drivers, ${data.applications} applications, ${data.documents} documents saved`,
+        description: `${data.drivers} drivers, ${data.documents} documents (${data.downloadedFiles} files downloaded${data.failedFiles > 0 ? `, ${data.failedFiles} failed` : ''})`,
       });
     },
     onError: () => {
@@ -128,6 +163,17 @@ export default function AdminFleetFile() {
 
   const handleDownload = () => {
     window.open('/api/admin/fleet-file/download', '_blank');
+  };
+
+  const openDocument = (doc: any) => {
+    if (doc.localFile && doc.localPath) {
+      const url = `/api/admin/fleet-file/document/${doc.localPath}`;
+      setViewingDoc({
+        url,
+        name: doc.localFile,
+        type: doc.doc_type || 'document',
+      });
+    }
   };
 
   const formatDate = (date: string | null) => {
@@ -172,7 +218,9 @@ export default function AdminFleetFile() {
   });
 
   const getDriverDocCount = (driverId: string) => {
-    return (fleetData?.documents || []).filter((d: any) => d.driver_id === driverId).length;
+    const docs = (fleetData?.documents || []).filter((d: any) => d.driver_id === driverId);
+    const downloaded = docs.filter((d: any) => d.localFile);
+    return { total: docs.length, downloaded: downloaded.length };
   };
 
   const getDriverApp = (email: string) => {
@@ -185,7 +233,7 @@ export default function AdminFleetFile() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Fleet File</h1>
-            <p className="text-muted-foreground">Local backup of all driver data, applications and documents</p>
+            <p className="text-muted-foreground">Local backup of all driver data, applications, and document files</p>
           </div>
           <div className="flex gap-2">
             {status?.lastSync && (
@@ -195,7 +243,7 @@ export default function AdminFleetFile() {
                 data-testid="button-download"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Download Backup
+                Download JSON
               </Button>
             )}
             <Button
@@ -208,7 +256,7 @@ export default function AdminFleetFile() {
               ) : (
                 <RefreshCw className="w-4 h-4 mr-2" />
               )}
-              {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
+              {syncMutation.isPending ? 'Downloading files...' : 'Sync Now'}
             </Button>
           </div>
         </div>
@@ -230,7 +278,7 @@ export default function AdminFleetFile() {
               ) : (
                 <>
                   <div className="text-2xl font-bold text-muted-foreground">Never</div>
-                  <p className="text-xs text-muted-foreground">Click Sync Now to create backup</p>
+                  <p className="text-xs text-muted-foreground">Click Sync Now to backup</p>
                 </>
               )}
             </CardContent>
@@ -238,7 +286,7 @@ export default function AdminFleetFile() {
 
           <Card data-testid="card-drivers-backed">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Drivers Backed Up</CardTitle>
+              <CardTitle className="text-sm font-medium">Drivers</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -253,18 +301,23 @@ export default function AdminFleetFile() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-apps-backed">
+          <Card data-testid="card-docs-backed">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Applications Saved</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Documents Saved</CardTitle>
+              <FileDown className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               {statusLoading ? (
                 <Skeleton className="h-8 w-full" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold">{status?.lastSync?.totalApplications || 0}</div>
-                  <p className="text-xs text-muted-foreground">all submissions backed up</p>
+                  <div className="text-2xl font-bold">{status?.lastSync?.downloadedFiles ?? status?.lastSync?.totalDocuments ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {status?.lastSync?.totalDocuments || 0} total records
+                    {(status?.lastSync?.failedFiles || 0) > 0 && (
+                      <span className="text-red-500"> ({status?.lastSync?.failedFiles} failed)</span>
+                    )}
+                  </p>
                 </>
               )}
             </CardContent>
@@ -281,7 +334,7 @@ export default function AdminFleetFile() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{status?.fileSize ? formatFileSize(status.fileSize) : '0 B'}</div>
-                  <p className="text-xs text-muted-foreground">{status?.lastSync?.totalDocuments || 0} document records</p>
+                  <p className="text-xs text-muted-foreground">JSON + document files</p>
                 </>
               )}
             </CardContent>
@@ -293,11 +346,11 @@ export default function AdminFleetFile() {
             <div className="flex items-start gap-3">
               <Shield className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium text-sm">Backup Protection</p>
+                <p className="font-medium text-sm">Full Document Backup</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Fleet File saves a complete copy of all driver profiles, applications, bank details, and document records 
-                  locally on your server. This backup is independent from Supabase and will be stored on your Hostinger hosting. 
-                  Click "Sync Now" regularly to keep the backup up to date.
+                  Fleet File downloads and saves all actual document files (driving licences, DBS certificates, insurance docs, profile photos) 
+                  from Supabase Storage to your local server. Every file is viewable directly from this page. 
+                  Sync regularly to keep your backup current.
                 </p>
               </div>
             </div>
@@ -339,14 +392,14 @@ export default function AdminFleetFile() {
                       <TableHead>Phone</TableHead>
                       <TableHead>Vehicle</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Documents</TableHead>
+                      <TableHead>Files Saved</TableHead>
                       <TableHead>Application</TableHead>
                       <TableHead>View</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredDrivers.map((driver: any) => {
-                      const docCount = getDriverDocCount(driver.id);
+                      const { total, downloaded } = getDriverDocCount(driver.id);
                       const hasApp = !!getDriverApp(driver.email);
                       return (
                         <TableRow key={driver.id} data-testid={`row-driver-${driver.driver_code || driver.id}`}>
@@ -374,8 +427,18 @@ export default function AdminFleetFile() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              <File className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{docCount}</span>
+                              {downloaded > 0 ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Image className="h-3 w-3 mr-1" />
+                                  {downloaded} file{downloaded !== 1 ? 's' : ''}
+                                </Badge>
+                              ) : total > 0 ? (
+                                <Badge variant="outline" className="text-yellow-600 border-yellow-600 text-xs">
+                                  {total} record{total !== 1 ? 's' : ''}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">0</span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -427,7 +490,8 @@ export default function AdminFleetFile() {
                     <TableHead>Date</TableHead>
                     <TableHead>Drivers</TableHead>
                     <TableHead>Applications</TableHead>
-                    <TableHead>Documents</TableHead>
+                    <TableHead>Files Downloaded</TableHead>
+                    <TableHead>Failed</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -438,7 +502,16 @@ export default function AdminFleetFile() {
                       </TableCell>
                       <TableCell><span className="font-medium">{log.drivers}</span></TableCell>
                       <TableCell><span className="font-medium">{log.applications}</span></TableCell>
-                      <TableCell><span className="font-medium">{log.documents}</span></TableCell>
+                      <TableCell>
+                        <span className="font-medium text-green-600">{log.downloadedFiles ?? log.documents}</span>
+                      </TableCell>
+                      <TableCell>
+                        {(log.failedFiles || 0) > 0 ? (
+                          <span className="font-medium text-red-500">{log.failedFiles}</span>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -449,7 +522,7 @@ export default function AdminFleetFile() {
       </div>
 
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           {selectedDriver && (
             <>
               <DialogHeader>
@@ -459,7 +532,90 @@ export default function AdminFleetFile() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
-                <Accordion type="multiple" defaultValue={['profile', 'documents']} className="w-full">
+                <div className="flex gap-3 flex-wrap">
+                  <Badge variant="secondary">
+                    {selectedDriver.driver?.driver_code || 'No code'}
+                  </Badge>
+                  <Badge variant="secondary">
+                    {selectedDriver.documentCount} document{selectedDriver.documentCount !== 1 ? 's' : ''}
+                  </Badge>
+                  {(selectedDriver.downloadedCount ?? 0) > 0 && (
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      {selectedDriver.downloadedCount} files saved locally
+                    </Badge>
+                  )}
+                </div>
+
+                <Accordion type="multiple" defaultValue={['documents', 'profile']} className="w-full">
+                  <AccordionItem value="documents">
+                    <AccordionTrigger className="hover:no-underline">
+                      <span className="flex items-center gap-2">
+                        <Image className="h-4 w-4" />
+                        Documents & Files ({selectedDriver.documentCount})
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {selectedDriver.documents.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {selectedDriver.documents.map((doc: any, idx: number) => (
+                            <Card
+                              key={idx}
+                              className={`${doc.localFile ? 'hover-elevate cursor-pointer' : ''}`}
+                              onClick={() => doc.localFile && openDocument(doc)}
+                              data-testid={`card-doc-${idx}`}
+                            >
+                              <CardContent className="p-3">
+                                <div className="flex items-start gap-3">
+                                  <div className="shrink-0 mt-0.5">
+                                    {doc.localFile ? (
+                                      isImageFile(doc.localFile) ? (
+                                        <Image className="h-5 w-5 text-blue-500" />
+                                      ) : (
+                                        <FileText className="h-5 w-5 text-red-500" />
+                                      )
+                                    ) : (
+                                      <XCircle className="h-5 w-5 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {getDocLabel(doc.doc_type)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Source: {doc.source === 'driver_documents' ? 'Documents table' : doc.source === 'driver_profile' ? 'Driver profile' : 'Application'}
+                                    </p>
+                                    {doc.localFile ? (
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                                          <CheckCircle className="w-3 h-3 mr-1" />
+                                          Saved
+                                        </Badge>
+                                        {doc.fileSize && (
+                                          <span className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <Badge variant="outline" className="text-red-500 border-red-500 text-xs mt-1">
+                                        <XCircle className="w-3 h-3 mr-1" />
+                                        Download failed
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {doc.localFile && (
+                                    <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground py-4 text-center">No documents found for this driver</p>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+
                   <AccordionItem value="profile">
                     <AccordionTrigger className="hover:no-underline">
                       <span className="flex items-center gap-2">
@@ -519,7 +675,6 @@ export default function AdminFleetFile() {
                             ['Address', selectedDriver.application.full_address],
                             ['Postcode', selectedDriver.application.postcode],
                             ['Nationality', selectedDriver.application.nationality],
-                            ['British', selectedDriver.application.is_british ? 'Yes' : 'No'],
                             ['NI Number', selectedDriver.application.national_insurance_number],
                             ['Vehicle Type', selectedDriver.application.vehicle_type],
                             ['Bank Name', selectedDriver.application.bank_name],
@@ -533,93 +688,65 @@ export default function AdminFleetFile() {
                             </div>
                           ))}
                         </div>
-                        {(selectedDriver.application.driving_licence_front_url ||
-                          selectedDriver.application.driving_licence_back_url ||
-                          selectedDriver.application.dbs_certificate_url ||
-                          selectedDriver.application.goods_in_transit_insurance_url ||
-                          selectedDriver.application.hire_and_reward_url ||
-                          selectedDriver.application.profile_picture_url) && (
-                          <div className="mt-4">
-                            <p className="text-sm font-medium mb-2">Application Document URLs</p>
-                            <div className="space-y-1 text-xs font-mono break-all">
-                              {[
-                                ['Profile Picture', selectedDriver.application.profile_picture_url],
-                                ['Driving Licence Front', selectedDriver.application.driving_licence_front_url],
-                                ['Driving Licence Back', selectedDriver.application.driving_licence_back_url],
-                                ['DBS Certificate', selectedDriver.application.dbs_certificate_url],
-                                ['Goods in Transit', selectedDriver.application.goods_in_transit_insurance_url],
-                                ['Hire & Reward', selectedDriver.application.hire_and_reward_url],
-                              ]
-                                .filter(([, url]) => url)
-                                .map(([label, url]) => (
-                                  <div key={label as string} className="p-2 bg-muted rounded">
-                                    <span className="text-muted-foreground">{label}:</span>
-                                    <br />
-                                    <a href={url as string} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                      {url as string}
-                                    </a>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
                       </AccordionContent>
                     </AccordionItem>
                   )}
-
-                  <AccordionItem value="documents">
-                    <AccordionTrigger className="hover:no-underline">
-                      <span className="flex items-center gap-2">
-                        <File className="h-4 w-4" />
-                        Documents ({selectedDriver.documentCount})
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      {selectedDriver.documents.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Bucket</TableHead>
-                              <TableHead>Storage Path</TableHead>
-                              <TableHead>Uploaded</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {selectedDriver.documents.map((doc: any) => (
-                              <TableRow key={doc.id}>
-                                <TableCell>
-                                  <span className="font-medium text-sm">{(doc.doc_type || '').replace(/_/g, ' ')}</span>
-                                </TableCell>
-                                <TableCell>
-                                  {doc.status === 'approved' ? (
-                                    <Badge variant="outline" className="text-green-600 border-green-600">Approved</Badge>
-                                  ) : doc.status === 'rejected' ? (
-                                    <Badge variant="outline" className="text-red-600 border-red-600">Rejected</Badge>
-                                  ) : (
-                                    <Badge variant="outline">{doc.status || 'pending'}</Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-xs font-mono">{doc.bucket || '—'}</span>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-xs font-mono break-all max-w-[200px] block truncate">{doc.storage_path || doc.file_url || '—'}</span>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm">{formatDate(doc.uploaded_at || doc.created_at)}</span>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p className="text-sm text-muted-foreground py-4 text-center">No documents found</p>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
                 </Accordion>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingDoc} onOpenChange={() => setViewingDoc(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          {viewingDoc && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {isImageFile(viewingDoc.name) ? (
+                    <Image className="h-5 w-5 text-blue-500" />
+                  ) : (
+                    <FileText className="h-5 w-5 text-red-500" />
+                  )}
+                  {getDocLabel(viewingDoc.type)}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="mt-2 flex flex-col items-center">
+                {isImageFile(viewingDoc.name) ? (
+                  <img
+                    src={viewingDoc.url}
+                    alt={viewingDoc.name}
+                    className="max-w-full max-h-[70vh] object-contain rounded-md"
+                    data-testid="img-document-viewer"
+                  />
+                ) : viewingDoc.name.endsWith('.pdf') ? (
+                  <iframe
+                    src={viewingDoc.url}
+                    className="w-full h-[70vh] rounded-md border"
+                    title={viewingDoc.name}
+                    data-testid="iframe-document-viewer"
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <File className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">Cannot preview this file type</p>
+                  </div>
+                )}
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" asChild>
+                    <a href={viewingDoc.url} target="_blank" rel="noopener noreferrer" data-testid="button-open-new-tab">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open in New Tab
+                    </a>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <a href={viewingDoc.url} download={viewingDoc.name} data-testid="button-download-file">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </a>
+                  </Button>
+                </div>
               </div>
             </>
           )}
