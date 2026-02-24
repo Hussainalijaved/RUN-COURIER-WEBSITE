@@ -1884,15 +1884,60 @@ export async function registerRoutes(
     
     if (!uploaded) return res.status(500).json({ error: "Failed to upload POD photo" });
 
-    const { error: updateError } = await supAdmin
+    // Verify the stop exists before updating
+    const { data: existingStop } = await supAdmin
       .from('multi_drop_stops')
-      .update({ pod_photo_url: storagePath })
+      .select('id')
       .eq('id', stopId)
-      .eq('job_id', jobId);
+      .eq('job_id', jobId)
+      .maybeSingle();
     
-    if (updateError) {
-      console.error('[Stop POD] Failed to update stop:', updateError);
-      return res.status(500).json({ error: "Failed to save POD reference" });
+    if (!existingStop) {
+      console.error(`[Stop POD] Stop ${stopId} not found for job ${jobId} - may have been recreated`);
+      // Try to find the stop by job_id and stop_order from the filename pattern
+      // Fall back to updating by job_id and searching for any stop
+      const { data: allStops } = await supAdmin
+        .from('multi_drop_stops')
+        .select('id, stop_order')
+        .eq('job_id', jobId)
+        .order('stop_order', { ascending: true });
+      
+      if (allStops && allStops.length > 0) {
+        // Update the first stop that doesn't have a POD yet, or the first stop
+        const { data: stopsWithoutPod } = await supAdmin
+          .from('multi_drop_stops')
+          .select('id')
+          .eq('job_id', jobId)
+          .is('pod_photo_url', null)
+          .order('stop_order', { ascending: true })
+          .limit(1);
+        
+        const targetStopId = stopsWithoutPod?.[0]?.id || allStops[0].id;
+        console.log(`[Stop POD] Redirecting POD upload to stop ${targetStopId} (original ${stopId} not found)`);
+        
+        const { error: fallbackError } = await supAdmin
+          .from('multi_drop_stops')
+          .update({ pod_photo_url: storagePath })
+          .eq('id', targetStopId);
+        
+        if (fallbackError) {
+          console.error('[Stop POD] Fallback update also failed:', fallbackError);
+          return res.status(500).json({ error: "Failed to save POD reference" });
+        }
+      } else {
+        return res.status(404).json({ error: "No stops found for this job" });
+      }
+    } else {
+      const { error: updateError } = await supAdmin
+        .from('multi_drop_stops')
+        .update({ pod_photo_url: storagePath })
+        .eq('id', stopId)
+        .eq('job_id', jobId);
+      
+      if (updateError) {
+        console.error('[Stop POD] Failed to update stop:', updateError);
+        return res.status(500).json({ error: "Failed to save POD reference" });
+      }
     }
 
     let signedUrl = storagePath;
@@ -2200,44 +2245,102 @@ export async function registerRoutes(
     
     // Handle multi-drop stops update when stops are provided
     if (supabaseAdmin && (multiDropStops !== undefined || updateData.isMultiDrop !== undefined)) {
-      const jobId = String(job.id); // Ensure string for varchar column
+      const jobId = String(job.id);
       
-      // Delete existing stops first
-      const { error: deleteError } = await supabaseAdmin
-        .from('multi_drop_stops')
-        .delete()
-        .eq('job_id', jobId);
-      
-      if (deleteError) {
-        console.error('[Jobs] Failed to delete existing multi-drop stops:', deleteError);
-      } else {
-        console.log(`[Jobs] Deleted existing stops for job ${jobId}`);
-      }
-      
-      // Insert new stops if multi-drop is enabled and stops are provided
       const isMultiDropEnabled = updateData.isMultiDrop !== undefined ? updateData.isMultiDrop : job.isMultiDrop;
       if (isMultiDropEnabled && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
-        console.log(`[Jobs] Updating ${multiDropStops.length} multi-drop stops for job ${jobId} (type: ${typeof jobId})`);
-        const stopsToInsert = multiDropStops.map((stop: any, index: number) => ({
-          job_id: String(jobId), // Ensure job_id is a string for varchar column
-          address: stop.address || '',
-          postcode: stop.postcode || '',
-          stop_order: index + 1,
-          recipient_name: stop.recipientName || null,
-          recipient_phone: stop.recipientPhone || null,
-          instructions: stop.deliveryInstructions || null,
-        }));
-        
-        console.log('[Jobs] Inserting stops:', JSON.stringify(stopsToInsert));
-        const { data: insertedStops, error: stopsError } = await supabaseAdmin
+        // Fetch existing stops to preserve IDs, POD data, and status
+        const { data: existingStops } = await supabaseAdmin
           .from('multi_drop_stops')
-          .insert(stopsToInsert)
-          .select();
+          .select('*')
+          .eq('job_id', jobId)
+          .order('stop_order', { ascending: true });
         
-        if (stopsError) {
-          console.error('[Jobs] Failed to update multi-drop stops:', stopsError);
+        const existingMap = new Map<number, any>();
+        for (const s of (existingStops || [])) {
+          existingMap.set(s.stop_order, s);
+        }
+        
+        console.log(`[Jobs] Updating ${multiDropStops.length} multi-drop stops for job ${jobId} (existing: ${existingStops?.length || 0})`);
+        
+        const stopsToUpdate: any[] = [];
+        const stopsToInsert: any[] = [];
+        const usedExistingIds = new Set<string>();
+        
+        for (let index = 0; index < multiDropStops.length; index++) {
+          const stop = multiDropStops[index];
+          const stopOrder = index + 1;
+          const existing = existingMap.get(stopOrder);
+          
+          if (existing) {
+            usedExistingIds.add(existing.id);
+            stopsToUpdate.push({
+              id: existing.id,
+              address: stop.address || '',
+              postcode: stop.postcode || '',
+              stop_order: stopOrder,
+              recipient_name: stop.recipientName || null,
+              recipient_phone: stop.recipientPhone || null,
+              instructions: stop.deliveryInstructions || null,
+            });
+          } else {
+            stopsToInsert.push({
+              job_id: String(jobId),
+              address: stop.address || '',
+              postcode: stop.postcode || '',
+              stop_order: stopOrder,
+              recipient_name: stop.recipientName || null,
+              recipient_phone: stop.recipientPhone || null,
+              instructions: stop.deliveryInstructions || null,
+            });
+          }
+        }
+        
+        // Delete stops that are no longer needed (excess stops beyond new count)
+        const stopsToDelete = (existingStops || []).filter(s => !usedExistingIds.has(s.id));
+        if (stopsToDelete.length > 0) {
+          const deleteIds = stopsToDelete.map(s => s.id);
+          await supabaseAdmin
+            .from('multi_drop_stops')
+            .delete()
+            .in('id', deleteIds);
+          console.log(`[Jobs] Deleted ${stopsToDelete.length} excess stops`);
+        }
+        
+        // Update existing stops (preserving their IDs, POD data, status)
+        for (const stopData of stopsToUpdate) {
+          const { id, ...updateFields } = stopData;
+          await supabaseAdmin
+            .from('multi_drop_stops')
+            .update(updateFields)
+            .eq('id', id);
+        }
+        if (stopsToUpdate.length > 0) {
+          console.log(`[Jobs] Updated ${stopsToUpdate.length} existing stops (preserved POD/status)`);
+        }
+        
+        // Insert new stops
+        if (stopsToInsert.length > 0) {
+          const { error: stopsError } = await supabaseAdmin
+            .from('multi_drop_stops')
+            .insert(stopsToInsert)
+            .select();
+          if (stopsError) {
+            console.error('[Jobs] Failed to insert new stops:', stopsError);
+          } else {
+            console.log(`[Jobs] Inserted ${stopsToInsert.length} new stops`);
+          }
+        }
+      } else if (!isMultiDropEnabled) {
+        // Multi-drop disabled, remove all stops
+        const { error: deleteError } = await supabaseAdmin
+          .from('multi_drop_stops')
+          .delete()
+          .eq('job_id', jobId);
+        if (deleteError) {
+          console.error('[Jobs] Failed to delete stops:', deleteError);
         } else {
-          console.log(`[Jobs] Successfully inserted ${insertedStops?.length || 0} multi-drop stops`);
+          console.log(`[Jobs] Deleted all stops for job ${jobId} (multi-drop disabled)`);
         }
       }
     }

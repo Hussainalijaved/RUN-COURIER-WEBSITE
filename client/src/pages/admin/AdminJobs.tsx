@@ -162,6 +162,7 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
   const [deletingStopPodId, setDeletingStopPodId] = useState<string | null>(null);
   const stopPodFileInputRef = useRef<HTMLInputElement>(null);
   const [activeStopIdForUpload, setActiveStopIdForUpload] = useState<string | null>(null);
+  const activeStopIdRef = useRef<string | null>(null);
   const { data, isLoading } = useQuery<{ stops: MultiDropStop[] }>({
     queryKey: [`/api/jobs/${jobId}/stops`],
     enabled: !!isMultiDrop && !!jobId,
@@ -186,7 +187,7 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
 
   const handleStopPodUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    const stopId = activeStopIdForUpload;
+    const stopId = activeStopIdRef.current || activeStopIdForUpload;
     if (!file || !stopId) return;
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -225,6 +226,7 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
     } finally {
       setUploadingStopId(null);
       setActiveStopIdForUpload(null);
+      activeStopIdRef.current = null;
       if (stopPodFileInputRef.current) stopPodFileInputRef.current.value = '';
     }
   };
@@ -372,6 +374,7 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
                   variant="outline"
                   disabled={uploadingStopId === stop.id}
                   onClick={() => {
+                    activeStopIdRef.current = stop.id;
                     setActiveStopIdForUpload(stop.id);
                     stopPodFileInputRef.current?.click();
                   }}
