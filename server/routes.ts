@@ -3921,19 +3921,31 @@ export async function registerRoutes(
       // Note: Supabase uses 'driver_code' column for what we call 'driverCode' internally
       const { data: supabaseDrivers } = await supabaseAdmin
         .from('drivers')
-        .select('id, driver_code, full_name, email, phone, vehicle_type, status, online_status');
+        .select('id, driver_code, full_name, email, phone, vehicle_type, status, online_status, driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url, profile_picture_url, vehicle_registration, vehicle_make, vehicle_model, vehicle_color, is_active, created_at');
       
       // Build maps: by id and email for flexible lookup
       // IMPORTANT: driver_code from Supabase is the PERMANENT Driver ID (e.g., RC02C)
       type SupabaseDriverData = { 
         id: string; 
-        driver_code: string | null;  // This is the PERMANENT Driver ID from Supabase
+        driver_code: string | null;
         full_name: string | null;
         email: string | null;
         phone: string | null;
         vehicle_type: string | null;
         is_verified: boolean;
         is_available: boolean;
+        driving_licence_front_url: string | null;
+        driving_licence_back_url: string | null;
+        dbs_certificate_url: string | null;
+        goods_in_transit_insurance_url: string | null;
+        hire_reward_insurance_url: string | null;
+        profile_picture_url: string | null;
+        vehicle_registration: string | null;
+        vehicle_make: string | null;
+        vehicle_model: string | null;
+        vehicle_color: string | null;
+        is_active: boolean;
+        created_at: string | null;
       };
       const supabaseDriverById = new Map<string, SupabaseDriverData>();
       const supabaseDriverByEmail = new Map<string, SupabaseDriverData>();
@@ -3941,13 +3953,25 @@ export async function registerRoutes(
       for (const d of (supabaseDrivers || [])) {
         const driverData: SupabaseDriverData = { 
           id: d.id, 
-          driver_code: d.driver_code,  // PERMANENT Driver ID from Supabase
+          driver_code: d.driver_code,
           full_name: d.full_name,
           email: d.email,
           phone: d.phone,
           vehicle_type: d.vehicle_type,
           is_verified: d.status === 'approved',
           is_available: d.online_status === 'online',
+          driving_licence_front_url: (d as any).driving_licence_front_url || null,
+          driving_licence_back_url: (d as any).driving_licence_back_url || null,
+          dbs_certificate_url: (d as any).dbs_certificate_url || null,
+          goods_in_transit_insurance_url: (d as any).goods_in_transit_insurance_url || null,
+          hire_reward_insurance_url: (d as any).hire_reward_insurance_url || null,
+          profile_picture_url: (d as any).profile_picture_url || null,
+          vehicle_registration: (d as any).vehicle_registration || null,
+          vehicle_make: (d as any).vehicle_make || null,
+          vehicle_model: (d as any).vehicle_model || null,
+          vehicle_color: (d as any).vehicle_color || null,
+          is_active: (d as any).is_active ?? true,
+          created_at: (d as any).created_at || null,
         };
         
         // Map by id (which matches auth user id in Supabase)
@@ -4035,11 +4059,22 @@ export async function registerRoutes(
           fullName: supabaseDriver?.full_name || localDriver?.fullName || user.user_metadata?.fullName || user.user_metadata?.full_name || 'Unknown Driver',
           phone: supabaseDriver?.phone || localDriver?.phone || user.user_metadata?.phone || null,
           role: user.user_metadata?.role || 'driver',
-          driverCode: permanentDriverId || localDriver?.driverCode || null, // PERMANENT ID first
+          driverCode: permanentDriverId || localDriver?.driverCode || null,
           vehicleType: supabaseDriver?.vehicle_type || localDriver?.vehicleType || 'car',
           isVerified: supabaseDriver?.is_verified ?? localDriver?.isVerified ?? false,
           isAvailable: supabaseDriver?.is_available ?? localDriver?.isAvailable ?? false,
           createdAt: user.created_at,
+          driving_licence_front_url: supabaseDriver?.driving_licence_front_url || null,
+          driving_licence_back_url: supabaseDriver?.driving_licence_back_url || null,
+          dbs_certificate_url: supabaseDriver?.dbs_certificate_url || null,
+          goods_in_transit_insurance_url: supabaseDriver?.goods_in_transit_insurance_url || null,
+          hire_reward_insurance_url: supabaseDriver?.hire_reward_insurance_url || null,
+          profile_picture_url: supabaseDriver?.profile_picture_url || null,
+          vehicle_registration: supabaseDriver?.vehicle_registration || localDriver?.vehicleRegistration || null,
+          vehicle_make: supabaseDriver?.vehicle_make || localDriver?.vehicleMake || null,
+          vehicle_model: supabaseDriver?.vehicle_model || localDriver?.vehicleModel || null,
+          vehicle_color: supabaseDriver?.vehicle_color || localDriver?.vehicleColor || null,
+          is_active: supabaseDriver?.is_active ?? localDriver?.isActive ?? true,
         });
       }
 
@@ -4805,6 +4840,81 @@ export async function registerRoutes(
           }
         }
       });
+    }
+
+    if (driverId && allDocuments.length === 0) {
+      try {
+        const { supabaseAdmin: sbAdmin } = await import('./supabaseAdmin');
+        if (sbAdmin) {
+          const { data: driverRow } = await sbAdmin
+            .from('drivers')
+            .select('driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url, profile_picture_url')
+            .eq('id', driverId as string)
+            .maybeSingle();
+          
+          if (driverRow) {
+            const colDocMappings = [
+              { col: 'driving_licence_front_url', type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
+              { col: 'driving_licence_back_url', type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
+              { col: 'dbs_certificate_url', type: 'dbsCertificate', label: 'DBS Certificate' },
+              { col: 'goods_in_transit_insurance_url', type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
+              { col: 'hire_reward_insurance_url', type: 'hireAndReward', label: 'Hire & Reward Insurance' },
+              { col: 'profile_picture_url', type: 'profilePicture', label: 'Profile Picture' },
+            ];
+            const columnPaths: string[] = [];
+            const columnDocs: any[] = [];
+            for (const m of colDocMappings) {
+              const url = (driverRow as any)[m.col];
+              if (url && typeof url === 'string' && !url.startsWith('text:')) {
+                const storagePath = url.startsWith('http') ? (extractStoragePath(url) || url) : url;
+                columnPaths.push(storagePath);
+                columnDocs.push({
+                  id: `col-${driverId}-${m.type}`,
+                  driverId: driverId as string,
+                  authUserId: driverId as string,
+                  type: m.type,
+                  fileName: m.label,
+                  fileUrl: url,
+                  storagePath,
+                  bucket: 'DRIVER-DOCUMENTS',
+                  status: 'approved',
+                  uploadedAt: new Date(),
+                });
+              }
+            }
+            if (columnDocs.length > 0) {
+              const BUCKETS_TO_TRY = ['DRIVER-DOCUMENTS', 'driver-documents'];
+              for (const bucket of BUCKETS_TO_TRY) {
+                try {
+                  const { data: signedData } = await sbAdmin.storage.from(bucket).createSignedUrls(columnPaths, 3600);
+                  if (signedData) {
+                    let found = 0;
+                    signedData.forEach((result: any, idx: number) => {
+                      if (result.signedUrl && !result.error) {
+                        columnDocs[idx].fileUrl = result.signedUrl;
+                        columnDocs[idx].signedUrl = result.signedUrl;
+                        columnDocs[idx].bucket = bucket;
+                        found++;
+                      }
+                    });
+                    if (found > 0) {
+                      allDocuments.push(...columnDocs.filter(d => d.signedUrl));
+                      console.log(`[Documents] Generated ${found} documents from driver column URLs for ${driverId}`);
+                      break;
+                    }
+                  }
+                } catch (_) {}
+              }
+              if (allDocuments.length === 0) {
+                allDocuments.push(...columnDocs);
+                console.log(`[Documents] Added ${columnDocs.length} documents from driver columns (unsigned) for ${driverId}`);
+              }
+            }
+          }
+        }
+      } catch (colErr) {
+        console.error('[Documents] Driver column URL fallback error:', colErr);
+      }
     }
 
     if (driverId && allDocuments.length === 0) {
