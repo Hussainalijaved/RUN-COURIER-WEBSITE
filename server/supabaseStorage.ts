@@ -714,6 +714,7 @@ export class SupabaseStorage implements IStorage {
     
     const dbDriver = {
       id,
+      user_id: insertDriver.userId,
       driver_code: insertDriver.driverCode,
       full_name: insertDriver.fullName || null,
       email: insertDriver.email || null,

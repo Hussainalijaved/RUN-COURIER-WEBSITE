@@ -3881,6 +3881,9 @@ export async function registerRoutes(
       // Filter for driver role users
       const driverUsersList = users.filter(user => user.user_metadata?.role === 'driver');
       
+      // Track failed driver creation attempts to avoid spamming logs
+      const failedDriverUserIds = new Set<string>();
+      
       // Process drivers sequentially to avoid race conditions
       const driverUsers = [];
       for (const user of driverUsersList) {
@@ -3895,17 +3898,27 @@ export async function registerRoutes(
         
         if (!localDriver) {
           // Create a local driver record - use Supabase driver data (which is authoritative)
-          localDriver = await storage.createDriver({
-            userId: user.id,
-            fullName: supabaseDriver?.full_name || user.user_metadata?.fullName || user.user_metadata?.full_name || null,
-            email: supabaseDriver?.email || user.email || null,
-            phone: supabaseDriver?.phone || user.user_metadata?.phone || null,
-            vehicleType: (supabaseDriver?.vehicle_type as any) || 'car',
-            isAvailable: supabaseDriver?.is_available ?? false,
-            isVerified: supabaseDriver?.is_verified ?? false,
-            driverCode: permanentDriverId || undefined, // Use PERMANENT Supabase driver_id
-          });
-          localDriverMap.set(user.id, localDriver);
+          try {
+            localDriver = await storage.createDriver({
+              userId: user.id,
+              fullName: supabaseDriver?.full_name || user.user_metadata?.fullName || user.user_metadata?.full_name || null,
+              email: supabaseDriver?.email || user.email || null,
+              phone: supabaseDriver?.phone || user.user_metadata?.phone || null,
+              vehicleType: (supabaseDriver?.vehicle_type as any) || 'car',
+              isAvailable: supabaseDriver?.is_available ?? false,
+              isVerified: supabaseDriver?.is_verified ?? false,
+              driverCode: permanentDriverId || undefined, // Use PERMANENT Supabase driver_id
+            });
+            localDriverMap.set(user.id, localDriver);
+          } catch (createDriverError) {
+            // Log a warning only once per user to avoid spam
+            if (!failedDriverUserIds.has(user.id)) {
+              console.debug(`[API] Failed to create local driver record for user ${user.id} (${user.email}):`, (createDriverError as Error).message);
+              failedDriverUserIds.add(user.id);
+            }
+            // Continue to next user - don't fail the entire endpoint
+            continue;
+          }
         } else {
           // Update local driver with Supabase data if there's a mismatch
           const needsUpdate = (
