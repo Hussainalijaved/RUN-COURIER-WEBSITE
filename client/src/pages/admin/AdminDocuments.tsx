@@ -240,12 +240,21 @@ export default function AdminDocuments() {
   const rejectedDocs = documents?.filter(d => d.status === 'rejected') || [];
 
   const driverGroups: DriverGroup[] = useMemo(() => {
-    if (!documents) return [];
+    if (!documents && !drivers) return [];
     const groupMap = new Map<string, Document[]>();
-    for (const doc of documents) {
-      const existing = groupMap.get(doc.driverId) || [];
-      existing.push(doc);
-      groupMap.set(doc.driverId, existing);
+    if (documents) {
+      for (const doc of documents) {
+        const existing = groupMap.get(doc.driverId) || [];
+        existing.push(doc);
+        groupMap.set(doc.driverId, existing);
+      }
+    }
+    if (drivers) {
+      for (const driver of drivers) {
+        if (!groupMap.has(driver.id)) {
+          groupMap.set(driver.id, []);
+        }
+      }
     }
     const groups: DriverGroup[] = [];
     const entries = Array.from(groupMap.entries());
@@ -406,6 +415,12 @@ export default function AdminDocuments() {
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                           <CardContent className="pt-0 pb-4">
+                            {group.docs.length === 0 ? (
+                              <div className="py-6 text-center text-muted-foreground text-sm" data-testid={`text-no-docs-${group.driverId}`}>
+                                <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                                No documents uploaded yet
+                              </div>
+                            ) : (
                             <div className="overflow-x-auto">
                               <Table>
                                 <TableHeader>
@@ -495,6 +510,7 @@ export default function AdminDocuments() {
                                 </TableBody>
                               </Table>
                             </div>
+                            )}
                           </CardContent>
                         </CollapsibleContent>
                       </Card>
