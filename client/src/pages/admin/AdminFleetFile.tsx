@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -112,11 +112,28 @@ function isImageFile(fileName: string): boolean {
   return /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
 }
 
+interface SyncProgress {
+  status: 'idle' | 'running' | 'complete' | 'error';
+  phase: string;
+  current: number;
+  total: number;
+  downloadedFiles: number;
+  failedFiles: number;
+  drivers: number;
+  applications: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  error: string | null;
+}
+
 export default function AdminFleetFile() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDriver, setSelectedDriver] = useState<DriverDetail | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [viewingDoc, setViewingDoc] = useState<{ url: string; name: string; type: string } | null>(null);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();
 
   const { data: status, isLoading: statusLoading } = useQuery<FleetStatus>({
@@ -128,23 +145,71 @@ export default function AdminFleetFile() {
     enabled: !!status?.lastSync,
   });
 
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest('POST', '/api/admin/fleet-file/sync');
-    },
-    onSuccess: async (response) => {
-      const data = await response.json();
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/status'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/drivers'] });
-      toast({
-        title: 'Fleet File synced',
-        description: `${data.drivers} drivers, ${data.documents} documents (${data.downloadedFiles} files downloaded${data.failedFiles > 0 ? `, ${data.failedFiles} failed` : ''})`,
-      });
-    },
-    onError: () => {
-      toast({ title: 'Sync failed', variant: 'destructive' });
-    },
-  });
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const pollProgress = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/fleet-file/sync-progress', { credentials: 'include' });
+      if (res.ok) {
+        const data: SyncProgress = await res.json();
+        setSyncProgress(data);
+
+        if (data.status === 'complete') {
+          stopPolling();
+          setIsSyncing(false);
+          queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/status'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/drivers'] });
+          toast({
+            title: 'Fleet File sync complete',
+            description: `${data.downloadedFiles} files downloaded${data.failedFiles > 0 ? `, ${data.failedFiles} failed` : ''}`,
+          });
+        } else if (data.status === 'error') {
+          stopPolling();
+          setIsSyncing(false);
+          toast({ title: 'Sync failed', description: data.error || 'Unknown error', variant: 'destructive' });
+        }
+      }
+    } catch {}
+  }, [stopPolling, toast]);
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  useEffect(() => {
+    fetch('/api/admin/fleet-file/sync-progress', { credentials: 'include' })
+      .then(res => res.json())
+      .then((data: SyncProgress) => {
+        if (data.status === 'running') {
+          setSyncProgress(data);
+          setIsSyncing(true);
+          pollingRef.current = setInterval(pollProgress, 1500);
+        }
+      })
+      .catch(() => {});
+  }, [pollProgress]);
+
+  const startSync = async () => {
+    setIsSyncing(true);
+    setSyncProgress({
+      status: 'running', phase: 'Starting sync...', current: 0, total: 0,
+      downloadedFiles: 0, failedFiles: 0, drivers: 0, applications: 0,
+      startedAt: new Date().toISOString(), completedAt: null, error: null,
+    });
+
+    try {
+      await apiRequest('POST', '/api/admin/fleet-file/sync');
+      pollingRef.current = setInterval(pollProgress, 1500);
+    } catch {
+      setIsSyncing(false);
+      toast({ title: 'Failed to start sync', variant: 'destructive' });
+    }
+  };
 
   const fetchDriverDetail = async (driverCode: string) => {
     try {
@@ -247,19 +312,53 @@ export default function AdminFleetFile() {
               </Button>
             )}
             <Button
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
+              onClick={startSync}
+              disabled={isSyncing}
               data-testid="button-sync"
             >
-              {syncMutation.isPending ? (
+              {isSyncing ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <RefreshCw className="w-4 h-4 mr-2" />
               )}
-              {syncMutation.isPending ? 'Downloading files...' : 'Sync Now'}
+              {isSyncing ? 'Syncing...' : 'Sync Now'}
             </Button>
           </div>
         </div>
+
+        {isSyncing && syncProgress && (
+          <Card data-testid="card-sync-progress" className="border-blue-200 dark:border-blue-900">
+            <CardContent className="pt-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-500 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{syncProgress.phase}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {syncProgress.drivers > 0 && `${syncProgress.drivers} drivers`}
+                      {syncProgress.applications > 0 && ` | ${syncProgress.applications} applications`}
+                      {syncProgress.downloadedFiles > 0 && ` | ${syncProgress.downloadedFiles} downloaded`}
+                      {syncProgress.failedFiles > 0 && ` | ${syncProgress.failedFiles} failed`}
+                    </p>
+                  </div>
+                </div>
+                {syncProgress.total > 0 && (
+                  <div className="space-y-1">
+                    <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.round((syncProgress.current / syncProgress.total) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-right">
+                      {syncProgress.current} / {syncProgress.total} files ({Math.round((syncProgress.current / syncProgress.total) * 100)}%)
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card data-testid="card-last-sync">

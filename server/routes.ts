@@ -11106,7 +11106,33 @@ export async function registerRoutes(
     return ext || '.bin';
   }
 
+  let fleetSyncProgress: {
+    status: 'idle' | 'running' | 'complete' | 'error';
+    phase: string;
+    current: number;
+    total: number;
+    downloadedFiles: number;
+    failedFiles: number;
+    drivers: number;
+    applications: number;
+    startedAt: string | null;
+    completedAt: string | null;
+    error: string | null;
+  } = {
+    status: 'idle', phase: '', current: 0, total: 0,
+    downloadedFiles: 0, failedFiles: 0, drivers: 0, applications: 0,
+    startedAt: null, completedAt: null, error: null,
+  };
+
+  app.get("/api/admin/fleet-file/sync-progress", asyncHandler(async (_req, res) => {
+    res.json(fleetSyncProgress);
+  }));
+
   app.post("/api/admin/fleet-file/sync", asyncHandler(async (req, res) => {
+    if (fleetSyncProgress.status === 'running') {
+      return res.json({ success: true, message: 'Sync already in progress', inProgress: true, progress: fleetSyncProgress });
+    }
+
     if (!fs.existsSync(fleetDir)) fs.mkdirSync(fleetDir, { recursive: true });
 
     const supabase = (storage as any).supabase || (storage as any).checkSupabase?.();
@@ -11114,260 +11140,212 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Supabase not available" });
     }
 
-    const timestamp = new Date().toISOString();
-    let syncedDrivers = 0;
-    let syncedApplications = 0;
-    let syncedDocuments = 0;
-    let downloadedFiles = 0;
-    let failedFiles = 0;
-
-    const { data: allDrivers, error: driverErr } = await supabase
-      .from('drivers').select('*').order('created_at', { ascending: false });
-    if (driverErr) {
-      console.error('[Fleet File] Error fetching drivers:', driverErr);
-      return res.status(500).json({ error: "Failed to fetch drivers" });
-    }
-
-    const { data: allApplications, error: appErr } = await supabase
-      .from('driver_applications').select('*').order('submitted_at', { ascending: false });
-    if (appErr) console.error('[Fleet File] Error fetching applications:', appErr);
-
-    const { data: allDocuments, error: docErr } = await supabase
-      .from('driver_documents').select('*').order('created_at', { ascending: false });
-    if (docErr) console.error('[Fleet File] Error fetching documents:', docErr);
-
-    syncedDrivers = allDrivers?.length || 0;
-    syncedApplications = allApplications?.length || 0;
-    syncedDocuments = allDocuments?.length || 0;
-
-    const docsDir = path.join(fleetDir, 'documents');
-    if (!fs.existsSync(docsDir)) fs.mkdirSync(docsDir, { recursive: true });
-
-    const allSavedDocs: any[] = [];
-
-    // Download documents from driver_documents table
-    for (const doc of (allDocuments || [])) {
-      const driverCode = (allDrivers || []).find((d: any) => d.id === doc.driver_id)?.driver_code || doc.driver_id;
-      const safeCode = (driverCode || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const driverDocsDir = path.join(docsDir, safeCode);
-
-      const baseDocName = doc.doc_type || 'unknown';
-      const ext = getFileExtFromPath(doc.storage_path || doc.file_url || '.bin');
-      let localFileName = `${baseDocName}${ext}`;
-      let localFilePath = path.join(driverDocsDir, localFileName);
-      let counter = 1;
-      while (fs.existsSync(localFilePath)) {
-        localFileName = `${baseDocName}_${counter}${ext}`;
-        localFilePath = path.join(driverDocsDir, localFileName);
-        counter++;
-      }
-
-      let downloaded = false;
-      if (doc.storage_path && doc.bucket) {
-        downloaded = await downloadFileFromStorage(supabase, doc.storage_path, doc.bucket, localFilePath);
-      }
-      if (!downloaded && doc.file_url && doc.file_url.startsWith('http')) {
-        downloaded = await downloadFileFromUrl(doc.file_url, localFilePath);
-      }
-      if (!downloaded && doc.file_url && !doc.file_url.startsWith('http')) {
-        for (const bucket of ['driver-documents', 'DRIVER-DOCUMENTS']) {
-          downloaded = await downloadFileFromStorage(supabase, doc.file_url, bucket, localFilePath);
-          if (downloaded) break;
-        }
-      }
-
-      if (downloaded) {
-        downloadedFiles++;
-        const stats = fs.statSync(localFilePath);
-        allSavedDocs.push({
-          ...doc,
-          driverCode: safeCode,
-          localFile: localFileName,
-          localPath: `${safeCode}/${localFileName}`,
-          fileSize: stats.size,
-          source: 'driver_documents',
-        });
-      } else {
-        failedFiles++;
-        allSavedDocs.push({
-          ...doc,
-          driverCode: safeCode,
-          localFile: null,
-          localPath: null,
-          source: 'driver_documents',
-          downloadFailed: true,
-        });
-      }
-      console.log(`[Fleet File] ${downloaded ? 'Downloaded' : 'FAILED'}: ${safeCode}/${localFileName}`);
-    }
-
-    // Download documents from driver profile URL columns
-    for (const driver of (allDrivers || [])) {
-      const driverCode = driver.driver_code || driver.id;
-      const safeCode = (driverCode || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const driverDocsDir = path.join(docsDir, safeCode);
-
-      const existingDocTypes = new Set(
-        (allDocuments || []).filter((d: any) => d.driver_id === driver.id).map((d: any) => d.doc_type)
-      );
-
-      for (const [urlField, docType] of Object.entries(DRIVER_DOC_URL_FIELDS)) {
-        const url = driver[urlField];
-        if (!url) continue;
-        if (existingDocTypes.has(docType)) continue;
-
-        const ext = getFileExtFromPath(url);
-        const localFileName = `${docType}${ext}`;
-        const localFilePath = path.join(driverDocsDir, localFileName);
-
-        let downloaded = false;
-        if (url.startsWith('http')) {
-          downloaded = await downloadFileFromUrl(url, localFilePath);
-        } else {
-          for (const bucket of ['driver-documents', 'DRIVER-DOCUMENTS']) {
-            downloaded = await downloadFileFromStorage(supabase, url, bucket, localFilePath);
-            if (downloaded) break;
-          }
-        }
-
-        if (downloaded) {
-          downloadedFiles++;
-          const stats = fs.statSync(localFilePath);
-          allSavedDocs.push({
-            driver_id: driver.id,
-            doc_type: docType,
-            file_url: url,
-            driverCode: safeCode,
-            localFile: localFileName,
-            localPath: `${safeCode}/${localFileName}`,
-            fileSize: stats.size,
-            source: 'driver_profile',
-          });
-        } else {
-          failedFiles++;
-          allSavedDocs.push({
-            driver_id: driver.id,
-            doc_type: docType,
-            file_url: url,
-            driverCode: safeCode,
-            localFile: null,
-            localPath: null,
-            source: 'driver_profile',
-            downloadFailed: true,
-          });
-        }
-        console.log(`[Fleet File] Profile ${downloaded ? 'Downloaded' : 'FAILED'}: ${safeCode}/${localFileName}`);
-      }
-    }
-
-    // Download documents from application URL columns
-    for (const app of (allApplications || [])) {
-      const driver = (allDrivers || []).find((d: any) => d.email === app.email);
-      const driverCode = driver?.driver_code || app.email?.replace(/[^a-zA-Z0-9]/g, '_') || 'app_unknown';
-      const safeCode = driverCode.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const driverDocsDir = path.join(docsDir, safeCode);
-
-      const existingLocalFiles = new Set(
-        allSavedDocs.filter((d: any) => d.driverCode === safeCode && d.localFile).map((d: any) => d.doc_type)
-      );
-
-      for (const [urlField, docType] of Object.entries(APP_DOC_URL_FIELDS)) {
-        const url = app[urlField];
-        if (!url) continue;
-        if (existingLocalFiles.has(docType)) continue;
-
-        const ext = getFileExtFromPath(url);
-        const localFileName = `app_${docType}${ext}`;
-        const localFilePath = path.join(driverDocsDir, localFileName);
-
-        let downloaded = false;
-        if (url.startsWith('http')) {
-          downloaded = await downloadFileFromUrl(url, localFilePath);
-        } else {
-          for (const bucket of ['driver-documents', 'DRIVER-DOCUMENTS']) {
-            downloaded = await downloadFileFromStorage(supabase, url, bucket, localFilePath);
-            if (downloaded) break;
-          }
-        }
-
-        if (downloaded) {
-          downloadedFiles++;
-          const stats = fs.statSync(localFilePath);
-          allSavedDocs.push({
-            driver_id: driver?.id || null,
-            doc_type: docType,
-            file_url: url,
-            driverCode: safeCode,
-            localFile: localFileName,
-            localPath: `${safeCode}/${localFileName}`,
-            fileSize: stats.size,
-            source: 'application',
-            applicationId: app.id,
-          });
-        } else {
-          failedFiles++;
-        }
-        console.log(`[Fleet File] App ${downloaded ? 'Downloaded' : 'FAILED'}: ${safeCode}/${localFileName}`);
-      }
-    }
-
-    // Save master fleet file with document index
-    const fleetData = {
-      syncedAt: timestamp,
-      totalDrivers: allDrivers?.length || 0,
-      totalApplications: allApplications?.length || 0,
-      totalDocuments: allSavedDocs.length,
-      downloadedFiles,
-      failedFiles,
-      drivers: allDrivers || [],
-      applications: allApplications || [],
-      documents: allSavedDocs,
+    fleetSyncProgress = {
+      status: 'running', phase: 'Fetching data from Supabase...', current: 0, total: 0,
+      downloadedFiles: 0, failedFiles: 0, drivers: 0, applications: 0,
+      startedAt: new Date().toISOString(), completedAt: null, error: null,
     };
 
-    fs.writeFileSync(path.join(fleetDir, 'fleet-master.json'), JSON.stringify(fleetData, null, 2));
+    res.json({ success: true, message: 'Sync started', inProgress: true });
 
-    // Save individual driver files
-    const driversMetaDir = path.join(fleetDir, 'drivers');
-    if (!fs.existsSync(driversMetaDir)) fs.mkdirSync(driversMetaDir, { recursive: true });
+    (async () => {
+      try {
+        const timestamp = new Date().toISOString();
 
-    for (const driver of (allDrivers || [])) {
-      const driverCode = driver.driver_code || driver.id;
-      const safeId = (driverCode || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const driverDocs = allSavedDocs.filter((d: any) => d.driverCode === safeId);
-      const driverApp = (allApplications || []).find((a: any) => a.email === driver.email);
+        const { data: allDrivers, error: driverErr } = await supabase
+          .from('drivers').select('*').order('created_at', { ascending: false });
+        if (driverErr) throw new Error('Failed to fetch drivers');
 
-      fs.writeFileSync(
-        path.join(driversMetaDir, `${safeId}.json`),
-        JSON.stringify({
+        const { data: allApplications } = await supabase
+          .from('driver_applications').select('*').order('submitted_at', { ascending: false });
+        const { data: allDocuments } = await supabase
+          .from('driver_documents').select('*').order('created_at', { ascending: false });
+
+        fleetSyncProgress.drivers = allDrivers?.length || 0;
+        fleetSyncProgress.applications = allApplications?.length || 0;
+
+        const docsDir = path.join(fleetDir, 'documents');
+        if (!fs.existsSync(docsDir)) fs.mkdirSync(docsDir, { recursive: true });
+
+        const allSavedDocs: any[] = [];
+
+        interface DownloadTask {
+          driverCode: string;
+          docType: string;
+          storagePath?: string;
+          bucket?: string;
+          fileUrl?: string;
+          source: string;
+          originalDoc?: any;
+          applicationId?: string;
+          driverId?: string;
+        }
+        const downloadTasks: DownloadTask[] = [];
+
+        for (const doc of (allDocuments || [])) {
+          const dc = (allDrivers || []).find((d: any) => d.id === doc.driver_id)?.driver_code || doc.driver_id;
+          downloadTasks.push({
+            driverCode: (dc || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_'),
+            docType: doc.doc_type || 'unknown',
+            storagePath: doc.storage_path,
+            bucket: doc.bucket,
+            fileUrl: doc.file_url,
+            source: 'driver_documents',
+            originalDoc: doc,
+            driverId: doc.driver_id,
+          });
+        }
+
+        for (const driver of (allDrivers || [])) {
+          const safeCode = (driver.driver_code || driver.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const existingDocTypes = new Set(
+            (allDocuments || []).filter((d: any) => d.driver_id === driver.id).map((d: any) => d.doc_type)
+          );
+          for (const [urlField, docType] of Object.entries(DRIVER_DOC_URL_FIELDS)) {
+            const url = driver[urlField];
+            if (!url || existingDocTypes.has(docType)) continue;
+            downloadTasks.push({
+              driverCode: safeCode, docType, fileUrl: url, source: 'driver_profile', driverId: driver.id,
+            });
+          }
+        }
+
+        for (const app of (allApplications || [])) {
+          const driver = (allDrivers || []).find((d: any) => d.email === app.email);
+          const safeCode = (driver?.driver_code || app.email?.replace(/[^a-zA-Z0-9]/g, '_') || 'app_unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const existingTypes = new Set(downloadTasks.filter(t => t.driverCode === safeCode).map(t => t.docType));
+          for (const [urlField, docType] of Object.entries(APP_DOC_URL_FIELDS)) {
+            const url = app[urlField];
+            if (!url || existingTypes.has(docType)) continue;
+            downloadTasks.push({
+              driverCode: safeCode, docType, fileUrl: url, source: 'application',
+              applicationId: app.id, driverId: driver?.id,
+            });
+          }
+        }
+
+        fleetSyncProgress.total = downloadTasks.length;
+        fleetSyncProgress.phase = `Downloading 0/${downloadTasks.length} files...`;
+
+        const usedPaths = new Set<string>();
+
+        for (let i = 0; i < downloadTasks.length; i++) {
+          const task = downloadTasks[i];
+          fleetSyncProgress.current = i + 1;
+          fleetSyncProgress.phase = `Downloading ${i + 1}/${downloadTasks.length} files...`;
+
+          const driverDocsDir = path.join(docsDir, task.driverCode);
+          const baseName = task.source === 'application' ? `app_${task.docType}` : task.docType;
+          const ext = getFileExtFromPath(task.storagePath || task.fileUrl || '.bin');
+          let localFileName = `${baseName}${ext}`;
+          let localFilePath = path.join(driverDocsDir, localFileName);
+          let counter = 1;
+          while (usedPaths.has(localFilePath) || fs.existsSync(localFilePath)) {
+            localFileName = `${baseName}_${counter}${ext}`;
+            localFilePath = path.join(driverDocsDir, localFileName);
+            counter++;
+          }
+          usedPaths.add(localFilePath);
+
+          let downloaded = false;
+          if (task.storagePath && task.bucket) {
+            downloaded = await downloadFileFromStorage(supabase, task.storagePath, task.bucket, localFilePath);
+          }
+          if (!downloaded && task.fileUrl && task.fileUrl.startsWith('http')) {
+            downloaded = await downloadFileFromUrl(task.fileUrl, localFilePath);
+          }
+          if (!downloaded && task.fileUrl && !task.fileUrl.startsWith('http')) {
+            for (const bucket of ['driver-documents', 'DRIVER-DOCUMENTS']) {
+              downloaded = await downloadFileFromStorage(supabase, task.fileUrl, bucket, localFilePath);
+              if (downloaded) break;
+            }
+          }
+
+          if (downloaded) {
+            fleetSyncProgress.downloadedFiles++;
+            const stats = fs.statSync(localFilePath);
+            allSavedDocs.push({
+              ...(task.originalDoc || {}),
+              driver_id: task.driverId,
+              doc_type: task.docType,
+              file_url: task.fileUrl,
+              driverCode: task.driverCode,
+              localFile: localFileName,
+              localPath: `${task.driverCode}/${localFileName}`,
+              fileSize: stats.size,
+              source: task.source,
+              ...(task.applicationId ? { applicationId: task.applicationId } : {}),
+            });
+          } else {
+            fleetSyncProgress.failedFiles++;
+            allSavedDocs.push({
+              ...(task.originalDoc || {}),
+              driver_id: task.driverId,
+              doc_type: task.docType,
+              file_url: task.fileUrl,
+              driverCode: task.driverCode,
+              localFile: null,
+              localPath: null,
+              source: task.source,
+              downloadFailed: true,
+            });
+          }
+        }
+
+        fleetSyncProgress.phase = 'Saving fleet data...';
+
+        const fleetData = {
           syncedAt: timestamp,
-          driver,
-          application: driverApp || null,
-          documents: driverDocs,
-          documentCount: driverDocs.length,
-          downloadedCount: driverDocs.filter((d: any) => d.localFile).length,
-        }, null, 2)
-      );
-    }
+          totalDrivers: allDrivers?.length || 0,
+          totalApplications: allApplications?.length || 0,
+          totalDocuments: allSavedDocs.length,
+          downloadedFiles: fleetSyncProgress.downloadedFiles,
+          failedFiles: fleetSyncProgress.failedFiles,
+          drivers: allDrivers || [],
+          applications: allApplications || [],
+          documents: allSavedDocs,
+        };
+        fs.writeFileSync(path.join(fleetDir, 'fleet-master.json'), JSON.stringify(fleetData, null, 2));
 
-    // Save sync log
-    const logFile = path.join(fleetDir, 'sync-log.json');
-    let syncLog: any[] = [];
-    try { if (fs.existsSync(logFile)) syncLog = JSON.parse(fs.readFileSync(logFile, 'utf8')); } catch {}
-    syncLog.unshift({ timestamp, drivers: syncedDrivers, applications: syncedApplications, documents: allSavedDocs.length, downloadedFiles, failedFiles });
-    if (syncLog.length > 50) syncLog = syncLog.slice(0, 50);
-    fs.writeFileSync(logFile, JSON.stringify(syncLog, null, 2));
+        const driversMetaDir = path.join(fleetDir, 'drivers');
+        if (!fs.existsSync(driversMetaDir)) fs.mkdirSync(driversMetaDir, { recursive: true });
 
-    console.log(`[Fleet File] Synced: ${syncedDrivers} drivers, ${syncedApplications} apps, ${allSavedDocs.length} docs (${downloadedFiles} downloaded, ${failedFiles} failed)`);
+        for (const driver of (allDrivers || [])) {
+          const safeId = (driver.driver_code || driver.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const driverDocs = allSavedDocs.filter((d: any) => d.driverCode === safeId);
+          const driverApp = (allApplications || []).find((a: any) => a.email === driver.email);
+          fs.writeFileSync(
+            path.join(driversMetaDir, `${safeId}.json`),
+            JSON.stringify({
+              syncedAt: timestamp, driver, application: driverApp || null,
+              documents: driverDocs, documentCount: driverDocs.length,
+              downloadedCount: driverDocs.filter((d: any) => d.localFile).length,
+            }, null, 2)
+          );
+        }
 
-    res.json({
-      success: true,
-      syncedAt: timestamp,
-      drivers: syncedDrivers,
-      applications: syncedApplications,
-      documents: allSavedDocs.length,
-      downloadedFiles,
-      failedFiles,
-    });
+        const logFile = path.join(fleetDir, 'sync-log.json');
+        let syncLog: any[] = [];
+        try { if (fs.existsSync(logFile)) syncLog = JSON.parse(fs.readFileSync(logFile, 'utf8')); } catch {}
+        syncLog.unshift({
+          timestamp, drivers: allDrivers?.length || 0, applications: allApplications?.length || 0,
+          documents: allSavedDocs.length, downloadedFiles: fleetSyncProgress.downloadedFiles,
+          failedFiles: fleetSyncProgress.failedFiles,
+        });
+        if (syncLog.length > 50) syncLog = syncLog.slice(0, 50);
+        fs.writeFileSync(logFile, JSON.stringify(syncLog, null, 2));
+
+        fleetSyncProgress.status = 'complete';
+        fleetSyncProgress.phase = 'Complete';
+        fleetSyncProgress.completedAt = new Date().toISOString();
+        console.log(`[Fleet File] Sync complete: ${fleetSyncProgress.downloadedFiles} downloaded, ${fleetSyncProgress.failedFiles} failed`);
+      } catch (err: any) {
+        fleetSyncProgress.status = 'error';
+        fleetSyncProgress.phase = 'Error';
+        fleetSyncProgress.error = err.message || 'Unknown error';
+        console.error('[Fleet File] Sync error:', err);
+      }
+    })();
   }));
 
   app.get("/api/admin/fleet-file/status", asyncHandler(async (req, res) => {
