@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
@@ -691,6 +692,8 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  app.use(compression());
+
   // Apply STRICT admin access middleware to all admin-only routes
   // These routes will REJECT requests without valid admin credentials
   app.use('/api/admin', requireAdminAccessStrict);
@@ -1329,7 +1332,9 @@ export async function registerRoutes(
 
   app.get("/api/jobs", asyncHandler(async (req, res) => {
     const { status, customerId, driverId, vendorId, limit = 50 } = req.query;
-    console.log(`[API Jobs] Fetching jobs with customerId: ${customerId}, driverId: ${driverId}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API Jobs] Fetching jobs with customerId: ${customerId}, driverId: ${driverId}`);
+    }
     const jobs = await storage.getJobs({
       status: status as JobStatus | undefined,
       customerId: customerId as string | undefined,
@@ -1337,7 +1342,9 @@ export async function registerRoutes(
       vendorId: vendorId as string | undefined,
       limit: Number(limit),
     });
-    console.log(`[API Jobs] Found ${jobs.length} jobs for customerId: ${customerId}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API Jobs] Found ${jobs.length} jobs for customerId: ${customerId}`);
+    }
     
     // Auto-assign stable job numbers to jobs that don't have one
     const numberedJobs = assignStableJobNumbers(jobs);
@@ -2872,7 +2879,7 @@ export async function registerRoutes(
       }
     }
     if (postcodesToGeocode.length > 0) {
-      await geocodePostcodesBulk(postcodesToGeocode);
+      geocodePostcodesBulk(postcodesToGeocode).catch(err => console.error('[PostcodeGeo] Background error:', err.message));
     }
     
     // Enrich drivers with postcode-based coordinates

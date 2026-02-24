@@ -101,7 +101,7 @@ export const cache = new MemoryCache();
 // Cache TTL constants (in milliseconds)
 export const CACHE_TTL = {
   DRIVERS_LIST: 2000,      // 2 seconds - drivers list for live map, needs near real-time
-  JOBS_LIST: 2000,         // 2 seconds - jobs need to be fresh
+  JOBS_LIST: 5000,         // 5 seconds - jobs cache for reduced database load
   DRIVER_DETAIL: 5000,     // 5 seconds - individual driver detail
   JOB_DETAIL: 3000,        // 3 seconds - individual job detail
   STATS: 10000,            // 10 seconds - dashboard stats

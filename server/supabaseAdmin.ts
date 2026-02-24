@@ -85,7 +85,9 @@ export async function verifyAccessToken(accessToken: string): Promise<VerifiedUs
       const parts = accessToken.split('.');
       if (parts.length === 3) {
         const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-        console.log('[Supabase Auth] Token payload - sub:', payload.sub, 'email:', payload.email, 'exp:', new Date(payload.exp * 1000).toISOString());
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Supabase Auth] Token payload - sub:', payload.sub, 'email:', payload.email, 'exp:', new Date(payload.exp * 1000).toISOString());
+        }
         
         // Check if token is expired
         if (payload.exp && payload.exp * 1000 < Date.now()) {
@@ -94,7 +96,9 @@ export async function verifyAccessToken(accessToken: string): Promise<VerifiedUs
         }
       }
     } catch (decodeError) {
-      console.log('[Supabase Auth] Could not decode token for logging');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Supabase Auth] Could not decode token for logging');
+      }
     }
     
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
@@ -108,7 +112,9 @@ export async function verifyAccessToken(accessToken: string): Promise<VerifiedUs
         if (parts.length === 3) {
           const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
           if (payload.sub && payload.email) {
-            console.log('[Supabase Auth] Using JWT payload as fallback for user:', payload.email);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Supabase Auth] Using JWT payload as fallback for user:', payload.email);
+            }
             return {
               id: payload.sub,
               email: payload.email,
@@ -126,7 +132,9 @@ export async function verifyAccessToken(accessToken: string): Promise<VerifiedUs
     }
 
     const metadata = user.user_metadata || {};
-    console.log('[Supabase Auth] Token verified for user:', user.email, 'role:', metadata.role);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Supabase Auth] Token verified for user:', user.email, 'role:', metadata.role);
+    }
     
     return {
       id: user.id,

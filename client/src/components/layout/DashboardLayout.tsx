@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -132,7 +132,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex h-screen w-full">
         <Sidebar>
           <SidebarHeader className="border-b border-sidebar-border p-4">
-            <Link href="/" className="flex items-center gap-2" data-testid="sidebar-logo-link">
+            <a href="/" className="flex items-center gap-2 cursor-pointer" data-testid="sidebar-logo-link" onClick={(e) => { e.preventDefault(); setLocation('/'); }}>
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
@@ -145,7 +145,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </span>
                 <span className="text-xs text-muted-foreground">{roleLabel} Panel</span>
               </div>
-            </Link>
+            </a>
           </SidebarHeader>
 
           <SidebarContent>
@@ -156,18 +156,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   {navItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
-                        asChild
                         isActive={location === item.href}
                         tooltip={item.label}
+                        onClick={(e) => handleNavClick(e as any, item.href)}
+                        className="cursor-pointer"
+                        data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
                       >
-                        <a 
-                          href={item.href} 
-                          onClick={(e) => handleNavClick(e, item.href)}
-                          data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.label}</span>
-                        </a>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -180,11 +176,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Home">
-                      <Link href="/" data-testid="nav-home">
-                        <Home className="h-4 w-4" />
-                        <span>Back to Website</span>
-                      </Link>
+                    <SidebarMenuButton 
+                      tooltip="Home"
+                      onClick={(e) => { e.preventDefault(); setLocation('/'); }}
+                      className="cursor-pointer"
+                      data-testid="nav-home"
+                    >
+                      <Home className="h-4 w-4" />
+                      <span>Back to Website</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -197,10 +196,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <SidebarMenuItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton
-                      size="lg"
-                      className="data-[state=open]:bg-sidebar-accent hover:bg-sidebar-accent/80 transition-all duration-200 cursor-pointer rounded-lg border border-transparent hover:border-border/50"
+                    <button
+                      className="peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 h-12 p-2 data-[state=open]:bg-sidebar-accent hover:bg-sidebar-accent/80 transition-all duration-200 cursor-pointer rounded-lg border border-transparent hover:border-border/50"
                       data-testid="user-menu"
+                      data-size="lg"
                     >
                       <Avatar className="h-8 w-8 ring-2 ring-primary/20">
                         <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
@@ -214,17 +213,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         </span>
                       </div>
                       <ChevronUp className="ml-auto h-4 w-4 text-muted-foreground" />
-                    </SidebarMenuButton>
+                    </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     side="top"
                     className="w-[--radix-popper-anchor-width]"
                   >
                     <DropdownMenuItem asChild>
-                      <Link href={`/${user.role}/profile`} className="cursor-pointer" data-testid="menu-profile-settings">
+                      <a 
+                        href={`/${user.role}/profile`} 
+                        className="cursor-pointer flex items-center" 
+                        data-testid="menu-profile-settings"
+                        onClick={(e) => { e.preventDefault(); setLocation(`/${user.role}/profile`); }}
+                      >
                         <Settings className="mr-2 h-4 w-4" />
                         Profile Settings
-                      </Link>
+                      </a>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
