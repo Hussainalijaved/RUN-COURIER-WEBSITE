@@ -433,6 +433,44 @@ const uploadPodImage = multer({
   }
 });
 
+// Postcode geocoding cache: maps postcode (uppercased, trimmed) -> {lat, lng}
+const postcodeGeoCache = new Map<string, { lat: number; lng: number }>();
+
+async function geocodePostcodesBulk(postcodes: string[]): Promise<void> {
+  if (postcodes.length === 0) return;
+  const unique = [...new Set(postcodes.map(p => p.trim().toUpperCase()))].filter(p => !postcodeGeoCache.has(p));
+  if (unique.length === 0) return;
+
+  const batchSize = 100;
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const batch = unique.slice(i, i + batchSize);
+    try {
+      const resp = await fetch('https://api.postcodes.io/postcodes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postcodes: batch }),
+      });
+      if (!resp.ok) {
+        console.error(`[PostcodeGeo] API returned ${resp.status}`);
+        continue;
+      }
+      const data = await resp.json();
+      if (data.result && Array.isArray(data.result)) {
+        for (const item of data.result) {
+          if (item.result && item.result.latitude != null && item.result.longitude != null) {
+            postcodeGeoCache.set(item.query.toUpperCase(), {
+              lat: item.result.latitude,
+              lng: item.result.longitude,
+            });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('[PostcodeGeo] Bulk lookup error:', err.message);
+    }
+  }
+}
+
 // Stable job number cache: maps job ID to a stable random 6-digit number
 const stableJobNumberCache = new Map<string, string>();
 let jobNumberCacheInitialized = false;
@@ -2825,9 +2863,34 @@ export async function registerRoutes(
       includeInactive: includeInactive === "true",
     });
     
+    // Geocode postcodes for drivers without GPS coordinates
+    const postcodesToGeocode: string[] = [];
+    for (const d of drivers) {
+      if (d.postcode && !d.currentLatitude && !d.currentLongitude) {
+        const key = d.postcode.trim().toUpperCase();
+        if (!postcodeGeoCache.has(key)) {
+          postcodesToGeocode.push(d.postcode);
+        }
+      }
+    }
+    if (postcodesToGeocode.length > 0) {
+      await geocodePostcodesBulk(postcodesToGeocode);
+    }
+    
+    // Enrich drivers with postcode-based coordinates
+    const enrichedDrivers = drivers.map((d: any) => {
+      if (d.postcode && !d.currentLatitude && !d.currentLongitude) {
+        const cached = postcodeGeoCache.get(d.postcode.trim().toUpperCase());
+        if (cached) {
+          return { ...d, postcodeLatitude: String(cached.lat), postcodeLongitude: String(cached.lng) };
+        }
+      }
+      return d;
+    });
+    
     // Cache for 2 seconds - fast enough for real-time feel while reducing DB load
-    cache.set(cacheKey, drivers, CACHE_TTL.DRIVERS_LIST);
-    res.json(drivers);
+    cache.set(cacheKey, enrichedDrivers, CACHE_TTL.DRIVERS_LIST);
+    res.json(enrichedDrivers);
   }));
 
   app.get("/api/drivers/:id", asyncHandler(async (req, res) => {
