@@ -228,7 +228,7 @@ export default function AdminDrivers() {
     queryKey: ['/api/documents'],
   });
 
-  const { data: selectedDriverDocs, isLoading: selectedDriverDocsLoading } = useQuery<Document[]>({
+  const { data: selectedDriverDocs, isLoading: selectedDriverDocsLoading, isFetching: selectedDriverDocsFetching } = useQuery<Document[]>({
     queryKey: ['/api/documents', { driverId: selectedDriver?.id }],
     queryFn: async () => {
       if (!selectedDriver?.id) return [];
@@ -1546,7 +1546,7 @@ export default function AdminDrivers() {
             </DialogHeader>
             {selectedDriver && (
               <div className="space-y-4">
-                {selectedDriverDocsLoading ? (
+                {(selectedDriverDocsLoading || selectedDriverDocsFetching) ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">Loading documents...</p>

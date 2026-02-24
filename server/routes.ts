@@ -1821,7 +1821,9 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Failed to update stop status" });
     }
     
-    console.log(`[Stops] Updated stop ${stopId} status to ${status}`);
+    console.log(`[Stops] Updated stop ${stopId} status to ${status}, job ${jobId}`);
+    
+    cache.clear();
     
     return res.json({ 
       success: true, 

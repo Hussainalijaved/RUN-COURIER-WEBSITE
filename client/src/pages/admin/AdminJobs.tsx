@@ -172,11 +172,16 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
     mutationFn: async ({ stopId, status }: { stopId: string; status: string }) => {
       setUpdatingStopId(stopId);
       const response = await apiRequest('PATCH', `/api/jobs/${jobId}/stops/${stopId}`, { status });
-      return response.json();
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update stop status');
+      }
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/stops`] });
-      toast({ title: 'Stop status updated' });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: `Stop ${result.stop?.stopOrder || ''} marked as ${result.stop?.status || 'updated'}` });
       setUpdatingStopId(null);
     },
     onError: (error: any) => {
