@@ -1381,7 +1381,27 @@ export async function registerRoutes(
               }
               for (const job of resolvedJobs) {
                 if ((job as any).isMultiDrop && stopsMap[(job as any).id]) {
-                  (job as any).multiDropStops = stopsMap[(job as any).id];
+                  let stops = stopsMap[(job as any).id];
+                  // Include the job's main delivery address as the final stop if not already listed
+                  const deliveryAddr = (job as any).deliveryAddress || (job as any).delivery_address;
+                  if (deliveryAddr) {
+                    const normalizedAddr = deliveryAddr.trim().toLowerCase();
+                    const alreadyIncluded = stops.some((s: any) => 
+                      (s.address && s.address.trim().toLowerCase() === normalizedAddr) || 
+                      (s.postcode && (job as any).deliveryPostcode && s.postcode.trim().toLowerCase() === ((job as any).deliveryPostcode || (job as any).delivery_postcode || '').trim().toLowerCase())
+                    );
+                    if (!alreadyIncluded) {
+                      stops = [...stops, {
+                        stopOrder: stops.length + 1,
+                        postcode: (job as any).deliveryPostcode || (job as any).delivery_postcode || '',
+                        address: deliveryAddr,
+                        recipientName: (job as any).recipientName || (job as any).recipient_name || '',
+                        recipientPhone: '',
+                        instructions: '',
+                      }];
+                    }
+                  }
+                  (job as any).multiDropStops = stops;
                 }
               }
             }
@@ -8193,6 +8213,101 @@ export async function registerRoutes(
     const allInvoices = [...invoicesFromTokens, ...jobInvoices]
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     
+    // Re-fetch multi-drop stops from database for all invoices with multi-drop jobs
+    // This ensures stops added after invoice creation are always shown
+    try {
+      const multiDropJobIds: string[] = [];
+      for (const inv of allInvoices) {
+        if (inv.job_details) {
+          const details = typeof inv.job_details === 'string' ? JSON.parse(inv.job_details) : inv.job_details;
+          if (Array.isArray(details)) {
+            for (const job of details) {
+              if (job.isMultiDrop && job.jobNumber) {
+                multiDropJobIds.push(job.jobNumber);
+              }
+            }
+          }
+        }
+      }
+      
+      if (multiDropJobIds.length > 0) {
+        // Look up the actual job IDs from job numbers via the jobs table
+        const { data: jobLookup } = await supabaseAdmin
+          .from('jobs')
+          .select('id, tracking_number')
+          .in('id', allInvoices.flatMap((inv: any) => inv.job_ids || []).filter(Boolean));
+        
+        const allJobIds = (jobLookup || []).map((j: any) => j.id);
+        
+        if (allJobIds.length > 0) {
+          const { data: allStops } = await supabaseAdmin
+            .from('multi_drop_stops')
+            .select('job_id, stop_order, postcode, address, recipient_name, recipient_phone, instructions')
+            .in('job_id', allJobIds)
+            .order('stop_order', { ascending: true });
+          
+          if (allStops && allStops.length > 0) {
+            const stopsMap: Record<string, any[]> = {};
+            for (const stop of allStops) {
+              if (!stopsMap[stop.job_id]) stopsMap[stop.job_id] = [];
+              stopsMap[stop.job_id].push({
+                stopOrder: stop.stop_order,
+                postcode: stop.postcode,
+                address: stop.address,
+                recipientName: stop.recipient_name,
+                recipientPhone: stop.recipient_phone,
+                instructions: stop.instructions,
+              });
+            }
+            
+            // Update job_details in each invoice with fresh stops
+            for (const inv of allInvoices) {
+              if (inv.job_details) {
+                let details = typeof inv.job_details === 'string' ? JSON.parse(inv.job_details) : inv.job_details;
+                if (Array.isArray(details)) {
+                  let updated = false;
+                  // Match jobs in details to stops by job_ids from the invoice
+                  const invJobIds = inv.job_ids || [];
+                  for (let i = 0; i < details.length; i++) {
+                    const job = details[i];
+                    // Try to find matching job_id for this job detail entry
+                    const matchingJobId = invJobIds[i] || invJobIds.find((jid: string) => stopsMap[jid]);
+                    if (job.isMultiDrop && matchingJobId && stopsMap[matchingJobId]) {
+                      let stops = [...stopsMap[matchingJobId]];
+                      // Include delivery address as final stop if not already in stops
+                      if (job.deliveryAddress) {
+                        const normalizedAddr = job.deliveryAddress.trim().toLowerCase();
+                        const alreadyIncluded = stops.some((s: any) => 
+                          (s.address && s.address.trim().toLowerCase() === normalizedAddr)
+                        );
+                        if (!alreadyIncluded) {
+                          stops.push({
+                            stopOrder: stops.length + 1,
+                            postcode: '',
+                            address: job.deliveryAddress,
+                            recipientName: job.recipientName || '',
+                            recipientPhone: '',
+                            instructions: '',
+                          });
+                        }
+                      }
+                      job.multiDropStops = stops;
+                      updated = true;
+                    }
+                  }
+                  if (updated) {
+                    inv.job_details = JSON.stringify(details);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[Invoices] Error enriching stops:', e);
+    }
+    
     console.log('[Invoices] Total invoices:', allInvoices.length);
     res.json(allInvoices);
   }));
@@ -8535,6 +8650,24 @@ export async function registerRoutes(
         
         jobDetails = jobs.map(job => {
           const enriched = ensureJobNumber({ id: job.id, jobNumber: (job as any).job_number || null });
+          let stops = multiDropStopsMap[job.id] || [];
+          // Include the job's main delivery address as the final stop if not already in stops list
+          if (job.is_multi_drop && job.delivery_address) {
+            const normalizedAddr = job.delivery_address.trim().toLowerCase();
+            const alreadyIncluded = stops.some((s: any) => 
+              (s.address && s.address.trim().toLowerCase() === normalizedAddr)
+            );
+            if (!alreadyIncluded) {
+              stops = [...stops, {
+                stopOrder: stops.length + 1,
+                postcode: (job as any).delivery_postcode || '',
+                address: job.delivery_address,
+                recipientName: job.recipient_name || '',
+                recipientPhone: '',
+                instructions: '',
+              }];
+            }
+          }
           return {
             jobNumber: enriched.jobNumber,
             trackingNumber: job.tracking_number || 'N/A',
@@ -8545,7 +8678,7 @@ export async function registerRoutes(
             vehicleType: job.vehicle_type || 'car',
             price: parseFloat(job.total_price) || 0,
             isMultiDrop: job.is_multi_drop || false,
-            multiDropStops: multiDropStopsMap[job.id] || [],
+            multiDropStops: stops,
           };
         });
       }
