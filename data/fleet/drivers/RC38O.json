@@ -129,14 +129,11 @@
       "source": "driver_profile"
     },
     {
-      "driver_id": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0",
       "doc_type": "profile_picture",
-      "file_url": "https://dkkuuxyejgxldvmwpdkf.supabase.co/storage/v1/object/public/driver-documents/d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0/document_1771973697009_profilePictureUrl_1771973666516.jpeg",
-      "driverCode": "RC38O",
-      "localFile": null,
-      "localPath": null,
-      "source": "driver_profile",
-      "downloadFailed": true
+      "source": "admin_upload",
+      "localFile": "profile_picture.jpeg",
+      "fileSize": 150208,
+      "uploadedAt": "2026-02-25T00:19:46.058Z"
     }
   ],
   "documentCount": 6,

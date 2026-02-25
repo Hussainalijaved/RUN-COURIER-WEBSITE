@@ -7661,197 +7661,138 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Application not found" });
     }
 
+    res.json(application);
+
     // CRITICAL: When application is approved, also set is_verified = true on the driver
+    // OPTIMIZED: Runs AFTER response sent. All file copies in parallel, no duplicate work
     if (status === 'approved') {
       try {
-        // Find the driver by email and update their verification status
         const { supabaseAdmin } = await import('./supabaseAdmin');
         if (supabaseAdmin) {
-          // Find driver by email
+          const startTime = Date.now();
           const { data: driver, error: findError } = await supabaseAdmin
             .from('drivers')
             .select('id, driver_code, status')
             .ilike('email', application.email)
             .maybeSingle();
           
+          const allDocMappings = [
+            { url: application.profilePictureUrl, type: 'profile_picture', col: 'profile_picture_url', label: 'Profile Picture' },
+            { url: application.drivingLicenceFrontUrl, type: 'driving_licence', col: 'driving_licence_front_url', label: 'Driving Licence (Front)' },
+            { url: application.drivingLicenceBackUrl, type: 'driving_licence_back', col: 'driving_licence_back_url', label: 'Driving Licence (Back)' },
+            { url: application.dbsCertificateUrl, type: 'dbs_certificate', col: 'dbs_certificate_url', label: 'DBS Certificate' },
+            { url: application.goodsInTransitInsuranceUrl, type: 'goods_in_transit', col: 'goods_in_transit_insurance_url', label: 'Goods in Transit Insurance' },
+            { url: application.hireAndRewardUrl, type: 'hire_and_reward', col: 'hire_reward_insurance_url', label: 'Hire & Reward Insurance' },
+          ].filter(m => !!m.url);
+
+          async function copyAllDocsParallel(driverId: string) {
+            const results = await Promise.allSettled(
+              allDocMappings.map(async (m) => {
+                const fileResult = await copyApplicationFileToDriver(m.url!, driverId, supabaseAdmin);
+                return { ...m, fileResult };
+              })
+            );
+            return results
+              .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+              .map(r => r.value);
+          }
+
+          async function upsertDocRecords(driverId: string, copiedDocs: any[], docStatus: string = 'approved') {
+            await Promise.allSettled(copiedDocs.map(async (m) => {
+              try {
+                const { data: existingDoc } = await supabaseAdmin.from('driver_documents')
+                  .select('id, storage_path, bucket')
+                  .eq('driver_id', driverId)
+                  .eq('doc_type', m.type)
+                  .maybeSingle();
+
+                if (existingDoc && existingDoc.storage_path && existingDoc.bucket) {
+                  await supabaseAdmin.from('driver_documents')
+                    .update({ status: docStatus, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() })
+                    .eq('id', existingDoc.id);
+                } else if (existingDoc) {
+                  await supabaseAdmin.from('driver_documents')
+                    .update({
+                      file_url: m.fileResult.path, bucket: m.fileResult.bucket, storage_path: m.fileResult.path,
+                      status: docStatus, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString(),
+                    })
+                    .eq('id', existingDoc.id);
+                } else {
+                  await supabaseAdmin.from('driver_documents')
+                    .insert({
+                      driver_id: driverId, auth_user_id: driverId, doc_type: m.type,
+                      file_url: m.fileResult.path, bucket: m.fileResult.bucket, storage_path: m.fileResult.path,
+                      file_name: m.label, status: docStatus, uploaded_at: new Date().toISOString(),
+                      reviewed_by: reviewedBy, reviewed_at: new Date().toISOString(),
+                    });
+                }
+                console.log(`[Driver Application] Doc ${m.type} processed for driver ${driverId}`);
+              } catch (docErr) {
+                console.error(`[Driver Application] Failed doc ${m.type}:`, docErr);
+              }
+            }));
+          }
+
           if (driver) {
             const updateData: Record<string, any> = { 
-              status: 'approved',
-              updated_at: new Date().toISOString(),
-              approved_at: new Date().toISOString()
+              status: 'approved', updated_at: new Date().toISOString(), approved_at: new Date().toISOString()
             };
+            if (application.profilePictureUrl) updateData.profile_picture_url = normalizeDocumentUrl(application.profilePictureUrl) || application.profilePictureUrl;
+            if (application.fullAddress) updateData.address = application.fullAddress;
+            if (application.nationality) updateData.nationality = application.nationality;
+            if (application.nationalInsuranceNumber) updateData.national_insurance_number = application.nationalInsuranceNumber;
+            if (application.vehicleType) updateData.vehicle_type = application.vehicleType;
+            if (application.vehicleRegistration) updateData.vehicle_registration = application.vehicleRegistration;
+            if (application.vehicleMake) updateData.vehicle_make = application.vehicleMake;
+            if (application.vehicleModel) updateData.vehicle_model = application.vehicleModel;
+            if (application.vehicleColor) updateData.vehicle_color = application.vehicleColor;
+            if (application.bankName) updateData.bank_name = application.bankName;
+            if (application.accountHolderName) updateData.account_holder_name = application.accountHolderName;
+            if (application.sortCode) updateData.sort_code = application.sortCode;
+            if (application.accountNumber) updateData.account_number = application.accountNumber;
 
-            if (application.profilePictureUrl) {
-              updateData.profile_picture_url = normalizeDocumentUrl(application.profilePictureUrl) || application.profilePictureUrl;
-            }
-            if (application.fullAddress) {
-              updateData.address = application.fullAddress;
-            }
-            if (application.nationality) {
-              updateData.nationality = application.nationality;
-            }
-            if (application.nationalInsuranceNumber) {
-              updateData.national_insurance_number = application.nationalInsuranceNumber;
-            }
-            if (application.vehicleType) {
-              updateData.vehicle_type = application.vehicleType;
-            }
-            if (application.vehicleRegistration) {
-              updateData.vehicle_registration = application.vehicleRegistration;
-            }
-            if (application.vehicleMake) {
-              updateData.vehicle_make = application.vehicleMake;
-            }
-            if (application.vehicleModel) {
-              updateData.vehicle_model = application.vehicleModel;
-            }
-            if (application.vehicleColor) {
-              updateData.vehicle_color = application.vehicleColor;
-            }
-            if (application.bankName) {
-              updateData.bank_name = application.bankName;
-            }
-            if (application.accountHolderName) {
-              updateData.account_holder_name = application.accountHolderName;
-            }
-            if (application.sortCode) {
-              updateData.sort_code = application.sortCode;
-            }
-            if (application.accountNumber) {
-              updateData.account_number = application.accountNumber;
-            }
+            const [updateResult, copiedDocs] = await Promise.all([
+              (async () => {
+                let { error: updateError } = await supabaseAdmin.from('drivers').update(updateData).eq('id', driver.id);
+                if (updateError && (updateError.message?.includes('vehicle_registration') || updateError.message?.includes('vehicle_make') || updateError.message?.includes('vehicle_model') || updateError.message?.includes('vehicle_color') || updateError.message?.includes('column'))) {
+                  console.warn(`[Driver Application] Retrying update without vehicle columns for driver ${driver.driver_code}`);
+                  const vehicleReg = updateData.vehicle_registration;
+                  delete updateData.vehicle_registration; delete updateData.vehicle_make; delete updateData.vehicle_model; delete updateData.vehicle_color;
+                  if (vehicleReg && updateData.vehicle_type) updateData.vehicle_type = `${updateData.vehicle_type}|${vehicleReg}`;
+                  const retry = await supabaseAdmin.from('drivers').update(updateData).eq('id', driver.id);
+                  updateError = retry.error;
+                }
+                return updateError;
+              })(),
+              copyAllDocsParallel(driver.id),
+            ]);
 
-            let { error: updateError } = await supabaseAdmin
-              .from('drivers')
-              .update(updateData)
-              .eq('id', driver.id);
-            
-            if (updateError && (updateError.message?.includes('vehicle_registration') || updateError.message?.includes('vehicle_make') || updateError.message?.includes('vehicle_model') || updateError.message?.includes('vehicle_color') || updateError.message?.includes('column'))) {
-              console.warn(`[Driver Application] Retrying update without vehicle columns for driver ${driver.driver_code}`);
-              const vehicleReg = updateData.vehicle_registration;
-              delete updateData.vehicle_registration;
-              delete updateData.vehicle_make;
-              delete updateData.vehicle_model;
-              delete updateData.vehicle_color;
-              if (vehicleReg && updateData.vehicle_type) {
-                updateData.vehicle_type = `${updateData.vehicle_type}|${vehicleReg}`;
-              }
-              const retry = await supabaseAdmin.from('drivers').update(updateData).eq('id', driver.id);
-              updateError = retry.error;
-              if (retry.error) {
-                console.error(`[Driver Application] Retry also failed for driver ${driver.driver_code}:`, retry.error);
-              }
-            }
-
-            if (updateError) {
-              console.error(`[Driver Application] Failed to update driver ${driver.driver_code}:`, updateError);
-            } else {
+            if (!updateResult) {
               console.log(`[Driver Application] Driver ${driver.driver_code} verified and profile synced after application approval`);
-              
               await storage.verifyDriver(driver.id, true);
-
               if (application.profilePictureUrl) {
-                await storage.updateDriver(driver.id, { profilePictureUrl: application.profilePictureUrl });
-                console.log(`[Driver Application] Profile picture synced for driver ${driver.driver_code}: ${application.profilePictureUrl}`);
+                storage.updateDriver(driver.id, { profilePictureUrl: application.profilePictureUrl }).catch(() => {});
               }
 
-              // Sync document URLs to driver columns using normalized proxy URLs
-              // Also copy files from application-pending to driver's own folder
               const docColumnUpdates: Record<string, any> = {};
-              const docUrlFields = [
-                { appField: 'drivingLicenceFrontUrl', col: 'driving_licence_front_url' },
-                { appField: 'drivingLicenceBackUrl', col: 'driving_licence_back_url' },
-                { appField: 'dbsCertificateUrl', col: 'dbs_certificate_url' },
-                { appField: 'goodsInTransitInsuranceUrl', col: 'goods_in_transit_insurance_url' },
-                { appField: 'hireAndRewardUrl', col: 'hire_reward_insurance_url' },
-              ];
-              for (const field of docUrlFields) {
-                const rawUrl = (application as any)[field.appField];
-                if (rawUrl) {
-                  const result = await copyApplicationFileToDriver(rawUrl, driver.id, supabaseAdmin);
-                  docColumnUpdates[field.col] = result.path;
-                }
+              for (const doc of copiedDocs) {
+                if (doc.col) docColumnUpdates[doc.col] = doc.fileResult.path;
               }
-              if (Object.keys(docColumnUpdates).length > 0) {
-                const { error: docColErr } = await supabaseAdmin
-                  .from('drivers')
-                  .update(docColumnUpdates)
-                  .eq('id', driver.id);
-                if (docColErr) {
-                  console.error(`[Driver Application] Failed to sync document URLs to driver columns:`, docColErr);
-                } else {
-                  console.log(`[Driver Application] Document URLs synced to driver columns for ${driver.driver_code}`);
-                }
-              }
+              const [, ] = await Promise.all([
+                Object.keys(docColumnUpdates).length > 0
+                  ? supabaseAdmin.from('drivers').update(docColumnUpdates).eq('id', driver.id)
+                    .then(({ error }: any) => { if (error) console.error(`[Driver Application] Failed doc column sync:`, error); else console.log(`[Driver Application] Doc URLs synced for ${driver.driver_code}`); })
+                  : Promise.resolve(),
+                upsertDocRecords(driver.id, copiedDocs),
+              ]);
 
-              const docMappings = [
-                { url: application.profilePictureUrl, type: 'profilePicture', label: 'Profile Picture' },
-                { url: application.drivingLicenceFrontUrl, type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
-                { url: application.drivingLicenceBackUrl, type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
-                { url: application.dbsCertificateUrl, type: 'dbsCertificate', label: 'DBS Certificate' },
-                { url: application.goodsInTransitInsuranceUrl, type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
-                { url: application.hireAndRewardUrl, type: 'hireAndReward', label: 'Hire & Reward Insurance' },
-              ];
-              for (const mapping of docMappings) {
-                if (!mapping.url) continue;
-                try {
-                  const fileResult = await copyApplicationFileToDriver(mapping.url, driver.id, supabaseAdmin);
-
-                  const { data: existingDoc } = await supabaseAdmin.from('driver_documents')
-                    .select('id, storage_path, bucket')
-                    .eq('driver_id', driver.id)
-                    .eq('doc_type', mapping.type)
-                    .maybeSingle();
-
-                  if (existingDoc && existingDoc.storage_path && existingDoc.bucket) {
-                    await supabaseAdmin.from('driver_documents')
-                      .update({
-                        status: 'approved',
-                        reviewed_by: reviewedBy,
-                        reviewed_at: new Date().toISOString(),
-                      })
-                      .eq('id', existingDoc.id);
-                    console.log(`[Driver Application] Approved existing document ${mapping.type} for driver ${driver.driver_code} (preserved storage_path)`);
-                  } else if (existingDoc) {
-                    await supabaseAdmin.from('driver_documents')
-                      .update({
-                        file_url: fileResult.path,
-                        bucket: fileResult.bucket,
-                        storage_path: fileResult.path,
-                        status: 'approved',
-                        reviewed_by: reviewedBy,
-                        reviewed_at: new Date().toISOString(),
-                      })
-                      .eq('id', existingDoc.id);
-                    console.log(`[Driver Application] Updated document ${mapping.type} with resolved path for driver ${driver.driver_code}`);
-                  } else {
-                    await supabaseAdmin.from('driver_documents')
-                      .insert({
-                        driver_id: driver.id,
-                        auth_user_id: driver.id,
-                        doc_type: mapping.type,
-                        file_url: fileResult.path,
-                        bucket: fileResult.bucket,
-                        storage_path: fileResult.path,
-                        file_name: mapping.label,
-                        status: 'approved',
-                        uploaded_at: new Date().toISOString(),
-                        reviewed_by: reviewedBy,
-                        reviewed_at: new Date().toISOString(),
-                      });
-                    console.log(`[Driver Application] Inserted new document ${mapping.type} for driver ${driver.driver_code}`);
-                  }
-                } catch (docErr) {
-                  console.error(`[Driver Application] Failed to create document record ${mapping.type}:`, docErr);
-                }
-              }
-
-              const { sendDriverApprovalEmailExisting } = await import('./emailService');
-              sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code)
-                .then(sent => {
-                  if (sent) console.log(`[Driver Application] Approval email sent to existing driver ${application.email}`);
-                })
-                .catch(err => console.error('[Driver Application] Error sending approval email to existing driver:', err));
+              import('./emailService').then(({ sendDriverApprovalEmailExisting }) => {
+                sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code)
+                  .then(sent => { if (sent) console.log(`[Driver Application] Approval email sent to existing driver ${application.email}`); })
+                  .catch(err => console.error('[Driver Application] Error sending approval email:', err));
+              });
+            } else {
+              console.error(`[Driver Application] Failed to update driver ${driver.driver_code}:`, updateResult);
             }
           } else if (findError) {
             console.error(`[Driver Application] Error finding driver by email ${application.email}:`, findError);
@@ -7860,10 +7801,23 @@ export async function registerRoutes(
             try {
               const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
               
-              const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-              const oldAuthUser = existingUsers?.users?.find(
-                u => u.email?.toLowerCase() === application.email.toLowerCase()
-              );
+              const { data: existingUserLookup } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
+              let oldAuthUser: any = null;
+              if (existingUserLookup?.users) {
+                const { data: lookupByEmail } = await supabaseAdmin
+                  .from('auth.users' as any)
+                  .select('id, email')
+                  .ilike('email', application.email)
+                  .maybeSingle()
+                  .catch(() => ({ data: null }));
+                if (!lookupByEmail) {
+                  const { data: allUsersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+                  oldAuthUser = allUsersData?.users?.find(
+                    (u: any) => u.email?.toLowerCase() === application.email.toLowerCase()
+                  );
+                }
+              }
+
               if (oldAuthUser) {
                 console.log(`[Driver Application] Found existing auth user ${oldAuthUser.id} for ${application.email} - cleaning up for re-signup`);
                 const oldDriverRecord = await storage.getDriverByUserId(oldAuthUser.id);
@@ -7881,11 +7835,7 @@ export async function registerRoutes(
                 email: application.email,
                 password: tempPassword,
                 email_confirm: true,
-                user_metadata: {
-                  fullName: application.fullName,
-                  role: 'driver',
-                  phone: application.phone
-                }
+                user_metadata: { fullName: application.fullName, role: 'driver', phone: application.phone }
               });
 
               if (authError) {
@@ -7894,33 +7844,23 @@ export async function registerRoutes(
                 const userId = authUser.user.id;
                 console.log(`[Driver Application] Auth user created: ${userId}`);
 
-                const { data: existingDriver } = await supabaseAdmin
-                  .from('drivers')
-                  .select('id, driver_code')
-                  .eq('id', userId)
-                  .maybeSingle();
+                const [existingDriverResult, copiedDocs] = await Promise.all([
+                  supabaseAdmin.from('drivers').select('id, driver_code').eq('id', userId).maybeSingle(),
+                  copyAllDocsParallel(userId),
+                ]);
 
-                const existingCode = existingDriver?.driver_code;
+                const existingCode = existingDriverResult.data?.driver_code;
                 let driverCode = existingCode;
                 if (!driverCode || !/^RC\d{2}[A-Z]$/.test(driverCode)) {
                   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                  const num1 = Math.floor(Math.random() * 10);
-                  const num2 = Math.floor(Math.random() * 10);
-                  const letter = letters[Math.floor(Math.random() * letters.length)];
-                  driverCode = `RC${num1}${num2}${letter}`;
+                  driverCode = `RC${Math.floor(Math.random() * 10)}${Math.floor(Math.random() * 10)}${letters[Math.floor(Math.random() * letters.length)]}`;
                 }
 
                 const driverData: Record<string, any> = {
-                  id: userId,
-                  user_id: userId,
-                  driver_code: driverCode,
-                  full_name: application.fullName,
-                  email: application.email,
-                  phone: application.phone,
-                  postcode: application.postcode || null,
-                  address: application.fullAddress || null,
-                  nationality: application.nationality || null,
-                  is_british: application.isBritish ?? true,
+                  id: userId, user_id: userId, driver_code: driverCode,
+                  full_name: application.fullName, email: application.email, phone: application.phone,
+                  postcode: application.postcode || null, address: application.fullAddress || null,
+                  nationality: application.nationality || null, is_british: application.isBritish ?? true,
                   national_insurance_number: application.nationalInsuranceNumber || null,
                   right_to_work_share_code: application.rightToWorkShareCode || null,
                   vehicle_type: application.vehicleType || 'car',
@@ -7928,45 +7868,22 @@ export async function registerRoutes(
                   vehicle_make: application.vehicleMake || null,
                   vehicle_model: application.vehicleModel || null,
                   vehicle_color: application.vehicleColor || null,
-                  online_status: 'offline',
-                  status: 'approved',
-                  is_active: true,
-                  bank_name: application.bankName || null,
-                  account_holder_name: application.accountHolderName || null,
-                  sort_code: application.sortCode || null,
-                  account_number: application.accountNumber || null,
+                  online_status: 'offline', status: 'approved', is_active: true,
+                  bank_name: application.bankName || null, account_holder_name: application.accountHolderName || null,
+                  sort_code: application.sortCode || null, account_number: application.accountNumber || null,
+                  approved_at: new Date().toISOString(),
                 };
 
-                const newDriverDocFields = [
-                  { appField: 'profilePictureUrl', col: 'profile_picture_url' },
-                  { appField: 'drivingLicenceFrontUrl', col: 'driving_licence_front_url' },
-                  { appField: 'drivingLicenceBackUrl', col: 'driving_licence_back_url' },
-                  { appField: 'dbsCertificateUrl', col: 'dbs_certificate_url' },
-                  { appField: 'goodsInTransitInsuranceUrl', col: 'goods_in_transit_insurance_url' },
-                  { appField: 'hireAndRewardUrl', col: 'hire_reward_insurance_url' },
-                ];
-                for (const field of newDriverDocFields) {
-                  const rawUrl = (application as any)[field.appField];
-                  if (rawUrl) {
-                    const result = await copyApplicationFileToDriver(rawUrl, userId, supabaseAdmin);
-                    driverData[field.col] = result.path;
-                  }
+                for (const doc of copiedDocs) {
+                  if (doc.col) driverData[doc.col] = doc.fileResult.path;
                 }
 
-                let { error: insertError } = await supabaseAdmin
-                  .from('drivers')
-                  .upsert(driverData, { onConflict: 'id' });
-
+                let { error: insertError } = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
                 if (insertError && (insertError.message?.includes('vehicle_registration') || insertError.message?.includes('vehicle_make') || insertError.message?.includes('column'))) {
                   console.warn(`[Driver Application] Retrying driver creation without vehicle columns`);
                   const vehicleReg = driverData.vehicle_registration;
-                  delete driverData.vehicle_registration;
-                  delete driverData.vehicle_make;
-                  delete driverData.vehicle_model;
-                  delete driverData.vehicle_color;
-                  if (vehicleReg && driverData.vehicle_type) {
-                    driverData.vehicle_type = `${driverData.vehicle_type}|${vehicleReg}`;
-                  }
+                  delete driverData.vehicle_registration; delete driverData.vehicle_make; delete driverData.vehicle_model; delete driverData.vehicle_color;
+                  if (vehicleReg && driverData.vehicle_type) driverData.vehicle_type = `${driverData.vehicle_type}|${vehicleReg}`;
                   const retry = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
                   insertError = retry.error;
                 }
@@ -7976,186 +7893,29 @@ export async function registerRoutes(
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email} (vehicle: ${application.vehicleType} ${application.vehicleMake || ''} ${application.vehicleModel || ''}, reg: ${application.vehicleRegistration || 'none'})`);
 
-                  try {
-                    await supabaseAdmin.from('drivers').update({
-                      must_change_password: true,
-                      approved_at: new Date().toISOString()
-                    }).eq('id', userId);
-                  } catch {}
-                  try {
-                    await supabaseAdmin.from('drivers').update({
-                      approved_at: new Date().toISOString()
-                    }).eq('id', userId);
-                  } catch {}
+                  supabaseAdmin.from('drivers').update({ must_change_password: true }).eq('id', userId).catch(() => {});
 
-                  const newDocMappings = [
-                    { url: application.profilePictureUrl, type: 'profile_picture', label: 'Profile Picture' },
-                    { url: application.drivingLicenceFrontUrl, type: 'driving_licence', label: 'Driving Licence (Front)' },
-                    { url: application.drivingLicenceBackUrl, type: 'driving_licence_back', label: 'Driving Licence (Back)' },
-                    { url: application.dbsCertificateUrl, type: 'dbs_certificate', label: 'DBS Certificate' },
-                    { url: application.goodsInTransitInsuranceUrl, type: 'goods_in_transit', label: 'Goods in Transit Insurance' },
-                    { url: application.hireAndRewardUrl, type: 'hire_and_reward', label: 'Hire & Reward Insurance' },
-                  ];
-                  for (const mapping of newDocMappings) {
-                    if (!mapping.url) continue;
-                    try {
-                      const fileResult = await copyApplicationFileToDriver(mapping.url, userId, supabaseAdmin);
+                  await upsertDocRecords(userId, copiedDocs);
 
-                      const { data: existingDoc } = await supabaseAdmin.from('driver_documents')
-                        .select('id, storage_path, bucket')
-                        .eq('driver_id', userId)
-                        .eq('doc_type', mapping.type)
-                        .maybeSingle();
-
-                      if (existingDoc && existingDoc.storage_path && existingDoc.bucket) {
-                        await supabaseAdmin.from('driver_documents')
-                          .update({
-                            status: 'approved',
-                            reviewed_by: reviewedBy,
-                            reviewed_at: new Date().toISOString(),
-                          })
-                          .eq('id', existingDoc.id);
-                        console.log(`[Driver Application] Approved existing document ${mapping.type} for new driver ${driverCode} (preserved storage_path)`);
-                      } else if (existingDoc) {
-                        await supabaseAdmin.from('driver_documents')
-                          .update({
-                            file_url: fileResult.path,
-                            bucket: fileResult.bucket,
-                            storage_path: fileResult.path,
-                            status: 'approved',
-                            reviewed_by: reviewedBy,
-                            reviewed_at: new Date().toISOString(),
-                          })
-                          .eq('id', existingDoc.id);
-                        console.log(`[Driver Application] Updated document ${mapping.type} with resolved path for new driver ${driverCode}`);
-                      } else {
-                        await supabaseAdmin.from('driver_documents')
-                          .insert({
-                            driver_id: userId,
-                            auth_user_id: userId,
-                            doc_type: mapping.type,
-                            file_url: fileResult.path,
-                            bucket: fileResult.bucket,
-                            storage_path: fileResult.path,
-                            file_name: mapping.label,
-                            status: 'approved',
-                            uploaded_at: new Date().toISOString(),
-                            reviewed_by: reviewedBy,
-                            reviewed_at: new Date().toISOString(),
-                          });
-                        console.log(`[Driver Application] Inserted new document ${mapping.type} for new driver ${driverCode}`);
-                      }
-                    } catch (docErr) {
-                      console.error(`[Driver Application] Failed to create document record ${mapping.type}:`, docErr);
-                    }
-                  }
-
-                  const { sendDriverApprovalEmail } = await import('./emailService');
-                  sendDriverApprovalEmail(application.email, application.fullName, driverCode, tempPassword)
-                    .then(sent => {
-                      if (sent) console.log(`[Driver Application] Approval email with credentials sent to ${application.email}`);
-                      else console.error(`[Driver Application] Failed to send approval email to ${application.email}`);
-                    })
-                    .catch(err => console.error('[Driver Application] Error sending approval email:', err));
+                  import('./emailService').then(({ sendDriverApprovalEmail }) => {
+                    sendDriverApprovalEmail(application.email, application.fullName, driverCode, tempPassword)
+                      .then(sent => { if (sent) console.log(`[Driver Application] Approval email sent to ${application.email}`); })
+                      .catch(err => console.error('[Driver Application] Error sending approval email:', err));
+                  });
                 }
               }
             } catch (createErr) {
               console.error(`[Driver Application] Error creating driver account:`, createErr);
             }
           }
+          console.log(`[Driver Application] Approval completed in ${Date.now() - startTime}ms`);
         }
       } catch (verifyErr) {
         console.error(`[Driver Application] Error verifying driver after approval:`, verifyErr);
-        // Don't fail the request - application was already reviewed
       }
     }
 
-    // Create document records in driver_documents table when approved
-    if (status === 'approved') {
-      try {
-        const { supabaseAdmin } = await import('./supabaseAdmin');
-        if (supabaseAdmin) {
-          const { data: driver } = await supabaseAdmin
-            .from('drivers')
-            .select('id')
-            .ilike('email', application.email)
-            .maybeSingle();
-
-          if (driver) {
-            const docMappings = [
-              { field: 'drivingLicenceFrontUrl', type: 'driving_licence', url: application.drivingLicenceFrontUrl },
-              { field: 'drivingLicenceBackUrl', type: 'driving_licence_back', url: application.drivingLicenceBackUrl },
-              { field: 'dbsCertificateUrl', type: 'dbs_certificate', url: application.dbsCertificateUrl },
-              { field: 'goodsInTransitInsuranceUrl', type: 'goods_in_transit', url: application.goodsInTransitInsuranceUrl },
-              { field: 'hireAndRewardUrl', type: 'hire_and_reward', url: application.hireAndRewardUrl },
-              { field: 'profilePictureUrl', type: 'profile_picture', url: application.profilePictureUrl },
-            ];
-
-            for (const d of docMappings) {
-              if (!d.url) continue;
-              try {
-                const docStatus = documentStatuses?.[d.field] || 'pending';
-                const fileResult = await copyApplicationFileToDriver(d.url, driver.id, supabaseAdmin);
-
-                const { data: existingDoc } = await supabaseAdmin.from('driver_documents')
-                  .select('id, storage_path, bucket')
-                  .eq('driver_id', driver.id)
-                  .eq('doc_type', d.type)
-                  .maybeSingle();
-
-                if (existingDoc && existingDoc.storage_path && existingDoc.bucket) {
-                  await supabaseAdmin.from('driver_documents')
-                    .update({
-                      status: docStatus,
-                      reviewed_at: new Date().toISOString(),
-                      reviewed_by: reviewedBy,
-                    })
-                    .eq('id', existingDoc.id);
-                  console.log(`[Driver Application] Updated status for existing doc ${d.type} (preserved storage_path)`);
-                } else if (existingDoc) {
-                  await supabaseAdmin.from('driver_documents')
-                    .update({
-                      file_url: fileResult.path,
-                      storage_path: fileResult.path,
-                      bucket: fileResult.bucket,
-                      status: docStatus,
-                      reviewed_at: new Date().toISOString(),
-                      reviewed_by: reviewedBy,
-                    })
-                    .eq('id', existingDoc.id);
-                  console.log(`[Driver Application] Updated doc ${d.type} with copied path`);
-                } else {
-                  await supabaseAdmin.from('driver_documents')
-                    .insert({
-                      driver_id: driver.id,
-                      auth_user_id: driver.id,
-                      doc_type: d.type,
-                      file_name: d.url!.split('/').pop() || d.type,
-                      file_url: fileResult.path,
-                      storage_path: fileResult.path,
-                      bucket: fileResult.bucket,
-                      status: docStatus,
-                      uploaded_at: new Date().toISOString(),
-                      reviewed_at: new Date().toISOString(),
-                      reviewed_by: reviewedBy,
-                    });
-                  console.log(`[Driver Application] Inserted new doc ${d.type} for driver ${driver.id}`);
-                }
-              } catch (singleErr) {
-                console.error(`[Driver Application] Failed to handle doc ${d.type}:`, singleErr);
-              }
-            }
-          }
-        }
-      } catch (docErr) {
-        console.error('[Driver Application] Error creating document records:', docErr);
-      }
-    }
-
-    // Send admin notification for driver application review
-    await sendDriverApplicationNotification(application.fullName, status).catch(err => console.error('Failed to send application notification:', err));
-
-    res.json(application);
+    sendDriverApplicationNotification(application.fullName, status).catch(err => console.error('Failed to send application notification:', err));
   }));
 
   app.post("/api/driver-applications/:id/resend-approval", asyncHandler(async (req, res) => {
