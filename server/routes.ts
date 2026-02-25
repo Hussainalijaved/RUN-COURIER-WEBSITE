@@ -7940,38 +7940,142 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Application is not approved" });
     }
 
-    const { data: driver, error: findError } = await supabaseAdmin!
+    let { data: driver } = await supabaseAdmin!
       .from('drivers')
       .select('id, driver_code, email')
       .ilike('email', application.email)
       .maybeSingle();
 
-    if (!driver) {
-      return res.status(404).json({ error: "Driver account not found for this application" });
-    }
-
     const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
 
-    const { error: updateError } = await supabaseAdmin!.auth.admin.updateUserById(driver.id, {
-      password: tempPassword
-    });
-    if (updateError) {
-      console.error('[Resend Approval] Failed to update password:', updateError);
-      return res.status(500).json({ error: "Failed to reset password" });
-    }
+    if (!driver) {
+      console.log(`[Resend Approval] No driver account found for ${application.email} - creating one now`);
+      try {
+        let oldAuthUser: any = null;
+        try {
+          const { data: allUsersData } = await supabaseAdmin!.auth.admin.listUsers({ page: 1, perPage: 1000 });
+          oldAuthUser = allUsersData?.users?.find(
+            (u: any) => u.email?.toLowerCase() === application.email.toLowerCase()
+          ) || null;
+        } catch {}
 
-    try {
-      await supabaseAdmin!.from('drivers').update({
-        must_change_password: true
-      }).eq('id', driver.id);
-    } catch {}
+        if (oldAuthUser) {
+          const oldDriverRecord = await storage.getDriverByUserId(oldAuthUser.id);
+          if (!oldDriverRecord || oldDriverRecord.isActive === false) {
+            if (oldDriverRecord) {
+              await supabaseAdmin!.from('drivers').delete().eq('id', oldAuthUser.id);
+            }
+            await supabaseAdmin!.auth.admin.deleteUser(oldAuthUser.id);
+            console.log(`[Resend Approval] Cleaned up old auth user ${oldAuthUser.id}`);
+          }
+        }
+
+        const { data: authUserResult, error: createAuthErr } = await supabaseAdmin!.auth.admin.createUser({
+          email: application.email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { fullName: application.fullName, role: 'driver', phone: application.phone }
+        });
+
+        if (createAuthErr || !authUserResult?.user) {
+          console.error(`[Resend Approval] Failed to create auth user:`, createAuthErr);
+          return res.status(500).json({ error: `Failed to create driver account: ${createAuthErr?.message || 'Unknown error'}` });
+        }
+
+        const userId = authUserResult.user.id;
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const driverCode = `RC${Math.floor(Math.random() * 10)}${Math.floor(Math.random() * 10)}${letters[Math.floor(Math.random() * letters.length)]}`;
+
+        const driverData: Record<string, any> = {
+          id: userId, user_id: userId, driver_code: driverCode,
+          full_name: application.fullName, email: application.email, phone: application.phone,
+          postcode: application.postcode || null, address: application.fullAddress || null,
+          nationality: application.nationality || null, is_british: application.isBritish ?? true,
+          national_insurance_number: application.nationalInsuranceNumber || null,
+          right_to_work_share_code: application.rightToWorkShareCode || null,
+          vehicle_type: application.vehicleType || 'car',
+          vehicle_registration: application.vehicleRegistration || null,
+          vehicle_make: application.vehicleMake || null,
+          vehicle_model: application.vehicleModel || null,
+          vehicle_color: application.vehicleColor || null,
+          online_status: 'offline', status: 'approved', is_active: true,
+          must_change_password: true, approved_at: new Date().toISOString(),
+          bank_name: application.bankName || null, account_holder_name: application.accountHolderName || null,
+          sort_code: application.sortCode || null, account_number: application.accountNumber || null,
+        };
+
+        if (application.profilePictureUrl) driverData.profile_picture_url = normalizeDocumentUrl(application.profilePictureUrl) || application.profilePictureUrl;
+
+        let { error: insertError } = await supabaseAdmin!.from('drivers').upsert(driverData, { onConflict: 'id' });
+        if (insertError && (insertError.message?.includes('vehicle_registration') || insertError.message?.includes('vehicle_make') || insertError.message?.includes('column'))) {
+          const vehicleReg = driverData.vehicle_registration;
+          delete driverData.vehicle_registration; delete driverData.vehicle_make; delete driverData.vehicle_model; delete driverData.vehicle_color;
+          if (vehicleReg && driverData.vehicle_type) driverData.vehicle_type = `${driverData.vehicle_type}|${vehicleReg}`;
+          const retry = await supabaseAdmin!.from('drivers').upsert(driverData, { onConflict: 'id' });
+          insertError = retry.error;
+        }
+
+        if (insertError) {
+          console.error(`[Resend Approval] Failed to create driver:`, insertError);
+          return res.status(500).json({ error: "Failed to create driver record" });
+        }
+
+        driver = { id: userId, driver_code: driverCode, email: application.email };
+        console.log(`[Resend Approval] Created driver ${driverCode} for ${application.email}`);
+
+        const allDocMappings = [
+          { url: application.profilePictureUrl, type: 'profile_picture', col: 'profile_picture_url', label: 'Profile Picture' },
+          { url: application.drivingLicenceFrontUrl, type: 'driving_licence', col: 'driving_licence_front_url', label: 'Driving Licence (Front)' },
+          { url: application.drivingLicenceBackUrl, type: 'driving_licence_back', col: 'driving_licence_back_url', label: 'Driving Licence (Back)' },
+          { url: application.dbsCertificateUrl, type: 'dbs_certificate', col: 'dbs_certificate_url', label: 'DBS Certificate' },
+          { url: application.goodsInTransitInsuranceUrl, type: 'goods_in_transit', col: 'goods_in_transit_insurance_url', label: 'Goods in Transit Insurance' },
+          { url: application.hireAndRewardUrl, type: 'hire_and_reward', col: 'hire_reward_insurance_url', label: 'Hire & Reward Insurance' },
+        ].filter(m => !!m.url);
+
+        Promise.allSettled(allDocMappings.map(async (m) => {
+          try {
+            const fileResult = await copyApplicationFileToDriver(m.url!, userId, supabaseAdmin!);
+            const { data: existingDoc } = await supabaseAdmin!.from('driver_documents')
+              .select('id').eq('driver_id', userId).eq('doc_type', m.type).maybeSingle();
+            if (existingDoc) {
+              await supabaseAdmin!.from('driver_documents').update({
+                file_url: fileResult.path, bucket: fileResult.bucket, storage_path: fileResult.path,
+                status: 'approved', reviewed_at: new Date().toISOString(),
+              }).eq('id', existingDoc.id);
+            } else {
+              await supabaseAdmin!.from('driver_documents').insert({
+                driver_id: userId, auth_user_id: userId, doc_type: m.type,
+                file_url: fileResult.path, bucket: fileResult.bucket, storage_path: fileResult.path,
+                file_name: m.label, status: 'approved', uploaded_at: new Date().toISOString(),
+              });
+            }
+          } catch (docErr) {
+            console.error(`[Resend Approval] Doc ${m.type} error:`, docErr);
+          }
+        })).then(() => console.log(`[Resend Approval] Document processing complete for ${driverCode}`));
+      } catch (createErr) {
+        console.error(`[Resend Approval] Error creating driver account:`, createErr);
+        return res.status(500).json({ error: "Failed to create driver account" });
+      }
+    } else {
+      const { error: updateError } = await supabaseAdmin!.auth.admin.updateUserById(driver.id, {
+        password: tempPassword
+      });
+      if (updateError) {
+        console.error('[Resend Approval] Failed to update password:', updateError);
+        return res.status(500).json({ error: "Failed to reset password" });
+      }
+      try {
+        await supabaseAdmin!.from('drivers').update({ must_change_password: true }).eq('id', driver.id);
+      } catch {}
+    }
 
     const { sendDriverApprovalEmail } = await import('./emailService');
     const sent = await sendDriverApprovalEmail(application.email, application.fullName, driver.driver_code, tempPassword);
 
     if (sent) {
-      console.log(`[Resend Approval] Approval email resent to ${application.email}`);
-      res.json({ success: true, message: "Approval email sent successfully" });
+      console.log(`[Resend Approval] Approval email sent to ${application.email} (driver: ${driver.driver_code})`);
+      res.json({ success: true, message: "Approval email sent successfully", driverCode: driver.driver_code });
     } else {
       console.error(`[Resend Approval] Failed to send email to ${application.email}`);
       res.status(500).json({ error: "Failed to send email" });
