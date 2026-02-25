@@ -11499,6 +11499,131 @@ export async function registerRoutes(
     fs.createReadStream(filePath).pipe(res);
   }));
 
+  const fleetUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'application/pdf'];
+      if (allowed.includes(file.mimetype)) cb(null, true);
+      else cb(new Error('Only images and PDFs are allowed'));
+    }
+  });
+
+  app.post("/api/admin/fleet-file/upload-document/:driverCode", fleetUpload.single('file'), asyncHandler(async (req, res) => {
+    const safeCode = req.params.driverCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const docType = (req.body.docType || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const docDir = path.join(fleetDir, 'documents', safeCode);
+    if (!fs.existsSync(docDir)) fs.mkdirSync(docDir, { recursive: true });
+
+    const ext = path.extname(file.originalname).toLowerCase() || '.bin';
+    const fileName = `${docType}${ext}`;
+    const filePath = path.join(docDir, fileName);
+    fs.writeFileSync(filePath, file.buffer);
+
+    const driverFile = path.join(fleetDir, 'drivers', `${safeCode}.json`);
+    if (fs.existsSync(driverFile)) {
+      try {
+        const driverData = JSON.parse(fs.readFileSync(driverFile, 'utf8'));
+        if (!driverData.documents) driverData.documents = [];
+        const existing = driverData.documents.findIndex((d: any) => d.doc_type === docType);
+        const docEntry = {
+          doc_type: docType,
+          source: 'admin_upload',
+          localFile: fileName,
+          fileSize: file.size,
+          uploadedAt: new Date().toISOString(),
+        };
+        if (existing >= 0) driverData.documents[existing] = docEntry;
+        else driverData.documents.push(docEntry);
+        fs.writeFileSync(driverFile, JSON.stringify(driverData, null, 2));
+      } catch {}
+    }
+
+    res.json({ success: true, fileName, docType, fileSize: file.size });
+  }));
+
+  app.delete("/api/admin/fleet-file/document/:driverCode/:fileName", asyncHandler(async (req, res) => {
+    const safeCode = req.params.driverCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeFile = path.basename(req.params.fileName);
+    const filePath = path.join(fleetDir, 'documents', safeCode, safeFile);
+
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    const driverFile = path.join(fleetDir, 'drivers', `${safeCode}.json`);
+    if (fs.existsSync(driverFile)) {
+      try {
+        const driverData = JSON.parse(fs.readFileSync(driverFile, 'utf8'));
+        if (driverData.documents) {
+          driverData.documents = driverData.documents.filter((d: any) => d.localFile !== safeFile);
+          fs.writeFileSync(driverFile, JSON.stringify(driverData, null, 2));
+        }
+      } catch {}
+    }
+
+    res.json({ success: true });
+  }));
+
+  app.put("/api/admin/fleet-file/profile/:driverCode", asyncHandler(async (req, res) => {
+    const safeCode = req.params.driverCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const updates = req.body;
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ error: 'Invalid profile data' });
+    }
+
+    const driverFile = path.join(fleetDir, 'drivers', `${safeCode}.json`);
+    if (!fs.existsSync(driverFile)) {
+      return res.status(404).json({ error: 'Driver file not found. Run a sync first.' });
+    }
+
+    const driverData = JSON.parse(fs.readFileSync(driverFile, 'utf8'));
+    if (!driverData.driver) driverData.driver = {};
+
+    const allowedFields = [
+      'full_name', 'email', 'phone', 'address', 'address_line_1', 'postcode',
+      'nationality', 'national_insurance_number', 'vehicle_type',
+      'vehicle_registration', 'vehicle_reg', 'vehicle_make', 'vehicle_model',
+      'vehicle_color', 'bank_name', 'account_holder_name', 'sort_code',
+      'account_number', 'status'
+    ];
+
+    for (const field of allowedFields) {
+      if (field in updates) {
+        driverData.driver[field] = updates[field];
+      }
+    }
+
+    if (!driverData.localEdits) driverData.localEdits = {};
+    driverData.localEdits.lastEditedAt = new Date().toISOString();
+    driverData.localEdits.editedFields = [
+      ...new Set([...(driverData.localEdits.editedFields || []), ...Object.keys(updates).filter(k => allowedFields.includes(k))])
+    ];
+
+    fs.writeFileSync(driverFile, JSON.stringify(driverData, null, 2));
+
+    const masterFile = path.join(fleetDir, 'fleet-master.json');
+    if (fs.existsSync(masterFile)) {
+      try {
+        const master = JSON.parse(fs.readFileSync(masterFile, 'utf8'));
+        if (master.drivers) {
+          const idx = master.drivers.findIndex((d: any) =>
+            (d.driver_code || d.id) === (driverData.driver.driver_code || driverData.driver.id)
+          );
+          if (idx >= 0) {
+            for (const field of allowedFields) {
+              if (field in updates) master.drivers[idx][field] = updates[field];
+            }
+            fs.writeFileSync(masterFile, JSON.stringify(master, null, 2));
+          }
+        }
+      } catch {}
+    }
+
+    res.json({ success: true, driver: driverData.driver });
+  }));
+
   app.get("/api/admin/fleet-file/download", asyncHandler(async (req, res) => {
     const masterFile = path.join(fleetDir, 'fleet-master.json');
     if (!fs.existsSync(masterFile)) {

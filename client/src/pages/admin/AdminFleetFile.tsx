@@ -48,10 +48,23 @@ import {
   StickyNote,
   Save,
   MessageSquare,
+  Upload,
+  Pencil,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 interface FleetStatus {
   lastSync: {
@@ -139,6 +152,11 @@ export default function AdminFleetFile() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [driverNotes, setDriverNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileEdits, setProfileEdits] = useState<Record<string, string>>({});
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadDocType, setUploadDocType] = useState('');
   const { toast } = useToast();
 
   const { data: status, isLoading: statusLoading } = useQuery<FleetStatus>({
@@ -218,6 +236,8 @@ export default function AdminFleetFile() {
       const data = await res.json();
       setSelectedDriver(data);
       setDetailDialogOpen(true);
+      setEditingProfile(false);
+      setUploadDocType('');
       try {
         const notesRes = await apiRequest('GET', `/api/admin/fleet-file/notes/${driverCode}`);
         const notesData = await notesRes.json();
@@ -243,6 +263,93 @@ export default function AdminFleetFile() {
       toast({ title: 'Failed to save notes', variant: 'destructive' });
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const getDriverCode = () => {
+    if (!selectedDriver?.driver) return '';
+    return (selectedDriver.driver.driver_code || selectedDriver.driver.id || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  };
+
+  const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const code = getDriverCode();
+    if (!code) return;
+    const docType = uploadDocType || 'unknown';
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('docType', docType);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || '';
+      const res = await fetch(`/api/admin/fleet-file/upload-document/${code}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      toast({ title: 'Document uploaded to Fleet File' });
+      fetchDriverDetail(code);
+    } catch {
+      toast({ title: 'Failed to upload document', variant: 'destructive' });
+    } finally {
+      setUploadingDoc(false);
+      setUploadDocType('');
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteDocument = async (fileName: string) => {
+    const code = getDriverCode();
+    if (!code) return;
+    try {
+      await apiRequest('DELETE', `/api/admin/fleet-file/document/${code}/${fileName}`);
+      toast({ title: 'Document deleted from Fleet File' });
+      fetchDriverDetail(code);
+    } catch {
+      toast({ title: 'Failed to delete document', variant: 'destructive' });
+    }
+  };
+
+  const startEditingProfile = () => {
+    if (!selectedDriver?.driver) return;
+    const d = selectedDriver.driver;
+    setProfileEdits({
+      full_name: d.full_name || '',
+      email: d.email || '',
+      phone: d.phone || '',
+      address: d.address || d.address_line_1 || '',
+      postcode: d.postcode || '',
+      nationality: d.nationality || '',
+      national_insurance_number: d.national_insurance_number || '',
+      vehicle_type: d.vehicle_type || '',
+      vehicle_registration: d.vehicle_registration || d.vehicle_reg || '',
+      vehicle_make: d.vehicle_make || '',
+      vehicle_model: d.vehicle_model || '',
+      vehicle_color: d.vehicle_color || '',
+      bank_name: d.bank_name || '',
+      account_holder_name: d.account_holder_name || '',
+      sort_code: d.sort_code || '',
+      account_number: d.account_number || '',
+    });
+    setEditingProfile(true);
+  };
+
+  const saveProfileEdits = async () => {
+    const code = getDriverCode();
+    if (!code) return;
+    setSavingProfile(true);
+    try {
+      await apiRequest('PUT', `/api/admin/fleet-file/profile/${code}`, profileEdits);
+      toast({ title: 'Profile updated in Fleet File' });
+      setEditingProfile(false);
+      fetchDriverDetail(code);
+    } catch {
+      toast({ title: 'Failed to save profile', variant: 'destructive' });
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -743,55 +850,126 @@ export default function AdminFleetFile() {
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
+                      <div className="mb-4 p-3 border rounded-md space-y-3">
+                        <p className="text-sm font-medium">Upload Document</p>
+                        <div className="flex items-end gap-3 flex-wrap">
+                          <div className="flex-1 min-w-[150px]">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Document Type</Label>
+                            <Select value={uploadDocType} onValueChange={setUploadDocType}>
+                              <SelectTrigger data-testid="select-upload-doc-type">
+                                <SelectValue placeholder="Select type..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="driving_licence">Driving Licence (Front)</SelectItem>
+                                <SelectItem value="driving_licence_back">Driving Licence (Back)</SelectItem>
+                                <SelectItem value="dbs_certificate">DBS Certificate</SelectItem>
+                                <SelectItem value="goods_in_transit">Goods in Transit Insurance</SelectItem>
+                                <SelectItem value="hire_and_reward">Hire & Reward Insurance</SelectItem>
+                                <SelectItem value="profile_picture">Profile Picture</SelectItem>
+                                <SelectItem value="vehicle_photos">Vehicle Photo</SelectItem>
+                                <SelectItem value="other">Other Document</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={handleUploadDocument}
+                              disabled={!uploadDocType || uploadingDoc}
+                              className="hidden"
+                              id="fleet-doc-upload"
+                              data-testid="input-upload-file"
+                            />
+                            <Button
+                              variant="outline"
+                              disabled={!uploadDocType || uploadingDoc}
+                              onClick={() => document.getElementById('fleet-doc-upload')?.click()}
+                              data-testid="button-upload-document"
+                            >
+                              {uploadingDoc ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Upload className="w-4 h-4 mr-2" />
+                              )}
+                              Choose & Upload
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Files are saved locally to Fleet File only, not to Supabase
+                        </p>
+                      </div>
+
                       {selectedDriver.documents.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {selectedDriver.documents.map((doc: any, idx: number) => (
                             <Card
                               key={idx}
                               className={`${doc.localFile ? 'hover-elevate cursor-pointer' : ''}`}
-                              onClick={() => doc.localFile && openDocument(doc)}
                               data-testid={`card-doc-${idx}`}
                             >
                               <CardContent className="p-3">
                                 <div className="flex items-start gap-3">
-                                  <div className="shrink-0 mt-0.5">
-                                    {doc.localFile ? (
-                                      isImageFile(doc.localFile) ? (
-                                        <Image className="h-5 w-5 text-blue-500" />
+                                  <div
+                                    className="flex-1 flex items-start gap-3 cursor-pointer"
+                                    onClick={() => doc.localFile && openDocument(doc)}
+                                  >
+                                    <div className="shrink-0 mt-0.5">
+                                      {doc.localFile ? (
+                                        isImageFile(doc.localFile) ? (
+                                          <Image className="h-5 w-5 text-blue-500" />
+                                        ) : (
+                                          <FileText className="h-5 w-5 text-red-500" />
+                                        )
                                       ) : (
-                                        <FileText className="h-5 w-5 text-red-500" />
-                                      )
-                                    ) : (
-                                      <XCircle className="h-5 w-5 text-muted-foreground" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">
-                                      {getDocLabel(doc.doc_type)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                      Source: {doc.source === 'driver_documents' ? 'Documents table' : doc.source === 'driver_profile' ? 'Driver profile' : 'Application'}
-                                    </p>
-                                    {doc.localFile ? (
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
-                                          <CheckCircle className="w-3 h-3 mr-1" />
-                                          Saved
+                                        <XCircle className="h-5 w-5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">
+                                        {getDocLabel(doc.doc_type)}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        Source: {doc.source === 'driver_documents' ? 'Documents table' : doc.source === 'driver_profile' ? 'Driver profile' : doc.source === 'admin_upload' ? 'Admin upload' : 'Application'}
+                                      </p>
+                                      {doc.localFile ? (
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                                            <CheckCircle className="w-3 h-3 mr-1" />
+                                            Saved
+                                          </Badge>
+                                          {doc.fileSize && (
+                                            <span className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <Badge variant="outline" className="text-red-500 border-red-500 text-xs mt-1">
+                                          <XCircle className="w-3 h-3 mr-1" />
+                                          Download failed
                                         </Badge>
-                                        {doc.fileSize && (
-                                          <span className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</span>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <Badge variant="outline" className="text-red-500 border-red-500 text-xs mt-1">
-                                        <XCircle className="w-3 h-3 mr-1" />
-                                        Download failed
-                                      </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {doc.localFile && (
+                                      <Eye className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                    {doc.localFile && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteDocument(doc.localFile);
+                                        }}
+                                        data-testid={`button-delete-doc-${idx}`}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                      </Button>
                                     )}
                                   </div>
-                                  {doc.localFile && (
-                                    <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  )}
                                 </div>
                               </CardContent>
                             </Card>
@@ -811,34 +989,114 @@ export default function AdminFleetFile() {
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        {[
-                          ['Driver Code', selectedDriver.driver?.driver_code],
-                          ['Full Name', selectedDriver.driver?.full_name],
-                          ['Email', selectedDriver.driver?.email],
-                          ['Phone', selectedDriver.driver?.phone],
-                          ['Address', selectedDriver.driver?.address || selectedDriver.driver?.address_line_1],
-                          ['Postcode', selectedDriver.driver?.postcode],
-                          ['Nationality', selectedDriver.driver?.nationality],
-                          ['NI Number', selectedDriver.driver?.national_insurance_number],
-                          ['Vehicle Type', selectedDriver.driver?.vehicle_type],
-                          ['Vehicle Reg', selectedDriver.driver?.vehicle_registration || selectedDriver.driver?.vehicle_reg],
-                          ['Vehicle Make', selectedDriver.driver?.vehicle_make],
-                          ['Vehicle Model', selectedDriver.driver?.vehicle_model],
-                          ['Vehicle Colour', selectedDriver.driver?.vehicle_color],
-                          ['Status', selectedDriver.driver?.status],
-                          ['Bank Name', selectedDriver.driver?.bank_name],
-                          ['Account Holder', selectedDriver.driver?.account_holder_name],
-                          ['Sort Code', selectedDriver.driver?.sort_code],
-                          ['Account Number', selectedDriver.driver?.account_number],
-                          ['Created', formatDate(selectedDriver.driver?.created_at)],
-                        ].map(([label, value]) => (
-                          <div key={label as string}>
-                            <span className="text-muted-foreground">{label}:</span>{' '}
-                            <span className="font-medium">{(value as string) || '—'}</span>
+                      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                        <p className="text-xs text-muted-foreground">
+                          {editingProfile ? 'Changes saved locally to Fleet File only, not to Supabase' : 'Click Edit to modify profile locally'}
+                        </p>
+                        {editingProfile ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => setEditingProfile(false)}
+                              data-testid="button-cancel-edit"
+                            >
+                              <X className="w-4 h-4 mr-2" />
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={saveProfileEdits}
+                              disabled={savingProfile}
+                              data-testid="button-save-profile"
+                            >
+                              {savingProfile ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4 mr-2" />
+                              )}
+                              Save Changes
+                            </Button>
                           </div>
-                        ))}
+                        ) : (
+                          <Button
+                            variant="outline"
+                            onClick={startEditingProfile}
+                            data-testid="button-edit-profile"
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit Profile
+                          </Button>
+                        )}
                       </div>
+
+                      {editingProfile ? (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground block text-xs mb-1">Driver Code</span>
+                            <span className="font-medium">{selectedDriver.driver?.driver_code || '—'}</span>
+                          </div>
+                          {([
+                            ['full_name', 'Full Name'],
+                            ['email', 'Email'],
+                            ['phone', 'Phone'],
+                            ['address', 'Address'],
+                            ['postcode', 'Postcode'],
+                            ['nationality', 'Nationality'],
+                            ['national_insurance_number', 'NI Number'],
+                            ['vehicle_type', 'Vehicle Type'],
+                            ['vehicle_registration', 'Vehicle Reg'],
+                            ['vehicle_make', 'Vehicle Make'],
+                            ['vehicle_model', 'Vehicle Model'],
+                            ['vehicle_color', 'Vehicle Colour'],
+                            ['bank_name', 'Bank Name'],
+                            ['account_holder_name', 'Account Holder'],
+                            ['sort_code', 'Sort Code'],
+                            ['account_number', 'Account Number'],
+                          ] as const).map(([field, label]) => (
+                            <div key={field}>
+                              <Label className="text-xs text-muted-foreground mb-1 block">{label}</Label>
+                              <Input
+                                value={profileEdits[field] || ''}
+                                onChange={(e) => setProfileEdits(prev => ({ ...prev, [field]: e.target.value }))}
+                                className="h-8 text-sm"
+                                data-testid={`input-edit-${field}`}
+                              />
+                            </div>
+                          ))}
+                          <div>
+                            <span className="text-muted-foreground block text-xs mb-1">Created</span>
+                            <span className="font-medium">{formatDate(selectedDriver.driver?.created_at) || '—'}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          {[
+                            ['Driver Code', selectedDriver.driver?.driver_code],
+                            ['Full Name', selectedDriver.driver?.full_name],
+                            ['Email', selectedDriver.driver?.email],
+                            ['Phone', selectedDriver.driver?.phone],
+                            ['Address', selectedDriver.driver?.address || selectedDriver.driver?.address_line_1],
+                            ['Postcode', selectedDriver.driver?.postcode],
+                            ['Nationality', selectedDriver.driver?.nationality],
+                            ['NI Number', selectedDriver.driver?.national_insurance_number],
+                            ['Vehicle Type', selectedDriver.driver?.vehicle_type],
+                            ['Vehicle Reg', selectedDriver.driver?.vehicle_registration || selectedDriver.driver?.vehicle_reg],
+                            ['Vehicle Make', selectedDriver.driver?.vehicle_make],
+                            ['Vehicle Model', selectedDriver.driver?.vehicle_model],
+                            ['Vehicle Colour', selectedDriver.driver?.vehicle_color],
+                            ['Status', selectedDriver.driver?.status],
+                            ['Bank Name', selectedDriver.driver?.bank_name],
+                            ['Account Holder', selectedDriver.driver?.account_holder_name],
+                            ['Sort Code', selectedDriver.driver?.sort_code],
+                            ['Account Number', selectedDriver.driver?.account_number],
+                            ['Created', formatDate(selectedDriver.driver?.created_at)],
+                          ].map(([label, value]) => (
+                            <div key={label as string}>
+                              <span className="text-muted-foreground">{label}:</span>{' '}
+                              <span className="font-medium">{(value as string) || '—'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </AccordionContent>
                   </AccordionItem>
 
