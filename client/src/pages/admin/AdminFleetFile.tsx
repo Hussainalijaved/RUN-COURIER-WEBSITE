@@ -25,6 +25,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Textarea } from '@/components/ui/textarea';
 import {
   HardDrive,
   RefreshCw,
@@ -44,6 +45,9 @@ import {
   FileDown,
   XCircle,
   ExternalLink,
+  StickyNote,
+  Save,
+  MessageSquare,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -133,6 +137,8 @@ export default function AdminFleetFile() {
   const [viewingDoc, setViewingDoc] = useState<{ url: string; name: string; type: string } | null>(null);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [driverNotes, setDriverNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
   const { toast } = useToast();
 
   const { data: status, isLoading: statusLoading } = useQuery<FleetStatus>({
@@ -142,6 +148,10 @@ export default function AdminFleetFile() {
   const { data: fleetData, isLoading: dataLoading } = useQuery<FleetDriverData>({
     queryKey: ['/api/admin/fleet-file/drivers'],
     enabled: !!status?.lastSync,
+  });
+
+  const { data: allNotes } = useQuery<Record<string, { notes: string; updatedAt: string }>>({
+    queryKey: ['/api/admin/fleet-file/all-notes'],
   });
 
   const { data: progressData } = useQuery<SyncProgress>({
@@ -208,8 +218,31 @@ export default function AdminFleetFile() {
       const data = await res.json();
       setSelectedDriver(data);
       setDetailDialogOpen(true);
+      try {
+        const notesRes = await apiRequest('GET', `/api/admin/fleet-file/notes/${driverCode}`);
+        const notesData = await notesRes.json();
+        setDriverNotes(notesData.notes || '');
+      } catch {
+        setDriverNotes('');
+      }
     } catch {
       toast({ title: 'Failed to load driver details', variant: 'destructive' });
+    }
+  };
+
+  const saveDriverNotes = async () => {
+    if (!selectedDriver) return;
+    const code = selectedDriver.driver?.driver_code || selectedDriver.driver?.id;
+    if (!code) return;
+    setSavingNotes(true);
+    try {
+      await apiRequest('PUT', `/api/admin/fleet-file/notes/${code}`, { notes: driverNotes });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/fleet-file/all-notes'] });
+      toast({ title: 'Notes saved' });
+    } catch {
+      toast({ title: 'Failed to save notes', variant: 'destructive' });
+    } finally {
+      setSavingNotes(false);
     }
   };
 
@@ -498,6 +531,7 @@ export default function AdminFleetFile() {
                       <TableHead>Vehicle</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Files Saved</TableHead>
+                      <TableHead>Notes</TableHead>
                       <TableHead>Application</TableHead>
                       <TableHead>View</TableHead>
                     </TableRow>
@@ -545,6 +579,17 @@ export default function AdminFleetFile() {
                                 <span className="text-xs text-muted-foreground">0</span>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const code = (driver.driver_code || driver.id || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+                              const hasNotes = allNotes?.[code]?.notes;
+                              return hasNotes ? (
+                                <MessageSquare className="h-4 w-4 text-blue-500" />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             {hasApp ? (
@@ -652,7 +697,44 @@ export default function AdminFleetFile() {
                   )}
                 </div>
 
-                <Accordion type="multiple" defaultValue={['documents', 'profile']} className="w-full">
+                <Accordion type="multiple" defaultValue={['notes', 'documents', 'profile']} className="w-full">
+                  <AccordionItem value="notes">
+                    <AccordionTrigger className="hover:no-underline">
+                      <span className="flex items-center gap-2">
+                        <StickyNote className="h-4 w-4" />
+                        Admin Notes
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-3">
+                        <Textarea
+                          placeholder="Add notes about this driver (visible only in Fleet File)..."
+                          value={driverNotes}
+                          onChange={(e) => setDriverNotes(e.target.value)}
+                          className="min-h-[100px] resize-y"
+                          data-testid="textarea-driver-notes"
+                        />
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-xs text-muted-foreground">
+                            Notes are saved locally to the Fleet File only
+                          </p>
+                          <Button
+                            onClick={saveDriverNotes}
+                            disabled={savingNotes}
+                            data-testid="button-save-notes"
+                          >
+                            {savingNotes ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4 mr-2" />
+                            )}
+                            Save Notes
+                          </Button>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
                   <AccordionItem value="documents">
                     <AccordionTrigger className="hover:no-underline">
                       <span className="flex items-center gap-2">

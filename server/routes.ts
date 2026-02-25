@@ -11441,6 +11441,42 @@ export async function registerRoutes(
     }
   }));
 
+  const fleetNotesFile = path.join(fleetDir, 'admin-notes.json');
+
+  function loadFleetNotes(): Record<string, { notes: string; updatedAt: string }> {
+    try {
+      if (fs.existsSync(fleetNotesFile)) return JSON.parse(fs.readFileSync(fleetNotesFile, 'utf8'));
+    } catch {}
+    return {};
+  }
+
+  function saveFleetNotes(notes: Record<string, { notes: string; updatedAt: string }>) {
+    if (!fs.existsSync(fleetDir)) fs.mkdirSync(fleetDir, { recursive: true });
+    fs.writeFileSync(fleetNotesFile, JSON.stringify(notes, null, 2));
+  }
+
+  app.get("/api/admin/fleet-file/notes/:driverCode", asyncHandler(async (req, res) => {
+    const safeCode = req.params.driverCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const allNotes = loadFleetNotes();
+    res.json(allNotes[safeCode] || { notes: '', updatedAt: null });
+  }));
+
+  app.put("/api/admin/fleet-file/notes/:driverCode", asyncHandler(async (req, res) => {
+    const safeCode = req.params.driverCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const { notes } = req.body;
+    if (typeof notes !== 'string') {
+      return res.status(400).json({ error: 'Notes must be a string' });
+    }
+    const allNotes = loadFleetNotes();
+    allNotes[safeCode] = { notes, updatedAt: new Date().toISOString() };
+    saveFleetNotes(allNotes);
+    res.json({ success: true, ...allNotes[safeCode] });
+  }));
+
+  app.get("/api/admin/fleet-file/all-notes", asyncHandler(async (_req, res) => {
+    res.json(loadFleetNotes());
+  }));
+
   app.get("/api/admin/fleet-file/document/:driverCode/:fileName", asyncHandler(async (req, res) => {
     const { driverCode, fileName } = req.params;
     const safeCode = driverCode.replace(/[^a-zA-Z0-9_-]/g, '_');
