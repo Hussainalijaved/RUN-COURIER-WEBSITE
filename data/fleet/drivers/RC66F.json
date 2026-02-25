@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-02-24T23:52:18.774Z",
+  "syncedAt": "2026-02-25T22:01:52.422Z",
   "driver": {
     "id": "b9992aaa-f425-40a5-ab02-1c1491ade572",
     "user_id": "b9992aaa-f425-40a5-ab02-1c1491ade572",
@@ -83,8 +83,8 @@
       "doc_type": "driving_licence_front",
       "file_url": "drivers/pending/drivingLicenceFront/drivingLicenceFront_1771755214157_17717551908979173226693372849284.jpg",
       "driverCode": "RC66F",
-      "localFile": "driving_licence_front.jpg",
-      "localPath": "RC66F/driving_licence_front.jpg",
+      "localFile": "driving_licence_front_1.jpg",
+      "localPath": "RC66F/driving_licence_front_1.jpg",
       "fileSize": 1370762,
       "source": "driver_profile"
     },
@@ -93,8 +93,8 @@
       "doc_type": "driving_licence_back",
       "file_url": "drivers/pending/drivingLicenceBack/drivingLicenceBack_1771755235779_17717552173881414427913862366606.jpg",
       "driverCode": "RC66F",
-      "localFile": "driving_licence_back.jpg",
-      "localPath": "RC66F/driving_licence_back.jpg",
+      "localFile": "driving_licence_back_1.jpg",
+      "localPath": "RC66F/driving_licence_back_1.jpg",
       "fileSize": 1467431,
       "source": "driver_profile"
     },
@@ -103,8 +103,8 @@
       "doc_type": "goods_in_transit",
       "file_url": "drivers/pending/goodsInTransitInsurance/goodsInTransitInsurance_1771755609513_Screenshot_20260222_101940_My_Portal.jpg",
       "driverCode": "RC66F",
-      "localFile": "goods_in_transit.jpg",
-      "localPath": "RC66F/goods_in_transit.jpg",
+      "localFile": "goods_in_transit_1.jpg",
+      "localPath": "RC66F/goods_in_transit_1.jpg",
       "fileSize": 509433,
       "source": "driver_profile"
     },
@@ -113,8 +113,8 @@
       "doc_type": "hire_and_reward",
       "file_url": "drivers/pending/hireAndReward/hireAndReward_1771755615023_Screenshot_20260222_101940_My_Portal.jpg",
       "driverCode": "RC66F",
-      "localFile": "hire_and_reward.jpg",
-      "localPath": "RC66F/hire_and_reward.jpg",
+      "localFile": "hire_and_reward_1.jpg",
+      "localPath": "RC66F/hire_and_reward_1.jpg",
       "fileSize": 509433,
       "source": "driver_profile"
     },
@@ -123,8 +123,8 @@
       "doc_type": "profile_picture",
       "file_url": "https://dkkuuxyejgxldvmwpdkf.supabase.co/storage/v1/object/public/driver-documents/drivers/pending/profilePicture/profilePicture_1771755622865_Messenger_creation_DD1F3DC0-3BF5-4C48-A67A-130BBF5F2569.jpeg",
       "driverCode": "RC66F",
-      "localFile": "profile_picture.jpeg",
-      "localPath": "RC66F/profile_picture.jpeg",
+      "localFile": "profile_picture_1.jpeg",
+      "localPath": "RC66F/profile_picture_1.jpeg",
       "fileSize": 88698,
       "source": "driver_profile"
     }

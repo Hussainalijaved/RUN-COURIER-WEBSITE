@@ -7786,11 +7786,14 @@ export async function registerRoutes(
                 upsertDocRecords(driver.id, copiedDocs),
               ]);
 
-              import('./emailService').then(({ sendDriverApprovalEmailExisting }) => {
-                sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code)
-                  .then(sent => { if (sent) console.log(`[Driver Application] Approval email sent to existing driver ${application.email}`); })
-                  .catch(err => console.error('[Driver Application] Error sending approval email:', err));
-              });
+              try {
+                const { sendDriverApprovalEmailExisting } = await import('./emailService');
+                const sent = await sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code);
+                if (sent) console.log(`[Driver Application] Approval email sent to existing driver ${application.email}`);
+                else console.error(`[Driver Application] Failed to send approval email to existing driver ${application.email}`);
+              } catch (emailErr) {
+                console.error('[Driver Application] Error sending approval email to existing driver:', emailErr);
+              }
             } else {
               console.error(`[Driver Application] Failed to update driver ${driver.driver_code}:`, updateResult);
             }
@@ -7801,21 +7804,14 @@ export async function registerRoutes(
             try {
               const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
               
-              const { data: existingUserLookup } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
               let oldAuthUser: any = null;
-              if (existingUserLookup?.users) {
-                const { data: lookupByEmail } = await supabaseAdmin
-                  .from('auth.users' as any)
-                  .select('id, email')
-                  .ilike('email', application.email)
-                  .maybeSingle()
-                  .catch(() => ({ data: null }));
-                if (!lookupByEmail) {
-                  const { data: allUsersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-                  oldAuthUser = allUsersData?.users?.find(
-                    (u: any) => u.email?.toLowerCase() === application.email.toLowerCase()
-                  );
-                }
+              try {
+                const { data: allUsersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+                oldAuthUser = allUsersData?.users?.find(
+                  (u: any) => u.email?.toLowerCase() === application.email.toLowerCase()
+                ) || null;
+              } catch (lookupErr) {
+                console.warn(`[Driver Application] User lookup failed:`, lookupErr);
               }
 
               if (oldAuthUser) {
@@ -7893,15 +7889,18 @@ export async function registerRoutes(
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email} (vehicle: ${application.vehicleType} ${application.vehicleMake || ''} ${application.vehicleModel || ''}, reg: ${application.vehicleRegistration || 'none'})`);
 
-                  supabaseAdmin.from('drivers').update({ must_change_password: true }).eq('id', userId).catch(() => {});
+                  try { await supabaseAdmin.from('drivers').update({ must_change_password: true }).eq('id', userId); } catch {}
 
                   await upsertDocRecords(userId, copiedDocs);
 
-                  import('./emailService').then(({ sendDriverApprovalEmail }) => {
-                    sendDriverApprovalEmail(application.email, application.fullName, driverCode, tempPassword)
-                      .then(sent => { if (sent) console.log(`[Driver Application] Approval email sent to ${application.email}`); })
-                      .catch(err => console.error('[Driver Application] Error sending approval email:', err));
-                  });
+                  try {
+                    const { sendDriverApprovalEmail } = await import('./emailService');
+                    const sent = await sendDriverApprovalEmail(application.email, application.fullName, driverCode, tempPassword);
+                    if (sent) console.log(`[Driver Application] Approval email with credentials sent to ${application.email}`);
+                    else console.error(`[Driver Application] Failed to send approval email to ${application.email}`);
+                  } catch (emailErr) {
+                    console.error('[Driver Application] Error sending approval email:', emailErr);
+                  }
                 }
               }
             } catch (createErr) {

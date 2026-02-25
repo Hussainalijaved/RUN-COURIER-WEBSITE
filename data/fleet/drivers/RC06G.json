@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-02-24T23:52:18.774Z",
+  "syncedAt": "2026-02-25T22:01:52.422Z",
   "driver": {
     "id": "8fe1cc96-e425-40a0-bbb9-f533c720974c",
     "user_id": "8fe1cc96-e425-40a0-bbb9-f533c720974c",
@@ -94,8 +94,8 @@
       "size_bytes": null,
       "admin_notes": null,
       "driverCode": "RC06G",
-      "localFile": "profile_picture.jpg",
-      "localPath": "RC06G/profile_picture.jpg",
+      "localFile": "profile_picture_1.jpg",
+      "localPath": "RC06G/profile_picture_1.jpg",
       "fileSize": 40383,
       "source": "driver_documents"
     },
@@ -144,8 +144,8 @@
       "size_bytes": null,
       "admin_notes": null,
       "driverCode": "RC06G",
-      "localFile": "dbs_certificate.jpg",
-      "localPath": "RC06G/dbs_certificate.jpg",
+      "localFile": "dbs_certificate_1.jpg",
+      "localPath": "RC06G/dbs_certificate_1.jpg",
       "fileSize": 168006,
       "source": "driver_documents"
     },
@@ -294,8 +294,8 @@
       "size_bytes": null,
       "admin_notes": null,
       "driverCode": "RC06G",
-      "localFile": "goods_in_transit_insurance.jpg",
-      "localPath": "RC06G/goods_in_transit_insurance.jpg",
+      "localFile": "goods_in_transit_insurance_1.jpg",
+      "localPath": "RC06G/goods_in_transit_insurance_1.jpg",
       "fileSize": 168006,
       "source": "driver_documents"
     },
@@ -319,8 +319,8 @@
       "size_bytes": null,
       "admin_notes": null,
       "driverCode": "RC06G",
-      "localFile": "hire_and_reward_insurance.jpg",
-      "localPath": "RC06G/hire_and_reward_insurance.jpg",
+      "localFile": "hire_and_reward_insurance_1.jpg",
+      "localPath": "RC06G/hire_and_reward_insurance_1.jpg",
       "fileSize": 168006,
       "source": "driver_documents"
     },
@@ -369,8 +369,8 @@
       "size_bytes": null,
       "admin_notes": null,
       "driverCode": "RC06G",
-      "localFile": "driving_license_back.jpg",
-      "localPath": "RC06G/driving_license_back.jpg",
+      "localFile": "driving_license_back_1.jpg",
+      "localPath": "RC06G/driving_license_back_1.jpg",
       "fileSize": 97036,
       "source": "driver_documents"
     },
@@ -394,8 +394,8 @@
       "size_bytes": null,
       "admin_notes": null,
       "driverCode": "RC06G",
-      "localFile": "driving_license.jpg",
-      "localPath": "RC06G/driving_license.jpg",
+      "localFile": "driving_license_1.jpg",
+      "localPath": "RC06G/driving_license_1.jpg",
       "fileSize": 97036,
       "source": "driver_documents"
     }

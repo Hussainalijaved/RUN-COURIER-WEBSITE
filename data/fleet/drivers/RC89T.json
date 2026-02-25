@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-02-24T23:52:18.774Z",
+  "syncedAt": "2026-02-25T22:01:52.422Z",
   "driver": {
     "id": "f78713aa-b219-4da8-82f5-56c900205590",
     "user_id": "f78713aa-b219-4da8-82f5-56c900205590",
@@ -98,8 +98,8 @@
       "size_bytes": 75512,
       "admin_notes": null,
       "driverCode": "RC89T",
-      "localFile": "proof_of_address.pdf",
-      "localPath": "RC89T/proof_of_address.pdf",
+      "localFile": "proof_of_address_1.pdf",
+      "localPath": "RC89T/proof_of_address_1.pdf",
       "fileSize": 75512,
       "source": "driver_documents"
     },
@@ -123,8 +123,8 @@
       "size_bytes": 304742,
       "admin_notes": null,
       "driverCode": "RC89T",
-      "localFile": "proof_of_identity.jpg",
-      "localPath": "RC89T/proof_of_identity.jpg",
+      "localFile": "proof_of_identity_1.jpg",
+      "localPath": "RC89T/proof_of_identity_1.jpg",
       "fileSize": 304742,
       "source": "driver_documents"
     },
@@ -148,8 +148,8 @@
       "size_bytes": 82875,
       "admin_notes": null,
       "driverCode": "RC89T",
-      "localFile": "goods_in_transit_insurance.pdf",
-      "localPath": "RC89T/goods_in_transit_insurance.pdf",
+      "localFile": "goods_in_transit_insurance_1.pdf",
+      "localPath": "RC89T/goods_in_transit_insurance_1.pdf",
       "fileSize": 82875,
       "source": "driver_documents"
     },
@@ -173,8 +173,8 @@
       "size_bytes": 82875,
       "admin_notes": null,
       "driverCode": "RC89T",
-      "localFile": "hire_and_reward_insurance.pdf",
-      "localPath": "RC89T/hire_and_reward_insurance.pdf",
+      "localFile": "hire_and_reward_insurance_1.pdf",
+      "localPath": "RC89T/hire_and_reward_insurance_1.pdf",
       "fileSize": 82875,
       "source": "driver_documents"
     },
@@ -198,8 +198,8 @@
       "size_bytes": 269093,
       "admin_notes": null,
       "driverCode": "RC89T",
-      "localFile": "driving_license_back.jpg",
-      "localPath": "RC89T/driving_license_back.jpg",
+      "localFile": "driving_license_back_1.jpg",
+      "localPath": "RC89T/driving_license_back_1.jpg",
       "fileSize": 269093,
       "source": "driver_documents"
     },
@@ -223,8 +223,8 @@
       "size_bytes": 304742,
       "admin_notes": null,
       "driverCode": "RC89T",
-      "localFile": "driving_license.jpg",
-      "localPath": "RC89T/driving_license.jpg",
+      "localFile": "driving_license_1.jpg",
+      "localPath": "RC89T/driving_license_1.jpg",
       "fileSize": 304742,
       "source": "driver_documents"
     },
@@ -233,8 +233,8 @@
       "doc_type": "driving_licence_front",
       "file_url": "drivers/pending/drivingLicenceFront/drivingLicenceFront_1771883639236_dvla_front.jpg",
       "driverCode": "RC89T",
-      "localFile": "driving_licence_front.jpg",
-      "localPath": "RC89T/driving_licence_front.jpg",
+      "localFile": "driving_licence_front_1.jpg",
+      "localPath": "RC89T/driving_licence_front_1.jpg",
       "fileSize": 304742,
       "source": "driver_profile"
     },
@@ -243,8 +243,8 @@
       "doc_type": "driving_licence_back",
       "file_url": "drivers/pending/drivingLicenceBack/drivingLicenceBack_1771883654425_dvla_back.jpg",
       "driverCode": "RC89T",
-      "localFile": "driving_licence_back.jpg",
-      "localPath": "RC89T/driving_licence_back.jpg",
+      "localFile": "driving_licence_back_1.jpg",
+      "localPath": "RC89T/driving_licence_back_1.jpg",
       "fileSize": 1954364,
       "source": "driver_profile"
     },
@@ -253,8 +253,8 @@
       "doc_type": "hire_and_reward",
       "file_url": "drivers/pending/hireAndReward/hireAndReward_1771883765094_insurence.pdf",
       "driverCode": "RC89T",
-      "localFile": "hire_and_reward.pdf",
-      "localPath": "RC89T/hire_and_reward.pdf",
+      "localFile": "hire_and_reward_1.pdf",
+      "localPath": "RC89T/hire_and_reward_1.pdf",
       "fileSize": 82875,
       "source": "driver_profile"
     },
@@ -263,8 +263,8 @@
       "doc_type": "profile_picture",
       "file_url": "https://dkkuuxyejgxldvmwpdkf.supabase.co/storage/v1/object/public/driver-documents/drivers/pending/profilePicture/profilePicture_1771883621434_Image00.jpg",
       "driverCode": "RC89T",
-      "localFile": "profile_picture.jpg",
-      "localPath": "RC89T/profile_picture.jpg",
+      "localFile": "profile_picture_1.jpg",
+      "localPath": "RC89T/profile_picture_1.jpg",
       "fileSize": 19465,
       "source": "driver_profile"
     }

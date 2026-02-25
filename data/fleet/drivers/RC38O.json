@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-02-24T23:52:18.774Z",
+  "syncedAt": "2026-02-25T22:01:52.422Z",
   "driver": {
     "id": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0",
     "user_id": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0",
@@ -83,8 +83,8 @@
       "doc_type": "driving_licence_front",
       "file_url": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0/driving_license_1771973699229_drivingLicenceFront_1771904999285_IMG_5587.jpeg",
       "driverCode": "RC38O",
-      "localFile": "driving_licence_front.jpeg",
-      "localPath": "RC38O/driving_licence_front.jpeg",
+      "localFile": "driving_licence_front_1.jpeg",
+      "localPath": "RC38O/driving_licence_front_1.jpeg",
       "fileSize": 380601,
       "source": "driver_profile"
     },
@@ -93,8 +93,8 @@
       "doc_type": "driving_licence_back",
       "file_url": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0/driving_licence_back_1771973701080_drivingLicenceBack_1771905004925_IMG_7022.png",
       "driverCode": "RC38O",
-      "localFile": "driving_licence_back.png",
-      "localPath": "RC38O/driving_licence_back.png",
+      "localFile": "driving_licence_back_1.png",
+      "localPath": "RC38O/driving_licence_back_1.png",
       "fileSize": 3574718,
       "source": "driver_profile"
     },
@@ -103,8 +103,8 @@
       "doc_type": "dbs_certificate",
       "file_url": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0/dbs_certificate_1771973704193_dbsCertificate_1771905016142_a5885e11-d2a2-4406-8eb1-f6a93f469b0b.jpeg",
       "driverCode": "RC38O",
-      "localFile": "dbs_certificate.jpeg",
-      "localPath": "RC38O/dbs_certificate.jpeg",
+      "localFile": "dbs_certificate_1.jpeg",
+      "localPath": "RC38O/dbs_certificate_1.jpeg",
       "fileSize": 218501,
       "source": "driver_profile"
     },
@@ -113,8 +113,8 @@
       "doc_type": "goods_in_transit",
       "file_url": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0/goods_in_transit_1771973706132_goodsInTransitInsurance_1771905047016_IMG_6322.jpeg",
       "driverCode": "RC38O",
-      "localFile": "goods_in_transit.jpeg",
-      "localPath": "RC38O/goods_in_transit.jpeg",
+      "localFile": "goods_in_transit_1.jpeg",
+      "localPath": "RC38O/goods_in_transit_1.jpeg",
       "fileSize": 212131,
       "source": "driver_profile"
     },
@@ -123,17 +123,20 @@
       "doc_type": "hire_and_reward",
       "file_url": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0/hire_and_reward_1771973707882_hireAndReward_1771905060240_IMG_6317.jpeg",
       "driverCode": "RC38O",
-      "localFile": "hire_and_reward.jpeg",
-      "localPath": "RC38O/hire_and_reward.jpeg",
+      "localFile": "hire_and_reward_1.jpeg",
+      "localPath": "RC38O/hire_and_reward_1.jpeg",
       "fileSize": 564629,
       "source": "driver_profile"
     },
     {
+      "driver_id": "d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0",
       "doc_type": "profile_picture",
-      "source": "admin_upload",
-      "localFile": "profile_picture.jpeg",
-      "fileSize": 150208,
-      "uploadedAt": "2026-02-25T00:19:46.058Z"
+      "file_url": "https://dkkuuxyejgxldvmwpdkf.supabase.co/storage/v1/object/public/driver-documents/d1c5b0b2-12c3-4dd7-b58d-2fdeac5a3dd0/document_1771973697009_profilePictureUrl_1771973666516.jpeg",
+      "driverCode": "RC38O",
+      "localFile": null,
+      "localPath": null,
+      "source": "driver_profile",
+      "downloadFailed": true
     }
   ],
   "documentCount": 6,

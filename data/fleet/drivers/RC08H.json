@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-02-24T23:52:18.774Z",
+  "syncedAt": "2026-02-25T22:01:52.422Z",
   "driver": {
     "id": "c5c49285-bb76-4f07-bc7a-e8f50b09c278",
     "user_id": "c5c49285-bb76-4f07-bc7a-e8f50b09c278",
@@ -83,8 +83,8 @@
       "doc_type": "driving_licence_front",
       "file_url": "drivers/pending/drivingLicenceFront/drivingLicenceFront_1771950662665_IMG_9371.jpeg",
       "driverCode": "RC08H",
-      "localFile": "driving_licence_front.jpeg",
-      "localPath": "RC08H/driving_licence_front.jpeg",
+      "localFile": "driving_licence_front_1.jpeg",
+      "localPath": "RC08H/driving_licence_front_1.jpeg",
       "fileSize": 3374073,
       "source": "driver_profile"
     },
@@ -93,8 +93,8 @@
       "doc_type": "driving_licence_back",
       "file_url": "drivers/pending/drivingLicenceBack/drivingLicenceBack_1771950634614_IMG_9372.jpeg",
       "driverCode": "RC08H",
-      "localFile": "driving_licence_back.jpeg",
-      "localPath": "RC08H/driving_licence_back.jpeg",
+      "localFile": "driving_licence_back_1.jpeg",
+      "localPath": "RC08H/driving_licence_back_1.jpeg",
       "fileSize": 3396112,
       "source": "driver_profile"
     },
@@ -103,8 +103,8 @@
       "doc_type": "dbs_certificate",
       "file_url": "drivers/pending/dbsCertificate/dbsCertificate_1771950693707_IMG_0647.jpeg",
       "driverCode": "RC08H",
-      "localFile": "dbs_certificate.jpeg",
-      "localPath": "RC08H/dbs_certificate.jpeg",
+      "localFile": "dbs_certificate_1.jpeg",
+      "localPath": "RC08H/dbs_certificate_1.jpeg",
       "fileSize": 2890603,
       "source": "driver_profile"
     },
@@ -113,8 +113,8 @@
       "doc_type": "goods_in_transit",
       "file_url": "drivers/pending/goodsInTransitInsurance/goodsInTransitInsurance_1771950797369_IMG_0727.png",
       "driverCode": "RC08H",
-      "localFile": "goods_in_transit.png",
-      "localPath": "RC08H/goods_in_transit.png",
+      "localFile": "goods_in_transit_1.png",
+      "localPath": "RC08H/goods_in_transit_1.png",
       "fileSize": 815940,
       "source": "driver_profile"
     },
@@ -123,8 +123,8 @@
       "doc_type": "hire_and_reward",
       "file_url": "drivers/pending/hireAndReward/hireAndReward_1771950790426_IMG_0727.png",
       "driverCode": "RC08H",
-      "localFile": "hire_and_reward.png",
-      "localPath": "RC08H/hire_and_reward.png",
+      "localFile": "hire_and_reward_1.png",
+      "localPath": "RC08H/hire_and_reward_1.png",
       "fileSize": 815940,
       "source": "driver_profile"
     },
@@ -133,8 +133,8 @@
       "doc_type": "profile_picture",
       "file_url": "https://dkkuuxyejgxldvmwpdkf.supabase.co/storage/v1/object/public/driver-documents/drivers/pending/profilePicture/profilePicture_1771950674645_image.jpg",
       "driverCode": "RC08H",
-      "localFile": "profile_picture.jpg",
-      "localPath": "RC08H/profile_picture.jpg",
+      "localFile": "profile_picture_1.jpg",
+      "localPath": "RC08H/profile_picture_1.jpg",
       "fileSize": 2250184,
       "source": "driver_profile"
     }

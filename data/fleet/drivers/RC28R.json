@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-02-24T23:52:18.774Z",
+  "syncedAt": "2026-02-25T22:01:52.422Z",
   "driver": {
     "id": "dac10104-ce59-4db5-92cc-ce2bab3ec753",
     "user_id": "dac10104-ce59-4db5-92cc-ce2bab3ec753",
@@ -98,8 +98,8 @@
       "size_bytes": 498573,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "vehicle_photo_load_space.jpg",
-      "localPath": "RC28R/vehicle_photo_load_space.jpg",
+      "localFile": "vehicle_photo_load_space_1.jpg",
+      "localPath": "RC28R/vehicle_photo_load_space_1.jpg",
       "fileSize": 498573,
       "source": "driver_documents"
     },
@@ -123,8 +123,8 @@
       "size_bytes": 498573,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "vehicle_photo_right.jpg",
-      "localPath": "RC28R/vehicle_photo_right.jpg",
+      "localFile": "vehicle_photo_right_1.jpg",
+      "localPath": "RC28R/vehicle_photo_right_1.jpg",
       "fileSize": 498573,
       "source": "driver_documents"
     },
@@ -148,8 +148,8 @@
       "size_bytes": 498573,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "vehicle_photo_left.jpg",
-      "localPath": "RC28R/vehicle_photo_left.jpg",
+      "localFile": "vehicle_photo_left_1.jpg",
+      "localPath": "RC28R/vehicle_photo_left_1.jpg",
       "fileSize": 498573,
       "source": "driver_documents"
     },
@@ -173,8 +173,8 @@
       "size_bytes": 498573,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "vehicle_photo_back.jpg",
-      "localPath": "RC28R/vehicle_photo_back.jpg",
+      "localFile": "vehicle_photo_back_1.jpg",
+      "localPath": "RC28R/vehicle_photo_back_1.jpg",
       "fileSize": 498573,
       "source": "driver_documents"
     },
@@ -198,8 +198,8 @@
       "size_bytes": 498573,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "vehicle_photo_front.jpg",
-      "localPath": "RC28R/vehicle_photo_front.jpg",
+      "localFile": "vehicle_photo_front_1.jpg",
+      "localPath": "RC28R/vehicle_photo_front_1.jpg",
       "fileSize": 498573,
       "source": "driver_documents"
     },
@@ -223,8 +223,8 @@
       "size_bytes": 223930,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "dbs_certificate.jpeg",
-      "localPath": "RC28R/dbs_certificate.jpeg",
+      "localFile": "dbs_certificate_1.jpeg",
+      "localPath": "RC28R/dbs_certificate_1.jpeg",
       "fileSize": 223930,
       "source": "driver_documents"
     },
@@ -248,8 +248,8 @@
       "size_bytes": 257151,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "proof_of_address.jpeg",
-      "localPath": "RC28R/proof_of_address.jpeg",
+      "localFile": "proof_of_address_1.jpeg",
+      "localPath": "RC28R/proof_of_address_1.jpeg",
       "fileSize": 257151,
       "source": "driver_documents"
     },
@@ -273,8 +273,8 @@
       "size_bytes": 248799,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "proof_of_identity.jpg",
-      "localPath": "RC28R/proof_of_identity.jpg",
+      "localFile": "proof_of_identity_1.jpg",
+      "localPath": "RC28R/proof_of_identity_1.jpg",
       "fileSize": 248799,
       "source": "driver_documents"
     },
@@ -298,8 +298,8 @@
       "size_bytes": 131806,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "goods_in_transit_insurance.jpeg",
-      "localPath": "RC28R/goods_in_transit_insurance.jpeg",
+      "localFile": "goods_in_transit_insurance_1.jpeg",
+      "localPath": "RC28R/goods_in_transit_insurance_1.jpeg",
       "fileSize": 131806,
       "source": "driver_documents"
     },
@@ -323,8 +323,8 @@
       "size_bytes": 79283,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "hire_and_reward_insurance.pdf",
-      "localPath": "RC28R/hire_and_reward_insurance.pdf",
+      "localFile": "hire_and_reward_insurance_1.pdf",
+      "localPath": "RC28R/hire_and_reward_insurance_1.pdf",
       "fileSize": 79283,
       "source": "driver_documents"
     },
@@ -348,8 +348,8 @@
       "size_bytes": 123319,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "driving_license_back.jpg",
-      "localPath": "RC28R/driving_license_back.jpg",
+      "localFile": "driving_license_back_1.jpg",
+      "localPath": "RC28R/driving_license_back_1.jpg",
       "fileSize": 123319,
       "source": "driver_documents"
     },
@@ -373,8 +373,8 @@
       "size_bytes": 107757,
       "admin_notes": null,
       "driverCode": "RC28R",
-      "localFile": "driving_license.jpg",
-      "localPath": "RC28R/driving_license.jpg",
+      "localFile": "driving_license_1.jpg",
+      "localPath": "RC28R/driving_license_1.jpg",
       "fileSize": 107757,
       "source": "driver_documents"
     },
@@ -383,8 +383,8 @@
       "doc_type": "driving_licence_front",
       "file_url": "drivers/pending/drivingLicenceFront/drivingLicenceFront_1771788516777_WhatsApp_Image_2024-12-24_at_22.14.54_6f8f4275.jpg",
       "driverCode": "RC28R",
-      "localFile": "driving_licence_front.jpg",
-      "localPath": "RC28R/driving_licence_front.jpg",
+      "localFile": "driving_licence_front_1.jpg",
+      "localPath": "RC28R/driving_licence_front_1.jpg",
       "fileSize": 120821,
       "source": "driver_profile"
     },
@@ -393,8 +393,8 @@
       "doc_type": "driving_licence_back",
       "file_url": "drivers/pending/drivingLicenceBack/drivingLicenceBack_1771788539679_WhatsApp_Image_2024-12-24_at_22.11.50_8c4abeea.jpg",
       "driverCode": "RC28R",
-      "localFile": "driving_licence_back.jpg",
-      "localPath": "RC28R/driving_licence_back.jpg",
+      "localFile": "driving_licence_back_1.jpg",
+      "localPath": "RC28R/driving_licence_back_1.jpg",
       "fileSize": 195353,
       "source": "driver_profile"
     },
@@ -403,8 +403,8 @@
       "doc_type": "goods_in_transit",
       "file_url": "drivers/pending/goodsInTransitInsurance/goodsInTransitInsurance_1771788591334_WhatsApp_Image_2026-02-08_at_13.34.28.jpeg",
       "driverCode": "RC28R",
-      "localFile": "goods_in_transit.jpeg",
-      "localPath": "RC28R/goods_in_transit.jpeg",
+      "localFile": "goods_in_transit_1.jpeg",
+      "localPath": "RC28R/goods_in_transit_1.jpeg",
       "fileSize": 131806,
       "source": "driver_profile"
     },
@@ -413,8 +413,8 @@
       "doc_type": "hire_and_reward",
       "file_url": "drivers/pending/hireAndReward/hireAndReward_1771788598442_CV_Certificate_56329964.pdf",
       "driverCode": "RC28R",
-      "localFile": "hire_and_reward.pdf",
-      "localPath": "RC28R/hire_and_reward.pdf",
+      "localFile": "hire_and_reward_1.pdf",
+      "localPath": "RC28R/hire_and_reward_1.pdf",
       "fileSize": 79283,
       "source": "driver_profile"
     },
@@ -423,8 +423,8 @@
       "doc_type": "profile_picture",
       "file_url": "https://dkkuuxyejgxldvmwpdkf.supabase.co/storage/v1/object/public/driver-documents/drivers/pending/profilePicture/profilePicture_1771788490505_WhatsApp_Image_2026-02-11_at_17.58.14.jpeg",
       "driverCode": "RC28R",
-      "localFile": "profile_picture.jpeg",
-      "localPath": "RC28R/profile_picture.jpeg",
+      "localFile": "profile_picture_1.jpeg",
+      "localPath": "RC28R/profile_picture_1.jpeg",
       "fileSize": 267855,
       "source": "driver_profile"
     }
