@@ -7735,7 +7735,7 @@ export async function registerRoutes(
 
           if (driver) {
             const updateData: Record<string, any> = { 
-              status: 'approved', updated_at: new Date().toISOString(), approved_at: new Date().toISOString()
+              status: 'approved', updated_at: new Date().toISOString()
             };
             if (application.profilePictureUrl) updateData.profile_picture_url = normalizeDocumentUrl(application.profilePictureUrl) || application.profilePictureUrl;
             if (application.fullAddress) updateData.address = application.fullAddress;
@@ -7867,7 +7867,6 @@ export async function registerRoutes(
                   online_status: 'offline', status: 'approved', is_active: true,
                   bank_name: application.bankName || null, account_holder_name: application.accountHolderName || null,
                   sort_code: application.sortCode || null, account_number: application.accountNumber || null,
-                  approved_at: new Date().toISOString(),
                 };
 
                 for (const doc of copiedDocs) {
@@ -7875,10 +7874,11 @@ export async function registerRoutes(
                 }
 
                 let { error: insertError } = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
-                if (insertError && (insertError.message?.includes('vehicle_registration') || insertError.message?.includes('vehicle_make') || insertError.message?.includes('column'))) {
-                  console.warn(`[Driver Application] Retrying driver creation without vehicle columns`);
+                if (insertError && insertError.message?.includes('column')) {
+                  console.warn(`[Driver Application] Retrying driver creation without problematic columns: ${insertError.message}`);
                   const vehicleReg = driverData.vehicle_registration;
                   delete driverData.vehicle_registration; delete driverData.vehicle_make; delete driverData.vehicle_model; delete driverData.vehicle_color;
+                  delete driverData.right_to_work_share_code; delete driverData.must_change_password;
                   if (vehicleReg && driverData.vehicle_type) driverData.vehicle_type = `${driverData.vehicle_type}|${vehicleReg}`;
                   const retry = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
                   insertError = retry.error;
@@ -7999,7 +7999,6 @@ export async function registerRoutes(
           vehicle_model: application.vehicleModel || null,
           vehicle_color: application.vehicleColor || null,
           online_status: 'offline', status: 'approved', is_active: true,
-          must_change_password: true, approved_at: new Date().toISOString(),
           bank_name: application.bankName || null, account_holder_name: application.accountHolderName || null,
           sort_code: application.sortCode || null, account_number: application.accountNumber || null,
         };
@@ -8007,9 +8006,11 @@ export async function registerRoutes(
         if (application.profilePictureUrl) driverData.profile_picture_url = normalizeDocumentUrl(application.profilePictureUrl) || application.profilePictureUrl;
 
         let { error: insertError } = await supabaseAdmin!.from('drivers').upsert(driverData, { onConflict: 'id' });
-        if (insertError && (insertError.message?.includes('vehicle_registration') || insertError.message?.includes('vehicle_make') || insertError.message?.includes('column'))) {
+        if (insertError && insertError.message?.includes('column')) {
+          console.warn(`[Resend Approval] Retrying without problematic columns: ${insertError.message}`);
           const vehicleReg = driverData.vehicle_registration;
           delete driverData.vehicle_registration; delete driverData.vehicle_make; delete driverData.vehicle_model; delete driverData.vehicle_color;
+          delete driverData.must_change_password; delete driverData.right_to_work_share_code;
           if (vehicleReg && driverData.vehicle_type) driverData.vehicle_type = `${driverData.vehicle_type}|${vehicleReg}`;
           const retry = await supabaseAdmin!.from('drivers').upsert(driverData, { onConflict: 'id' });
           insertError = retry.error;
