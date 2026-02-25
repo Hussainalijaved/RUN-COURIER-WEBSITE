@@ -204,31 +204,46 @@ export default function AdminFleetFile() {
 
   const fetchDriverDetail = async (driverCode: string) => {
     try {
-      const res = await fetch(`/api/admin/fleet-file/driver/${driverCode}`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedDriver(data);
-        setDetailDialogOpen(true);
-      }
+      const res = await apiRequest('GET', `/api/admin/fleet-file/driver/${driverCode}`);
+      const data = await res.json();
+      setSelectedDriver(data);
+      setDetailDialogOpen(true);
     } catch {
       toast({ title: 'Failed to load driver details', variant: 'destructive' });
     }
   };
 
-  const handleDownload = () => {
-    window.open('/api/admin/fleet-file/download', '_blank');
+  const handleDownload = async () => {
+    try {
+      const res = await apiRequest('GET', '/api/admin/fleet-file/download');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fleet-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: 'Failed to download backup', variant: 'destructive' });
+    }
   };
 
-  const openDocument = (doc: any) => {
+  const openDocument = async (doc: any) => {
     if (doc.localFile && doc.localPath) {
-      const url = `/api/admin/fleet-file/document/${doc.localPath}`;
-      setViewingDoc({
-        url,
-        name: doc.localFile,
-        type: doc.doc_type || 'document',
-      });
+      try {
+        const res = await apiRequest('GET', `/api/admin/fleet-file/document/${doc.localPath}`);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        setViewingDoc({
+          url: blobUrl,
+          name: doc.localFile,
+          type: doc.doc_type || 'document',
+        });
+      } catch {
+        toast({ title: 'Failed to load document', variant: 'destructive' });
+      }
     }
   };
 
@@ -788,7 +803,10 @@ export default function AdminFleetFile() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!viewingDoc} onOpenChange={() => setViewingDoc(null)}>
+      <Dialog open={!!viewingDoc} onOpenChange={() => {
+        if (viewingDoc?.url) URL.revokeObjectURL(viewingDoc.url);
+        setViewingDoc(null);
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           {viewingDoc && (
             <>
