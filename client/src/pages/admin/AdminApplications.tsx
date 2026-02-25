@@ -76,6 +76,7 @@ export default function AdminApplications() {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState('');
   const [emailTarget, setEmailTarget] = useState<DriverApplication | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -193,6 +194,7 @@ export default function AdminApplications() {
 
   const resendApprovalMutation = useMutation({
     mutationFn: async (applicationId: string) => {
+      setResendingId(applicationId);
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`/api/driver-applications/${applicationId}/resend-approval`, {
         method: 'POST',
@@ -208,12 +210,14 @@ export default function AdminApplications() {
       return response.json();
     },
     onSuccess: () => {
+      setResendingId(null);
       toast({
         title: 'Email Sent',
         description: 'The approval email with new login credentials has been resent.',
       });
     },
     onError: (error: Error) => {
+      setResendingId(null);
       toast({
         title: 'Failed to Resend',
         description: error.message,
@@ -551,12 +555,13 @@ export default function AdminApplications() {
               variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
+                if (resendingId) return;
                 resendApprovalMutation.mutate(application.id);
               }}
-              disabled={resendApprovalMutation.isPending}
+              disabled={resendingId !== null}
               data-testid={`button-resend-approval-${application.id}`}
             >
-              {resendApprovalMutation.isPending ? (
+              {resendingId === application.id ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1" />
               ) : (
                 <Mail className="h-4 w-4 mr-1" />
