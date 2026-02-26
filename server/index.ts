@@ -297,6 +297,26 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (supabaseAdmin) {
+        const { error: tableCheck } = await supabaseAdmin.from('driver_locations').select('id').limit(1);
+        if (tableCheck?.message?.includes('Could not find')) {
+          console.log("[MIGRATION] driver_locations table does not exist yet.");
+          console.log("[MIGRATION] Please run supabase/migrations/031_create_driver_locations.sql in Supabase SQL Editor");
+          console.log("[MIGRATION] GPS tracking will use WebSocket + drivers table as fallback until then");
+        } else if (tableCheck) {
+          console.warn("[MIGRATION] driver_locations check error:", tableCheck.message);
+        } else {
+          console.log("[MIGRATION] driver_locations table exists and is accessible");
+        }
+      }
+    } catch (e: any) {
+      console.warn("[MIGRATION] driver_locations check:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
       const { hydrateLocationCache } = await import('./realtime');
       await hydrateLocationCache();
       console.log("[BACKGROUND] Cache hydrated");

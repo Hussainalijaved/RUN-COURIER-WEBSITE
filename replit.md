@@ -25,6 +25,13 @@ Supabase Auth manages user authentication and session management. Role-based acc
 ### Real-Time Features
 A WebSocket server (`ws` library) at `/ws/realtime` enables live driver location tracking, real-time job status updates, broadcasting, and offline detection. It uses secure token-based authentication with Supabase JWT verification. Job status updates are pushed via WebSocket, with administrators receiving all updates and customers receiving updates for their own jobs.
 
+### GPS Tracking Architecture
+Driver GPS locations flow through two parallel paths:
+1. **WebSocket** (`driver:update_location` messages) — real-time, low-latency updates broadcast to admin map observers via `realtime.ts` location cache.
+2. **REST** (`PATCH /api/mobile/v1/driver/location` and `POST /api/driver/status`) — persistent updates written to `drivers` table (`current_latitude`/`current_longitude`) and `driver_locations` table (dedicated GPS table with speed/heading/accuracy).
+
+The `driver_locations` Supabase table (migration: `031_create_driver_locations.sql`) stores one row per driver (upserted on `driver_id`), enabling Supabase Realtime subscriptions from the frontend. The `useDriverLocations` hook merges WebSocket and Supabase Realtime data using timestamp-based deduplication. At server startup, the location cache is hydrated from the `drivers` table. The admin live map only shows drivers with real GPS data (no fake coordinates).
+
 ### Booking State Persistence
 A global `BookingContext` persists booking data to `localStorage` with a 24-hour expiry.
 

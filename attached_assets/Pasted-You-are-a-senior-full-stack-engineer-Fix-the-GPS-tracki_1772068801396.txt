@@ -1,0 +1,118 @@
+You are a senior full-stack engineer.
+
+Fix the GPS tracking system for my courier platform.
+
+Stack:
+- Mobile app: Expo + React Native
+- Web dashboard: Vite React
+- Backend: Supabase (Postgres + Realtime + RLS)
+
+Problem:
+Driver accepts a job → GPS shows active in app
+But admin dashboard shows "Location data unavailable"
+Location does not update reliably in real-time.
+
+Goal:
+Implement a production-ready, reliable, secure GPS tracking system.
+
+--------------------------------------------------
+PART 1: DATABASE (SUPABASE)
+--------------------------------------------------
+
+1) Create a new table: driver_locations
+
+Fields:
+- id (bigint primary key)
+- job_id (uuid, not null)
+- driver_id (uuid, not null)
+- lat (double precision)
+- lng (double precision)
+- speed (real)
+- heading (real)
+- accuracy (real)
+- recorded_at (timestamptz default now())
+- updated_at (timestamptz default now())
+
+Add UNIQUE constraint on (job_id, driver_id).
+
+2) Add trigger to auto-update updated_at.
+
+3) Enable RLS.
+
+4) Add policies:
+- Driver can insert/update only where driver_id = auth.uid()
+- Admin can read all rows (assume admin role is determined by profiles.role = 'admin')
+
+5) Enable realtime on driver_locations.
+
+--------------------------------------------------
+PART 2: MOBILE APP (EXPO / REACT NATIVE)
+--------------------------------------------------
+
+Implement proper background GPS tracking:
+
+1) Request permissions:
+- Foreground location
+- Background location
+
+2) Configure:
+- iOS background mode = location
+- Android ACCESS_BACKGROUND_LOCATION
+
+3) When driver ACCEPTS job:
+- Start background tracking task
+- Send location every 5–10 seconds
+- Use expo-location + TaskManager
+
+4) When job COMPLETED or CANCELLED:
+- Stop background tracking
+
+5) Write to Supabase using UPSERT:
+onConflict: "job_id,driver_id"
+
+Do NOT create duplicate rows.
+Always update the same row per job.
+
+6) Add retry logic if write fails (network issue).
+
+--------------------------------------------------
+PART 3: ADMIN DASHBOARD (VITE REACT)
+--------------------------------------------------
+
+1) On job details page:
+- Fetch latest driver location initially.
+
+2) Subscribe to realtime changes:
+- Use supabase.channel()
+- Listen to postgres_changes on driver_locations
+- Filter by job_id
+
+3) Update map marker instantly when new data arrives.
+
+4) Add fallback polling every 15 seconds if realtime disconnects.
+
+--------------------------------------------------
+PART 4: DEBUGGING & LOGGING
+--------------------------------------------------
+
+Add console logs for:
+- Permission granted/denied
+- Location write success/failure
+- Realtime subscription status
+
+Ensure system handles:
+- App in background
+- App minimized
+- Network drop
+- Driver switching jobs
+
+--------------------------------------------------
+
+Return:
+- Full SQL migration
+- Updated mobile tracking code
+- Updated admin realtime subscription code
+- Any required Expo config changes
+- Clear explanation of changes made
+
+The result must be production-ready, secure, and optimized.

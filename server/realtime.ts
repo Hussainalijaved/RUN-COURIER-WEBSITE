@@ -456,7 +456,12 @@ async function handleLocationUpdate(client: AuthenticatedClient, message: Locati
     await storage.updateDriverLocation(
       client.driverId,
       payload.lat.toString(),
-      payload.lng.toString()
+      payload.lng.toString(),
+      {
+        speed: payload.speed,
+        heading: payload.heading,
+        accuracy: payload.accuracy,
+      }
     );
   } catch (error) {
     log(`Error persisting driver location: ${error}`, 'realtime');

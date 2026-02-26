@@ -55,7 +55,7 @@ export interface IStorage {
   createDriver(driver: InsertDriver): Promise<Driver>;
   updateDriver(id: string, data: Partial<Driver>): Promise<Driver | undefined>;
   updateDriverAvailability(id: string, isAvailable: boolean): Promise<Driver | undefined>;
-  updateDriverLocation(id: string, latitude: string, longitude: string): Promise<Driver | undefined>;
+  updateDriverLocation(id: string, latitude: string, longitude: string, extras?: { speed?: number; heading?: number; accuracy?: number; jobId?: string }): Promise<Driver | undefined>;
   verifyDriver(id: string, isVerified: boolean): Promise<Driver | undefined>;
   deactivateDriver(id: string): Promise<Driver | undefined>;
   reactivateDriver(id: string): Promise<Driver | undefined>;

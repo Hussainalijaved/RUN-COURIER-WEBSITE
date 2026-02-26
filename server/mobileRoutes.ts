@@ -522,10 +522,12 @@ export function registerMobileRoutes(app: Express): void {
         const lng = parseFloat(String(longitude));
         
         if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-          await storage.updateDriverLocation(driver.id, lat.toFixed(7), lng.toFixed(7));
+          await storage.updateDriverLocation(driver.id, lat.toFixed(7), lng.toFixed(7), {
+            speed: speed ? parseFloat(String(speed)) : undefined,
+            heading: heading ? parseFloat(String(heading)) : undefined,
+          });
           locationUpdated = true;
           
-          // Broadcast location update to WebSocket for admin maps
           broadcastLocationUpdate(driver.id, lat, lng, newOnlineStatus ? "available" : "offline");
         }
       }
@@ -1374,7 +1376,12 @@ export function registerMobileRoutes(app: Express): void {
       const updatedDriver = await storage.updateDriverLocation(
         driver.id, 
         lat.toFixed(7), 
-        lng.toFixed(7)
+        lng.toFixed(7),
+        {
+          speed: speed ? parseFloat(speed) : undefined,
+          heading: heading ? parseFloat(heading) : undefined,
+          accuracy: accuracy ? parseFloat(accuracy) : undefined,
+        }
       );
 
       if (!updatedDriver) {

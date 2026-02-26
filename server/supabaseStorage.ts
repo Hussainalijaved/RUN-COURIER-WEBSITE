@@ -831,12 +831,35 @@ export class SupabaseStorage implements IStorage {
     return this.updateDriver(id, { isAvailable });
   }
 
-  async updateDriverLocation(id: string, latitude: string, longitude: string): Promise<Driver | undefined> {
-    return this.updateDriver(id, { 
+  async updateDriverLocation(id: string, latitude: string, longitude: string, extras?: { speed?: number; heading?: number; accuracy?: number; jobId?: string }): Promise<Driver | undefined> {
+    const driverUpdate = this.updateDriver(id, { 
       currentLatitude: latitude, 
       currentLongitude: longitude,
       lastLocationUpdate: new Date(),
     });
+
+    try {
+      const supabase = this.checkSupabase();
+      const { error: locErr } = await supabase.from('driver_locations').upsert({
+        driver_id: id,
+        job_id: extras?.jobId || null,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        speed: extras?.speed ?? null,
+        heading: extras?.heading ?? null,
+        accuracy: extras?.accuracy ?? null,
+        is_moving: (extras?.speed ?? 0) > 0.5,
+        recorded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'driver_id' });
+      if (locErr && !locErr.message?.includes('Could not find')) {
+        console.warn('[SupabaseStorage] driver_locations upsert error:', locErr.message);
+      }
+    } catch (err) {
+      // Non-critical — driver location is already saved in drivers table
+    }
+
+    return driverUpdate;
   }
 
   async verifyDriver(id: string, isVerified: boolean): Promise<Driver | undefined> {
