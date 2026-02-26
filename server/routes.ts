@@ -3921,12 +3921,128 @@ export async function registerRoutes(
           }
         }
         console.log(`[Drivers] Deleted Supabase driver devices`);
+
+        // Delete driver_locations entries
+        for (const id of driverIds) {
+          await supabaseAdmin.from('driver_locations').delete().eq('driver_id', id);
+        }
+        console.log(`[Drivers] Deleted Supabase driver locations`);
+
+        // Delete driver_documents records and their files from Supabase Storage
+        for (const id of driverIds) {
+          const { data: docs } = await supabaseAdmin
+            .from('driver_documents')
+            .select('id, file_url, storage_path, bucket')
+            .eq('driver_id', id);
+
+          if (docs && docs.length > 0) {
+            const BUCKETS = ['DRIVER-DOCUMENTS', 'driver-documents'];
+
+            for (const doc of docs) {
+              const storagePath = doc.storage_path || extractStoragePath(doc.file_url || '');
+              if (storagePath) {
+                for (const bucket of BUCKETS) {
+                  const { error: rmErr } = await supabaseAdmin.storage
+                    .from(bucket)
+                    .remove([storagePath]);
+                  if (!rmErr) {
+                    console.log(`[Drivers] Deleted file from ${bucket}: ${storagePath}`);
+                    break;
+                  }
+                }
+              }
+            }
+
+            const { error: docsDelErr } = await supabaseAdmin
+              .from('driver_documents')
+              .delete()
+              .eq('driver_id', id);
+            if (docsDelErr) {
+              console.error(`Failed to delete driver_documents for driver_id=${id}:`, docsDelErr);
+            }
+          }
+        }
+        console.log(`[Drivers] Deleted Supabase driver documents (records + storage files)`);
+
+        // Delete documents from legacy 'documents' table as well
+        for (const id of driverIds) {
+          await supabaseAdmin.from('documents').delete().eq('driver_id', id);
+        }
+
+        // Delete driver_payments records
+        for (const id of driverIds) {
+          await supabaseAdmin.from('driver_payments').delete().eq('driver_id', id);
+        }
+        console.log(`[Drivers] Deleted Supabase driver payments`);
+
+        // Delete files from Supabase Storage by auth user folder
+        const storageUserId = authUserId || driverId;
+        for (const bucket of ['DRIVER-DOCUMENTS', 'driver-documents']) {
+          try {
+            const { data: files } = await supabaseAdmin.storage
+              .from(bucket)
+              .list(storageUserId);
+            if (files && files.length > 0) {
+              const paths = files.map(f => `${storageUserId}/${f.name}`);
+              await supabaseAdmin.storage.from(bucket).remove(paths);
+              console.log(`[Drivers] Deleted ${paths.length} files from ${bucket}/${storageUserId}/`);
+            }
+          } catch (e) {
+            // Bucket may not exist or folder may be empty
+          }
+        }
+
+        // Also delete pending application files (drivers/pending/*)
+        try {
+          const pendingPrefixes = [
+            `drivers/pending/driving_licence/${driverEmail}`,
+            `drivers/pending/driving_license/${driverEmail}`,
+            `drivers/pending/dbs_certificate/${driverEmail}`,
+            `drivers/pending/goods_in_transit/${driverEmail}`,
+            `drivers/pending/hire_and_reward/${driverEmail}`,
+            `drivers/pending/profile_picture/${driverEmail}`,
+          ];
+          for (const bucket of ['DRIVER-DOCUMENTS', 'driver-documents']) {
+            for (const prefix of pendingPrefixes) {
+              const { data: pendingFiles } = await supabaseAdmin.storage
+                .from(bucket)
+                .list(prefix.substring(0, prefix.lastIndexOf('/')), {
+                  search: prefix.substring(prefix.lastIndexOf('/') + 1),
+                });
+              if (pendingFiles && pendingFiles.length > 0) {
+                const folder = prefix.substring(0, prefix.lastIndexOf('/'));
+                const paths = pendingFiles.map(f => `${folder}/${f.name}`);
+                await supabaseAdmin.storage.from(bucket).remove(paths);
+                console.log(`[Drivers] Deleted ${paths.length} pending files from ${bucket}/${folder}/`);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[Drivers] Pending files cleanup error (non-critical):", e);
+        }
       }
     } catch (e) {
-      console.error("Failed to clean up Supabase jobs/assignments:", e);
+      console.error("Failed to clean up Supabase jobs/assignments/documents:", e);
     }
     
-    // 3. Delete from Supabase drivers table
+    // 3. Delete local document files
+    try {
+      const localUploadsDir = path.join(process.cwd(), 'uploads', 'documents');
+      if (fs.existsSync(localUploadsDir)) {
+        const allIds = [...driverIds, authUserId].filter(Boolean) as string[];
+        for (const id of allIds) {
+          const driverDir = path.join(localUploadsDir, id);
+          if (fs.existsSync(driverDir)) {
+            fs.rmSync(driverDir, { recursive: true, force: true });
+            console.log(`[Drivers] Deleted local files: ${driverDir}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to delete local document files:", e);
+    }
+
+    // 5. Delete from Supabase drivers table
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       if (supabaseAdmin) {
@@ -3944,7 +4060,7 @@ export async function registerRoutes(
       console.error("Failed to delete driver from Supabase:", e);
     }
     
-    // 4. Delete from Supabase Auth (THIS IS CRITICAL - prevents driver from coming back)
+    // 6. Delete from Supabase Auth (THIS IS CRITICAL - prevents driver from coming back)
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       if (supabaseAdmin) {
@@ -3983,7 +4099,7 @@ export async function registerRoutes(
       console.error("Failed to delete from Supabase Auth:", e);
     }
     
-    // 5. Delete from PostgreSQL drivers table
+    // 7. Delete from PostgreSQL drivers table
     try {
       const { db } = await import("./db");
       const { drivers: driversTable } = await import("@shared/schema");
@@ -3995,7 +4111,7 @@ export async function registerRoutes(
       console.error("Failed to delete driver from PostgreSQL:", e);
     }
     
-    // 6. Delete from in-memory storage
+    // 8. Delete from in-memory storage
     const deleted = await storage.deleteDriver(driverId);
     if (!deleted) {
       console.log(`[Drivers] Driver not in memory storage (may have been deleted already)`);
