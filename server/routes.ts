@@ -7796,9 +7796,25 @@ export async function registerRoutes(
               }
             } else {
               console.error(`[Driver Application] Failed to update driver ${driver.driver_code}:`, updateResult);
+              try {
+                const { sendDriverApprovalEmailExisting } = await import('./emailService');
+                const sent = await sendDriverApprovalEmailExisting(application.email, application.fullName, driver.driver_code);
+                if (sent) console.log(`[Driver Application] Approval email sent despite update error to ${application.email}`);
+                else console.error(`[Driver Application] Failed to send approval email to ${application.email}`);
+              } catch (emailErr) {
+                console.error('[Driver Application] Error sending approval email after update failure:', emailErr);
+              }
             }
           } else if (findError) {
             console.error(`[Driver Application] Error finding driver by email ${application.email}:`, findError);
+            try {
+              const { sendDriverApprovalEmailExisting } = await import('./emailService');
+              const sent = await sendDriverApprovalEmailExisting(application.email, application.fullName, 'TBD');
+              if (sent) console.log(`[Driver Application] Approval email sent despite lookup error to ${application.email}`);
+              else console.error(`[Driver Application] Failed to send approval email to ${application.email}`);
+            } catch (emailErr) {
+              console.error('[Driver Application] Error sending fallback approval email:', emailErr);
+            }
           } else if (!driver) {
             console.log(`[Driver Application] No driver found for email ${application.email} - creating account automatically`);
             try {
@@ -7886,6 +7902,14 @@ export async function registerRoutes(
 
                 if (insertError) {
                   console.error(`[Driver Application] Failed to create driver record:`, insertError);
+                  try {
+                    const { sendDriverApprovalEmail } = await import('./emailService');
+                    const sent = await sendDriverApprovalEmail(application.email, application.fullName, driverCode, tempPassword);
+                    if (sent) console.log(`[Driver Application] Approval email sent despite record error to ${application.email}`);
+                    else console.error(`[Driver Application] Failed to send approval email to ${application.email}`);
+                  } catch (emailErr) {
+                    console.error('[Driver Application] Error sending approval email after record failure:', emailErr);
+                  }
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email} (vehicle: ${application.vehicleType} ${application.vehicleMake || ''} ${application.vehicleModel || ''}, reg: ${application.vehicleRegistration || 'none'})`);
 
