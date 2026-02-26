@@ -120,9 +120,14 @@ export default function AdminMap() {
     },
   });
 
-  // Show ALL drivers on the map regardless of status
-  // Admin needs visibility of all drivers for management purposes
-  const activeDrivers = drivers || [];
+  const activeDrivers = (drivers || []).filter(d => {
+    if (realtimeLocations.has(d.id)) return true;
+    if (d.currentLatitude && d.currentLongitude) return true;
+    const da = d as any;
+    if (da.postcodeLatitude && da.postcodeLongitude) return true;
+    if (d.isAvailable || d.onlineStatus === 'online') return true;
+    return false;
+  });
   
   const availableDrivers = activeDrivers.filter(d => {
     const realtimeLoc = realtimeLocations.get(d.id);
@@ -361,21 +366,14 @@ export default function AdminMap() {
       const hasGps = location.source === 'gps';
       const hasPostcode = location.source === 'postcode';
       const noGps = !hasGps;
-      const noLocation = location.source === null;
       const isOnlineNoGps = driver.isAvailable && noGps;
-      const isOfflineNoGps = !driver.isAvailable && noGps;
-      let displayLocation: { lat: number; lng: number };
-      if (location.source) {
-        displayLocation = { lat: location.lat, lng: location.lng };
-      } else {
-        const hash = driver.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-        displayLocation = { lat: 51.5074 + ((hash % 100) - 50) * 0.0003, lng: -0.1278 + ((hash % 73) - 36) * 0.0004 };
-      }
+      if (!location.source) return;
+      const displayLocation = { lat: location.lat, lng: location.lng };
 
       currentMarkerIds.add(driver.id);
       const status = getDriverStatus(driver);
       const fillColor = noGps ? (isOnlineNoGps ? '#F97316' : '#6B7280') : (status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF');
-      const markerOpacity = noLocation ? 0.4 : (hasPostcode ? 0.7 : 1);
+      const markerOpacity = hasPostcode ? 0.7 : 1;
 
       const existingMarker = driverMarkersRef.current.get(driver.id);
       
@@ -408,7 +406,7 @@ export default function AdminMap() {
       const baseScale = iconData.scale;
       const iconConfig = {
         path: iconData.path,
-        scale: noLocation ? baseScale * 0.8 : baseScale,
+        scale: baseScale,
         fillColor,
         fillOpacity: markerOpacity,
         strokeColor,
