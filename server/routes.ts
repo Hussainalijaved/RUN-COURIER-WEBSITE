@@ -4099,7 +4099,21 @@ export async function registerRoutes(
       console.error("Failed to delete from Supabase Auth:", e);
     }
     
-    // 7. Delete from PostgreSQL drivers table
+    // 7. Delete documents from PostgreSQL documents table
+    try {
+      const { db } = await import("./db");
+      const { documents: documentsTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      for (const id of driverIds) {
+        await db.delete(documentsTable).where(eq(documentsTable.driverId, id));
+      }
+      console.log(`[Drivers] Deleted documents from PostgreSQL`);
+    } catch (e) {
+      console.error("Failed to delete documents from PostgreSQL:", e);
+    }
+
+    // 8. Delete from PostgreSQL drivers table (after documents are removed)
     try {
       const { db } = await import("./db");
       const { drivers: driversTable } = await import("@shared/schema");
@@ -4111,11 +4125,14 @@ export async function registerRoutes(
       console.error("Failed to delete driver from PostgreSQL:", e);
     }
     
-    // 8. Delete from in-memory storage
+    // 9. Delete from in-memory storage
     const deleted = await storage.deleteDriver(driverId);
     if (!deleted) {
       console.log(`[Drivers] Driver not in memory storage (may have been deleted already)`);
     }
+    
+    // 10. Invalidate documents cache so deleted driver's docs don't appear
+    documentsCache.invalidate();
     
     console.log(`[Drivers] PERMANENTLY DELETED driver (${driverEmail}) from ALL systems`);
     res.json({ success: true, message: "Driver permanently deleted from all systems" });
@@ -4655,13 +4672,20 @@ export async function registerRoutes(
     res.json({ success: true, message: "Account reactivated successfully", user: reactivatedUser });
   }));
 
-  const documentsCache = {
-    data: null as any[] | null,
+  const documentsCache: {
+    data: any[] | null;
+    timestamp: number;
+    ttl: number;
+    isResolving: boolean;
+    invalidate(): void;
+    isValid(): boolean;
+  } = {
+    data: null,
     timestamp: 0,
     ttl: 600_000,
     isResolving: false,
     invalidate() { this.data = null; this.timestamp = 0; },
-    isValid() { return this.data && (Date.now() - this.timestamp) < this.ttl; },
+    isValid() { return this.data !== null && (Date.now() - this.timestamp) < this.ttl; },
   };
 
   app.get("/api/documents", asyncHandler(async (req, res) => {
@@ -4878,6 +4902,34 @@ export async function registerRoutes(
       }
       allDocuments.length = 0;
       allDocuments.push(...deduped);
+    }
+
+    // Filter out documents belonging to deleted drivers
+    {
+      const activeDrivers = await storage.getDrivers({ includeInactive: true });
+      const activeDriverIds = new Set(activeDrivers.map(d => d.id));
+      // Also include userId mappings
+      activeDrivers.forEach(d => {
+        if (d.userId) activeDriverIds.add(d.userId);
+      });
+      try {
+        const apps = await storage.getDriverApplications();
+        apps.forEach((a: any) => {
+          if (a.id) activeDriverIds.add(a.id);
+        });
+      } catch (e) {
+        // Non-critical
+      }
+
+      const beforeOrphanFilter = allDocuments.length;
+      allDocuments = allDocuments.filter(doc => {
+        const docDriverId = doc.driverId || doc.authUserId;
+        if (!docDriverId) return true;
+        return activeDriverIds.has(docDriverId);
+      });
+      if (allDocuments.length < beforeOrphanFilter) {
+        console.log(`[Documents] Filtered out ${beforeOrphanFilter - allDocuments.length} documents from deleted drivers`);
+      }
     }
     
     const { supabaseAdmin: supabaseAdminClient } = await import('./supabaseAdmin');
