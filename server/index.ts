@@ -325,6 +325,67 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Fix drivers with missing or invalid driver_code (should be RC##L format)
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+
+      const { data: allDrivers } = await supabaseAdmin
+        .from('drivers')
+        .select('id, driver_code, driver_id');
+
+      if (!allDrivers || allDrivers.length === 0) return;
+
+      const validFormat = /^RC\d{2}[A-Z]$/;
+      const existingCodes = new Set<string>();
+      allDrivers.forEach((d: any) => {
+        if (d.driver_code && validFormat.test(d.driver_code)) existingCodes.add(d.driver_code);
+        if (d.driver_id && validFormat.test(d.driver_id)) existingCodes.add(d.driver_id);
+      });
+
+      const needsFix = allDrivers.filter((d: any) => !d.driver_code || !validFormat.test(d.driver_code));
+      if (needsFix.length === 0) {
+        console.log("[BACKGROUND] All drivers have valid RC-format codes");
+        return;
+      }
+
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      let fixed = 0;
+      for (const d of needsFix) {
+        // If driver_id has valid format, use it
+        if (d.driver_id && validFormat.test(d.driver_id)) {
+          await supabaseAdmin.from('drivers').update({ driver_code: d.driver_id }).eq('id', d.id);
+          existingCodes.add(d.driver_id);
+          fixed++;
+          continue;
+        }
+        // Generate a new unique code
+        let newCode = '';
+        for (let i = 0; i < 1000; i++) {
+          const candidate = `RC${Math.floor(Math.random() * 10)}${Math.floor(Math.random() * 10)}${letters[Math.floor(Math.random() * 26)]}`;
+          if (!existingCodes.has(candidate)) {
+            newCode = candidate;
+            break;
+          }
+        }
+        if (newCode) {
+          const { error } = await supabaseAdmin.from('drivers').update({ driver_code: newCode }).eq('id', d.id);
+          if (!error) {
+            existingCodes.add(newCode);
+            fixed++;
+            console.log(`[BACKGROUND] Fixed driver ${d.id}: ${d.driver_code || d.driver_id || 'none'} -> ${newCode}`);
+          }
+        }
+      }
+      if (fixed > 0) {
+        console.log(`[BACKGROUND] Fixed ${fixed} driver codes to RC-format`);
+      }
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Driver code fix error:", e?.message);
+    }
+  })();
+
   // Add RLS policy for drivers to update their own profile picture
   (async () => {
     try {
