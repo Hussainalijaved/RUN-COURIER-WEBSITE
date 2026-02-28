@@ -1993,18 +1993,8 @@ export default function AdminJobs() {
                     
                     return (
                       <>
-                        {selectedJob.podRecipientName && (
-                          <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                            <p className="text-sm text-muted-foreground">Received By</p>
-                            <p className="font-medium text-green-700 dark:text-green-400" data-testid="text-pod-recipient">
-                              {selectedJob.podRecipientName}
-                            </p>
-                          </div>
-                        )}
-                        
                         {allPhotos.length > 0 && (
                           <div>
-                            <p className="text-sm text-muted-foreground mb-2">Delivery Photos ({allPhotos.length})</p>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                               {allPhotos.map((photoUrl, index) => (
                                 <div key={photoUrl} className="relative group">
@@ -2071,32 +2061,48 @@ export default function AdminJobs() {
                             </div>
                           </div>
                         )}
-                        
-                        {selectedJob.podSignatureUrl && (
-                          <div className="mt-4">
-                            <p className="text-sm text-muted-foreground mb-2">Recipient Signature</p>
-                            <a
-                              href={selectedJob.podSignatureUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block"
-                            >
-                              <img
-                                src={selectedJob.podSignatureUrl}
-                                alt="Recipient Signature"
-                                className="rounded-lg border bg-white p-2 max-h-32 object-contain hover:opacity-90 transition-opacity cursor-pointer"
-                                data-testid="img-pod-signature"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                              />
-                            </a>
+
+                        <div className="flex items-start gap-4 mt-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                          <div className="flex-1 space-y-2">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Received By</p>
+                              <p className="font-semibold text-base text-green-700 dark:text-green-400" data-testid="text-pod-recipient">
+                                {selectedJob.podRecipientName || selectedJob.recipientName || 'Not recorded'}
+                              </p>
+                            </div>
+                            {selectedJob.podNotes && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Driver Notes</p>
+                                <p className="text-sm" data-testid="text-pod-notes">{selectedJob.podNotes}</p>
+                              </div>
+                            )}
+                            {selectedJob.deliveredAt && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Delivered</p>
+                                <p className="text-sm font-medium">{formatDate(selectedJob.deliveredAt)}</p>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        
-                        {selectedJob.deliveredAt && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Delivered on {formatDate(selectedJob.deliveredAt)}
-                          </p>
-                        )}
+                          {selectedJob.podSignatureUrl && (
+                            <div className="flex-shrink-0">
+                              <p className="text-xs text-muted-foreground mb-1">Signature</p>
+                              <a
+                                href={selectedJob.podSignatureUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block"
+                              >
+                                <img
+                                  src={selectedJob.podSignatureUrl}
+                                  alt="Recipient Signature"
+                                  className="rounded-md border bg-white p-1 h-16 w-28 object-contain hover:opacity-90 transition-opacity cursor-pointer"
+                                  data-testid="img-pod-signature"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       </>
                     );
                   })()}
