@@ -1792,15 +1792,43 @@ export default function AdminJobs() {
             {selectedJob && (
               <div className="space-y-6 overflow-y-auto flex-1 pr-2">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1">
                     <h4 className="font-semibold mb-2">Pickup</h4>
-                    <p className="text-sm">{selectedJob.pickupAddress}</p>
-                    <p className="text-sm font-mono text-muted-foreground">{selectedJob.pickupPostcode}</p>
+                    {selectedJob.pickupBuildingName && (
+                      <p className="text-sm font-medium" data-testid="text-pickup-building">{selectedJob.pickupBuildingName}</p>
+                    )}
+                    <p className="text-sm" data-testid="text-pickup-address">{selectedJob.pickupAddress}</p>
+                    <p className="text-sm font-mono text-muted-foreground" data-testid="text-pickup-postcode">{selectedJob.pickupPostcode}</p>
+                    {selectedJob.pickupContactName && (
+                      <div className="pt-1 text-sm text-muted-foreground" data-testid="text-pickup-contact">
+                        <span className="font-medium text-foreground">{selectedJob.pickupContactName}</span>
+                        {selectedJob.pickupContactPhone && (
+                          <span className="ml-2">{selectedJob.pickupContactPhone}</span>
+                        )}
+                      </div>
+                    )}
+                    {selectedJob.pickupInstructions && (
+                      <p className="text-xs text-muted-foreground italic pt-1" data-testid="text-pickup-instructions">{selectedJob.pickupInstructions}</p>
+                    )}
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <h4 className="font-semibold mb-2">Delivery</h4>
-                    <p className="text-sm">{selectedJob.deliveryAddress}</p>
-                    <p className="text-sm font-mono text-muted-foreground">{selectedJob.deliveryPostcode}</p>
+                    {selectedJob.deliveryBuildingName && (
+                      <p className="text-sm font-medium" data-testid="text-delivery-building">{selectedJob.deliveryBuildingName}</p>
+                    )}
+                    <p className="text-sm" data-testid="text-delivery-address">{selectedJob.deliveryAddress}</p>
+                    <p className="text-sm font-mono text-muted-foreground" data-testid="text-delivery-postcode">{selectedJob.deliveryPostcode}</p>
+                    {selectedJob.recipientName && (
+                      <div className="pt-1 text-sm text-muted-foreground" data-testid="text-delivery-contact">
+                        <span className="font-medium text-foreground">{selectedJob.recipientName}</span>
+                        {selectedJob.recipientPhone && (
+                          <span className="ml-2">{selectedJob.recipientPhone}</span>
+                        )}
+                      </div>
+                    )}
+                    {selectedJob.deliveryInstructions && (
+                      <p className="text-xs text-muted-foreground italic pt-1" data-testid="text-delivery-instructions">{selectedJob.deliveryInstructions}</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-4">
@@ -1900,14 +1928,6 @@ export default function AdminJobs() {
                     <Badge variant="outline">Return Trip</Badge>
                   )}
                 </div>
-                {selectedJob.recipientName && (
-                  <div>
-                    <h4 className="font-semibold mb-2">Recipient</h4>
-                    <p className="text-sm">{selectedJob.recipientName}</p>
-                    <p className="text-sm text-muted-foreground">{selectedJob.recipientPhone}</p>
-                  </div>
-                )}
-                
                 {/* Multi-Drop Stops Section */}
                 <MultiDropStopsSection jobId={selectedJob.id} isMultiDrop={selectedJob.isMultiDrop ?? false} />
                 
