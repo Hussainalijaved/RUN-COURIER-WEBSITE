@@ -2,11 +2,11 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
-// Logo URL - use current deployment or production
-const LOGO_URL = 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev/logo-email.jpg';
-
 // Base URL for tracking links - uses current deployment or production
 const BASE_URL = process.env.APP_URL || 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev';
+
+// Logo URL - derived from BASE_URL to stay consistent across deployments
+const LOGO_URL = `${BASE_URL}/logo-email.jpg`;
 
 // Mobile app store URLs
 const GOOGLE_PLAY_URL = process.env.GOOGLE_PLAY_URL || 'https://play.google.com/store/apps/details?id=com.runcourier.app';
@@ -19,9 +19,9 @@ const APP_STORE_BADGE_URL = 'https://developer.apple.com/assets/elements/badges/
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
   return `
-    <div style="background-color: #007BFF; padding: 20px; text-align: center;">
-      <img src="${LOGO_URL}" alt="Run Courier" style="max-width: 120px; height: auto; margin-bottom: 10px;" />
-      ${title ? `<h1 style="color: white; margin: 0; font-size: 24px;">${title}</h1>` : ''}
+    <div style="background-color: #007BFF; padding: 24px 20px; text-align: center;">
+      <img src="${LOGO_URL}" alt="Run Courier" style="max-width: 180px; height: auto; margin-bottom: ${title ? '12px' : '0'}; display: inline-block;" />
+      ${title ? `<h1 style="color: white; margin: 0; font-size: 22px; font-weight: 600;">${title}</h1>` : ''}
     </div>
   `;
 }
