@@ -298,6 +298,23 @@ async function runBackgroundTasks() {
   (async () => {
     try {
       const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      const { data, error: colCheck } = await supabaseAdmin.from('jobs').select('customer_email').limit(1);
+      if (colCheck?.message?.includes('customer_email')) {
+        console.log("[MIGRATION] customer_email column missing from jobs table.");
+        console.log("[MIGRATION] Please run in Supabase SQL Editor: ALTER TABLE jobs ADD COLUMN IF NOT EXISTS customer_email TEXT;");
+        console.log("[MIGRATION] Booking emails will still work using request data as fallback.");
+      } else {
+        console.log("[MIGRATION] customer_email column exists on jobs table");
+      }
+    } catch (e: any) {
+      console.warn("[MIGRATION] customer_email column check:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
       if (supabaseAdmin) {
         const { error: tableCheck } = await supabaseAdmin.from('driver_locations').select('id').limit(1);
         if (tableCheck?.message?.includes('Could not find')) {

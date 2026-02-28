@@ -152,6 +152,9 @@ async function getResendCredentials() {
   }
 }
 
+let lastEmailSentAt = 0;
+const EMAIL_MIN_INTERVAL_MS = 600;
+
 export async function sendEmailNotification(
   recipient: string,
   subject: string,
@@ -166,8 +169,15 @@ export async function sendEmailNotification(
       return false;
     }
 
+    const now = Date.now();
+    const elapsed = now - lastEmailSentAt;
+    if (elapsed < EMAIL_MIN_INTERVAL_MS) {
+      await new Promise(resolve => setTimeout(resolve, EMAIL_MIN_INTERVAL_MS - elapsed));
+    }
+
     const resend = new Resend(credentials.apiKey);
     console.log(`[Email] Sending from ${credentials.fromEmail} to ${recipient}`);
+    lastEmailSentAt = Date.now();
     
     const result = await resend.emails.send({
       from: credentials.fromEmail,
@@ -596,7 +606,17 @@ ${jobDetails.customerEmail ? `Customer Email: ${jobDetails.customerEmail}\n` : '
 Please log in to the admin dashboard to manage this booking.
 Run Courier - https://runcourier.co.uk`;
 
-  return sendEmailNotification('sales@runcourier.co.uk', `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
+  const adminEmails = ['sales@runcourier.co.uk', 'runcourier1@gmail.com'];
+  let anySuccess = false;
+  for (const email of adminEmails) {
+    try {
+      const result = await sendEmailNotification(email, `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
+      if (result) anySuccess = true;
+    } catch (err) {
+      console.error(`[Email] Failed to send admin notification to ${email}:`, err);
+    }
+  }
+  return anySuccess;
 }
 
 // Send booking confirmation email to customer

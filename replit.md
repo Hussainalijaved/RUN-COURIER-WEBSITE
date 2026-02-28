@@ -88,5 +88,5 @@ Drivers can update their profile and upload documents via the mobile app or duri
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.
 -   **Supabase Services**: Authentication, database, real-time subscriptions, and Edge Functions.
 -   **Stripe**: Integrated via Edge Functions for payment processing and managing customer IDs for "Pay Later" invoicing.
--   **Resend**: Used for sending transactional emails via the `send-email` Edge Function.
+-   **Resend**: Used for sending transactional emails via `server/emailService.ts` and the `send-email` Edge Function. A global rate limiter (600ms minimum between sends) prevents hitting Resend's 2 req/s limit. New booking notifications are sent to both `sales@runcourier.co.uk` and `runcourier1@gmail.com`. Customer confirmation emails are sent when `customerEmail` is available from the booking request.
 -   **Twilio**: Used for SMS OTP verification during the driver application process.

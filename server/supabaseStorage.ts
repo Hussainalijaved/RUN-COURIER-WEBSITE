@@ -161,6 +161,7 @@ function mapDbToJob(dbJob: any): Job {
     driverHidden: dbJob.driver_hidden,
     driverHiddenAt: dbJob.driver_hidden_at ? new Date(dbJob.driver_hidden_at) : null,
     driverHiddenBy: dbJob.driver_hidden_by,
+    customerEmail: dbJob.customer_email || null,
     createdAt: dbJob.created_at ? new Date(dbJob.created_at) : new Date(),
     updatedAt: dbJob.updated_at ? new Date(dbJob.updated_at) : null,
   };
@@ -1015,6 +1016,10 @@ export class SupabaseStorage implements IStorage {
       parcel_weight: 0,
     };
     
+    if ((insertJob as any).customerEmail) {
+      (dbJob as any).customer_email = (insertJob as any).customerEmail;
+    }
+    
     const { data, error } = await supabase
       .from('jobs')
       .insert(dbJob)
@@ -1022,6 +1027,23 @@ export class SupabaseStorage implements IStorage {
       .single();
     
     if (error) {
+      if (error.message?.includes('customer_email') && (dbJob as any).customer_email) {
+        console.warn('[SupabaseStorage] customer_email column not found, retrying without it');
+        delete (dbJob as any).customer_email;
+        const { data: retryData, error: retryError } = await supabase
+          .from('jobs')
+          .insert(dbJob)
+          .select()
+          .single();
+        if (retryError) {
+          console.error('[SupabaseStorage] Error creating job (retry):', retryError);
+          throw retryError;
+        }
+        console.log(`[SupabaseStorage] Created job ${retryData.id} with tracking ${insertJob.trackingNumber}`);
+        const result = mapDbToJob(retryData);
+        (result as any).customerEmail = (insertJob as any).customerEmail;
+        return result;
+      }
       console.error('[SupabaseStorage] Error creating job:', error);
       throw error;
     }
