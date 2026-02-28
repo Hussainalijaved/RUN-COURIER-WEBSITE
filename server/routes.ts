@@ -3051,7 +3051,11 @@ export async function registerRoutes(
       }
     }
     if (postcodesToGeocode.length > 0) {
-      geocodePostcodesBulk(postcodesToGeocode).catch(err => console.error('[PostcodeGeo] Background error:', err.message));
+      try {
+        await geocodePostcodesBulk(postcodesToGeocode);
+      } catch (err: any) {
+        console.error('[PostcodeGeo] Geocoding error:', err.message);
+      }
     }
     
     // Enrich drivers with postcode-based coordinates

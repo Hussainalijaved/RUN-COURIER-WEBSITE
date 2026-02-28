@@ -82,7 +82,7 @@ export default function AdminMap() {
 
   const { data: drivers, isLoading: driversLoading, refetch: refetchDrivers } = useQuery<Driver[]>({
     queryKey: ['/api/drivers'],
-    refetchInterval: wsConnected ? false : 10000,
+    refetchInterval: 15000,
   });
 
   const { data: jobs, refetch: refetchJobs } = useQuery<Job[]>({
@@ -121,11 +121,12 @@ export default function AdminMap() {
   });
 
   const activeDrivers = (drivers || []).filter(d => {
+    if (!d.isActive) return false;
     if (realtimeLocations.has(d.id)) return true;
     if (d.currentLatitude && d.currentLongitude) return true;
     const da = d as any;
     if (da.postcodeLatitude && da.postcodeLongitude) return true;
-    if (d.isAvailable || d.onlineStatus === 'online') return true;
+    if (d.postcode) return true;
     return false;
   });
   
@@ -709,8 +710,8 @@ export default function AdminMap() {
     setSelectedJob(null);
     const map = mapInstanceRef.current;
     const location = getDriverLocation(driver);
-    if (map && location) {
-      map.panTo(location);
+    if (map && location.source) {
+      map.panTo({ lat: location.lat, lng: location.lng });
       map.setZoom(15);
     }
   };
