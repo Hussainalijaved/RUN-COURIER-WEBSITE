@@ -1325,7 +1325,8 @@ export default function AdminJobs() {
             }
             @media print {
               body { margin: 0; padding: 0; }
-              .label-container { page-break-inside: avoid; }
+              .label-page { page-break-after: always; }
+              .label-page:last-child { page-break-after: auto; }
             }
             * {
               margin: 0;
@@ -1337,95 +1338,22 @@ export default function AdminJobs() {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
-            }
-            .label-container {
-              width: 4in;
-              height: 6in;
-              padding: 0.25in;
               background: white;
+              color: black;
             }
-            .flex { display: flex; }
-            .flex-col { flex-direction: column; }
-            .items-center { align-items: center; }
-            .items-start { align-items: flex-start; }
-            .justify-center { justify-content: center; }
-            .justify-between { justify-content: space-between; }
-            .flex-shrink-0 { flex-shrink: 0; }
-            .gap-1 { gap: 0.25rem; }
-            .gap-2 { gap: 0.5rem; }
-            .gap-3 { gap: 0.75rem; }
-            .text-center { text-align: center; }
-            .text-right { text-align: right; }
-            .text-xs { font-size: 0.75rem; }
-            .text-sm { font-size: 0.875rem; }
-            .text-base { font-size: 1rem; }
-            .text-lg { font-size: 1.125rem; }
-            .text-xl { font-size: 1.25rem; }
-            .text-2xl { font-size: 1.5rem; }
-            .font-bold { font-weight: 700; }
-            .font-semibold { font-weight: 600; }
-            .font-mono { font-family: monospace; }
-            .capitalize { text-transform: capitalize; }
-            .italic { font-style: italic; }
-            .tracking-widest { letter-spacing: 0.1em; }
-            .leading-tight { line-height: 1.25; }
-            .border { border: 1px solid #000; }
-            .border-2 { border: 2px solid #000; }
-            .border-t { border-top: 1px solid #000; }
-            .border-t-2 { border-top: 2px solid #000; }
-            .border-b-2 { border-bottom: 2px solid #000; }
-            .border-dashed { border-style: dashed; }
-            .border-black { border-color: #000; }
-            .border-gray-300 { border-color: #d1d5db; }
-            .border-gray-400 { border-color: #9ca3af; }
-            .rounded { border-radius: 0.25rem; }
-            .rounded-full { border-radius: 9999px; }
             .bg-white { background-color: #fff !important; }
-            .bg-black { background-color: #000 !important; }
-            .bg-gray-50 { background-color: #f9fafb !important; }
-            .bg-gray-100 { background-color: #f3f4f6 !important; }
-            .text-white { color: #fff !important; }
-            .text-black { color: #000; }
-            .text-gray-400 { color: #9ca3af; }
-            .text-gray-500 { color: #6b7280; }
-            .text-gray-600 { color: #4b5563; }
-            .text-\\[10px\\] { font-size: 10px; }
-            .p-1 { padding: 0.25rem; }
-            .p-2 { padding: 0.5rem; }
-            .p-3 { padding: 0.75rem; }
-            .p-4 { padding: 1rem; }
-            .pb-2 { padding-bottom: 0.5rem; }
-            .pb-3 { padding-bottom: 0.75rem; }
-            .pt-1 { padding-top: 0.25rem; }
-            .pt-2 { padding-top: 0.5rem; }
-            .pt-3 { padding-top: 0.75rem; }
-            .mb-1 { margin-bottom: 0.25rem; }
-            .mb-2 { margin-bottom: 0.5rem; }
-            .mb-3 { margin-bottom: 0.75rem; }
-            .mb-4 { margin-bottom: 1rem; }
-            .mt-1 { margin-top: 0.25rem; }
-            .mt-2 { margin-top: 0.5rem; }
-            .mt-3 { margin-top: 0.75rem; }
-            .space-y-2 > * + * { margin-top: 0.5rem; }
-            .space-y-3 > * + * { margin-top: 0.75rem; }
-            .grid { display: grid; }
-            .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-            .flex-1 { flex: 1 1 0%; }
-            .h-full { height: 100%; }
-            .h-3 { height: 0.75rem; }
-            .h-12 { height: 3rem; }
-            .w-3 { width: 0.75rem; }
-            .w-auto { width: auto; }
-            .object-contain { object-fit: contain; }
-            .uppercase { text-transform: uppercase; }
-            img { max-width: 100%; height: auto; display: block; }
-            svg { display: inline-block; vertical-align: middle; width: 0.75rem; height: 0.75rem; }
+            .text-black { color: #000 !important; }
+            img {
+              display: block;
+            }
+            svg {
+              display: inline-block;
+              vertical-align: middle;
+            }
           </style>
         </head>
         <body>
-          <div class="label-container">
-            ${labelContent}
-          </div>
+          ${labelContent}
           <script>
             window.onload = function() {
               setTimeout(function() {
@@ -2765,28 +2693,32 @@ export default function AdminJobs() {
                 }
               </DialogDescription>
             </DialogHeader>
-            <div className="flex justify-center py-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-auto" style={{ maxHeight: '50vh' }}>
+            <div className="py-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-auto" style={{ maxHeight: '55vh' }}>
               {loadingStops ? (
-                <div className="flex items-center gap-2 py-8">
+                <div className="flex items-center justify-center gap-2 py-8">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>Loading multi-drop stops...</span>
                 </div>
               ) : jobForLabel && jobForLabel.isMultiDrop && multiDropStops.length > 0 ? (
-                <div className="transform origin-top" style={{ transform: 'scale(0.5)' }}>
-                  <MultiDropShippingLabels 
-                    ref={labelRef} 
-                    job={jobForLabel} 
-                    stops={multiDropStops}
-                    driverName={getDriverName(jobForLabel.driverId)} 
-                  />
+                <div className="flex justify-center">
+                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'top center', marginBottom: '-45%' }}>
+                    <MultiDropShippingLabels 
+                      ref={labelRef} 
+                      job={jobForLabel} 
+                      stops={multiDropStops}
+                      driverName={getDriverName(jobForLabel.driverId)} 
+                    />
+                  </div>
                 </div>
               ) : jobForLabel ? (
-                <div className="transform origin-top" style={{ transform: 'scale(0.6)' }}>
-                  <ShippingLabel 
-                    ref={labelRef} 
-                    job={jobForLabel} 
-                    driverName={getDriverName(jobForLabel.driverId)} 
-                  />
+                <div className="flex justify-center">
+                  <div style={{ transform: 'scale(0.65)', transformOrigin: 'top center', marginBottom: '-35%' }}>
+                    <ShippingLabel 
+                      ref={labelRef} 
+                      job={jobForLabel} 
+                      driverName={getDriverName(jobForLabel.driverId)} 
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>

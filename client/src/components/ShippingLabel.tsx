@@ -32,16 +32,18 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
     const generateBarcode = (trackingNumber: string) => {
       const bars = [];
       const code = trackingNumber.toUpperCase();
-      for (let i = 0; i < code.length * 5; i++) {
-        const width = (i % 3 === 0) ? 3 : (i % 2 === 0) ? 2 : 1;
+      const totalBars = Math.min(code.length * 3, 40);
+      for (let i = 0; i < totalBars; i++) {
+        const width = (i % 3 === 0) ? 2 : 1;
         const isBlack = i % 2 === 0;
         bars.push(
           <div
             key={i}
             style={{
               width: `${width}px`,
-              height: '35px',
+              height: '32px',
               backgroundColor: isBlack ? '#000' : '#fff',
+              flexShrink: 0,
             }}
           />
         );
@@ -54,166 +56,172 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
     return (
       <div
         ref={ref}
-        className="bg-white text-black p-3"
+        className="bg-white text-black"
         style={{
           width: '4in',
           height: '6in',
+          padding: '12px 16px',
           fontFamily: 'Arial, sans-serif',
           boxSizing: 'border-box',
+          overflow: 'hidden',
         }}
         data-testid="shipping-label"
       >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between border-b-2 border-black pb-1.5 mb-1.5">
-            <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+          {/* HEADER */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #000', paddingBottom: '6px', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <img 
                 src={runCourierLogo} 
                 alt="Run Courier" 
                 style={{
-                  height: '40px',
-                  width: 'auto',
+                  height: '36px',
+                  width: '36px',
                   objectFit: 'contain',
-                  borderRadius: '6px',
+                  borderRadius: '5px',
+                  flexShrink: 0,
+                  display: 'block',
                 }}
               />
-              <div style={{ lineHeight: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0', color: '#000' }}>RUN COURIER&#8482;</p>
-              </div>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', whiteSpace: 'nowrap' }}>RUN COURIER&#8482;</span>
             </div>
-            <div className="text-right">
-              <p style={{ fontSize: '9px', color: '#444', margin: 0 }}>www.runcourier.co.uk</p>
-              <p style={{ fontSize: '9px', color: '#444', margin: 0 }}>+44 20 4634 6100</p>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '9px', color: '#444' }}>www.runcourier.co.uk</div>
+              <div style={{ fontSize: '9px', color: '#444' }}>+44 20 4634 6100</div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-1">
+          {/* TRACKING ROW */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
             {j.jobNumber && (
-              <div>
-                <span style={{ fontSize: '8px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Job No.</span>
-                <p className="font-mono text-sm font-bold" style={{ margin: '0' }}>{j.jobNumber}</p>
+              <div style={{ flexShrink: 0 }}>
+                <div style={{ fontSize: '7px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Job</div>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace' }}>{j.jobNumber}</div>
               </div>
             )}
-            <div className="flex justify-center items-center flex-1">
-              <div className="flex">{generateBarcode(job.trackingNumber)}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, overflow: 'hidden', margin: '0 8px' }}>
+              <div style={{ display: 'flex', flexShrink: 0 }}>{generateBarcode(job.trackingNumber)}</div>
             </div>
-            <div className="text-right">
-              <span style={{ fontSize: '8px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</span>
-              <p className="font-bold text-xs" style={{ margin: 0 }}>{formatDate(job.createdAt)}</p>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '7px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</div>
+              <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{formatDate(job.createdAt)}</div>
             </div>
           </div>
-          <p className="text-center font-mono text-xs font-bold tracking-widest mb-1.5">
+          <div style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '11px', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '8px' }}>
             {job.trackingNumber}
-          </p>
+          </div>
 
-          <div className="flex-1 space-y-1.5">
-            <div className="border border-black rounded p-2">
-              <div className="flex items-center gap-1 mb-1">
-                <div className="bg-black text-white rounded-full p-0.5">
-                  <MapPin className="h-2.5 w-2.5" />
-                </div>
-                <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>From / Pickup</span>
-                {scheduledTime && (
-                  <span className="ml-auto flex items-center gap-0.5" style={{ fontSize: '10px', fontWeight: 'bold', color: '#007BFF' }}>
-                    <Clock className="h-2.5 w-2.5" />
-                    {scheduledTime}
-                  </span>
+          {/* PICKUP */}
+          <div style={{ border: '1px solid #000', borderRadius: '4px', padding: '8px', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+              <div style={{ backgroundColor: '#000', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <MapPin style={{ width: '10px', height: '10px' }} />
+              </div>
+              <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>From / Pickup</span>
+              {scheduledTime && (
+                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', fontSize: '10px', fontWeight: 'bold', color: '#007BFF' }}>
+                  <Clock style={{ width: '10px', height: '10px' }} />
+                  {scheduledTime}
+                </span>
+              )}
+            </div>
+            {j.pickupBuildingName && (
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginBottom: '1px' }}>{j.pickupBuildingName}</div>
+            )}
+            <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: '1.3' }}>{job.pickupAddress}</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '2px' }}>{job.pickupPostcode}</div>
+            {(j.pickupContactName || j.senderName) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '3px', fontSize: '9px' }}>
+                <User style={{ width: '10px', height: '10px', flexShrink: 0 }} />
+                <span style={{ fontWeight: '600' }}>{j.pickupContactName || j.senderName}</span>
+                {(j.pickupContactPhone || j.senderPhone) && (
+                  <>
+                    <span style={{ color: '#aaa', margin: '0 1px' }}>|</span>
+                    <Phone style={{ width: '10px', height: '10px', flexShrink: 0 }} />
+                    <span>{j.pickupContactPhone || j.senderPhone}</span>
+                  </>
                 )}
               </div>
-              {j.pickupBuildingName && (
-                <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0 0 1px', color: '#000' }}>{j.pickupBuildingName}</p>
-              )}
-              <p style={{ fontSize: '11px', fontWeight: '600', lineHeight: '1.2', margin: 0 }}>{job.pickupAddress}</p>
-              <p className="font-bold font-mono" style={{ fontSize: '15px', margin: '2px 0 0' }}>{job.pickupPostcode}</p>
-              {(j.pickupContactName || j.senderName) && (
-                <div className="flex items-center gap-1 mt-1" style={{ fontSize: '10px' }}>
-                  <User className="h-2.5 w-2.5 flex-shrink-0" />
-                  <span className="font-semibold">{j.pickupContactName || j.senderName}</span>
-                  {(j.pickupContactPhone || j.senderPhone) && (
-                    <>
-                      <span style={{ color: '#999' }}>|</span>
-                      <Phone className="h-2.5 w-2.5 flex-shrink-0" />
-                      <span>{j.pickupContactPhone || j.senderPhone}</span>
-                    </>
-                  )}
-                </div>
-              )}
-              {job.pickupInstructions && (
-                <p style={{ fontSize: '9px', color: '#555', marginTop: '2px', fontStyle: 'italic' }}>{job.pickupInstructions}</p>
-              )}
-            </div>
-
-            <div className="border-2 border-black rounded p-2" style={{ backgroundColor: '#f3f4f6' }}>
-              <div className="flex items-center gap-1 mb-1">
-                <div className="bg-black text-white rounded-full p-0.5">
-                  <MapPin className="h-2.5 w-2.5" />
-                </div>
-                <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>To / Delivery</span>
-              </div>
-              {j.deliveryBuildingName && (
-                <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0 0 1px', color: '#000' }}>{j.deliveryBuildingName}</p>
-              )}
-              <p style={{ fontSize: '11px', fontWeight: '600', lineHeight: '1.2', margin: 0 }}>{job.deliveryAddress}</p>
-              <p className="font-bold font-mono" style={{ fontSize: '18px', margin: '2px 0 0' }}>{job.deliveryPostcode}</p>
-              {job.recipientName && (
-                <div className="flex items-center gap-1 mt-1" style={{ fontSize: '10px' }}>
-                  <User className="h-2.5 w-2.5 flex-shrink-0" />
-                  <span className="font-semibold">{job.recipientName}</span>
-                  {job.recipientPhone && (
-                    <>
-                      <span style={{ color: '#999' }}>|</span>
-                      <Phone className="h-2.5 w-2.5 flex-shrink-0" />
-                      <span>{job.recipientPhone}</span>
-                    </>
-                  )}
-                </div>
-              )}
-              {job.deliveryInstructions && (
-                <p style={{ fontSize: '9px', color: '#555', marginTop: '2px', fontStyle: 'italic' }}>{job.deliveryInstructions}</p>
-              )}
-            </div>
+            )}
+            {job.pickupInstructions && (
+              <div style={{ fontSize: '8px', color: '#555', marginTop: '2px', fontStyle: 'italic' }}>{job.pickupInstructions}</div>
+            )}
           </div>
 
-          <div className="border-t border-black pt-1.5 mt-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '2px', textAlign: 'center' }}>
-            <div>
-              <p style={{ fontSize: '8px', color: '#666', margin: 0 }}>Weight</p>
-              <p style={{ fontSize: '10px', fontWeight: 'bold', margin: 0 }}>{job.weight || '—'} kg</p>
+          {/* DELIVERY */}
+          <div style={{ border: '2px solid #000', borderRadius: '4px', padding: '8px', backgroundColor: '#f5f5f5', flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+              <div style={{ backgroundColor: '#000', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <MapPin style={{ width: '10px', height: '10px' }} />
+              </div>
+              <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>To / Delivery</span>
             </div>
-            <div>
-              <p style={{ fontSize: '8px', color: '#666', margin: 0 }}>Vehicle</p>
-              <p style={{ fontSize: '10px', fontWeight: 'bold', margin: 0, textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</p>
-            </div>
-            <div>
-              <p style={{ fontSize: '8px', color: '#666', margin: 0 }}>Type</p>
-              <p style={{ fontSize: '10px', fontWeight: 'bold', margin: 0 }}>
-                {job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Standard'}
-              </p>
-            </div>
-            <div>
-              <p style={{ fontSize: '8px', color: '#666', margin: 0 }}>Distance</p>
-              <p style={{ fontSize: '10px', fontWeight: 'bold', margin: 0 }}>{j.distance || j.distanceMiles || '—'} mi</p>
-            </div>
-            {driverName && (
+            {j.deliveryBuildingName && (
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginBottom: '1px' }}>{j.deliveryBuildingName}</div>
+            )}
+            <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: '1.3' }}>{job.deliveryAddress}</div>
+            <div style={{ fontSize: '17px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '2px' }}>{job.deliveryPostcode}</div>
+            {job.recipientName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '3px', fontSize: '9px' }}>
+                <User style={{ width: '10px', height: '10px', flexShrink: 0 }} />
+                <span style={{ fontWeight: '600' }}>{job.recipientName}</span>
+                {job.recipientPhone && (
+                  <>
+                    <span style={{ color: '#aaa', margin: '0 1px' }}>|</span>
+                    <Phone style={{ width: '10px', height: '10px', flexShrink: 0 }} />
+                    <span>{job.recipientPhone}</span>
+                  </>
+                )}
+              </div>
+            )}
+            {job.deliveryInstructions && (
+              <div style={{ fontSize: '8px', color: '#555', marginTop: '2px', fontStyle: 'italic' }}>{job.deliveryInstructions}</div>
+            )}
+          </div>
+
+          {/* BOTTOM DETAILS */}
+          <div style={{ borderTop: '2px solid #000', paddingTop: '6px', marginTop: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: driverName ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '4px', textAlign: 'center' }}>
               <div>
-                <p style={{ fontSize: '8px', color: '#666', margin: 0 }}>Driver</p>
-                <p style={{ fontSize: '10px', fontWeight: 'bold', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{driverName}</p>
+                <div style={{ fontSize: '8px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Weight</div>
+                <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '8px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Vehicle</div>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '8px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Type</div>
+                <div style={{ fontSize: '11px', fontWeight: 'bold' }}>
+                  {job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Standard'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '8px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Distance</div>
+                <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+              </div>
+              {driverName && (
+                <div>
+                  <div style={{ fontSize: '8px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Driver</div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{driverName}</div>
+                </div>
+              )}
+            </div>
+            {j.parcelDescription && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9px', color: '#555', marginTop: '4px', borderTop: '1px dashed #ccc', paddingTop: '3px' }}>
+                <Package style={{ width: '10px', height: '10px', flexShrink: 0 }} />
+                <span style={{ fontWeight: '600' }}>Parcel:</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.parcelDescription}</span>
               </div>
             )}
           </div>
 
-          {j.parcelDescription && (
-            <div className="border-t border-dashed border-gray-400 pt-1 mt-0.5">
-              <div className="flex items-center gap-1" style={{ fontSize: '9px', color: '#555' }}>
-                <Package className="h-2.5 w-2.5 flex-shrink-0" />
-                <span className="font-semibold">Parcel:</span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.parcelDescription}</span>
-              </div>
-            </div>
-          )}
-
-          <div className="border-t border-dashed border-gray-400 pt-1 mt-0.5 text-center">
-            <p style={{ fontSize: '8px', color: '#666', margin: 0 }}>
+          {/* TAGLINE */}
+          <div style={{ borderTop: '1px dashed #bbb', paddingTop: '3px', marginTop: '4px', textAlign: 'center' }}>
+            <div style={{ fontSize: '7px', color: '#888' }}>
               Same Day Delivery | Tracked & Insured | www.runcourier.co.uk
-            </p>
+            </div>
           </div>
         </div>
       </div>
