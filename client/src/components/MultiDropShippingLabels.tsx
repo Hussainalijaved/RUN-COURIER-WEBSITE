@@ -62,18 +62,16 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
     const generateBarcode = (trackingNumber: string, stopNum: number) => {
       const bars = [];
       const code = `${trackingNumber}-${stopNum}`.toUpperCase();
-      const totalBars = Math.min(code.length * 3, 40);
+      const totalBars = Math.min(code.length * 2 + 4, 36);
       for (let i = 0; i < totalBars; i++) {
-        const width = (i % 3 === 0) ? 2 : 1;
         const isBlack = i % 2 === 0;
         bars.push(
           <div
             key={i}
             style={{
-              width: `${width}px`,
-              height: '28px',
+              width: i % 3 === 0 ? '2px' : '1px',
+              height: '24px',
               backgroundColor: isBlack ? '#000' : '#fff',
-              flexShrink: 0,
             }}
           />
         );
@@ -167,9 +165,11 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
           width: '4in',
           height: '6in',
           padding: '10px 14px',
-          fontFamily: 'Arial, sans-serif',
+          fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
+          fontSize: '9px',
+          lineHeight: 1.3,
           pageBreakAfter: index < labels.length - 1 ? 'always' : 'auto',
         }}
         data-testid={`shipping-label-stop-${label.stopNumber}`}
@@ -177,91 +177,85 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
           {/* HEADER */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #000', paddingBottom: '5px', marginBottom: '5px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-              <img 
-                src={runCourierLogo} 
-                alt="Run Courier" 
-                style={{
-                  height: '32px',
-                  width: '32px',
-                  objectFit: 'contain',
-                  borderRadius: '4px',
-                  flexShrink: 0,
-                  display: 'block',
-                }}
-              />
-              <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#000', whiteSpace: 'nowrap' }}>RUN COURIER&#8482;</span>
-            </div>
-            <div 
-              style={{ 
-                backgroundColor: '#000', 
-                color: '#fff', 
-                padding: '3px 10px', 
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-            >
-              {label.stopNumber}/{label.totalStops}
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '8px', color: '#444' }}>www.runcourier.co.uk</div>
-              <div style={{ fontSize: '8px', color: '#444' }}>+44 20 4634 6100</div>
-            </div>
-          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '2px solid #000', paddingBottom: '3px', marginBottom: '4px' }}>
+            <tbody>
+              <tr>
+                <td style={{ width: '32px', verticalAlign: 'middle', paddingBottom: '3px' }}>
+                  <img
+                    src={runCourierLogo}
+                    alt="RC"
+                    style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '3px', display: 'block' }}
+                  />
+                </td>
+                <td style={{ verticalAlign: 'middle', paddingLeft: '5px', paddingBottom: '3px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#000' }}>RUN COURIER&#8482;</div>
+                </td>
+                <td style={{ verticalAlign: 'middle', textAlign: 'center', paddingBottom: '3px' }}>
+                  <div style={{ backgroundColor: '#000', color: '#fff', padding: '2px 8px', borderRadius: '3px', fontSize: '10px', fontWeight: 'bold', display: 'inline-block' }}>
+                    {label.stopNumber}/{label.totalStops}
+                  </div>
+                </td>
+                <td style={{ verticalAlign: 'middle', textAlign: 'right', paddingBottom: '3px' }}>
+                  <div style={{ fontSize: '7px', color: '#444' }}>runcourier.co.uk</div>
+                  <div style={{ fontSize: '7px', color: '#444' }}>020 4634 6100</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-          {/* TRACKING ROW */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-            {j.jobNumber && (
-              <div style={{ flexShrink: 0 }}>
-                <div style={{ fontSize: '7px', color: '#888', textTransform: 'uppercase' }}>Job</div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', fontFamily: 'monospace' }}>{j.jobNumber}</div>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, overflow: 'hidden', margin: '0 6px' }}>
-              <div style={{ display: 'flex', flexShrink: 0 }}>{generateBarcode(job.trackingNumber, label.stopNumber)}</div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '7px', color: '#888', textTransform: 'uppercase' }}>Date</div>
-              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{formatDate(job.createdAt)}</div>
-            </div>
-          </div>
-          <div style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '9px', fontWeight: 'bold', letterSpacing: '1.5px', marginBottom: '6px' }}>
-            {job.trackingNumber}-{label.stopNumber}
-          </div>
+          {/* BARCODE + TRACKING */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4px' }}>
+            <tbody>
+              <tr>
+                <td style={{ width: '45px', verticalAlign: 'top' }}>
+                  {j.jobNumber && (
+                    <>
+                      <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase' }}>Job</div>
+                      <div style={{ fontSize: '9px', fontWeight: 'bold', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{j.jobNumber}</div>
+                    </>
+                  )}
+                </td>
+                <td style={{ textAlign: 'center', verticalAlign: 'top' }}>
+                  <div style={{ display: 'inline-flex', justifyContent: 'center' }}>{generateBarcode(job.trackingNumber, label.stopNumber)}</div>
+                  <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace', letterSpacing: '1px', marginTop: '1px' }}>{job.trackingNumber}-{label.stopNumber}</div>
+                </td>
+                <td style={{ width: '50px', verticalAlign: 'top', textAlign: 'right' }}>
+                  <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase' }}>Date</div>
+                  <div style={{ fontSize: '8px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatDate(job.createdAt)}</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-          {/* FROM */}
-          <div style={{ border: '1px solid #000', borderRadius: '4px', padding: '6px', marginBottom: '5px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '3px' }}>
-              <div style={{ backgroundColor: '#000', color: '#fff', borderRadius: '50%', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <MapPin style={{ width: '9px', height: '9px' }} />
+          {/* FROM BOX */}
+          <div style={{ border: '1px solid #000', borderRadius: '3px', padding: '5px 6px', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
+              <div style={{ backgroundColor: '#000', color: '#fff', borderRadius: '50%', width: '12px', height: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <MapPin style={{ width: '7px', height: '7px' }} />
               </div>
-              <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
+              <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                 {label.isPickup ? 'Pickup' : `From Stop ${label.stopNumber - 1}`}
               </span>
               {label.isPickup && scheduledTime && (
-                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', fontSize: '9px', fontWeight: 'bold', color: '#007BFF' }}>
-                  <Clock style={{ width: '9px', height: '9px' }} />
+                <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '2px', fontSize: '8px', fontWeight: 'bold', color: '#007BFF' }}>
+                  <Clock style={{ width: '7px', height: '7px' }} />
                   {scheduledTime}
                 </span>
               )}
             </div>
             {label.fromBuildingName && (
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#000', marginBottom: '1px' }}>{label.fromBuildingName}</div>
+              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.fromBuildingName}</div>
             )}
-            <div style={{ fontSize: '9px', fontWeight: '600', lineHeight: '1.3' }}>{label.fromAddress}</div>
-            <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '1px' }}>{label.fromPostcode}</div>
+            <div style={{ fontSize: '8px', lineHeight: 1.2 }}>{label.fromAddress}</div>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '1px' }}>{label.fromPostcode}</div>
             {label.fromContactName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '2px', fontSize: '8px' }}>
-                <User style={{ width: '9px', height: '9px', flexShrink: 0 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '1px', fontSize: '7.5px', color: '#333' }}>
+                <User style={{ width: '7px', height: '7px', flexShrink: 0 }} />
                 <span style={{ fontWeight: '600' }}>{label.fromContactName}</span>
                 {label.fromContactPhone && (
                   <>
-                    <span style={{ color: '#aaa' }}>|</span>
-                    <Phone style={{ width: '9px', height: '9px', flexShrink: 0 }} />
+                    <span style={{ color: '#bbb' }}>&#183;</span>
+                    <Phone style={{ width: '7px', height: '7px', flexShrink: 0 }} />
                     <span>{label.fromContactPhone}</span>
                   </>
                 )}
@@ -269,79 +263,80 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             )}
           </div>
 
-          {/* TO */}
-          <div style={{ border: '2px solid #000', borderRadius: '4px', padding: '6px', backgroundColor: '#f5f5f5', flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '3px' }}>
-              <div style={{ backgroundColor: '#000', color: '#fff', borderRadius: '50%', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <MapPin style={{ width: '9px', height: '9px' }} />
+          {/* TO BOX */}
+          <div style={{ border: '2px solid #000', borderRadius: '3px', padding: '5px 6px', backgroundColor: '#f7f7f7', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
+              <div style={{ backgroundColor: '#000', color: '#fff', borderRadius: '50%', width: '12px', height: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <MapPin style={{ width: '7px', height: '7px' }} />
               </div>
-              <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
+              <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                 {label.isFinalDelivery ? 'Final Delivery' : `Deliver To Stop ${label.stopNumber}`}
               </span>
             </div>
             {label.toBuildingName && (
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#000', marginBottom: '1px' }}>{label.toBuildingName}</div>
+              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.toBuildingName}</div>
             )}
-            <div style={{ fontSize: '9px', fontWeight: '600', lineHeight: '1.3' }}>{label.toAddress}</div>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '1px' }}>{label.toPostcode}</div>
+            <div style={{ fontSize: '8px', lineHeight: 1.2 }}>{label.toAddress}</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '1px' }}>{label.toPostcode}</div>
             {label.recipientName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '2px', fontSize: '8px' }}>
-                <User style={{ width: '9px', height: '9px', flexShrink: 0 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '1px', fontSize: '7.5px', color: '#333' }}>
+                <User style={{ width: '7px', height: '7px', flexShrink: 0 }} />
                 <span style={{ fontWeight: '600' }}>{label.recipientName}</span>
                 {label.recipientPhone && (
                   <>
-                    <span style={{ color: '#aaa' }}>|</span>
-                    <Phone style={{ width: '9px', height: '9px', flexShrink: 0 }} />
+                    <span style={{ color: '#bbb' }}>&#183;</span>
+                    <Phone style={{ width: '7px', height: '7px', flexShrink: 0 }} />
                     <span>{label.recipientPhone}</span>
                   </>
                 )}
               </div>
             )}
             {label.deliveryInstructions && (
-              <div style={{ fontSize: '8px', color: '#555', marginTop: '2px', fontStyle: 'italic' }}>{label.deliveryInstructions}</div>
+              <div style={{ fontSize: '7px', color: '#666', marginTop: '2px', fontStyle: 'italic' }}>{label.deliveryInstructions}</div>
             )}
           </div>
 
-          {/* BOTTOM DETAILS */}
-          <div style={{ borderTop: '2px solid #000', paddingTop: '5px', marginTop: '5px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: driverName ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '3px', textAlign: 'center' }}>
-              <div>
-                <div style={{ fontSize: '7px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Weight</div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '7px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Vehicle</div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '7px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Type</div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold' }}>Multi-Drop</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '7px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Distance</div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
-              </div>
-              {driverName && (
-                <div>
-                  <div style={{ fontSize: '7px', color: '#555', fontWeight: '600', textTransform: 'uppercase', marginBottom: '1px' }}>Driver</div>
-                  <div style={{ fontSize: '9px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{driverName}</div>
-                </div>
-              )}
-            </div>
+          {/* FOOTER */}
+          <div style={{ borderTop: '1.5px solid #000', marginTop: '4px', paddingTop: '3px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ textAlign: 'center', padding: '0 2px' }}>
+                    <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Weight</div>
+                    <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '0 2px' }}>
+                    <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Vehicle</div>
+                    <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '0 2px' }}>
+                    <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Type</div>
+                    <div style={{ fontSize: '8px', fontWeight: 'bold' }}>Multi</div>
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '0 2px' }}>
+                    <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Dist.</div>
+                    <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+                  </td>
+                  {driverName && (
+                    <td style={{ textAlign: 'center', padding: '0 2px', maxWidth: '50px' }}>
+                      <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Driver</div>
+                      <div style={{ fontSize: '7px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{driverName}</div>
+                    </td>
+                  )}
+                </tr>
+              </tbody>
+            </table>
             {j.parcelDescription && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '8px', color: '#555', marginTop: '3px', borderTop: '1px dashed #ccc', paddingTop: '2px' }}>
-                <Package style={{ width: '9px', height: '9px', flexShrink: 0 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '7px', color: '#666', marginTop: '2px', paddingTop: '2px', borderTop: '1px dashed #ddd' }}>
+                <Package style={{ width: '7px', height: '7px', flexShrink: 0 }} />
                 <span style={{ fontWeight: '600' }}>Parcel:</span>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.parcelDescription}</span>
               </div>
             )}
           </div>
 
-          {/* TAGLINE */}
-          <div style={{ borderTop: '1px dashed #bbb', paddingTop: '2px', marginTop: '3px', textAlign: 'center' }}>
-            <div style={{ fontSize: '7px', color: '#888' }}>
-              Same Day Delivery | Tracked & Insured | www.runcourier.co.uk
-            </div>
+          <div style={{ textAlign: 'center', marginTop: '2px', paddingTop: '2px', borderTop: '1px dashed #ddd' }}>
+            <span style={{ fontSize: '6px', color: '#aaa' }}>Same Day Delivery &#8226; Tracked & Insured &#8226; runcourier.co.uk</span>
           </div>
         </div>
       </div>
