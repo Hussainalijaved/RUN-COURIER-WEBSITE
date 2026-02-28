@@ -128,7 +128,37 @@ export default function AdminMap() {
     if (da.postcodeLatitude && da.postcodeLongitude) return true;
     if (d.postcode) return true;
     return false;
+  }).sort((a, b) => {
+    const hasRealGps = (d: Driver) => {
+      if (realtimeLocations.has(d.id)) return true;
+      if (d.currentLatitude && d.currentLongitude) {
+        const lat = parseFloat(d.currentLatitude);
+        const lng = parseFloat(d.currentLongitude);
+        return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+      }
+      return false;
+    };
+    const aHasGps = hasRealGps(a);
+    const bHasGps = hasRealGps(b);
+    if (aHasGps && !bHasGps) return -1;
+    if (!aHasGps && bHasGps) return 1;
+    const aOnline = a.isAvailable;
+    const bOnline = b.isAvailable;
+    if (aOnline && !bOnline) return -1;
+    if (!aOnline && bOnline) return 1;
+    return (a.driverCode || '').localeCompare(b.driverCode || '');
   });
+
+  const liveGpsCount = activeDrivers.filter(d => {
+    if (realtimeLocations.has(d.id)) return true;
+    if (d.currentLatitude && d.currentLongitude) {
+      const lat = parseFloat(d.currentLatitude);
+      const lng = parseFloat(d.currentLongitude);
+      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    }
+    return false;
+  }).length;
+  const postcodeOnlyCount = activeDrivers.length - liveGpsCount;
   
   const availableDrivers = activeDrivers.filter(d => {
     const realtimeLoc = realtimeLocations.get(d.id);
@@ -445,14 +475,16 @@ export default function AdminMap() {
           const driverDisplay = driver.driverCode 
             ? `${driver.driverCode} · ${driver.fullName || 'Driver'}` 
             : driver.fullName || 'Driver';
-          const noGpsWarning = noGps 
-            ? `<div style="font-size: 11px; color: ${isOnlineNoGps ? '#F97316' : '#6B7280'}; font-weight: 600; margin-top: 4px;">${hasPostcode ? 'NO GPS - Postcode location' : 'NO GPS - Approximate location'}</div>`
-            : '';
+          const postcodeInfo = driver.postcode ? `<div style="font-size: 11px; color: #666; margin-top: 2px;">Area: ${driver.postcode}</div>` : '';
+          const locationStatus = noGps 
+            ? `<div style="font-size: 11px; color: ${isOnlineNoGps ? '#F97316' : '#6B7280'}; font-weight: 600; margin-top: 4px;">${hasPostcode ? 'POSTCODE ONLY - Not real-time' : 'NO GPS DATA'}</div>`
+            : `<div style="font-size: 11px; color: #22C55E; font-weight: 600; margin-top: 4px;">LIVE GPS TRACKING</div>`;
           infoWindowRef.current.setContent(`
-            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
+            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 180px;">
               <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${driverDisplay}</div>
               <div style="font-size: 12px; color: #666; text-transform: capitalize;">Vehicle: ${vehicleType}</div>
-              ${noGpsWarning}
+              ${postcodeInfo}
+              ${locationStatus}
             </div>
           `);
           infoWindowRef.current.open(map, marker);
@@ -720,7 +752,7 @@ export default function AdminMap() {
     setSelectedJob(job);
     setSelectedDriver(null);
     const map = mapInstanceRef.current;
-    const location = jobLocations.get(job.id);
+    const location = jobLocations.get(String(job.id));
     if (map && location) {
       const bounds = new google.maps.LatLngBounds();
       bounds.extend({ lat: location.pickupLat, lng: location.pickupLng });
@@ -836,8 +868,8 @@ export default function AdminMap() {
                     <span>Offline</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                    <span>Pending Job</span>
+                    <div className="w-3 h-3 rounded-full bg-orange-500 opacity-70" />
+                    <span>Postcode</span>
                   </div>
                 </div>
                 <Button 
@@ -892,6 +924,16 @@ export default function AdminMap() {
                   Jobs ({pendingJobs.length})
                 </TabsTrigger>
               </TabsList>
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-2 pb-1 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                  {liveGpsCount} Live GPS
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
+                  {postcodeOnlyCount} Postcode Only
+                </span>
+              </div>
             </CardHeader>
 
             <TabsContent value="drivers" className="flex-1 flex flex-col mt-0 overflow-hidden">
@@ -951,17 +993,36 @@ export default function AdminMap() {
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Truck className="h-3 w-3" />
                                 <span className="capitalize">{driver.vehicleType?.replace('_', ' ')}</span>
+                                {driver.postcode && (
+                                  <>
+                                    <span className="text-muted-foreground/50">|</span>
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{driver.postcode}</span>
+                                  </>
+                                )}
                               </div>
                               <div className="mt-1 flex items-center gap-2 flex-wrap">
                                 {getStatusBadge(driver)}
                                 {isLive && (
-                                  <span className="text-[10px] text-green-600 font-medium">LIVE</span>
+                                  <span className="text-[10px] text-green-600 font-medium">LIVE GPS</span>
+                                )}
+                                {!isLive && hasGpsLocation && driver.lastLocationUpdate && (
+                                  <span className="text-[10px] text-yellow-600 font-medium">
+                                    GPS {(() => {
+                                      const diff = Date.now() - new Date(driver.lastLocationUpdate).getTime();
+                                      const mins = Math.floor(diff / 60000);
+                                      if (mins < 60) return `${mins}m ago`;
+                                      const hrs = Math.floor(mins / 60);
+                                      if (hrs < 24) return `${hrs}h ago`;
+                                      return `${Math.floor(hrs / 24)}d ago`;
+                                    })()}
+                                  </span>
                                 )}
                                 {isOnlineNoGps && !hasPostcodeLocation && (
                                   <span className="text-[10px] text-orange-600 font-medium">NO GPS</span>
                                 )}
                                 {hasPostcodeLocation && (
-                                  <span className="text-[10px] text-orange-500 font-medium">POSTCODE</span>
+                                  <span className="text-[10px] text-orange-500 font-medium">POSTCODE ONLY</span>
                                 )}
                                 {!driver.isVerified && (
                                   <span className="text-[10px] text-red-600 font-medium">NOT VERIFIED</span>
@@ -1019,21 +1080,50 @@ export default function AdminMap() {
                         <span className="text-muted-foreground">({selectedDriver.vehicleRegistration})</span>
                       )}
                     </div>
+                    {selectedDriver.postcode && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span>Area: {selectedDriver.postcode}</span>
+                      </div>
+                    )}
                     {(() => {
                       const loc = getDriverLocation(selectedDriver);
                       if (loc.source) {
                         return (
                           <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <Navigation className="h-4 w-4 text-muted-foreground" />
                             <span className="text-xs font-mono">
                               {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
                             </span>
                             {realtimeLocations.has(selectedDriver.id) && (
-                              <Badge className="bg-green-500 text-white text-[10px] px-1 py-0">LIVE</Badge>
+                              <Badge className="bg-green-500 text-white text-[10px] px-1 py-0">LIVE GPS</Badge>
                             )}
                             {loc.source === 'postcode' && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 text-orange-600 border-orange-300">POSTCODE</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 text-orange-600 border-orange-300">POSTCODE ONLY</Badge>
                             )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    {(() => {
+                      const loc = getDriverLocation(selectedDriver);
+                      if (loc.source === 'postcode') {
+                        return (
+                          <div className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
+                            <AlertCircle className="h-3 w-3 inline mr-1" />
+                            This driver has no live GPS. Location shown is based on their postcode. Ask them to open the app for real-time tracking.
+                          </div>
+                        );
+                      }
+                      if (loc.source === 'gps' && !realtimeLocations.has(selectedDriver.id) && selectedDriver.lastLocationUpdate) {
+                        const diff = Date.now() - new Date(selectedDriver.lastLocationUpdate).getTime();
+                        const mins = Math.floor(diff / 60000);
+                        const timeStr = mins < 60 ? `${mins} minutes` : mins < 1440 ? `${Math.floor(mins / 60)} hours` : `${Math.floor(mins / 1440)} days`;
+                        return (
+                          <div className="text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 p-2 rounded-md">
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            Last GPS update was {timeStr} ago. Location may not be current.
                           </div>
                         );
                       }
