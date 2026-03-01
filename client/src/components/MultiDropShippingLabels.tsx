@@ -151,10 +151,11 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
         }}
         data-testid={`shipping-label-stop-${label.stopNumber}`}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* labelInner: full-height flex column */}
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
 
-          {/* ── HEADER ── */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px', flexShrink: 0 }}>
+          {/* ── HEADER (fixed) ── */}
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <img src={runCourierLogo} alt="" style={{ width: '24px', height: '24px', borderRadius: '3px', display: 'block', flexShrink: 0 }} />
               <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: 1.1 }}>RUN COURIER<span style={{ fontSize: '8px', verticalAlign: 'super' }}>&trade;</span></div>
@@ -162,14 +163,14 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             <div style={{ backgroundColor: '#000', color: '#fff', padding: '3px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace', flexShrink: 0 }}>
               {label.stopNumber}/{label.totalStops}
             </div>
-            <div style={{ textAlign: 'right', fontSize: '7px', color: '#555', lineHeight: 1.5, flexShrink: 0 }}>
+            <div style={{ textAlign: 'right', fontSize: '7px', color: '#555', lineHeight: 1.4, flexShrink: 0 }}>
               <div>runcourier.co.uk</div>
               <div>020 4634 6100</div>
             </div>
           </div>
 
-          {/* ── JOB / BARCODE / DATE ── */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '5px', marginBottom: '2px', flexShrink: 0 }}>
+          {/* ── JOB / BARCODE / DATE (fixed) ── */}
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: '5px', paddingBottom: '4px' }}>
             {j.jobNumber && (
               <div style={{ flexShrink: 0, minWidth: '42px' }}>
                 <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Job No.</div>
@@ -178,7 +179,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             )}
             <div style={{ flex: 1, textAlign: 'center', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100%', overflow: 'hidden' }}>{generateBarcode(`${job.trackingNumber}-${label.stopNumber}`)}</div>
-              <div style={{ fontFamily: "'Courier New', monospace", fontSize: '9px', fontWeight: 'bold', letterSpacing: '1.5px', marginTop: '1px' }}>{job.trackingNumber}-{label.stopNumber}</div>
+              <div style={{ fontFamily: "'Courier New', monospace", fontSize: '9px', fontWeight: 'bold', letterSpacing: '1.5px', paddingTop: '1px' }}>{job.trackingNumber}-{label.stopNumber}</div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right', minWidth: '46px' }}>
               <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Date</div>
@@ -186,100 +187,105 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             </div>
           </div>
 
-          {/* ── FROM card ── */}
-          <div style={{ border: '1px solid #222', borderRadius: '8px', padding: '6px 8px', marginBottom: '4px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <IconPin />
-                <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
-                  {label.isPickup ? 'From / Pickup' : `From Stop ${label.stopNumber - 1}`}
-                </span>
+          {/* ── MAIN: cards area (flex:1) ── */}
+          <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '4px', minHeight: 0 }}>
+
+            {/* ── FROM card (fixed) ── */}
+            <div style={{ flex: '0 0 auto', border: '1px solid #222', borderRadius: '8px', padding: '6px 8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <IconPin />
+                  <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
+                    {label.isPickup ? 'From / Pickup' : `From Stop ${label.stopNumber - 1}`}
+                  </span>
+                </div>
+                {label.isPickup && scheduledTime && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '8px', fontWeight: 'bold', color: '#1a73e8' }}>
+                    <IconClock />
+                    <span>{scheduledTime}</span>
+                  </div>
+                )}
               </div>
-              {label.isPickup && scheduledTime && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '8px', fontWeight: 'bold', color: '#1a73e8' }}>
-                  <IconClock />
-                  <span>{scheduledTime}</span>
+              {label.fromBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.fromBuildingName}</div>}
+              <div style={{ fontSize: '9px', lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.fromAddress}</div>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{label.fromPostcode}</div>
+              {label.fromContactName && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+                  <IconUser />
+                  <span style={{ fontWeight: '600' }}>{label.fromContactName}</span>
+                  {label.fromContactPhone && (
+                    <>
+                      <span style={{ color: '#ccc' }}>|</span>
+                      <IconPhone />
+                      <span style={{ color: '#555' }}>{label.fromContactPhone}</span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
-            {label.fromBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: '1px' }}>{label.fromBuildingName}</div>}
-            <div style={{ fontSize: '9px', lineHeight: 1.25 }}>{label.fromAddress}</div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", marginTop: '2px', letterSpacing: '1.5px' }}>{label.fromPostcode}</div>
-            {label.fromContactName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontSize: '8px', flexWrap: 'wrap' }}>
-                <IconUser />
-                <span style={{ fontWeight: '600' }}>{label.fromContactName}</span>
-                {label.fromContactPhone && (
-                  <>
-                    <span style={{ color: '#ccc' }}>|</span>
-                    <IconPhone />
-                    <span style={{ color: '#555' }}>{label.fromContactPhone}</span>
-                  </>
-                )}
+
+            {/* ── TO card (flex:1, absorbs remaining, overflow hidden) ── */}
+            <div style={{ flex: '1 1 auto', minHeight: 0, border: '1.5px solid #111', borderRadius: '8px', padding: '6px 8px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
+                <IconPin />
+                <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
+                  {label.isFinalDelivery ? 'To / Final Delivery' : `To Stop ${label.stopNumber}`}
+                </span>
               </div>
-            )}
+              {label.toBuildingName && <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{label.toBuildingName}</div>}
+              <div style={{ fontSize: '10px', lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.toAddress}</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '3px', letterSpacing: '2px' }}>{label.toPostcode}</div>
+              {label.recipientName && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '3px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+                  <IconUser />
+                  <span style={{ fontWeight: '600' }}>{label.recipientName}</span>
+                  {label.recipientPhone && (
+                    <>
+                      <span style={{ color: '#ccc' }}>|</span>
+                      <IconPhone />
+                      <span style={{ color: '#555' }}>{label.recipientPhone}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
           </div>
 
-          {/* ── TO card ── */}
-          <div style={{ border: '1.5px solid #111', borderRadius: '8px', padding: '6px 8px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '3px' }}>
-              <IconPin />
-              <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
-                {label.isFinalDelivery ? 'To / Final Delivery' : `To Stop ${label.stopNumber}`}
-              </span>
-            </div>
-            {label.toBuildingName && <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '1px' }}>{label.toBuildingName}</div>}
-            <div style={{ fontSize: '10px', lineHeight: 1.25 }}>{label.toAddress}</div>
-            <div style={{ fontSize: '22px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", marginTop: '3px', letterSpacing: '2px' }}>{label.toPostcode}</div>
-            {label.recipientName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '3px', fontSize: '9px', flexWrap: 'wrap' }}>
-                <IconUser />
-                <span style={{ fontWeight: '600' }}>{label.recipientName}</span>
-                {label.recipientPhone && (
-                  <>
-                    <span style={{ color: '#ccc' }}>|</span>
-                    <IconPhone />
-                    <span style={{ color: '#555' }}>{label.recipientPhone}</span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── FOOTER ── */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
-            borderTop: '1px solid #ddd',
-            marginTop: '5px',
-            paddingTop: '3px',
-            flexShrink: 0,
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Weight</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Vehicle</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Type</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>Multi</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Distance</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
-            </div>
-            {driverCode && (
+          {/* ── FOOTER (fixed, pinned at bottom) ── */}
+          <div style={{ flex: '0 0 auto', paddingTop: '4px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
+              borderTop: '1px solid #ddd',
+              paddingTop: '3px',
+            }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Driver</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
+                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Weight</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
               </div>
-            )}
-          </div>
-          <div style={{ textAlign: 'center', marginTop: '2px', flexShrink: 0 }}>
-            <span style={{ fontSize: '6px', color: '#aaa' }}>Same Day Delivery | Tracked &amp; Insured | www.runcourier.co.uk</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Vehicle</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Type</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>Multi</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Distance</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+              </div>
+              {driverCode && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Driver</div>
+                  <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: 'center', paddingTop: '2px' }}>
+              <span style={{ fontSize: '6px', color: '#aaa' }}>Same Day Delivery | Tracked &amp; Insured | www.runcourier.co.uk</span>
+            </div>
           </div>
 
         </div>

@@ -1,0 +1,110 @@
+The label is still printing on 2 pages because the second (TO/DELIVERY) card becomes too tall and pushes the footer to a new page.
+
+DO NOT redesign the label. Keep the same look.
+Fix layout so everything ALWAYS fits on ONE 4x6 page.
+
+REQUIREMENTS:
+1) The whole label must be exactly 4in x 6in.
+2) The footer row must ALWAYS stay at the bottom on the same page.
+3) The two cards must fit between header and footer.
+4) The TO/DELIVERY card must take ONLY the remaining space (flex-grow) and must not push the footer down.
+5) Any extra text inside TO card should be truncated or hidden inside that card (not create a second page).
+
+IMPLEMENT THIS LAYOUT:
+
+- .label is fixed: width 4in; height 6in; position: relative; overflow: hidden; box-sizing: border-box;
+- Use a vertical flex layout inside .label:
+
+.labelInner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+Header is fixed-height (no overflow).
+Footer is fixed-height and pinned at bottom.
+
+Between them, the content area is flex: 1 and must contain the two cards.
+The TO card must be flex: 1 and overflow hidden.
+
+CSS TO APPLY (use these exact rules):
+
+*, *::before, *::after { box-sizing: border-box; }
+
+@page { size: 4in 6in; margin: 0; }
+
+html, body {
+  width: 4in; height: 6in;
+  margin: 0; padding: 0;
+}
+
+.label {
+  width: 4in; height: 6in;
+  padding: 24px 18px 16px 28px;   /* safe print area */
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+.labelInner{
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.header { flex: 0 0 auto; }
+.footer { flex: 0 0 55px; }   /* fixed footer height */
+
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;              /* IMPORTANT for overflow in flex */
+}
+
+.cardFrom { flex: 0 0 auto; }
+
+.cardTo {
+  flex: 1 1 auto;             /* take remaining space only */
+  min-height: 0;              /* IMPORTANT */
+  overflow: hidden;           /* prevents pushing footer */
+}
+
+Inside .cardTo, limit the address text to avoid growing:
+.toAddress {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;      /* max 2 lines */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.toContact {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+Also remove margins inside cards:
+.cardFrom *, .cardTo * { margin: 0; }
+
+PRINT RULE:
+@media print {
+  .label { break-inside: avoid; page-break-inside: avoid; }
+}
+
+DELIVERABLE:
+Update the HTML structure to match:
+<div class="label">
+  <div class="labelInner">
+    <div class="header">...</div>
+    <div class="main">
+      <div class="card cardFrom">...</div>
+      <div class="card cardTo">...</div>
+    </div>
+    <div class="footer">...</div>
+  </div>
+</div>
+
+Keep the exact same visual design (borders, rounded corners, icons).
+Only change layout rules so TO card cannot exceed remaining space and label prints on one page.
