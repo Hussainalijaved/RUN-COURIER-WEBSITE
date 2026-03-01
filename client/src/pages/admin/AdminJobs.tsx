@@ -1321,7 +1321,7 @@ export default function AdminJobs() {
           <style>
             @page {
               size: 4in 6in;
-              margin: 0.06in;
+              margin: 0;
             }
             *, *::before, *::after {
               margin: 0;
