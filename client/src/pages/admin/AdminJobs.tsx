@@ -2706,7 +2706,7 @@ export default function AdminJobs() {
                       ref={labelRef} 
                       job={jobForLabel} 
                       stops={multiDropStops}
-                      driverName={getDriverName(jobForLabel.driverId)} 
+                      driverCode={getDriverCode(jobForLabel.driverId)} 
                     />
                   </div>
                 </div>
@@ -2716,7 +2716,7 @@ export default function AdminJobs() {
                     <ShippingLabel 
                       ref={labelRef} 
                       job={jobForLabel} 
-                      driverName={getDriverName(jobForLabel.driverId)} 
+                      driverCode={getDriverCode(jobForLabel.driverId)} 
                     />
                   </div>
                 </div>
