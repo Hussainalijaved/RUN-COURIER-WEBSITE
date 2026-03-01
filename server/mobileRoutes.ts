@@ -293,12 +293,37 @@ export function registerMobileRoutes(app: Express): void {
 
       const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, dropoff_address, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
 
-      const { data: jobsData, error } = await supabaseAdmin
+      // Also check job_assignments table for this driver
+      let assignmentJobIds: string[] = [];
+      for (const dId of allDriverIds) {
+        const { data: assignments } = await supabaseAdmin
+          .from('job_assignments')
+          .select('job_id')
+          .eq('driver_id', dId)
+          .in('status', ['sent', 'pending', 'offered', 'assigned']);
+        if (assignments) {
+          assignmentJobIds.push(...assignments.map(a => String(a.job_id)));
+        }
+      }
+
+      // Query jobs by driver_id OR from active assignments
+      let jobsQuery = supabaseAdmin
         .from('jobs')
         .select(driverSafeColumns)
-        .in('driver_id', allDriverIds)
-        .in('status', ['assigned', 'offered'])
-        .order('created_at', { ascending: false });
+        .in('status', ['assigned', 'offered', 'pending']);
+      
+      if (assignmentJobIds.length > 0) {
+        // Get jobs where driver_id matches OR job is in active assignments
+        jobsQuery = supabaseAdmin
+          .from('jobs')
+          .select(driverSafeColumns)
+          .or(`driver_id.in.(${allDriverIds.join(',')}),id.in.(${assignmentJobIds.join(',')})`)
+          .in('status', ['assigned', 'offered', 'pending']);
+      } else {
+        jobsQuery = jobsQuery.in('driver_id', allDriverIds);
+      }
+
+      const { data: jobsData, error } = await jobsQuery.order('created_at', { ascending: false });
 
       if (error) {
         console.error('[Job Offers API] Query error:', error);
@@ -1464,6 +1489,13 @@ export function registerMobileRoutes(app: Express): void {
 
       let mobileJobs: any[] = [];
 
+      // Build list of all possible driver IDs (id, userId, auth UUID may differ)
+      const allDriverIds: string[] = [driver.id];
+      if (driver.userId && driver.userId !== driver.id) {
+        allDriverIds.push(driver.userId);
+      }
+      console.log(`[Mobile Jobs] Using driver IDs: ${allDriverIds.join(', ')}`);
+
       // CRITICAL: Query Supabase FIRST as it's the source of truth
       // SECURITY: Explicitly select ONLY driver-safe columns - NEVER include total_price/base_price/customer pricing
       if (supabaseAdmin) {
@@ -1471,31 +1503,32 @@ export function registerMobileRoutes(app: Express): void {
         
         // STEP 1: Get job_assignments for this driver (exclude rejected/expired/withdrawn)
         // CRITICAL: Don't show jobs from rejected assignments - driver declined them
-        const { data: allAssignments, error: assignmentsError } = await supabaseAdmin
-          .from('job_assignments')
-          .select('job_id, driver_price, status')
-          .eq('driver_id', driver.id)
-          .not('status', 'in', '("rejected","expired","withdrawn","cancelled")');
-        
-        if (assignmentsError) {
-          console.log(`[Mobile Jobs] Error fetching assignments:`, assignmentsError.message);
+        let allAssignments: any[] = [];
+        for (const dId of allDriverIds) {
+          const { data: assignments, error: assignmentsError } = await supabaseAdmin
+            .from('job_assignments')
+            .select('job_id, driver_price, status')
+            .eq('driver_id', dId)
+            .not('status', 'in', '("rejected","expired","withdrawn","cancelled")');
+          
+          if (assignmentsError) {
+            console.log(`[Mobile Jobs] Error fetching assignments for ${dId}:`, assignmentsError.message);
+          } else if (assignments) {
+            allAssignments.push(...assignments);
+          }
         }
         
         // Filter to only include valid assignments
-        const validAssignments = (allAssignments || []).filter(a => 
+        const validAssignments = allAssignments.filter(a => 
           !['rejected', 'expired', 'withdrawn', 'cancelled'].includes(a.status)
         );
         const assignmentJobIds = validAssignments.map(a => String(a.job_id));
-        console.log(`[Mobile Jobs] Found ${allAssignments?.length || 0} job assignments for driver ${driver.id}`);
+        console.log(`[Mobile Jobs] Found ${allAssignments.length} job assignments for driver ${driver.id} (${assignmentJobIds.length} valid)`);
         
         // STEP 2: Get jobs where driver_id is set OR job has an assignment for this driver
         let supabaseJobs: any[] = [];
         
-        // Query jobs directly assigned to driver (exclude hidden jobs)
-        console.log(`[Mobile Jobs] Querying jobs with driver_id=${driver.id}`);
-        const { data: directJobs, error: directError } = await supabaseAdmin
-          .from('jobs')
-          .select(`
+        const driverSafeSelect = `
             id,
             tracking_number,
             job_number,
@@ -1532,9 +1565,14 @@ export function registerMobileRoutes(app: Express): void {
             notes,
             created_at,
             updated_at
-          `)
-          .eq('driver_id', driver.id)
-          .or('driver_hidden.is.null,driver_hidden.eq.false')
+          `;
+        
+        // Query jobs directly assigned to driver (include ALL jobs, filter hidden later in JS)
+        console.log(`[Mobile Jobs] Querying jobs with driver_id IN [${allDriverIds.join(', ')}]`);
+        const { data: directJobs, error: directError } = await supabaseAdmin
+          .from('jobs')
+          .select(driverSafeSelect)
+          .in('driver_id', allDriverIds)
           .order('created_at', { ascending: false });
         
         if (directError) {
@@ -1544,50 +1582,12 @@ export function registerMobileRoutes(app: Express): void {
           console.log(`[Mobile Jobs] Found ${directJobs.length} directly assigned jobs`);
         }
         
-        // Also fetch jobs from assignments (for pending/sent offers not yet accepted, exclude hidden)
+        // Also fetch jobs from assignments (for pending/sent offers not yet accepted)
         if (assignmentJobIds.length > 0) {
           const { data: assignedJobs, error: assignedError } = await supabaseAdmin
             .from('jobs')
-            .select(`
-              id,
-              tracking_number,
-              job_number,
-              status,
-              driver_price,
-              vehicle_type,
-              priority,
-              pickup_address,
-              pickup_postcode,
-              pickup_latitude,
-              pickup_longitude,
-              pickup_instructions,
-              pickup_contact_name,
-              pickup_contact_phone,
-              delivery_address,
-              delivery_postcode,
-              delivery_latitude,
-              delivery_longitude,
-              delivery_instructions,
-              recipient_name,
-              recipient_phone,
-              weight,
-              distance,
-              scheduled_pickup_time,
-              estimated_delivery_time,
-              actual_pickup_time,
-              actual_delivery_time,
-              pod_signature_url,
-              pod_photo_url,
-              pod_notes,
-              is_multi_drop,
-              is_return_trip,
-              driver_hidden,
-              notes,
-              created_at,
-              updated_at
-            `)
-            .in('id', assignmentJobIds.map(id => parseInt(id) || id))
-            .or('driver_hidden.is.null,driver_hidden.eq.false');
+            .select(driverSafeSelect)
+            .in('id', assignmentJobIds.map(id => parseInt(id) || id));
           
           if (assignedError) {
             console.log("[Mobile Jobs] Supabase assigned jobs query error:", assignedError.message);
@@ -1738,30 +1738,37 @@ export function registerMobileRoutes(app: Express): void {
       dbJobs.forEach(j => jobMap.set(j.id, j));
       let jobs = Array.from(jobMap.values());
       
-      // Filter out hidden jobs (unless viewing completed/history)
-      jobs = jobs.filter(j => (j as any).driverHidden !== true);
-
       // Apply status filters
       // "active" = jobs the driver has ACCEPTED and is working on
       // "pending" = job offers waiting for driver to accept/decline
       // "completed" = job history (delivered, cancelled, failed)
+      const completedStatuses = ["delivered", "cancelled", "failed"];
+      
       if (status === "active") {
+        // Filter out hidden jobs for active view
+        jobs = jobs.filter(j => (j as any).driverHidden !== true);
         jobs = jobs.filter(j => 
           ["accepted", "on_the_way_pickup", "arrived_pickup", "collected", "on_the_way_delivery", "picked_up", "on_the_way"].includes(j.status)
         );
         // For active jobs, require driver_price
         jobs = jobs.filter(j => j.driverPrice != null);
       } else if (status === "pending") {
+        // Filter out hidden jobs for pending view
+        jobs = jobs.filter(j => (j as any).driverHidden !== true);
         jobs = jobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
-        // For pending jobs, show offers even without driver_price (pricing may be pending)
       } else if (status === "completed") {
-        // For history/completed jobs, show ALL jobs regardless of driver_price
-        jobs = jobs.filter(j => ["delivered", "cancelled", "failed"].includes(j.status));
+        // For history/completed jobs, show ALL completed jobs INCLUDING hidden ones
+        // Do NOT filter by driverHidden - completed jobs should always be in history
+        jobs = jobs.filter(j => completedStatuses.includes(j.status));
       } else {
-        // No filter - show all but require driver_price for non-completed
-        const completedStatuses = ["delivered", "cancelled", "failed"];
-        jobs = jobs.filter(j => completedStatuses.includes(j.status) || j.driverPrice != null);
+        // No filter - show all, only filter hidden for non-completed
+        jobs = jobs.filter(j => {
+          if (completedStatuses.includes(j.status)) return true;
+          return (j as any).driverHidden !== true && j.driverPrice != null;
+        });
       }
+      
+      console.log(`[Mobile Jobs] After status filter (${status || 'all'}): ${jobs.length} jobs`);
 
       mobileJobs = jobs.map(job => {
         const j = job as any;

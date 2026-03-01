@@ -137,17 +137,48 @@ export async function requireDriverRole(
     // CRITICAL: Query Supabase FIRST as it's the source of truth
     // The mobile app and website share Supabase as the single source of truth
     if (supabaseAdmin) {
-      console.log("[Mobile Auth] Querying Supabase for driver...");
-      const { data: supabaseDriver, error: supabaseError } = await supabaseAdmin
+      console.log("[Mobile Auth] Querying Supabase for driver with auth id:", req.auth.id);
+      
+      // Try by id first (most drivers have id = auth UUID)
+      let { data: supabaseDriver, error: supabaseError } = await supabaseAdmin
         .from('drivers')
         .select('*')
         .eq('id', req.auth.id)
         .single();
       
-      if (supabaseError) {
+      // Fallback: try by user_id column (some drivers have separate user_id)
+      if (!supabaseDriver) {
+        console.log("[Mobile Auth] Not found by id, trying user_id...");
+        const { data: byUserId, error: userIdError } = await supabaseAdmin
+          .from('drivers')
+          .select('*')
+          .eq('user_id', req.auth.id)
+          .single();
+        if (byUserId) {
+          supabaseDriver = byUserId;
+          console.log("[Mobile Auth] Found driver by user_id:", byUserId.driver_code);
+        }
+      }
+      
+      // Fallback: try by email
+      if (!supabaseDriver && req.auth.email) {
+        console.log("[Mobile Auth] Not found by user_id, trying email:", req.auth.email);
+        const { data: byEmail } = await supabaseAdmin
+          .from('drivers')
+          .select('*')
+          .eq('email', req.auth.email)
+          .single();
+        if (byEmail) {
+          supabaseDriver = byEmail;
+          console.log("[Mobile Auth] Found driver by email:", byEmail.driver_code);
+        }
+      }
+      
+      if (supabaseError && !supabaseDriver) {
         console.log("[Mobile Auth] Supabase query error:", supabaseError.message);
-      } else if (supabaseDriver) {
-        console.log("[Mobile Auth] Driver found in Supabase:", supabaseDriver.driver_code, "status:", supabaseDriver.status);
+      }
+      if (supabaseDriver) {
+        console.log("[Mobile Auth] Driver found in Supabase:", supabaseDriver.driver_code, "status:", supabaseDriver.status, "id:", supabaseDriver.id);
         driver = mapSupabaseDriverToLocal(supabaseDriver);
       }
     }
