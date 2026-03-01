@@ -117,113 +117,104 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             </div>
           </div>
 
-          {/* ── MAIN: cards area (flex:1, takes remaining space between header and footer) ── */}
-          <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '4px', minHeight: 0 }}>
-
-            {/* ── FROM / PICKUP card (fixed height) ── */}
-            <div style={{
-              flex: '0 0 auto',
-              border: '1px solid #222',
-              borderRadius: '10px',
-              padding: '6px 9px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <IconPin />
-                  <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#333' }}>From / Pickup</span>
+          {/* ── FROM / PICKUP card ── */}
+          <div style={{
+            border: '1px solid #222',
+            borderRadius: '10px',
+            padding: '5px 8px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <IconPin />
+                <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#333' }}>From / Pickup</span>
+              </div>
+              {scheduledTime && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '8px', fontWeight: 'bold', color: '#1a73e8' }}>
+                  <IconClock />
+                  <span>{scheduledTime}</span>
                 </div>
-                {scheduledTime && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '8px', fontWeight: 'bold', color: '#1a73e8' }}>
-                    <IconClock />
-                    <span>{scheduledTime}</span>
-                  </div>
+              )}
+            </div>
+            {j.pickupBuildingName && (
+              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.pickupBuildingName}</div>
+            )}
+            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.pickupAddress}</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{job.pickupPostcode}</div>
+            {(j.pickupContactName || j.senderName) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+                <IconUser />
+                <span style={{ fontWeight: '600' }}>{j.pickupContactName || j.senderName}</span>
+                {(j.pickupContactPhone || j.senderPhone) && (
+                  <>
+                    <span style={{ color: '#ccc' }}>|</span>
+                    <IconPhone />
+                    <span style={{ color: '#555' }}>{j.pickupContactPhone || j.senderPhone}</span>
+                  </>
                 )}
               </div>
-              {j.pickupBuildingName && (
-                <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.pickupBuildingName}</div>
-              )}
-              <div style={{ fontSize: '9px', lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.pickupAddress}</div>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{job.pickupPostcode}</div>
-              {(j.pickupContactName || j.senderName) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
-                  <IconUser />
-                  <span style={{ fontWeight: '600' }}>{j.pickupContactName || j.senderName}</span>
-                  {(j.pickupContactPhone || j.senderPhone) && (
-                    <>
-                      <span style={{ color: '#ccc' }}>|</span>
-                      <IconPhone />
-                      <span style={{ color: '#555' }}>{j.pickupContactPhone || j.senderPhone}</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ── TO / DELIVERY card (same size as FROM, overflow hidden) ── */}
-            <div style={{
-              flex: '0 0 auto',
-              border: '1.5px solid #111',
-              borderRadius: '10px',
-              padding: '5px 8px',
-              overflow: 'hidden',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '1px' }}>
-                <IconPin />
-                <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#333' }}>To / Delivery</span>
-              </div>
-              {j.deliveryBuildingName && (
-                <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.deliveryBuildingName}</div>
-              )}
-              <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.deliveryAddress}</div>
-              <div style={{ fontSize: '22px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '2px' }}>{job.deliveryPostcode}</div>
-              {job.recipientName && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
-                  <IconUser />
-                  <span style={{ fontWeight: '600' }}>{job.recipientName}</span>
-                  {job.recipientPhone && (
-                    <>
-                      <span style={{ color: '#ccc' }}>|</span>
-                      <IconPhone />
-                      <span style={{ color: '#555' }}>{job.recipientPhone}</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
+            )}
           </div>
 
-          {/* ── FOOTER (fixed height, pinned at bottom) ── */}
-          <div style={{ flex: '0 0 auto', paddingTop: '4px' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
-              borderTop: '1px solid #ddd',
-              paddingTop: '3px',
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Weight</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Vehicle</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Type</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Standard'}</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Distance</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
-              </div>
-              {driverCode && (
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Driver</div>
-                  <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
-                </div>
-              )}
+          {/* ── TO / DELIVERY card ── */}
+          <div style={{
+            border: '1.5px solid #111',
+            borderRadius: '10px',
+            padding: '5px 8px',
+            overflow: 'hidden',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
+              <IconPin />
+              <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#333' }}>To / Delivery</span>
             </div>
+            {j.deliveryBuildingName && (
+              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.deliveryBuildingName}</div>
+            )}
+            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.deliveryAddress}</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{job.deliveryPostcode}</div>
+            {job.recipientName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+                <IconUser />
+                <span style={{ fontWeight: '600' }}>{job.recipientName}</span>
+                {job.recipientPhone && (
+                  <>
+                    <span style={{ color: '#ccc' }}>|</span>
+                    <IconPhone />
+                    <span style={{ color: '#555' }}>{job.recipientPhone}</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── FOOTER STATS ── */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
+            borderTop: '1px solid #ddd',
+            paddingTop: '3px',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Weight</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Vehicle</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Type</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Standard'}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Distance</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+            </div>
+            {driverCode && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Driver</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
+              </div>
+            )}
           </div>
 
         </div>

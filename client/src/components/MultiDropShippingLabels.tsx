@@ -187,102 +187,95 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             </div>
           </div>
 
-          {/* ── MAIN: cards area (flex:1) ── */}
-          <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '4px', minHeight: 0 }}>
-
-            {/* ── FROM card (fixed) ── */}
-            <div style={{ flex: '0 0 auto', border: '1px solid #222', borderRadius: '8px', padding: '6px 8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <IconPin />
-                  <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
-                    {label.isPickup ? 'From / Pickup' : `From Stop ${label.stopNumber - 1}`}
-                  </span>
-                </div>
-                {label.isPickup && scheduledTime && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '8px', fontWeight: 'bold', color: '#1a73e8' }}>
-                    <IconClock />
-                    <span>{scheduledTime}</span>
-                  </div>
-                )}
-              </div>
-              {label.fromBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.fromBuildingName}</div>}
-              <div style={{ fontSize: '9px', lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.fromAddress}</div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{label.fromPostcode}</div>
-              {label.fromContactName && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
-                  <IconUser />
-                  <span style={{ fontWeight: '600' }}>{label.fromContactName}</span>
-                  {label.fromContactPhone && (
-                    <>
-                      <span style={{ color: '#ccc' }}>|</span>
-                      <IconPhone />
-                      <span style={{ color: '#555' }}>{label.fromContactPhone}</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ── TO card (same size as FROM, overflow hidden) ── */}
-            <div style={{ flex: '0 0 auto', border: '1.5px solid #111', borderRadius: '8px', padding: '5px 7px', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '1px' }}>
+          {/* ── FROM card ── */}
+          <div style={{ border: '1px solid #222', borderRadius: '8px', padding: '5px 7px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 <IconPin />
                 <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
-                  {label.isFinalDelivery ? 'To / Final Delivery' : `To Stop ${label.stopNumber}`}
+                  {label.isPickup ? 'From / Pickup' : `From Stop ${label.stopNumber - 1}`}
                 </span>
               </div>
-              {label.toBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.toBuildingName}</div>}
-              <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.toAddress}</div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '2px' }}>{label.toPostcode}</div>
-              {label.recipientName && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '3px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
-                  <IconUser />
-                  <span style={{ fontWeight: '600' }}>{label.recipientName}</span>
-                  {label.recipientPhone && (
-                    <>
-                      <span style={{ color: '#ccc' }}>|</span>
-                      <IconPhone />
-                      <span style={{ color: '#555' }}>{label.recipientPhone}</span>
-                    </>
-                  )}
+              {label.isPickup && scheduledTime && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '8px', fontWeight: 'bold', color: '#1a73e8' }}>
+                  <IconClock />
+                  <span>{scheduledTime}</span>
                 </div>
               )}
             </div>
-
+            {label.fromBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.fromBuildingName}</div>}
+            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.fromAddress}</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{label.fromPostcode}</div>
+            {label.fromContactName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+                <IconUser />
+                <span style={{ fontWeight: '600' }}>{label.fromContactName}</span>
+                {label.fromContactPhone && (
+                  <>
+                    <span style={{ color: '#ccc' }}>|</span>
+                    <IconPhone />
+                    <span style={{ color: '#555' }}>{label.fromContactPhone}</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* ── FOOTER (fixed, pinned at bottom) ── */}
-          <div style={{ flex: '0 0 auto', paddingTop: '4px' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
-              borderTop: '1px solid #ddd',
-              paddingTop: '3px',
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Weight</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Vehicle</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Type</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>Multi</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Distance</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
-              </div>
-              {driverCode && (
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Driver</div>
-                  <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
-                </div>
-              )}
+          {/* ── TO card (same size as FROM) ── */}
+          <div style={{ border: '1.5px solid #111', borderRadius: '8px', padding: '5px 7px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
+              <IconPin />
+              <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
+                {label.isFinalDelivery ? 'To / Final Delivery' : `To Stop ${label.stopNumber}`}
+              </span>
             </div>
+            {label.toBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.toBuildingName}</div>}
+            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.toAddress}</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{label.toPostcode}</div>
+            {label.recipientName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+                <IconUser />
+                <span style={{ fontWeight: '600' }}>{label.recipientName}</span>
+                {label.recipientPhone && (
+                  <>
+                    <span style={{ color: '#ccc' }}>|</span>
+                    <IconPhone />
+                    <span style={{ color: '#555' }}>{label.recipientPhone}</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── FOOTER STATS ── */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
+            borderTop: '1px solid #ddd',
+            paddingTop: '3px',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Weight</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Vehicle</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Type</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>Multi</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Distance</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+            </div>
+            {driverCode && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Driver</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
+              </div>
+            )}
           </div>
 
         </div>
