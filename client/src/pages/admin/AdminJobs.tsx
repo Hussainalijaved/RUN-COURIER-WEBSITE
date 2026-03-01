@@ -1342,6 +1342,7 @@ export default function AdminJobs() {
               color-adjust: exact !important;
               background: white;
               color: black;
+              overflow: hidden;
             }
             @media print {
               html, body {
