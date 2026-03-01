@@ -19,7 +19,8 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
   const pickupLng = job.pickup_longitude?.toString() || job.pickup_lng?.toString() || null;
   const deliveryLat = job.delivery_latitude?.toString() || job.dropoff_lat?.toString() || null;
   const deliveryLng = job.delivery_longitude?.toString() || job.dropoff_lng?.toString() || null;
-  const senderPhone = job.pickup_contact_phone || null;
+  const senderName = job.pickup_contact_name || job.sender_name || job.customer_name || null;
+  const senderPhone = job.pickup_contact_phone || job.sender_phone || job.customer_phone || null;
   const recipientPhone = job.recipient_phone || null;
   
   let staticMapUrl: string | null = null;
@@ -61,11 +62,13 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     deliveryLongitude: deliveryLng,
     recipientName: job.recipient_name,
     recipientPhone: recipientPhone,
-    senderName: job.pickup_contact_name || null,
+    senderName: senderName,
     senderPhone: senderPhone,
-    pickupContactPhone: job.pickup_contact_phone || null,
-    pickupContactName: job.pickup_contact_name || null,
+    pickupContactPhone: job.pickup_contact_phone || job.sender_phone || null,
+    pickupContactName: job.pickup_contact_name || job.sender_name || null,
     pickupBuildingName: job.pickup_building_name || null,
+    customerName: job.customer_name || null,
+    customerPhone: job.customer_phone || null,
     vehicleType: job.vehicle_type,
     distance: job.distance?.toString() || null,
     weight: job.weight?.toString() || null,
@@ -291,7 +294,7 @@ export function registerMobileRoutes(app: Express): void {
       }
       console.log(`[Job Offers API] Looking up jobs for driver IDs: ${allDriverIds.join(', ')}`);
 
-      const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, dropoff_address, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
+      const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, dropoff_address, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, customer_name, customer_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
 
       // Also check job_assignments table for this driver
       let assignmentJobIds: string[] = [];
@@ -388,6 +391,14 @@ export function registerMobileRoutes(app: Express): void {
         pickup_longitude: job.pickup_longitude ? parseFloat(String(job.pickup_longitude)) : null,
         delivery_latitude: job.delivery_latitude ? parseFloat(String(job.delivery_latitude)) : null,
         delivery_longitude: job.delivery_longitude ? parseFloat(String(job.delivery_longitude)) : null,
+        senderName: job.pickup_contact_name || job.sender_name || job.customer_name || null,
+        senderPhone: job.pickup_contact_phone || job.sender_phone || job.customer_phone || null,
+        pickupContactName: job.pickup_contact_name || job.sender_name || null,
+        pickupContactPhone: job.pickup_contact_phone || job.sender_phone || null,
+        recipientName: job.recipient_name || null,
+        recipientPhone: job.recipient_phone || null,
+        customerName: job.customer_name || null,
+        customerPhone: job.customer_phone || null,
       }));
 
       // Fetch route data for each job
@@ -1543,13 +1554,19 @@ export function registerMobileRoutes(app: Express): void {
             pickup_instructions,
             pickup_contact_name,
             pickup_contact_phone,
+            pickup_building_name,
             delivery_address,
             delivery_postcode,
             delivery_latitude,
             delivery_longitude,
             delivery_instructions,
+            delivery_building_name,
             recipient_name,
             recipient_phone,
+            sender_name,
+            sender_phone,
+            customer_name,
+            customer_phone,
             weight,
             distance,
             scheduled_pickup_time,
@@ -1788,10 +1805,12 @@ export function registerMobileRoutes(app: Express): void {
           deliveryLongitude: job.deliveryLongitude?.toString() || null,
           recipientName: job.recipientName,
           recipientPhone: job.recipientPhone || null,
-          senderName: j.senderName || j.pickupContactName || null,
-          senderPhone: j.senderPhone || j.pickupContactPhone || null,
-          pickupContactPhone: j.pickupContactPhone || null,
-          pickupContactName: j.pickupContactName || null,
+          senderName: j.pickupContactName || j.senderName || j.customerName || null,
+          senderPhone: j.pickupContactPhone || j.senderPhone || j.customerPhone || null,
+          pickupContactPhone: j.pickupContactPhone || j.senderPhone || null,
+          pickupContactName: j.pickupContactName || j.senderName || null,
+          customerName: j.customerName || null,
+          customerPhone: j.customerPhone || null,
           vehicleType: job.vehicleType,
           distance: job.distance?.toString() || null,
           weight: job.weight?.toString() || null,
@@ -1799,7 +1818,6 @@ export function registerMobileRoutes(app: Express): void {
           scheduledPickupTime: job.scheduledPickupTime,
           isMultiDrop: job.isMultiDrop,
           isReturnTrip: job.isReturnTrip,
-          // Include multi-drop stops (empty array for fallback path - would need separate query)
           multiDropStops: [],
           createdAt: job.createdAt,
           updatedAt: job.updatedAt,
@@ -2161,6 +2179,8 @@ export function registerMobileRoutes(app: Express): void {
             delivery_building_name,
             recipient_name,
             recipient_phone,
+            sender_name,
+            sender_phone,
             customer_name,
             customer_phone,
             customer_email,
@@ -2303,10 +2323,12 @@ export function registerMobileRoutes(app: Express): void {
           deliveryLongitude: job.deliveryLongitude?.toString() || null,
           recipientName: job.recipientName,
           recipientPhone: job.recipientPhone || null,
-          senderName: j.senderName || j.pickupContactName || null,
-          senderPhone: j.senderPhone || j.pickupContactPhone || null,
-          pickupContactPhone: j.pickupContactPhone || null,
-          pickupContactName: j.pickupContactName || null,
+          senderName: j.pickupContactName || j.senderName || j.customerName || null,
+          senderPhone: j.pickupContactPhone || j.senderPhone || j.customerPhone || null,
+          pickupContactPhone: j.pickupContactPhone || j.senderPhone || null,
+          pickupContactName: j.pickupContactName || j.senderName || null,
+          customerName: j.customerName || null,
+          customerPhone: j.customerPhone || null,
           vehicleType: job.vehicleType,
           distance: job.distance?.toString() || null,
           weight: job.weight?.toString() || null,
@@ -2350,13 +2372,13 @@ export function registerMobileRoutes(app: Express): void {
           deliveryLongitude: supabaseJob.delivery_longitude?.toString() || supabaseJob.dropoff_lng?.toString() || null,
           recipientName: supabaseJob.recipient_name,
           recipientPhone: supabaseJob.recipient_phone || null,
-          senderName: supabaseJob.pickup_contact_name || null,
-          senderPhone: supabaseJob.pickup_contact_phone || null,
-          pickupContactPhone: supabaseJob.pickup_contact_phone || null,
-          pickupContactName: supabaseJob.pickup_contact_name || null,
-          customerName: supabaseJob.customer_name,
-          customerPhone: supabaseJob.customer_phone,
-          customerEmail: supabaseJob.customer_email,
+          senderName: supabaseJob.pickup_contact_name || supabaseJob.sender_name || supabaseJob.customer_name || null,
+          senderPhone: supabaseJob.pickup_contact_phone || supabaseJob.sender_phone || supabaseJob.customer_phone || null,
+          pickupContactPhone: supabaseJob.pickup_contact_phone || supabaseJob.sender_phone || null,
+          pickupContactName: supabaseJob.pickup_contact_name || supabaseJob.sender_name || null,
+          customerName: supabaseJob.customer_name || null,
+          customerPhone: supabaseJob.customer_phone || null,
+          customerEmail: supabaseJob.customer_email || null,
           vehicleType: supabaseJob.vehicle_type,
           distance: supabaseJob.distance?.toString() || null,
           weight: supabaseJob.weight?.toString() || null,
@@ -3079,8 +3101,10 @@ export function registerMobileRoutes(app: Express): void {
               pickupAddress: job.pickupAddress,
               pickupPostcode: job.pickupPostcode,
               pickupBuildingName: (job as any).pickupBuildingName || null,
-              pickupContactName: (job as any).pickupContactName || null,
-              pickupContactPhone: (job as any).pickupContactPhone || null,
+              pickupContactName: (job as any).pickupContactName || (job as any).senderName || null,
+              pickupContactPhone: (job as any).pickupContactPhone || (job as any).senderPhone || null,
+              senderName: (job as any).pickupContactName || (job as any).senderName || (job as any).customerName || null,
+              senderPhone: (job as any).pickupContactPhone || (job as any).senderPhone || (job as any).customerPhone || null,
               pickupLatitude: job.pickupLatitude ? parseFloat(String(job.pickupLatitude)) : null,
               pickupLongitude: job.pickupLongitude ? parseFloat(String(job.pickupLongitude)) : null,
               deliveryAddress: job.deliveryAddress,

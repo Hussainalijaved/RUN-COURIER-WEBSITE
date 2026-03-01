@@ -1,0 +1,49 @@
+Fix a data mapping bug in the Driver mobile app (Expo / React Native).
+
+BUG:
+When a job is sent to the driver, the “Contact Sender” section shows the RECIPIENT (delivery) name + phone instead of the SENDER (pickup) name + phone.
+
+REFERENCE (correct data):
+- Pickup/Sender should display: pickup contact name + pickup contact phone
+- Delivery/Recipient should display: delivery contact name + delivery contact phone
+The web admin modal shows the correct separation, but the mobile app “Contact Sender” is using the wrong fields.
+
+TASK:
+1) Find the Active Job screen component where it renders:
+   - “Contact Sender”
+   - name text
+   - phone text
+   - Call button
+
+2) Trace the source object (job/jobDetails/activeJob).
+   Identify the exact fields used for name/phone.
+   Currently it uses delivery/recipient fields by mistake.
+
+3) Fix the mapping:
+   - Contact Sender must use PICKUP fields only:
+       senderName  = job.pickupContactName  (or job.pickup_contact_name / job.sender_name)
+       senderPhone = job.pickupContactPhone (or job.pickup_contact_phone / job.sender_phone)
+   - If there is a separate “Contact Recipient” section, it must use DELIVERY fields only:
+       recipientName  = job.deliveryContactName
+       recipientPhone = job.deliveryContactPhone
+
+4) Add defensive fallback:
+   If pickup contact is missing, fall back to pickup business name/phone (if exists),
+   but NEVER show delivery contact in the sender area.
+
+5) Verify the API/Supabase query:
+   Ensure the SELECT includes both pickup and delivery contact fields.
+   Example:
+   select: id, jobNumber,
+           pickup_contact_name, pickup_contact_phone, pickup_address, pickup_postcode,
+           delivery_contact_name, delivery_contact_phone, delivery_address, delivery_postcode
+
+6) After fixing, test:
+   - Create a job where pickup contact != delivery contact
+   - Assign to driver
+   - Confirm “Contact Sender” shows pickup contact
+   - Confirm delivery area shows delivery contact
+
+DO NOT change any business logic or database schema.
+Only fix the mobile UI data binding/mapping and missing select fields if needed.
+Return the exact code diff/patch for the Active Job screen and the data fetch function.
