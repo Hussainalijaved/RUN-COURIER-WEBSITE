@@ -1302,7 +1302,7 @@ export default function AdminJobs() {
         }
       }
       
-      return clone.innerHTML;
+      return clone.outerHTML;
     };
     
     const labelContent = await convertImagesToBase64(labelRef.current);
