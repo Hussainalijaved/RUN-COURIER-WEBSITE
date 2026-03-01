@@ -71,13 +71,14 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
         style={{
           width: '4in',
           height: '6in',
+          maxHeight: '6in',
+          margin: 0,
           padding: '38px 18px 16px 28px',
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
           color: '#111',
           backgroundColor: '#fff',
-          position: 'relative',
           fontSize: '11px',
           lineHeight: 1.3,
         }}

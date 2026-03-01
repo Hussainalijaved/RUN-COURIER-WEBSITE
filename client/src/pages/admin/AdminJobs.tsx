@@ -1328,29 +1328,43 @@ export default function AdminJobs() {
               padding: 0;
               box-sizing: border-box;
             }
-            html, body {
+            html {
               width: 4in;
               height: 6in;
-              margin: 0;
-              padding: 0;
-              overflow: hidden;
+              margin: 0 !important;
+              padding: 0 !important;
+              overflow: hidden !important;
             }
             body {
+              width: 4in;
+              height: 6in;
+              max-height: 6in;
+              margin: 0 !important;
+              padding: 0 !important;
+              overflow: hidden !important;
               font-family: Arial, sans-serif;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
               background: white;
               color: black;
-              overflow: hidden;
+            }
+            body > div {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             @media print {
               html, body {
-                margin: 0 !important;
-                padding: 0 !important;
                 width: 4in !important;
                 height: 6in !important;
+                max-height: 6in !important;
+                margin: 0 !important;
+                padding: 0 !important;
                 overflow: hidden !important;
+              }
+              body > div {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
               }
               .label-page { page-break-after: always; }
               .label-page:last-child { page-break-after: auto; }
