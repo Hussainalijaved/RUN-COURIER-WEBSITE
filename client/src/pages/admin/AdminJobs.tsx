@@ -1321,20 +1321,9 @@ export default function AdminJobs() {
           <style>
             @page {
               size: 4in 6in;
-              margin: 0;
+              margin: 0.06in;
             }
-            @media print {
-              html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 4in !important;
-                height: 6in !important;
-                overflow: hidden !important;
-              }
-              .label-page { page-break-after: always; }
-              .label-page:last-child { page-break-after: auto; }
-            }
-            * {
+            *, *::before, *::after {
               margin: 0;
               padding: 0;
               box-sizing: border-box;
@@ -1353,6 +1342,18 @@ export default function AdminJobs() {
               color-adjust: exact !important;
               background: white;
               color: black;
+            }
+            @media print {
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 4in !important;
+                height: 6in !important;
+                overflow: hidden !important;
+              }
+              .label-page { page-break-after: always; }
+              .label-page:last-child { page-break-after: auto; }
+              * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             }
             img {
               display: block;

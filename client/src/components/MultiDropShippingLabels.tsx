@@ -137,7 +137,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
         style={{
           width: '4in',
           height: '6in',
-          padding: '18px 14px 14px 14px',
+          padding: '18px 14px 14px 22px',
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
