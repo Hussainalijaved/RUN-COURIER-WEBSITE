@@ -1324,7 +1324,13 @@ export default function AdminJobs() {
               margin: 0;
             }
             @media print {
-              body { margin: 0; padding: 0; }
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 4in !important;
+                height: 6in !important;
+                overflow: hidden !important;
+              }
               .label-page { page-break-after: always; }
               .label-page:last-child { page-break-after: auto; }
             }
@@ -1332,6 +1338,13 @@ export default function AdminJobs() {
               margin: 0;
               padding: 0;
               box-sizing: border-box;
+            }
+            html, body {
+              width: 4in;
+              height: 6in;
+              margin: 0;
+              padding: 0;
+              overflow: hidden;
             }
             body {
               font-family: Arial, sans-serif;
@@ -1341,10 +1354,9 @@ export default function AdminJobs() {
               background: white;
               color: black;
             }
-            .bg-white { background-color: #fff !important; }
-            .text-black { color: #000 !important; }
             img {
               display: block;
+              max-width: 100%;
             }
             svg {
               display: inline-block;
