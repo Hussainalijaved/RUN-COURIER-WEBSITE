@@ -224,8 +224,8 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
               )}
             </div>
 
-            {/* ── TO card (flex:1, absorbs remaining, overflow hidden) ── */}
-            <div style={{ flex: '1 1 auto', minHeight: 0, border: '1.5px solid #111', borderRadius: '8px', padding: '5px 7px', overflow: 'hidden' }}>
+            {/* ── TO card (same size as FROM, overflow hidden) ── */}
+            <div style={{ flex: '0 0 auto', border: '1.5px solid #111', borderRadius: '8px', padding: '5px 7px', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '1px' }}>
                 <IconPin />
                 <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>

@@ -159,10 +159,9 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
               )}
             </div>
 
-            {/* ── TO / DELIVERY card (flex:1, absorbs remaining, overflow hidden) ── */}
+            {/* ── TO / DELIVERY card (same size as FROM, overflow hidden) ── */}
             <div style={{
-              flex: '1 1 auto',
-              minHeight: 0,
+              flex: '0 0 auto',
               border: '1.5px solid #111',
               borderRadius: '10px',
               padding: '5px 8px',
