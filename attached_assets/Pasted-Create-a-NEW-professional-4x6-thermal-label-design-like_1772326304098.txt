@@ -1,0 +1,73 @@
+Create a NEW professional 4x6 thermal label design like the reference image.
+
+GOAL STYLE (must match):
+- Clean modern label, lots of white space, rounded rectangles for FROM and TO sections.
+- Header with:
+  LEFT: small square logo + “RUN COURIER™”
+  RIGHT: website and phone on two lines
+- Under header:
+  LEFT: “JOB NO.” label + job number (big)
+  CENTER: barcode (full width but safe)
+  RIGHT: “DATE” label + date (big)
+- Tracking code text centered under barcode (monospace).
+- Two rounded bordered cards:
+  Card 1: “FROM / PICKUP” with a location pin icon + optional pickup time icon + time
+  Card 2: “TO / DELIVERY” with a location pin icon
+  Each card contains:
+    - full address line
+    - BIG postcode line (very large + bold)
+    - contact name with user icon + phone with phone icon
+- Bottom footer bar with 5 fields in one line:
+  Weight | Vehicle | Type | Distance | Driver
+  plus a tiny tagline line like “Same Day Delivery | Tracked & Insured | www.runcourier.co.uk”
+
+CRITICAL: MUST NOT CLIP WHEN PRINTING (fix my current issue):
+1) Use true 4x6 page size and a safe print area.
+   @page { size: 4in 6in; margin: 0; }
+2) The label container must include safe padding so nothing touches edges:
+   padding-top: 18px;
+   padding-left/right: 14px;
+   padding-bottom: 14px;
+   (This is mandatory to prevent top/right cutting on thermal printers.)
+3) No negative margins. No elements positioned outside container.
+4) Avoid absolute positioning for header/job/date that can clip. Use CSS grid/flex.
+5) Any long text must wrap nicely and never overflow:
+   - address wraps
+   - phone stays on one line if possible, otherwise wraps
+   - job number/date never get cut (shrink font slightly if needed, but always visible)
+
+TECH IMPLEMENTATION (deliverable):
+- Provide ONE complete HTML file with embedded CSS + minimal JS.
+- No external CSS frameworks.
+- Icons must be inline SVG (so printing works) for:
+  location pin, clock, user, phone.
+- Use CSS variables for consistent sizes.
+
+DATA BINDING:
+- Use a JS object `labelData` and render function `renderLabel(labelData)` that fills:
+  jobNumber, date, trackingCode,
+  fromAddress, fromPostcode, fromContactName, fromPhone, pickupTime,
+  toAddress, toPostcode, toContactName, toPhone,
+  weight, vehicle, type, distance, driver,
+  website, companyPhone.
+- Do NOT change backend logic; only the label rendering.
+
+PRINT SETTINGS:
+- Add a “Print” button visible on screen only (hidden in print).
+- Print CSS:
+  @media print {
+    body { margin: 0; }
+    .printBtn { display:none; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+QUALITY:
+- Use consistent typography:
+  base font 11–12px
+  headings 12–13px
+  postcode 28–32px bold
+  job/date 16–18px bold
+- Rounded cards: border 1px solid #222; border-radius 10–12px; padding 12px.
+- Spacing must look premium and aligned like the sample image.
+
+Return the full ready-to-paste HTML/CSS/JS that prints perfectly on a thermal printer without any clipping.
