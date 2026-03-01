@@ -283,9 +283,6 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
                 </div>
               )}
             </div>
-            <div style={{ textAlign: 'center', paddingTop: '2px' }}>
-              <span style={{ fontSize: '6px', color: '#aaa' }}>Same Day Delivery | Tracked &amp; Insured | www.runcourier.co.uk</span>
-            </div>
           </div>
 
         </div>

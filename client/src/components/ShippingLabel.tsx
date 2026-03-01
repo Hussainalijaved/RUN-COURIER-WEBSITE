@@ -225,9 +225,6 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                 </div>
               )}
             </div>
-            <div style={{ textAlign: 'center', paddingTop: '2px' }}>
-              <span style={{ fontSize: '6px', color: '#aaa', letterSpacing: '0.3px' }}>Same Day Delivery | Tracked &amp; Insured | www.runcourier.co.uk</span>
-            </div>
           </div>
 
         </div>
