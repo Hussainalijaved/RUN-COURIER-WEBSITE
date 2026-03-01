@@ -225,16 +225,16 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             </div>
 
             {/* ── TO card (flex:1, absorbs remaining, overflow hidden) ── */}
-            <div style={{ flex: '1 1 auto', minHeight: 0, border: '1.5px solid #111', borderRadius: '8px', padding: '6px 8px', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
+            <div style={{ flex: '1 1 auto', minHeight: 0, border: '1.5px solid #111', borderRadius: '8px', padding: '5px 7px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '1px' }}>
                 <IconPin />
                 <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
                   {label.isFinalDelivery ? 'To / Final Delivery' : `To Stop ${label.stopNumber}`}
                 </span>
               </div>
-              {label.toBuildingName && <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{label.toBuildingName}</div>}
-              <div style={{ fontSize: '10px', lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.toAddress}</div>
-              <div style={{ fontSize: '22px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '3px', letterSpacing: '2px' }}>{label.toPostcode}</div>
+              {label.toBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.toBuildingName}</div>}
+              <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.toAddress}</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '2px' }}>{label.toPostcode}</div>
               {label.recipientName && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '3px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
                   <IconUser />

@@ -165,20 +165,20 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
               minHeight: 0,
               border: '1.5px solid #111',
               borderRadius: '10px',
-              padding: '6px 9px',
+              padding: '5px 8px',
               overflow: 'hidden',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '1px' }}>
                 <IconPin />
                 <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#333' }}>To / Delivery</span>
               </div>
               {j.deliveryBuildingName && (
-                <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{j.deliveryBuildingName}</div>
+                <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.deliveryBuildingName}</div>
               )}
-              <div style={{ fontSize: '10px', lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.deliveryAddress}</div>
-              <div style={{ fontSize: '26px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '3px', letterSpacing: '2px' }}>{job.deliveryPostcode}</div>
+              <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.deliveryAddress}</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '2px' }}>{job.deliveryPostcode}</div>
               {job.recipientName && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '3px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
                   <IconUser />
                   <span style={{ fontWeight: '600' }}>{job.recipientName}</span>
                   {job.recipientPhone && (
