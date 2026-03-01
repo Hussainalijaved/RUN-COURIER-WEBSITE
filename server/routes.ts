@@ -470,13 +470,31 @@ async function geocodePostcodesBulk(postcodes: string[]): Promise<void> {
   }
 }
 
-// Stable job number cache: maps job ID to a stable random 6-digit number
 const stableJobNumberCache = new Map<string, string>();
 let jobNumberCacheInitialized = false;
+const jobNumberPersistQueue = new Set<string>();
+
+async function persistJobNumber(jobId: string, jobNumber: string): Promise<void> {
+  if (jobNumberPersistQueue.has(jobId)) return;
+  jobNumberPersistQueue.add(jobId);
+  try {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (supabaseAdmin) {
+      await supabaseAdmin.from('jobs').update({ job_number: jobNumber }).eq('id', parseInt(jobId) || jobId);
+    }
+  } catch (err) {
+    // Non-critical — number still works in-memory
+  } finally {
+    jobNumberPersistQueue.delete(jobId);
+  }
+}
 
 function ensureJobNumber(job: any): any {
   if (!job) return job;
-  if (job.jobNumber) return job;
+  if (job.jobNumber) {
+    stableJobNumberCache.set(String(job.id), job.jobNumber);
+    return job;
+  }
   const cached = stableJobNumberCache.get(String(job.id));
   if (cached) return { ...job, jobNumber: cached };
   let newJobNumber: string;
@@ -485,6 +503,7 @@ function ensureJobNumber(job: any): any {
     newJobNumber = String(Math.floor(100000 + Math.random() * 900000));
   } while (usedNumbers.has(newJobNumber));
   stableJobNumberCache.set(String(job.id), newJobNumber);
+  persistJobNumber(String(job.id), newJobNumber);
   return { ...job, jobNumber: newJobNumber };
 }
 
@@ -493,6 +512,12 @@ function assignStableJobNumbers(jobs: any[]): any[] {
     const sorted = [...jobs].sort((a, b) => Number(a.id) - Number(b.id));
     const usedNumbers = new Set<string>();
     sorted.forEach((job) => {
+      if (job.jobNumber) {
+        stableJobNumberCache.set(String(job.id), job.jobNumber);
+        usedNumbers.add(job.jobNumber);
+      }
+    });
+    sorted.forEach((job) => {
       if (!job.jobNumber && !stableJobNumberCache.has(String(job.id))) {
         let num: string;
         do {
@@ -500,13 +525,17 @@ function assignStableJobNumbers(jobs: any[]): any[] {
         } while (usedNumbers.has(num));
         usedNumbers.add(num);
         stableJobNumberCache.set(String(job.id), num);
+        persistJobNumber(String(job.id), num);
       }
     });
     jobNumberCacheInitialized = true;
   }
   
   return jobs.map(job => {
-    if (job.jobNumber) return job;
+    if (job.jobNumber) {
+      stableJobNumberCache.set(String(job.id), job.jobNumber);
+      return job;
+    }
     const cached = stableJobNumberCache.get(String(job.id));
     if (cached) return { ...job, jobNumber: cached };
     let newJobNumber: string;
@@ -515,6 +544,7 @@ function assignStableJobNumbers(jobs: any[]): any[] {
       newJobNumber = String(Math.floor(100000 + Math.random() * 900000));
     } while (usedNumbers.has(newJobNumber));
     stableJobNumberCache.set(String(job.id), newJobNumber);
+    persistJobNumber(String(job.id), newJobNumber);
     return { ...job, jobNumber: newJobNumber };
   });
 }

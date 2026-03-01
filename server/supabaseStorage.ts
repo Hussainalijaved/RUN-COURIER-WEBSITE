@@ -99,6 +99,7 @@ function mapDbToJob(dbJob: any): Job {
   return {
     id: dbJob.id,
     trackingNumber: dbJob.tracking_number,
+    jobNumber: dbJob.job_number || null,
     customerId: dbJob.customer_id,
     customerType: dbJob.customer_type || null,
     driverId: dbJob.driver_id,
@@ -1011,6 +1012,7 @@ export class SupabaseStorage implements IStorage {
       driver_price: insertJob.driverPrice || null,
       payment_status: insertJob.paymentStatus || 'pending',
       payment_intent_id: insertJob.paymentIntentId || null,
+      job_number: (insertJob as any).jobNumber || null,
       notes: '',
       priority: 'normal',
       parcel_weight: 0,

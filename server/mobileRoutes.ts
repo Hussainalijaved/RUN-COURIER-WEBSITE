@@ -1792,6 +1792,7 @@ export function registerMobileRoutes(app: Express): void {
         return {
           id: job.id,
           trackingNumber: job.trackingNumber,
+          jobNumber: j.jobNumber || null,
           status: job.status,
           pickupAddress: job.pickupAddress,
           pickupPostcode: job.pickupPostcode,
@@ -2308,6 +2309,7 @@ export function registerMobileRoutes(app: Express): void {
         res.json({
           id: job.id,
           trackingNumber: job.trackingNumber,
+          jobNumber: j.jobNumber || null,
           status: job.status,
           pickupAddress: job.pickupAddress,
           pickupPostcode: job.pickupPostcode,
@@ -2357,6 +2359,7 @@ export function registerMobileRoutes(app: Express): void {
         res.json({
           id: String(supabaseJob.id),
           trackingNumber: supabaseJob.tracking_number,
+          jobNumber: supabaseJob.job_number || null,
           status: supabaseJob.status,
           pickupAddress: supabaseJob.pickup_address,
           pickupPostcode: supabaseJob.pickup_postcode || null,
