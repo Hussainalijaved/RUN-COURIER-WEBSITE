@@ -1,0 +1,82 @@
+Build a VERY professional 4x6 inch thermal shipping label for RUN COURIER, matching this layout style:
+
+- Clean top header bar with: logo + brand on left, date in the middle/right, job number in a small box on the far right (must never cut off).
+- Barcode centered under header, with the tracking code text under the barcode.
+- Two main address blocks: FROM (top) and TO (below), each with:
+  company/name line, street/city line, a BIG bold postcode line, contact name + phone line, and optional “Collect by” time for FROM.
+- Left vertical black strip labels: “FROM” beside first block and “TO” beside second block (like the photo).
+- Bottom row: 5 small boxed fields in one line: VEHICLE, WEIGHT, DISTANCE, TYPE, DRIVER.
+
+CRITICAL PRINT REQUIREMENTS (must fix cutting/clipping):
+1) The label MUST print perfectly on real thermal printers (Zebra/Rollo/Munbyn etc).
+2) Use an inner “safe area” margin so nothing is near the paper edges:
+   - Safe padding TOP: 14px minimum
+   - Safe padding LEFT/RIGHT: 12px minimum
+   - Safe padding BOTTOM: 12px minimum
+3) DO NOT use negative margins.
+4) Avoid absolute positioning for header text that can clip; use flex/grid.
+5) Ensure long values never overflow:
+   - job number, phone numbers, addresses must wrap or truncate safely (no cutoff).
+6) The top header must fit even if job number is 6+ digits.
+
+IMPLEMENTATION DETAILS:
+- Output a single HTML file with embedded CSS (no external frameworks).
+- Use CSS that forces exact label size:
+
+@page { size: 4in 6in; margin: 0; }
+html, body { width: 4in; height: 6in; margin: 0; padding: 0; }
+
+- Create a .label container:
+  width: 4in; height: 6in; box-sizing: border-box;
+  padding: 14px 12px 12px 12px; /* safe print area */
+  overflow: hidden;
+  background: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+
+- Add a thin outer border and subtle internal lines like a shipping label.
+
+HEADER:
+- Use CSS grid with 3 columns:
+  left: brand block (logo square placeholder + “RUN COURIER” + small contact line),
+  middle: DATE box,
+  right: JOB # box.
+- The JOB # box must always show full text (shrink font slightly if needed, but never cut).
+- Use:
+  .jobBox { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  and ALSO enforce safe width so it stays inside print area.
+
+BARCODE:
+- Center barcode area, with max-width: 100%.
+- If using a barcode library is too much, render a placeholder <div class="barcode">|||||</div> BUT structure it so real barcode image/svg can be injected later.
+- Tracking code text below in spaced monospace.
+
+FROM/TO SECTIONS:
+- Two bordered blocks with internal padding.
+- Left vertical strip:
+  a fixed-width column (e.g., 28px) with dark background and rotated text “FROM”/“TO”.
+- Right side contains the address content.
+- Postcode must be BIG (e.g., 26–32px), bold, with letter spacing a little.
+
+BOTTOM STATS ROW:
+- Use a 5-column grid with borders.
+- Each cell has a small label (uppercase) and a value (bold).
+- Ensure it stays inside the label and does not overflow.
+
+PRINTING:
+- Add:
+@media print {
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; }
+}
+- Include a “Print” button on screen only (hidden in print).
+
+DATA BINDING:
+- Use variables in a JS object called labelData and a renderLabel() function that inserts:
+  brand, date, jobNumber, trackingCode, fromName, fromAddress, fromPostcode, fromContact, collectBy,
+  toName, toAddress, toPostcode, toContact,
+  vehicle, weight, distance, type, driver.
+- Do NOT change any backend logic; only create the label component.
+
+DELIVERABLE:
+Return the full HTML/CSS/JS code ready to paste into my project.
+This must look clean and professional like a courier label and must NOT clip on print.

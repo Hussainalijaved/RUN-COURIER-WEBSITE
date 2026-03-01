@@ -59,7 +59,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
 
     const generateBarcode = (text: string) => {
       const bars = [];
-      const len = Math.min(text.length * 2 + 6, 36);
+      const len = Math.min(text.length * 2 + 6, 38);
       for (let i = 0; i < len; i++) {
         bars.push(
           <div
@@ -149,7 +149,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
       });
     }
 
-    const b = '1.5px solid #000';
+    const border = '1px solid #000';
 
     const renderLabel = (label: LabelData, index: number) => (
       <div
@@ -157,7 +157,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
         style={{
           width: '4in',
           height: '6in',
-          padding: '10px 12px',
+          padding: '14px 12px 12px 12px',
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
@@ -168,54 +168,66 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
         }}
         data-testid={`shipping-label-stop-${label.stopNumber}`}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', border: '2px solid #000' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', border: '1.5px solid #000' }}>
 
-          {/* ═══ ROW 1: HEADER ═══ */}
-          <div style={{ display: 'flex', borderBottom: b, flexShrink: 0 }}>
-            <div style={{ padding: '5px 7px', display: 'flex', alignItems: 'center', gap: '5px', flex: 1, overflow: 'hidden' }}>
+          {/* ═══ HEADER — CSS Grid: brand | stop | date | job ═══ */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto auto auto',
+            borderBottom: '2px solid #000',
+            flexShrink: 0,
+          }}>
+            <div style={{ padding: '5px 7px', display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden' }}>
               <img src={runCourierLogo} alt="" style={{ width: '24px', height: '24px', borderRadius: '3px', display: 'block', flexShrink: 0 }} />
-              <div style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.5px', lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>RUN COURIER</div>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px', lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>RUN COURIER</div>
             </div>
-            <div style={{ borderLeft: b, padding: '4px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', color: '#fff', flexShrink: 0 }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{label.stopNumber}/{label.totalStops}</div>
+            <div style={{ borderLeft: border, padding: '4px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', color: '#fff' }}>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{label.stopNumber}/{label.totalStops}</div>
             </div>
-            <div style={{ borderLeft: b, padding: '4px 7px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Date</div>
+            <div style={{ borderLeft: border, padding: '4px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>DATE</div>
               <div style={{ fontSize: '9px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatDate(job.createdAt)}</div>
             </div>
             {j.jobNumber && (
-              <div style={{ borderLeft: b, padding: '4px 7px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Job</div>
-                <div style={{ fontSize: '9px', fontWeight: 'bold', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{j.jobNumber}</div>
+              <div style={{ borderLeft: border, padding: '4px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>JOB #</div>
+                <div style={{ fontSize: '9px', fontWeight: 'bold', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '55px' }}>{j.jobNumber}</div>
               </div>
             )}
           </div>
 
-          {/* ═══ ROW 2: BARCODE ═══ */}
-          <div style={{ borderBottom: b, padding: '4px 0', textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100%', overflow: 'hidden' }}>{generateBarcode(`${job.trackingNumber}-${label.stopNumber}`)}</div>
-            <div style={{ fontFamily: 'monospace', fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', marginTop: '1px' }}>
+          {/* ═══ BARCODE ═══ */}
+          <div style={{ borderBottom: border, padding: '6px 8px 4px', textAlign: 'center', flexShrink: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100%', overflow: 'hidden', margin: '0 auto' }}>
+              {generateBarcode(`${job.trackingNumber}-${label.stopNumber}`)}
+            </div>
+            <div style={{ fontFamily: "'Courier New', monospace", fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', marginTop: '2px' }}>
               {job.trackingNumber}-{label.stopNumber}
             </div>
           </div>
 
-          {/* ═══ ROW 3: FROM ═══ */}
-          <div style={{ borderBottom: b, display: 'flex', flexShrink: 0 }}>
-            <div style={{ backgroundColor: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', flexShrink: 0 }}>
-              <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '8px', fontWeight: 'bold', letterSpacing: '1.5px', whiteSpace: 'nowrap' }}>
-                {label.isPickup ? 'FROM' : `STOP ${label.stopNumber - 1}`}
-              </span>
+          {/* ═══ FROM ═══ */}
+          <div style={{ borderBottom: border, display: 'flex', flexShrink: 0 }}>
+            <div style={{
+              backgroundColor: '#000', color: '#fff',
+              width: '22px', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{
+                writingMode: 'vertical-lr', transform: 'rotate(180deg)',
+                fontSize: '8px', fontWeight: 'bold', letterSpacing: '1.5px',
+              }}>{label.isPickup ? 'FROM' : `STOP ${label.stopNumber - 1}`}</span>
             </div>
-            <div style={{ padding: '5px 8px', flex: 1, overflow: 'hidden' }}>
+            <div style={{ padding: '5px 8px', flex: 1, overflow: 'hidden', borderLeft: border }}>
               {label.fromBuildingName && (
                 <div style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.fromBuildingName}</div>
               )}
               <div style={{ fontSize: '9px', lineHeight: 1.25 }}>{label.fromAddress}</div>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '1px', letterSpacing: '1px' }}>{label.fromPostcode}</div>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", marginTop: '2px', letterSpacing: '1.5px' }}>{label.fromPostcode}</div>
               {label.fromContactName && (
-                <div style={{ fontSize: '8px', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '8px', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ fontWeight: '600' }}>{label.fromContactName}</span>
-                  {label.fromContactPhone && <span style={{ color: '#555' }}>{label.fromContactPhone}</span>}
+                  {label.fromContactPhone && <span style={{ color: '#555', marginLeft: '6px' }}>{label.fromContactPhone}</span>}
                 </div>
               )}
               {label.isPickup && scheduledTime && (
@@ -224,62 +236,61 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             </div>
           </div>
 
-          {/* ═══ ROW 4: TO ═══ */}
-          <div style={{ borderBottom: b, display: 'flex', flex: 1, minHeight: 0 }}>
-            <div style={{ backgroundColor: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '22px', flexShrink: 0 }}>
-              <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '9px', fontWeight: 'bold', letterSpacing: '1.5px', whiteSpace: 'nowrap' }}>
-                {label.isFinalDelivery ? 'FINAL' : `STOP ${label.stopNumber}`}
-              </span>
+          {/* ═══ TO ═══ */}
+          <div style={{ borderBottom: border, display: 'flex', flex: 1, minHeight: 0 }}>
+            <div style={{
+              backgroundColor: '#000', color: '#fff',
+              width: '26px', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{
+                writingMode: 'vertical-lr', transform: 'rotate(180deg)',
+                fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px',
+              }}>{label.isFinalDelivery ? 'FINAL' : `STOP ${label.stopNumber}`}</span>
             </div>
-            <div style={{ padding: '6px 8px', flex: 1, backgroundColor: '#fafafa', overflow: 'hidden' }}>
+            <div style={{ padding: '6px 8px', flex: 1, overflow: 'hidden', borderLeft: border }}>
               {label.toBuildingName && (
                 <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.toBuildingName}</div>
               )}
               <div style={{ fontSize: '10px', lineHeight: 1.25 }}>{label.toAddress}</div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'monospace', marginTop: '2px', letterSpacing: '2px' }}>{label.toPostcode}</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", marginTop: '3px', letterSpacing: '2px' }}>{label.toPostcode}</div>
               {label.recipientName && (
-                <div style={{ fontSize: '9px', marginTop: '3px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '9px', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ fontWeight: '600' }}>{label.recipientName}</span>
-                  {label.recipientPhone && <span style={{ color: '#555' }}>{label.recipientPhone}</span>}
+                  {label.recipientPhone && <span style={{ color: '#555', marginLeft: '6px' }}>{label.recipientPhone}</span>}
                 </div>
               )}
             </div>
           </div>
 
-          {/* ═══ ROW 5: DETAILS ═══ */}
-          <div style={{ display: 'flex', borderBottom: b, flexShrink: 0 }}>
-            <div style={{ flex: 1, padding: '3px 5px', textAlign: 'center', borderRight: b }}>
-              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase' }}>Vehicle</div>
-              <div style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+          {/* ═══ BOTTOM STATS — 5-column grid ═══ */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
+            flexShrink: 0,
+          }}>
+            <div style={{ padding: '3px 3px', textAlign: 'center', borderRight: border }}>
+              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', fontWeight: '600' }}>VEHICLE</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
             </div>
-            <div style={{ flex: 1, padding: '3px 5px', textAlign: 'center', borderRight: b }}>
-              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase' }}>Weight</div>
-              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
+            <div style={{ padding: '3px 3px', textAlign: 'center', borderRight: border }}>
+              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', fontWeight: '600' }}>WEIGHT</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
             </div>
-            <div style={{ flex: 1, padding: '3px 5px', textAlign: 'center', borderRight: driverCode ? b : 'none' }}>
-              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase' }}>Distance</div>
-              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+            <div style={{ padding: '3px 3px', textAlign: 'center', borderRight: border }}>
+              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', fontWeight: '600' }}>DISTANCE</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+            </div>
+            <div style={{ padding: '3px 3px', textAlign: 'center', borderRight: driverCode ? border : 'none' }}>
+              <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', fontWeight: '600' }}>TYPE</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>Multi</div>
             </div>
             {driverCode && (
-              <div style={{ flex: 1, padding: '3px 5px', textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase' }}>Driver</div>
-                <div style={{ fontSize: '9px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
+              <div style={{ padding: '3px 3px', textAlign: 'center' }}>
+                <div style={{ fontSize: '6px', color: '#666', textTransform: 'uppercase', fontWeight: '600' }}>DRIVER</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
               </div>
             )}
-          </div>
-
-          {/* ═══ ROW 6: PARCEL + TAGLINE ═══ */}
-          <div style={{ padding: '2px 7px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexShrink: 0 }}>
-            {j.parcelDescription ? (
-              <div style={{ fontSize: '7px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                <span style={{ fontWeight: '600' }}>Parcel: </span>{j.parcelDescription}
-              </div>
-            ) : (
-              <div />
-            )}
-            <div style={{ fontSize: '6px', color: '#888', whiteSpace: 'nowrap' }}>
-              Multi-drop &#8226; runcourier.co.uk
-            </div>
           </div>
 
         </div>
