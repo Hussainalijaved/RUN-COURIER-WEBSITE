@@ -1324,18 +1324,9 @@ export default function AdminJobs() {
               margin: 0;
             }
             *, *::before, *::after {
-              margin: 0;
-              padding: 0;
               box-sizing: border-box;
             }
-            html {
-              width: 4in;
-              height: 6in;
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: hidden !important;
-            }
-            body {
+            html, body {
               width: 4in;
               height: 6in;
               max-height: 6in;
@@ -1349,11 +1340,8 @@ export default function AdminJobs() {
               background: white;
               color: black;
             }
-            body > div {
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
-            }
             @media print {
+              @page { size: 4in 6in; margin: 0; }
               html, body {
                 width: 4in !important;
                 height: 6in !important;
@@ -1362,13 +1350,14 @@ export default function AdminJobs() {
                 padding: 0 !important;
                 overflow: hidden !important;
               }
-              body > div {
+              body > div,
+              body > div > div {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
+                overflow: hidden !important;
               }
               .label-page { page-break-after: always; }
               .label-page:last-child { page-break-after: auto; }
-              * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             }
             img {
               display: block;
