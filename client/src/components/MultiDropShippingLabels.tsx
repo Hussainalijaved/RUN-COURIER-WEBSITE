@@ -243,9 +243,6 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
                   {label.recipientPhone && <span style={{ color: '#555' }}>{label.recipientPhone}</span>}
                 </div>
               )}
-              {label.deliveryInstructions && (
-                <div style={{ fontSize: '8px', color: '#444', fontStyle: 'italic', marginTop: '2px' }}>{label.deliveryInstructions}</div>
-              )}
             </div>
           </div>
 

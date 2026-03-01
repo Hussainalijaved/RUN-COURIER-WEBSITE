@@ -115,9 +115,6 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
               {scheduledTime && (
                 <div style={{ fontSize: '9px', fontWeight: 'bold', marginTop: '2px' }}>Collect by: {scheduledTime}</div>
               )}
-              {job.pickupInstructions && (
-                <div style={{ fontSize: '8px', color: '#555', fontStyle: 'italic', marginTop: '2px' }}>{job.pickupInstructions}</div>
-              )}
             </div>
           </div>
 
@@ -139,9 +136,6 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
                     <span style={{ color: '#555' }}>{job.recipientPhone}</span>
                   )}
                 </div>
-              )}
-              {job.deliveryInstructions && (
-                <div style={{ fontSize: '9px', color: '#444', fontStyle: 'italic', marginTop: '3px' }}>{job.deliveryInstructions}</div>
               )}
             </div>
           </div>
