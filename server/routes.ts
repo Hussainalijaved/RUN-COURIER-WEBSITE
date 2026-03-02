@@ -23,7 +23,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
@@ -2453,6 +2453,60 @@ export async function registerRoutes(
       }
     }
     
+    if (status === "delivered") {
+      try {
+        let customerEmail = (job as any).customerEmail;
+        if (!customerEmail && job.customerId) {
+          const customer = await storage.getUser(job.customerId);
+          customerEmail = customer?.email;
+        }
+        if (!customerEmail && supabaseAdmin) {
+          const { data: sJob } = await supabaseAdmin
+            .from('jobs')
+            .select('customer_email')
+            .eq('id', job.id)
+            .single();
+          if (sJob?.customer_email) customerEmail = sJob.customer_email;
+        }
+
+        if (customerEmail) {
+          let podPhotoUrl = job.podPhotoUrl || null;
+          let podPhotos: string[] = (job as any).podPhotos || [];
+          let podSignatureUrl = job.podSignatureUrl || null;
+
+          if (supabaseAdmin) {
+            const resolveUrl = async (p: string): Promise<string> => {
+              if (p.startsWith('http')) return p;
+              const { data } = supabaseAdmin!.storage.from('pod-images').getPublicUrl(p);
+              return data?.publicUrl || p;
+            };
+            if (podPhotoUrl) podPhotoUrl = await resolveUrl(podPhotoUrl);
+            if (podPhotos.length > 0) podPhotos = await Promise.all(podPhotos.map(p => resolveUrl(p)));
+            if (podSignatureUrl) podSignatureUrl = await resolveUrl(podSignatureUrl);
+          }
+
+          const numberedJob = ensureJobNumber(job);
+          await sendDeliveryConfirmationEmail(customerEmail, {
+            trackingNumber: job.trackingNumber,
+            jobNumber: numberedJob.jobNumber,
+            pickupAddress: job.pickupAddress,
+            pickupPostcode: job.pickupPostcode,
+            deliveryAddress: job.deliveryAddress,
+            deliveryPostcode: job.deliveryPostcode,
+            recipientName: job.recipientName,
+            podRecipientName: (job as any).podRecipientName,
+            podPhotoUrl,
+            podPhotos,
+            podSignatureUrl,
+            deliveredAt: (job as any).deliveredAt?.toISOString() || new Date().toISOString(),
+          });
+          console.log(`[Delivery Email] Sent to ${customerEmail} for job ${job.trackingNumber}`);
+        }
+      } catch (emailError) {
+        console.error(`[Delivery Email] Failed:`, emailError);
+      }
+    }
+
     // Broadcast job status update for real-time updates
     broadcastJobUpdate({
       id: job.id,

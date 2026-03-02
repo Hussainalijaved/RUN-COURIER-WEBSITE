@@ -11,6 +11,7 @@ import path from "path";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "./pushNotifications";
 import { geocodeAddress } from "./geocoding";
+import { sendDeliveryConfirmationEmail } from "./emailService";
 
 // Helper to map Supabase job to local Job format for mobile API response
 // CRITICAL: Only expose driver_price to drivers, NEVER total_price or customer pricing
@@ -2493,6 +2494,70 @@ export function registerMobileRoutes(app: Express): void {
           error: "Failed to update job status",
           code: "UPDATE_FAILED"
         });
+      }
+
+      if (status === "delivered" && supabaseAdmin) {
+        (async () => {
+          try {
+            const { data: fullJob } = await supabaseAdmin
+              .from('jobs')
+              .select('id, tracking_number, job_number, pickup_address, pickup_postcode, delivery_address, delivery_postcode, recipient_name, pod_recipient_name, pod_photo_url, pod_photos, pod_signature_url, delivered_at, customer_email, customer_id')
+              .eq('id', jobId)
+              .single();
+
+            if (!fullJob) {
+              console.log(`[Delivery Email] Job ${jobId} not found in Supabase, skipping email`);
+              return;
+            }
+
+            let customerEmail = fullJob.customer_email;
+            if (!customerEmail && fullJob.customer_id) {
+              const { data: customer } = await supabaseAdmin
+                .from('users')
+                .select('email')
+                .eq('id', fullJob.customer_id)
+                .single();
+              if (customer?.email) customerEmail = customer.email;
+            }
+
+            if (!customerEmail) {
+              console.log(`[Delivery Email] No customer email for job ${jobId}, skipping`);
+              return;
+            }
+
+            let podPhotoUrl = fullJob.pod_photo_url || null;
+            let podPhotos: string[] = fullJob.pod_photos || [];
+            let podSignatureUrl = fullJob.pod_signature_url || null;
+
+            const resolveUrl = async (storagePath: string): Promise<string> => {
+              if (storagePath.startsWith('http')) return storagePath;
+              const { data } = supabaseAdmin!.storage.from('pod-images').getPublicUrl(storagePath);
+              return data?.publicUrl || storagePath;
+            };
+
+            if (podPhotoUrl) podPhotoUrl = await resolveUrl(podPhotoUrl);
+            if (podPhotos.length > 0) podPhotos = await Promise.all(podPhotos.map(resolveUrl));
+            if (podSignatureUrl) podSignatureUrl = await resolveUrl(podSignatureUrl);
+
+            console.log(`[Delivery Email] Sending to ${customerEmail} for job ${jobId}`);
+            await sendDeliveryConfirmationEmail(customerEmail, {
+              trackingNumber: fullJob.tracking_number,
+              jobNumber: fullJob.job_number,
+              pickupAddress: fullJob.pickup_address,
+              pickupPostcode: fullJob.pickup_postcode,
+              deliveryAddress: fullJob.delivery_address,
+              deliveryPostcode: fullJob.delivery_postcode,
+              recipientName: fullJob.recipient_name,
+              podRecipientName: fullJob.pod_recipient_name,
+              podPhotoUrl,
+              podPhotos,
+              podSignatureUrl,
+              deliveredAt: fullJob.delivered_at || new Date().toISOString(),
+            });
+          } catch (err) {
+            console.error(`[Delivery Email] Error sending for job ${jobId}:`, err);
+          }
+        })();
       }
 
       res.json({

@@ -2503,3 +2503,98 @@ Run Courier - https://runcourier.co.uk`;
   const result = await sendEmailNotification(driverEmail, `Payment Confirmation - £${data.amount} - Run Courier`, wrapEmailContent(htmlContent, 'Payment Confirmation'), textContent);
   return { success: result };
 }
+
+export async function sendDeliveryConfirmationEmail(
+  customerEmail: string,
+  jobDetails: {
+    trackingNumber: string;
+    jobNumber?: string | null;
+    pickupAddress?: string;
+    pickupPostcode?: string;
+    deliveryAddress?: string;
+    deliveryPostcode?: string;
+    recipientName?: string | null;
+    podRecipientName?: string | null;
+    podPhotoUrl?: string | null;
+    podPhotos?: string[];
+    podSignatureUrl?: string | null;
+    deliveredAt?: string | null;
+  }
+): Promise<boolean> {
+  const signedByName = jobDetails.podRecipientName || jobDetails.recipientName || 'Recipient';
+  const deliveredTime = jobDetails.deliveredAt
+    ? new Date(jobDetails.deliveredAt).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' })
+    : new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' });
+
+  const jobRef = jobDetails.jobNumber || jobDetails.trackingNumber;
+
+  let podImageHtml = '';
+  const photoUrl = jobDetails.podPhotoUrl || (jobDetails.podPhotos && jobDetails.podPhotos.length > 0 ? jobDetails.podPhotos[0] : null);
+  if (photoUrl) {
+    podImageHtml = `
+      <div style="margin: 20px 0; text-align: center;">
+        <p style="color: #555; font-size: 14px; margin-bottom: 8px; font-weight: 600;">Proof of Delivery Photo:</p>
+        <img src="${photoUrl}" alt="Proof of Delivery" style="max-width: 100%; width: 400px; border-radius: 8px; border: 1px solid #ddd;" />
+      </div>
+    `;
+  }
+
+  let signatureHtml = '';
+  if (jobDetails.podSignatureUrl) {
+    signatureHtml = `
+      <div style="margin: 20px 0; text-align: center;">
+        <p style="color: #555; font-size: 14px; margin-bottom: 8px; font-weight: 600;">Signature:</p>
+        <img src="${jobDetails.podSignatureUrl}" alt="Recipient Signature" style="max-width: 300px; border-radius: 4px; border: 1px solid #ddd; background: #fff; padding: 8px;" />
+      </div>
+    `;
+  }
+
+  const content = `
+    <h2 style="color: #333; margin-bottom: 4px;">Your Delivery is Complete</h2>
+    <p style="color: #555; font-size: 16px; margin-top: 0;">
+      Great news! Your parcel has been successfully delivered.
+    </p>
+
+    <div style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #777; font-size: 14px; width: 140px;">Job Reference:</td>
+          <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: 600;">${jobRef}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #777; font-size: 14px;">Tracking Number:</td>
+          <td style="padding: 8px 0; color: #333; font-size: 14px;">${jobDetails.trackingNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #777; font-size: 14px;">Delivered To:</td>
+          <td style="padding: 8px 0; color: #333; font-size: 14px;">${jobDetails.deliveryAddress || ''} ${jobDetails.deliveryPostcode || ''}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #777; font-size: 14px;">Received By:</td>
+          <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: 600;">${signedByName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #777; font-size: 14px;">Delivered At:</td>
+          <td style="padding: 8px 0; color: #333; font-size: 14px;">${deliveredTime}</td>
+        </tr>
+      </table>
+    </div>
+
+    ${podImageHtml}
+    ${signatureHtml}
+
+    <p style="color: #555; font-size: 14px; margin-top: 20px;">
+      Thank you for choosing Run Courier. We hope you had a great experience!
+    </p>
+    <div style="text-align: center; margin-top: 20px;">
+      <a href="${BASE_URL}/track/${jobDetails.trackingNumber}" style="display: inline-block; background-color: #007BFF; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">
+        View Delivery Details
+      </a>
+    </div>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Delivery Complete');
+  const textContent = `Your Delivery is Complete\n\nGreat news! Your parcel has been successfully delivered.\n\nJob Reference: ${jobRef}\nTracking: ${jobDetails.trackingNumber}\nDelivered To: ${jobDetails.deliveryAddress || ''} ${jobDetails.deliveryPostcode || ''}\nReceived By: ${signedByName}\nDelivered At: ${deliveredTime}\n\nThank you for choosing Run Courier!\n\nTrack: ${BASE_URL}/track/${jobDetails.trackingNumber}`;
+
+  return sendEmailNotification(customerEmail, `Delivery Complete - ${jobRef} - Run Courier`, htmlContent, textContent);
+}
