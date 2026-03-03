@@ -26,8 +26,27 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
   
   let staticMapUrl: string | null = null;
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (apiKey && pickupLat && pickupLng && deliveryLat && deliveryLng) {
-    staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${pickupLat},${pickupLng}&markers=color:red|label:D|${deliveryLat},${deliveryLng}&path=color:0x007BFF|weight:4|${pickupLat},${pickupLng}|${deliveryLat},${deliveryLng}&key=${apiKey}`;
+  if (apiKey && pickupLat && pickupLng) {
+    if (job.is_multi_drop && multiDropStops && multiDropStops.length > 0) {
+      let mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${pickupLat},${pickupLng}`;
+      let pathPoints = `${pickupLat},${pickupLng}`;
+      
+      for (let i = 0; i < multiDropStops.length; i++) {
+        const stop = multiDropStops[i];
+        const sLat = stop.latitude?.toString();
+        const sLng = stop.longitude?.toString();
+        if (sLat && sLng) {
+          const label = String.fromCharCode(65 + i); // A, B, C, D...
+          mapUrl += `&markers=color:red|label:${label}|${sLat},${sLng}`;
+          pathPoints += `|${sLat},${sLng}`;
+        }
+      }
+      
+      mapUrl += `&path=color:0x007BFF|weight:4|${pathPoints}&key=${apiKey}`;
+      staticMapUrl = mapUrl;
+    } else if (deliveryLat && deliveryLng) {
+      staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${pickupLat},${pickupLng}&markers=color:red|label:D|${deliveryLat},${deliveryLng}&path=color:0x007BFF|weight:4|${pickupLat},${pickupLng}|${deliveryLat},${deliveryLng}&key=${apiKey}`;
+    }
   }
   
   // Map multi-drop stops to mobile format
@@ -2195,6 +2214,27 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
       
+      // Geocode stops missing coordinates and persist them
+      for (const stop of (stops || [])) {
+        if (!stop.latitude || !stop.longitude) {
+          const addr = stop.address || stop.postcode;
+          if (addr) {
+            try {
+              const geo = await geocodeAddress(addr);
+              if (geo) {
+                stop.latitude = String(geo.lat);
+                stop.longitude = String(geo.lng);
+                await supabaseAdmin
+                  .from('multi_drop_stops')
+                  .update({ latitude: stop.latitude, longitude: stop.longitude })
+                  .eq('id', stop.id);
+                console.log(`[Multi-Drop] Geocoded stop ${stop.stop_order} for job ${jobId}: ${geo.lat}, ${geo.lng}`);
+              }
+            } catch (e) { /* non-critical */ }
+          }
+        }
+      }
+
       const mappedStops = (stops || []).map(stop => ({
         id: String(stop.id),
         stopOrder: stop.stop_order,
@@ -2202,6 +2242,8 @@ export function registerMobileRoutes(app: Express): void {
         postcode: stop.postcode || null,
         contactName: stop.contact_name || stop.recipient_name || null,
         contactPhone: stop.contact_phone || stop.recipient_phone || null,
+        recipientName: stop.recipient_name || stop.contact_name || null,
+        recipientPhone: stop.recipient_phone || stop.contact_phone || null,
         instructions: stop.instructions || null,
         latitude: stop.latitude?.toString() || null,
         longitude: stop.longitude?.toString() || null,

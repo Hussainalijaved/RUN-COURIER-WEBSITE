@@ -2161,16 +2161,41 @@ export async function registerRoutes(
         const multiDropStops = req.body.multiDropStops;
         if (finalJob.isMultiDrop && multiDropStops && Array.isArray(multiDropStops) && multiDropStops.length > 0) {
           console.log(`[Jobs] Saving ${multiDropStops.length} multi-drop stops for local job ${finalJob.id}`);
-          const stopsToInsert = multiDropStops.map((stop: any, index: number) => ({
-            job_id: String(finalJob.id), // Use local job ID for consistency with frontend queries
-            stop_order: stop.stopOrder || index + 1,
-            address: stop.address || stop.fullAddress || '',
-            postcode: stop.postcode || '',
-            recipient_name: stop.recipientName || null,
-            recipient_phone: stop.recipientPhone || null,
-            instructions: stop.instructions || null,
-            status: 'pending',
-          }));
+          const stopsToInsert = [];
+          for (let i = 0; i < multiDropStops.length; i++) {
+            const stop = multiDropStops[i];
+            const stopAddress = stop.address || stop.fullAddress || '';
+            const stopPostcode = stop.postcode || '';
+            
+            let stopLat: string | null = null;
+            let stopLng: string | null = null;
+            const geocodeTarget = stopAddress || stopPostcode;
+            if (geocodeTarget) {
+              try {
+                const geo = await geocodeAddress(geocodeTarget);
+                if (geo) {
+                  stopLat = String(geo.lat);
+                  stopLng = String(geo.lng);
+                  console.log(`[Jobs] Geocoded stop ${i + 1} (${stopPostcode}): ${stopLat}, ${stopLng}`);
+                }
+              } catch (geoErr) {
+                console.error(`[Jobs] Failed to geocode stop ${i + 1}:`, geoErr);
+              }
+            }
+            
+            stopsToInsert.push({
+              job_id: String(finalJob.id),
+              stop_order: stop.stopOrder || i + 1,
+              address: stopAddress,
+              postcode: stopPostcode,
+              recipient_name: stop.recipientName || null,
+              recipient_phone: stop.recipientPhone || null,
+              instructions: stop.instructions || null,
+              latitude: stopLat,
+              longitude: stopLng,
+              status: 'pending',
+            });
+          }
           
           const { error: stopsError } = await supabaseAdmin
             .from('multi_drop_stops')
@@ -2179,7 +2204,7 @@ export async function registerRoutes(
           if (stopsError) {
             console.error('[Jobs] Failed to save multi-drop stops:', stopsError);
           } else {
-            console.log(`[Jobs] Successfully saved ${stopsToInsert.length} multi-drop stops`);
+            console.log(`[Jobs] Successfully saved ${stopsToInsert.length} multi-drop stops (with geocoded coordinates)`);
           }
         }
       } else {
@@ -2273,6 +2298,23 @@ export async function registerRoutes(
           const stopOrder = index + 1;
           const existing = existingMap.get(stopOrder);
           
+          // Geocode the stop if address/postcode changed or coordinates missing
+          let stopLat = existing?.latitude || null;
+          let stopLng = existing?.longitude || null;
+          const addressChanged = existing ? (stop.address !== existing.address || stop.postcode !== existing.postcode) : true;
+          if (addressChanged || !stopLat || !stopLng) {
+            const geocodeTarget = stop.address || stop.postcode;
+            if (geocodeTarget) {
+              try {
+                const geo = await geocodeAddress(geocodeTarget);
+                if (geo) {
+                  stopLat = String(geo.lat);
+                  stopLng = String(geo.lng);
+                }
+              } catch (e) { /* non-critical */ }
+            }
+          }
+
           if (existing) {
             usedExistingIds.add(existing.id);
             stopsToUpdate.push({
@@ -2283,6 +2325,8 @@ export async function registerRoutes(
               recipient_name: stop.recipientName || null,
               recipient_phone: stop.recipientPhone || null,
               instructions: stop.deliveryInstructions || null,
+              latitude: stopLat,
+              longitude: stopLng,
             });
           } else {
             stopsToInsert.push({
@@ -2293,6 +2337,8 @@ export async function registerRoutes(
               recipient_name: stop.recipientName || null,
               recipient_phone: stop.recipientPhone || null,
               instructions: stop.deliveryInstructions || null,
+              latitude: stopLat,
+              longitude: stopLng,
             });
           }
         }
