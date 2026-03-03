@@ -49,21 +49,31 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     }
   }
   
-  // Map multi-drop stops to mobile format
+  // Map multi-drop stops to mobile format (include both camelCase and snake_case for compatibility)
+  if (job.is_multi_drop) {
+    console.log(`[mapToMobile] Job ${job.id} is multi-drop, has ${(multiDropStops || []).length} stops`);
+  }
   const mappedStops = (multiDropStops || []).map(stop => ({
     id: String(stop.id),
-    stopOrder: stop.stop_order,
+    stopOrder: stop.stop_order ?? stop.stopOrder,
+    stop_order: stop.stop_order ?? stop.stopOrder,
+    order: stop.stop_order ?? stop.stopOrder,
     address: stop.address,
     postcode: stop.postcode || null,
-    contactName: stop.contact_name || null,
-    contactPhone: stop.contact_phone || null,
+    contactName: stop.contact_name || stop.recipient_name || null,
+    contact_name: stop.contact_name || stop.recipient_name || null,
+    contactPhone: stop.contact_phone || stop.recipient_phone || null,
+    contact_phone: stop.contact_phone || stop.recipient_phone || null,
     recipientName: stop.recipient_name || stop.contact_name || null,
+    recipient_name: stop.recipient_name || stop.contact_name || null,
     recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+    recipient_phone: stop.recipient_phone || stop.contact_phone || null,
     instructions: stop.instructions || null,
     latitude: stop.latitude?.toString() || null,
     longitude: stop.longitude?.toString() || null,
     status: stop.status || 'pending',
-    completedAt: stop.completed_at || null,
+    completedAt: stop.completed_at || stop.completedAt || null,
+    completed_at: stop.completed_at || stop.completedAt || null,
   }));
   
   return {
@@ -94,13 +104,13 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     vehicleType: job.vehicle_type,
     distance: job.distance?.toString() || null,
     weight: job.weight?.toString() || null,
-    // CRITICAL: Use driver_price column (admin-set price), NEVER total_price
     driverPrice: job.driver_price?.toString() || null,
     scheduledPickupTime: job.scheduled_pickup_time,
     isMultiDrop: job.is_multi_drop || false,
     isReturnTrip: job.is_return_trip || false,
-    // Include multi-drop stops for the driver to see all delivery points
     multiDropStops: mappedStops,
+    stops: mappedStops,
+    totalStops: mappedStops.length,
     staticMapUrl: staticMapUrl,
     routePolyline: null as string | null,
     routeDistance: null as string | null,
@@ -434,17 +444,24 @@ export function registerMobileRoutes(app: Express): void {
         const mappedStops = stops.map((stop: any) => ({
           id: String(stop.id),
           stopOrder: stop.stop_order,
+          stop_order: stop.stop_order,
+          order: stop.stop_order,
           address: stop.address,
           postcode: stop.postcode || null,
-          contactName: stop.contact_name || null,
-          contactPhone: stop.contact_phone || null,
+          contactName: stop.contact_name || stop.recipient_name || null,
+          contact_name: stop.contact_name || stop.recipient_name || null,
+          contactPhone: stop.contact_phone || stop.recipient_phone || null,
+          contact_phone: stop.contact_phone || stop.recipient_phone || null,
           recipientName: stop.recipient_name || stop.contact_name || null,
+          recipient_name: stop.recipient_name || stop.contact_name || null,
           recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+          recipient_phone: stop.recipient_phone || stop.contact_phone || null,
           instructions: stop.instructions || null,
           latitude: stop.latitude?.toString() || null,
           longitude: stop.longitude?.toString() || null,
           status: stop.status || 'pending',
           completedAt: stop.completed_at || null,
+          completed_at: stop.completed_at || null,
         }));
 
         return {
@@ -464,7 +481,12 @@ export function registerMobileRoutes(app: Express): void {
           customerName: job.customer_name || null,
           customerPhone: job.customer_phone || null,
           isMultiDrop: job.is_multi_drop || false,
+          is_multi_drop: job.is_multi_drop || false,
           multiDropStops: mappedStops,
+          stops: mappedStops,
+          totalStops: mappedStops.length,
+          total_stops: mappedStops.length,
+          numberOfDrops: mappedStops.length,
         };
       });
 
@@ -1882,17 +1904,24 @@ export function registerMobileRoutes(app: Express): void {
         const mappedStops = stops.map((stop: any) => ({
           id: String(stop.id),
           stopOrder: stop.stop_order,
+          stop_order: stop.stop_order,
+          order: stop.stop_order,
           address: stop.address,
           postcode: stop.postcode || null,
-          contactName: stop.contact_name || null,
-          contactPhone: stop.contact_phone || null,
+          contactName: stop.contact_name || stop.recipient_name || null,
+          contact_name: stop.contact_name || stop.recipient_name || null,
+          contactPhone: stop.contact_phone || stop.recipient_phone || null,
+          contact_phone: stop.contact_phone || stop.recipient_phone || null,
           recipientName: stop.recipient_name || stop.contact_name || null,
+          recipient_name: stop.recipient_name || stop.contact_name || null,
           recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+          recipient_phone: stop.recipient_phone || stop.contact_phone || null,
           instructions: stop.instructions || null,
           latitude: stop.latitude?.toString() || null,
           longitude: stop.longitude?.toString() || null,
           status: stop.status || 'pending',
           completedAt: stop.completed_at || null,
+          completed_at: stop.completed_at || null,
         }));
 
         return {
@@ -1924,8 +1953,13 @@ export function registerMobileRoutes(app: Express): void {
           driverPrice: job.driverPrice?.toString() || null,
           scheduledPickupTime: job.scheduledPickupTime,
           isMultiDrop: job.isMultiDrop || false,
+          is_multi_drop: (job as any).isMultiDrop || false,
           isReturnTrip: job.isReturnTrip,
           multiDropStops: mappedStops,
+          stops: mappedStops,
+          totalStops: mappedStops.length,
+          total_stops: mappedStops.length,
+          numberOfDrops: mappedStops.length,
           createdAt: job.createdAt,
           updatedAt: job.updatedAt,
         };
@@ -2238,26 +2272,38 @@ export function registerMobileRoutes(app: Express): void {
       const mappedStops = (stops || []).map(stop => ({
         id: String(stop.id),
         stopOrder: stop.stop_order,
+        stop_order: stop.stop_order,
+        order: stop.stop_order,
         address: stop.address,
         postcode: stop.postcode || null,
         contactName: stop.contact_name || stop.recipient_name || null,
+        contact_name: stop.contact_name || stop.recipient_name || null,
         contactPhone: stop.contact_phone || stop.recipient_phone || null,
+        contact_phone: stop.contact_phone || stop.recipient_phone || null,
         recipientName: stop.recipient_name || stop.contact_name || null,
+        recipient_name: stop.recipient_name || stop.contact_name || null,
         recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+        recipient_phone: stop.recipient_phone || stop.contact_phone || null,
         instructions: stop.instructions || null,
         latitude: stop.latitude?.toString() || null,
         longitude: stop.longitude?.toString() || null,
         status: stop.status || 'pending',
         deliveredAt: stop.delivered_at || null,
+        delivered_at: stop.delivered_at || null,
         podPhotoUrl: stop.pod_photo_url || null,
+        pod_photo_url: stop.pod_photo_url || null,
         podSignatureUrl: stop.pod_signature_url || null,
+        pod_signature_url: stop.pod_signature_url || null,
       }));
+      
+      console.log(`[Multi-Drop Stops] Returning ${mappedStops.length} stops for job ${jobId}:`, JSON.stringify(mappedStops.map(s => ({ order: s.stopOrder, address: s.address, postcode: s.postcode }))));
       
       const completedCount = mappedStops.filter(s => s.status === 'delivered').length;
       
       res.json({
         success: true,
         stops: mappedStops,
+        multiDropStops: mappedStops,
         progress: {
           completed: completedCount,
           total: mappedStops.length,
@@ -2447,19 +2493,26 @@ export function registerMobileRoutes(app: Express): void {
           multiDropStops = stops.map((stop: any) => ({
             id: String(stop.id),
             stopOrder: stop.stop_order,
+            stop_order: stop.stop_order,
+            order: stop.stop_order,
             address: stop.address,
             postcode: stop.postcode || null,
-            contactName: stop.contact_name || null,
-            contactPhone: stop.contact_phone || null,
+            contactName: stop.contact_name || stop.recipient_name || null,
+            contact_name: stop.contact_name || stop.recipient_name || null,
+            contactPhone: stop.contact_phone || stop.recipient_phone || null,
+            contact_phone: stop.contact_phone || stop.recipient_phone || null,
             recipientName: stop.recipient_name || stop.contact_name || null,
+            recipient_name: stop.recipient_name || stop.contact_name || null,
             recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+            recipient_phone: stop.recipient_phone || stop.contact_phone || null,
             instructions: stop.instructions || null,
             latitude: stop.latitude?.toString() || null,
             longitude: stop.longitude?.toString() || null,
             status: stop.status || 'pending',
             completedAt: stop.completed_at || null,
+            completed_at: stop.completed_at || null,
           }));
-          console.log(`[Job Details] Found ${multiDropStops.length} multi-drop stops for job ${jobId}`);
+          console.log(`[Job Details] Found ${multiDropStops.length} multi-drop stops for job ${jobId}:`, JSON.stringify(multiDropStops));
         }
       }
 
@@ -2500,6 +2553,8 @@ export function registerMobileRoutes(app: Express): void {
           isMultiDrop: (job as any).isMultiDrop || false,
           isReturnTrip: job.isReturnTrip,
           multiDropStops: multiDropStops,
+          stops: multiDropStops,
+          totalStops: multiDropStops.length,
           podPhotoUrl: job.podPhotoUrl,
           podPhotos: job.podPhotos || [],
           podSignatureUrl: job.podSignatureUrl,
@@ -2550,6 +2605,8 @@ export function registerMobileRoutes(app: Express): void {
           isMultiDrop: supabaseJob.is_multi_drop || false,
           isReturnTrip: supabaseJob.is_return_trip || false,
           multiDropStops: multiDropStops,
+          stops: multiDropStops,
+          totalStops: multiDropStops.length,
           podPhotoUrl: supabaseJob.pod_photo_url,
           podPhotos: supabaseJob.pod_photos || [],
           podSignatureUrl: supabaseJob.pod_signature_url,
@@ -3326,17 +3383,24 @@ export function registerMobileRoutes(app: Express): void {
               offerStops = stops.map((stop: any) => ({
                 id: String(stop.id),
                 stopOrder: stop.stop_order,
+                stop_order: stop.stop_order,
+                order: stop.stop_order,
                 address: stop.address,
                 postcode: stop.postcode || null,
-                contactName: stop.contact_name || null,
-                contactPhone: stop.contact_phone || null,
+                contactName: stop.contact_name || stop.recipient_name || null,
+                contact_name: stop.contact_name || stop.recipient_name || null,
+                contactPhone: stop.contact_phone || stop.recipient_phone || null,
+                contact_phone: stop.contact_phone || stop.recipient_phone || null,
                 recipientName: stop.recipient_name || stop.contact_name || null,
+                recipient_name: stop.recipient_name || stop.contact_name || null,
                 recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+                recipient_phone: stop.recipient_phone || stop.contact_phone || null,
                 instructions: stop.instructions || null,
                 latitude: stop.latitude?.toString() || null,
                 longitude: stop.longitude?.toString() || null,
                 status: stop.status || 'pending',
                 completedAt: stop.completed_at || null,
+                completed_at: stop.completed_at || null,
               }));
             }
           }
@@ -3373,6 +3437,8 @@ export function registerMobileRoutes(app: Express): void {
               isMultiDrop: (job as any).isMultiDrop || false,
               isReturnTrip: job.isReturnTrip,
               multiDropStops: offerStops,
+              stops: offerStops,
+              totalStops: offerStops.length,
               driverPrice: assignment.driverPrice,
               pickupInstructions: job.pickupInstructions,
               deliveryInstructions: job.deliveryInstructions,
