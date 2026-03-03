@@ -2087,6 +2087,8 @@ export async function registerRoutes(
     const data = insertJobSchema.parse(preprocessedBody);
     const job = await storage.createJob(data);
     
+    stableJobNumberCache.set(String(job.id), jobNumber);
+    
     // Auto-geocode addresses for live map display
     const geocodeUpdates: any = {};
     if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) {
@@ -2172,6 +2174,7 @@ export async function registerRoutes(
           scheduled_delivery_time: finalJob.scheduledDeliveryTime?.toISOString() || null,
           is_multi_drop: finalJob.isMultiDrop || false,
           is_return_trip: finalJob.isReturnTrip || false,
+          job_number: jobNumber,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -7015,6 +7018,7 @@ export async function registerRoutes(
     try {
       console.log('[Embedded Payment] Creating job with data:', JSON.stringify(jobData, null, 2));
       job = await storage.createJob(jobData);
+      stableJobNumberCache.set(String(job.id), jobNumber);
       console.log('[Embedded Payment] Job created successfully:', job.id);
     } catch (createError: any) {
       console.error('[Embedded Payment] Failed to create job:', createError);
@@ -7225,6 +7229,7 @@ export async function registerRoutes(
     };
 
     const job = await storage.createJob(jobData);
+    stableJobNumberCache.set(String(job.id), jobNumber);
     
     await storage.incrementCompletedBookings(bookingData.customerId);
     console.log(`[Pay Later Booking] Created job ${trackingNumber} for customer ${bookingData.customerId} - payment to be invoiced weekly`);
@@ -7321,6 +7326,7 @@ export async function registerRoutes(
     };
 
     const job = await storage.createJob(jobData);
+    stableJobNumberCache.set(String(job.id), jobNumber);
     
     if (metadata.customerId) {
       await storage.incrementCompletedBookings(metadata.customerId);
