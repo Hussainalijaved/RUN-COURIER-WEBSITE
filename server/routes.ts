@@ -2116,83 +2116,44 @@ export async function registerRoutes(
       }
     }
     
-    // CRITICAL: Also create job in Supabase for mobile app sync
-    // Mobile app queries Supabase directly using RLS, so jobs must exist there
-    // NOTE: Supabase jobs table has different schema than local PostgreSQL
-    console.log('[Jobs] Attempting to sync job to Supabase...');
+    // Storage is already Supabase — job was created by storage.createJob above.
+    // We only need to UPDATE the existing job with additional fields like geocoded
+    // coordinates and the resolved Supabase driver ID for RLS compatibility.
+    console.log('[Jobs] Updating job in Supabase with additional fields...');
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
-      console.log('[Jobs] supabaseAdmin available:', !!supabaseAdmin);
       if (supabaseAdmin) {
-        // Map local job fields to Supabase jobs table columns
-        // Column names match the create-job edge function schema
-        // DO NOT include 'id' - let Supabase auto-generate it
-        // CRITICAL: Use finalJob (with geocoded coordinates) not original job
-        const supabaseJobData = {
-          // Required tracking
-          tracking_number: finalJob.trackingNumber,
-          // Driver/customer IDs - CRITICAL: Use Supabase auth.uid, NOT local driver UUID
-          driver_id: supabaseDriverId, // Must be Supabase auth.uid for RLS
-          customer_id: finalJob.customerId !== 'admin-created' ? finalJob.customerId : null,
-          // Status and type
-          status: finalJob.status === 'assigned' ? 'pending' : finalJob.status,
-          vehicle_type: finalJob.vehicleType || 'small_van',
-          payment_status: finalJob.paymentStatus || 'pending',
-          // Pickup details with geocoded coordinates
-          pickup_address: finalJob.pickupAddress || '',
-          pickup_postcode: finalJob.pickupPostcode || null,
-          pickup_latitude: finalJob.pickupLatitude || geocodeUpdates.pickupLatitude || null,
-          pickup_longitude: finalJob.pickupLongitude || geocodeUpdates.pickupLongitude || null,
-          pickup_contact_name: finalJob.pickupContactName || null,
-          pickup_contact_phone: finalJob.pickupContactPhone || null,
-          pickup_instructions: finalJob.pickupInstructions || null,
-          // Delivery details with geocoded coordinates
-          dropoff_address: finalJob.deliveryAddress || finalJob.dropoffAddress || 'Not specified',
-          delivery_address: finalJob.deliveryAddress || '',
-          delivery_postcode: finalJob.deliveryPostcode || null,
-          delivery_latitude: finalJob.deliveryLatitude || geocodeUpdates.deliveryLatitude || null,
-          delivery_longitude: finalJob.deliveryLongitude || geocodeUpdates.deliveryLongitude || null,
-          delivery_instructions: finalJob.deliveryInstructions || null,
-          // Recipient
-          recipient_name: finalJob.recipientName || 'Recipient',
-          recipient_phone: finalJob.recipientPhone || '',
-          // Numeric fields - use correct column names matching create-job edge function
-          weight: finalJob.weight ? parseFloat(String(finalJob.weight)).toFixed(2) : '1.00',
-          distance: finalJob.distance ? parseFloat(String(finalJob.distance)).toFixed(2) : '0.00',
-          base_price: finalJob.basePrice ? parseFloat(String(finalJob.basePrice)).toFixed(2) : '0.00',
-          distance_price: finalJob.distancePrice ? parseFloat(String(finalJob.distancePrice)).toFixed(2) : '0.00',
-          weight_surcharge: finalJob.weightSurcharge ? parseFloat(String(finalJob.weightSurcharge)).toFixed(2) : '0.00',
-          multi_drop_charge: finalJob.multiDropCharge ? parseFloat(String(finalJob.multiDropCharge)).toFixed(2) : '0.00',
-          return_trip_charge: finalJob.returnTripCharge ? parseFloat(String(finalJob.returnTripCharge)).toFixed(2) : '0.00',
-          central_london_charge: finalJob.centralLondonCharge ? parseFloat(String(finalJob.centralLondonCharge)).toFixed(2) : '0.00',
-          waiting_time_charge: finalJob.waitingTimeCharge ? parseFloat(String(finalJob.waitingTimeCharge)).toFixed(2) : '0.00',
-          total_price: finalJob.totalPrice ? parseFloat(String(finalJob.totalPrice)).toFixed(2) : '0.00',
-          // CRITICAL: driver_price is what drivers see - must be set by admin
-          driver_price: finalJob.driverPrice ? parseFloat(String(finalJob.driverPrice)).toFixed(2) : null,
-          // Schedule
-          scheduled_pickup_time: finalJob.scheduledPickupTime?.toISOString() || null,
-          scheduled_delivery_time: finalJob.scheduledDeliveryTime?.toISOString() || null,
-          is_multi_drop: finalJob.isMultiDrop || false,
-          is_return_trip: finalJob.isReturnTrip || false,
-          job_number: jobNumber,
-          created_at: new Date().toISOString(),
+        const supabaseUpdateData: any = {
           updated_at: new Date().toISOString(),
         };
         
-        console.log('[Jobs] Supabase job data:', JSON.stringify(supabaseJobData, null, 2));
+        // Set the Supabase auth.uid driver_id for RLS compatibility
+        if (supabaseDriverId) {
+          supabaseUpdateData.driver_id = supabaseDriverId;
+          supabaseUpdateData.status = finalJob.status === 'assigned' ? 'pending' : finalJob.status;
+        }
         
-        let insertedJob: any = null;
-        const { data: insertResult, error: supabaseError } = await supabaseAdmin
+        // Add geocoded coordinates
+        if (geocodeUpdates.pickupLatitude) supabaseUpdateData.pickup_latitude = geocodeUpdates.pickupLatitude;
+        if (geocodeUpdates.pickupLongitude) supabaseUpdateData.pickup_longitude = geocodeUpdates.pickupLongitude;
+        if (geocodeUpdates.deliveryLatitude) supabaseUpdateData.delivery_latitude = geocodeUpdates.deliveryLatitude;
+        if (geocodeUpdates.deliveryLongitude) supabaseUpdateData.delivery_longitude = geocodeUpdates.deliveryLongitude;
+        
+        // Ensure dropoff_address is set (some schemas require it)
+        supabaseUpdateData.dropoff_address = finalJob.deliveryAddress || 'Not specified';
+        
+        // Ensure job_number is set
+        supabaseUpdateData.job_number = jobNumber;
+        
+        const { error: updateError } = await supabaseAdmin
           .from('jobs')
-          .insert(supabaseJobData)
-          .select('id, tracking_number')
-          .single();
+          .update(supabaseUpdateData)
+          .eq('tracking_number', finalJob.trackingNumber);
         
-        if (supabaseError) {
-          console.error('[Jobs] Failed to sync job to Supabase:', supabaseError);
+        if (updateError) {
+          console.error('[Jobs] Failed to update job in Supabase:', updateError);
         } else {
-          insertedJob = insertResult;
-          console.log(`[Jobs] Job synced to Supabase with id ${insertResult?.id}, tracking: ${insertResult?.tracking_number}`);
+          console.log(`[Jobs] Job ${finalJob.trackingNumber} updated in Supabase with geocode + driver_id`);
         }
         
         // Save multi-drop stops to Supabase if present (independent of job sync)
