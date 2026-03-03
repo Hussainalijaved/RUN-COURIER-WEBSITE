@@ -38,6 +38,8 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     postcode: stop.postcode || null,
     contactName: stop.contact_name || null,
     contactPhone: stop.contact_phone || null,
+    recipientName: stop.recipient_name || stop.contact_name || null,
+    recipientPhone: stop.recipient_phone || stop.contact_phone || null,
     instructions: stop.instructions || null,
     latitude: stop.latitude?.toString() || null,
     longitude: stop.longitude?.toString() || null,
@@ -384,23 +386,68 @@ export function registerMobileRoutes(app: Express): void {
         }
       }
 
-      const parsedJobs = jobs.map(job => ({
-        ...job,
-        dropoff_address: job.dropoff_address || job.delivery_address || null,
-        delivery_address: job.delivery_address || job.dropoff_address || null,
-        pickup_latitude: job.pickup_latitude ? parseFloat(String(job.pickup_latitude)) : null,
-        pickup_longitude: job.pickup_longitude ? parseFloat(String(job.pickup_longitude)) : null,
-        delivery_latitude: job.delivery_latitude ? parseFloat(String(job.delivery_latitude)) : null,
-        delivery_longitude: job.delivery_longitude ? parseFloat(String(job.delivery_longitude)) : null,
-        senderName: job.pickup_contact_name || job.sender_name || job.customer_name || null,
-        senderPhone: job.pickup_contact_phone || job.sender_phone || job.customer_phone || null,
-        pickupContactName: job.pickup_contact_name || job.sender_name || null,
-        pickupContactPhone: job.pickup_contact_phone || job.sender_phone || null,
-        recipientName: job.recipient_name || null,
-        recipientPhone: job.recipient_phone || null,
-        customerName: job.customer_name || null,
-        customerPhone: job.customer_phone || null,
-      }));
+      // Fetch multi-drop stops for multi-drop jobs
+      const multiDropJobIds = jobs
+        .filter(j => j.is_multi_drop === true)
+        .map(j => String(j.id));
+      
+      let multiDropStopsMap: Record<string, any[]> = {};
+      if (multiDropJobIds.length > 0) {
+        console.log(`[Job Offers API] Fetching multi-drop stops for ${multiDropJobIds.length} jobs`);
+        const { data: allStops, error: stopsError } = await supabaseAdmin
+          .from('multi_drop_stops')
+          .select('*')
+          .in('job_id', multiDropJobIds)
+          .order('stop_order', { ascending: true });
+        
+        if (!stopsError && allStops) {
+          for (const stop of allStops) {
+            const jobId = String(stop.job_id);
+            if (!multiDropStopsMap[jobId]) multiDropStopsMap[jobId] = [];
+            multiDropStopsMap[jobId].push(stop);
+          }
+          console.log(`[Job Offers API] Found ${allStops.length} multi-drop stops`);
+        }
+      }
+
+      const parsedJobs = jobs.map(job => {
+        const stops = multiDropStopsMap[String(job.id)] || [];
+        const mappedStops = stops.map((stop: any) => ({
+          id: String(stop.id),
+          stopOrder: stop.stop_order,
+          address: stop.address,
+          postcode: stop.postcode || null,
+          contactName: stop.contact_name || null,
+          contactPhone: stop.contact_phone || null,
+          recipientName: stop.recipient_name || stop.contact_name || null,
+          recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+          instructions: stop.instructions || null,
+          latitude: stop.latitude?.toString() || null,
+          longitude: stop.longitude?.toString() || null,
+          status: stop.status || 'pending',
+          completedAt: stop.completed_at || null,
+        }));
+
+        return {
+          ...job,
+          dropoff_address: job.dropoff_address || job.delivery_address || null,
+          delivery_address: job.delivery_address || job.dropoff_address || null,
+          pickup_latitude: job.pickup_latitude ? parseFloat(String(job.pickup_latitude)) : null,
+          pickup_longitude: job.pickup_longitude ? parseFloat(String(job.pickup_longitude)) : null,
+          delivery_latitude: job.delivery_latitude ? parseFloat(String(job.delivery_latitude)) : null,
+          delivery_longitude: job.delivery_longitude ? parseFloat(String(job.delivery_longitude)) : null,
+          senderName: job.pickup_contact_name || job.sender_name || job.customer_name || null,
+          senderPhone: job.pickup_contact_phone || job.sender_phone || job.customer_phone || null,
+          pickupContactName: job.pickup_contact_name || job.sender_name || null,
+          pickupContactPhone: job.pickup_contact_phone || job.sender_phone || null,
+          recipientName: job.recipient_name || null,
+          recipientPhone: job.recipient_phone || null,
+          customerName: job.customer_name || null,
+          customerPhone: job.customer_phone || null,
+          isMultiDrop: job.is_multi_drop || false,
+          multiDropStops: mappedStops,
+        };
+      });
 
       // Fetch route data for each job
       for (const job of parsedJobs) {
@@ -1788,8 +1835,47 @@ export function registerMobileRoutes(app: Express): void {
       
       console.log(`[Mobile Jobs] After status filter (${status || 'all'}): ${jobs.length} jobs`);
 
+      // Fetch multi-drop stops for fallback path
+      const fallbackMultiDropIds = jobs
+        .filter(j => (j as any).isMultiDrop === true)
+        .map(j => String(j.id));
+      
+      let fallbackStopsMap: Record<string, any[]> = {};
+      if (fallbackMultiDropIds.length > 0 && supabaseAdmin) {
+        const { data: fbStops } = await supabaseAdmin
+          .from('multi_drop_stops')
+          .select('*')
+          .in('job_id', fallbackMultiDropIds)
+          .order('stop_order', { ascending: true });
+        
+        if (fbStops) {
+          for (const stop of fbStops) {
+            const jId = String(stop.job_id);
+            if (!fallbackStopsMap[jId]) fallbackStopsMap[jId] = [];
+            fallbackStopsMap[jId].push(stop);
+          }
+        }
+      }
+
       mobileJobs = jobs.map(job => {
         const j = job as any;
+        const stops = fallbackStopsMap[String(job.id)] || [];
+        const mappedStops = stops.map((stop: any) => ({
+          id: String(stop.id),
+          stopOrder: stop.stop_order,
+          address: stop.address,
+          postcode: stop.postcode || null,
+          contactName: stop.contact_name || null,
+          contactPhone: stop.contact_phone || null,
+          recipientName: stop.recipient_name || stop.contact_name || null,
+          recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+          instructions: stop.instructions || null,
+          latitude: stop.latitude?.toString() || null,
+          longitude: stop.longitude?.toString() || null,
+          status: stop.status || 'pending',
+          completedAt: stop.completed_at || null,
+        }));
+
         return {
           id: job.id,
           trackingNumber: job.trackingNumber,
@@ -1818,9 +1904,9 @@ export function registerMobileRoutes(app: Express): void {
           weight: job.weight?.toString() || null,
           driverPrice: job.driverPrice?.toString() || null,
           scheduledPickupTime: job.scheduledPickupTime,
-          isMultiDrop: job.isMultiDrop,
+          isMultiDrop: job.isMultiDrop || false,
           isReturnTrip: job.isReturnTrip,
-          multiDropStops: [],
+          multiDropStops: mappedStops,
           createdAt: job.createdAt,
           updatedAt: job.updatedAt,
         };
@@ -2302,9 +2388,41 @@ export function registerMobileRoutes(app: Express): void {
       const dLng = job?.deliveryLongitude?.toString() || supabaseJob?.delivery_longitude?.toString() || null;
       const routeData = await fetchRouteDataForJob(pLat, pLng, dLat, dLng);
 
+      // Fetch multi-drop stops if this is a multi-drop job
+      const effectiveJob = job || supabaseJob;
+      const isMultiDrop = job ? (job as any).isMultiDrop : (supabaseJob?.is_multi_drop || false);
+      let multiDropStops: any[] = [];
+      
+      if (isMultiDrop && supabaseAdmin) {
+        console.log(`[Job Details] Fetching multi-drop stops for job ${jobId}`);
+        const { data: stops, error: stopsError } = await supabaseAdmin
+          .from('multi_drop_stops')
+          .select('*')
+          .eq('job_id', String(jobId))
+          .order('stop_order', { ascending: true });
+        
+        if (!stopsError && stops) {
+          multiDropStops = stops.map((stop: any) => ({
+            id: String(stop.id),
+            stopOrder: stop.stop_order,
+            address: stop.address,
+            postcode: stop.postcode || null,
+            contactName: stop.contact_name || null,
+            contactPhone: stop.contact_phone || null,
+            recipientName: stop.recipient_name || stop.contact_name || null,
+            recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+            instructions: stop.instructions || null,
+            latitude: stop.latitude?.toString() || null,
+            longitude: stop.longitude?.toString() || null,
+            status: stop.status || 'pending',
+            completedAt: stop.completed_at || null,
+          }));
+          console.log(`[Job Details] Found ${multiDropStops.length} multi-drop stops for job ${jobId}`);
+        }
+      }
+
       // Build response from either source
       if (job) {
-        // Use assignment driver_price if job.driverPrice is null
         const effectiveDriverPrice = job.driverPrice ?? assignmentDriverPrice;
         const j = job as any;
         res.json({
@@ -2337,8 +2455,9 @@ export function registerMobileRoutes(app: Express): void {
           weight: job.weight?.toString() || null,
           driverPrice: effectiveDriverPrice?.toString() || null,
           scheduledPickupTime: job.scheduledPickupTime,
-          isMultiDrop: job.isMultiDrop,
+          isMultiDrop: (job as any).isMultiDrop || false,
           isReturnTrip: job.isReturnTrip,
+          multiDropStops: multiDropStops,
           podPhotoUrl: job.podPhotoUrl,
           podPhotos: job.podPhotos || [],
           podSignatureUrl: job.podSignatureUrl,
@@ -2354,9 +2473,7 @@ export function registerMobileRoutes(app: Express): void {
           driverLocation,
         });
       } else {
-        // Use assignment driver_price if supabaseJob.driver_price is null
         const effectiveDriverPrice = supabaseJob.driver_price ?? assignmentDriverPrice;
-        // Map from Supabase format (snake_case to camelCase)
         res.json({
           id: String(supabaseJob.id),
           trackingNumber: supabaseJob.tracking_number,
@@ -2386,11 +2503,11 @@ export function registerMobileRoutes(app: Express): void {
           vehicleType: supabaseJob.vehicle_type,
           distance: supabaseJob.distance?.toString() || null,
           weight: supabaseJob.weight?.toString() || null,
-          // CRITICAL: Use driver_price (admin-set), NEVER total_price
           driverPrice: effectiveDriverPrice?.toString() || null,
           scheduledPickupTime: supabaseJob.scheduled_pickup_time,
           isMultiDrop: supabaseJob.is_multi_drop || false,
           isReturnTrip: supabaseJob.is_return_trip || false,
+          multiDropStops: multiDropStops,
           podPhotoUrl: supabaseJob.pod_photo_url,
           podPhotos: supabaseJob.pod_photos || [],
           podSignatureUrl: supabaseJob.pod_signature_url,
@@ -3151,10 +3268,37 @@ export function registerMobileRoutes(app: Express): void {
       const enrichedOffers = await Promise.all(
         allAssignments.map(async (assignment) => {
           const job = await storage.getJob(assignment.jobId);
-          // Skip if job is hidden from driver view
           if (job && (job as any).driverHidden === true) {
             return null;
           }
+          
+          let offerStops: any[] = [];
+          if (job && (job as any).isMultiDrop && supabaseAdmin) {
+            const { data: stops } = await supabaseAdmin
+              .from('multi_drop_stops')
+              .select('*')
+              .eq('job_id', String(job.id))
+              .order('stop_order', { ascending: true });
+            
+            if (stops) {
+              offerStops = stops.map((stop: any) => ({
+                id: String(stop.id),
+                stopOrder: stop.stop_order,
+                address: stop.address,
+                postcode: stop.postcode || null,
+                contactName: stop.contact_name || null,
+                contactPhone: stop.contact_phone || null,
+                recipientName: stop.recipient_name || stop.contact_name || null,
+                recipientPhone: stop.recipient_phone || stop.contact_phone || null,
+                instructions: stop.instructions || null,
+                latitude: stop.latitude?.toString() || null,
+                longitude: stop.longitude?.toString() || null,
+                status: stop.status || 'pending',
+                completedAt: stop.completed_at || null,
+              }));
+            }
+          }
+
           return {
             id: assignment.id,
             jobId: assignment.jobId,
@@ -3184,8 +3328,9 @@ export function registerMobileRoutes(app: Express): void {
               recipientPhone: job.recipientPhone,
               weight: job.weight,
               distance: job.distance,
-              isMultiDrop: job.isMultiDrop,
+              isMultiDrop: (job as any).isMultiDrop || false,
               isReturnTrip: job.isReturnTrip,
+              multiDropStops: offerStops,
               driverPrice: assignment.driverPrice,
               pickupInstructions: job.pickupInstructions,
               deliveryInstructions: job.deliveryInstructions,
