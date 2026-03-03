@@ -98,33 +98,32 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
 
     const labels: LabelData[] = [];
 
+    const pickupFrom = {
+      fromAddress: job.pickupAddress,
+      fromPostcode: job.pickupPostcode,
+      fromBuildingName: j.pickupBuildingName,
+      fromContactName: j.pickupContactName || j.senderName,
+      fromContactPhone: j.pickupContactPhone || j.senderPhone,
+    };
+
     if (sortedStops.length > 0) {
-      labels.push({
-        fromAddress: job.pickupAddress, fromPostcode: job.pickupPostcode, fromBuildingName: j.pickupBuildingName,
-        fromContactName: j.pickupContactName || j.senderName, fromContactPhone: j.pickupContactPhone || j.senderPhone,
-        toAddress: sortedStops[0].address, toPostcode: sortedStops[0].postcode, toBuildingName: sortedStops[0].buildingName,
-        recipientName: sortedStops[0].recipientName, recipientPhone: sortedStops[0].recipientPhone,
-        stopNumber: 1, totalStops, isPickup: true, isFinalDelivery: false,
-      });
-      for (let i = 0; i < sortedStops.length - 1; i++) {
+      for (let i = 0; i < sortedStops.length; i++) {
         labels.push({
-          fromAddress: sortedStops[i].address, fromPostcode: sortedStops[i].postcode, fromBuildingName: sortedStops[i].buildingName,
-          toAddress: sortedStops[i + 1].address, toPostcode: sortedStops[i + 1].postcode, toBuildingName: sortedStops[i + 1].buildingName,
-          recipientName: sortedStops[i + 1].recipientName, recipientPhone: sortedStops[i + 1].recipientPhone,
-          stopNumber: i + 2, totalStops, isPickup: false, isFinalDelivery: false,
+          ...pickupFrom,
+          toAddress: sortedStops[i].address, toPostcode: sortedStops[i].postcode, toBuildingName: sortedStops[i].buildingName,
+          recipientName: sortedStops[i].recipientName, recipientPhone: sortedStops[i].recipientPhone,
+          stopNumber: i + 1, totalStops, isPickup: true, isFinalDelivery: false,
         });
       }
       labels.push({
-        fromAddress: sortedStops[sortedStops.length - 1].address, fromPostcode: sortedStops[sortedStops.length - 1].postcode,
-        fromBuildingName: sortedStops[sortedStops.length - 1].buildingName,
+        ...pickupFrom,
         toAddress: job.deliveryAddress, toPostcode: job.deliveryPostcode, toBuildingName: j.deliveryBuildingName,
         recipientName: job.recipientName || undefined, recipientPhone: job.recipientPhone || undefined,
-        stopNumber: totalStops, totalStops, isPickup: false, isFinalDelivery: true,
+        stopNumber: totalStops, totalStops, isPickup: true, isFinalDelivery: true,
       });
     } else {
       labels.push({
-        fromAddress: job.pickupAddress, fromPostcode: job.pickupPostcode, fromBuildingName: j.pickupBuildingName,
-        fromContactName: j.pickupContactName || j.senderName, fromContactPhone: j.pickupContactPhone || j.senderPhone,
+        ...pickupFrom,
         toAddress: job.deliveryAddress, toPostcode: job.deliveryPostcode, toBuildingName: j.deliveryBuildingName,
         recipientName: job.recipientName || undefined, recipientPhone: job.recipientPhone || undefined,
         stopNumber: 1, totalStops: 1, isPickup: true, isFinalDelivery: true,
