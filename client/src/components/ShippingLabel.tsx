@@ -68,6 +68,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
     return (
       <div
         ref={ref}
+        className="label-page"
         style={{
           width: '4in',
           height: '6in',

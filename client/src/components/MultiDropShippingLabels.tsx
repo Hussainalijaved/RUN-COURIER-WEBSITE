@@ -134,11 +134,13 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
     const renderLabel = (label: LabelData, index: number) => (
       <div
         key={index}
+        className="label-page"
         style={{
           width: '4in',
           height: '6in',
           maxHeight: '6in',
           margin: 0,
+          marginBottom: index < labels.length - 1 ? '16px' : 0,
           padding: '38px 18px 16px 28px',
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
@@ -287,6 +289,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
         {labels.map((label, index) => renderLabel(label, index))}
       </div>
     );
+
   }
 );
 
