@@ -10044,33 +10044,49 @@ export async function registerRoutes(
     }
   }));
 
-  const RESET_TOKENS_FILE = path.resolve(process.cwd(), 'data', 'reset-tokens.json');
-  function loadResetTokens(): Map<string, { code: string; email: string; userId: string; expiresAt: number }> {
-    try {
-      if (fs.existsSync(RESET_TOKENS_FILE)) {
-        const data = JSON.parse(fs.readFileSync(RESET_TOKENS_FILE, 'utf-8'));
-        const map = new Map<string, { code: string; email: string; userId: string; expiresAt: number }>();
-        for (const [k, v] of Object.entries(data)) {
-          const val = v as any;
-          if (val.expiresAt > Date.now()) map.set(k, val);
-        }
-        return map;
-      }
-    } catch {}
-    return new Map();
-  }
-  function saveResetTokens(tokens: Map<string, { code: string; email: string; userId: string; expiresAt: number }>) {
-    try {
-      const dir = path.dirname(RESET_TOKENS_FILE);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const obj: any = {};
-      for (const [k, v] of tokens) {
-        if (v.expiresAt > Date.now()) obj[k] = v;
-      }
-      fs.writeFileSync(RESET_TOKENS_FILE, JSON.stringify(obj, null, 2));
-    } catch (e) {
-      console.error('[ResetTokens] Failed to save:', e);
+  async function saveResetCode(userId: string, email: string, code: string, expiresAt: number) {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (!supabaseAdmin) throw new Error("Supabase not configured");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      app_metadata: { reset_code: code, reset_email: email.toLowerCase(), reset_expires: expiresAt }
+    });
+    if (error) {
+      console.error('[ResetTokens] Failed to save to Supabase app_metadata:', error);
+      throw error;
     }
+    console.log(`[ResetTokens] Saved reset code for ${email} in app_metadata`);
+  }
+
+  async function getResetCode(email: string): Promise<{ code: string; email: string; userId: string; expiresAt: number } | null> {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (!supabaseAdmin) return null;
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const user = users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user) return null;
+    const meta = user.app_metadata;
+    if (!meta?.reset_code || !meta?.reset_expires) return null;
+    if (meta.reset_expires < Date.now()) return null;
+    return { code: meta.reset_code, email: email.toLowerCase(), userId: user.id, expiresAt: meta.reset_expires };
+  }
+
+  async function clearResetCode(userId: string) {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (!supabaseAdmin) return;
+    await supabaseAdmin.auth.admin.updateUserById(userId, {
+      app_metadata: { reset_code: null, reset_email: null, reset_expires: null }
+    });
+  }
+
+  async function getResetCodeByToken(token: string): Promise<{ code: string; email: string; userId: string; expiresAt: number } | null> {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    if (!supabaseAdmin) return null;
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const user = users?.find(u => u.app_metadata?.reset_code === token);
+    if (!user) return null;
+    const meta = user.app_metadata;
+    if (!meta?.reset_code || !meta?.reset_expires) return null;
+    if (meta.reset_expires < Date.now()) return null;
+    return { code: meta.reset_code, email: user.email || '', userId: user.id, expiresAt: meta.reset_expires };
   }
 
   app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
@@ -10096,11 +10112,8 @@ export async function registerRoutes(
 
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 60 * 60 * 1000;
-      const emailKey = email.toLowerCase();
 
-      const tokens = loadResetTokens();
-      tokens.set(emailKey, { code, email: emailKey, userId: user.id, expiresAt });
-      saveResetTokens(tokens);
+      await saveResetCode(user.id, email, code, expiresAt);
 
       const emailSent = await sendPasswordResetEmail(email, code);
       
@@ -10136,24 +10149,14 @@ export async function registerRoutes(
           return res.status(500).json({ error: "Authentication service not configured" });
         }
 
-        const tokens = loadResetTokens();
-        let resetData: { code: string; email: string; userId: string; expiresAt: number } | undefined;
-        let resetKey: string | undefined;
-        for (const [k, v] of tokens) {
-          if (v.code === token || k === token) {
-            resetData = v;
-            resetKey = k;
-            break;
-          }
-        }
+        const resetData = await getResetCodeByToken(token);
 
-        if (!resetData || !resetKey) {
+        if (!resetData) {
           return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
         }
 
         if (resetData.expiresAt < Date.now()) {
-          tokens.delete(resetKey);
-          saveResetTokens(tokens);
+          await clearResetCode(resetData.userId);
           return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
         }
 
@@ -10166,8 +10169,7 @@ export async function registerRoutes(
           return res.status(500).json({ error: "Failed to update password. Please try again." });
         }
 
-        tokens.delete(resetKey);
-        saveResetTokens(tokens);
+        await clearResetCode(resetData.userId);
         console.log(`Password reset successfully for: ${resetData.email}`);
 
         return res.json({ success: true, message: "Password has been reset successfully." });
@@ -10191,17 +10193,14 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Authentication service not configured" });
       }
 
-      const emailKey = email.toLowerCase();
-      const tokens = loadResetTokens();
-      const resetData = tokens.get(emailKey);
+      const resetData = await getResetCode(email);
 
       if (!resetData) {
         return res.status(400).json({ error: "Invalid or expired reset code. Please request a new one." });
       }
 
       if (resetData.expiresAt < Date.now()) {
-        tokens.delete(emailKey);
-        saveResetTokens(tokens);
+        await clearResetCode(resetData.userId);
         return res.status(400).json({ error: "Reset code has expired. Please request a new one." });
       }
 
@@ -10218,8 +10217,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to update password. Please try again." });
       }
 
-      tokens.delete(emailKey);
-      saveResetTokens(tokens);
+      await clearResetCode(resetData.userId);
       console.log(`Password reset successfully for: ${resetData.email}`);
 
       res.json({ success: true, message: "Password has been reset successfully." });
