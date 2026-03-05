@@ -72,6 +72,8 @@ import {
   ChevronsUpDown,
   Check,
   Trash2,
+  KeyRound,
+  Copy,
 } from 'lucide-react';
 import { cn, normalizeDocUrl } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -144,6 +146,9 @@ export default function AdminDrivers() {
   const [driverToDeactivate, setDriverToDeactivate] = useState<Driver | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{tempPassword: string; driverEmail: string; driverName: string; driverCode: string} | null>(null);
+  const [driverToResetPassword, setDriverToResetPassword] = useState<Driver | null>(null);
   const [showInactive, setShowInactive] = useState(true);
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -354,6 +359,30 @@ export default function AdminDrivers() {
     },
     onError: (error: Error) => {
       toast({ title: error.message || 'Failed to delete driver', variant: 'destructive' });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (driverId: string) => {
+      const response = await apiRequest('POST', '/api/admin/driver/reset-password', { driverId });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to reset password');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setResetPasswordResult({
+        tempPassword: data.tempPassword,
+        driverEmail: data.driverEmail,
+        driverName: data.driverName,
+        driverCode: data.driverCode,
+      });
+      toast({ title: `Password reset for ${data.driverCode}` });
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || 'Failed to reset password', variant: 'destructive' });
+      setResetPasswordDialogOpen(false);
     },
   });
 
@@ -985,6 +1014,17 @@ export default function AdminDrivers() {
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem
+                                onClick={() => {
+                                  setDriverToResetPassword(driver);
+                                  setResetPasswordResult(null);
+                                  setResetPasswordDialogOpen(true);
+                                }}
+                                data-testid={`menu-reset-password-${driver.id}`}
+                              >
+                                <KeyRound className="mr-2 h-4 w-4" />
+                                Reset Password
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={() => {
                                   setDriverToDelete(driver);
@@ -1486,7 +1526,21 @@ export default function AdminDrivers() {
                       Reactivate Driver
                     </Button>
                   )}
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (selectedDriver) {
+                          setDriverToResetPassword(selectedDriver);
+                          setResetPasswordResult(null);
+                          setResetPasswordDialogOpen(true);
+                        }
+                      }}
+                      data-testid="button-reset-password-detail"
+                    >
+                      <KeyRound className="h-4 w-4 mr-2" />
+                      Reset Password
+                    </Button>
                     {!selectedDriver?.isVerified ? (
                       <Button 
                         className="bg-green-600 hover:bg-green-700"
@@ -1784,6 +1838,107 @@ export default function AdminDrivers() {
                 )}
                 Delete Permanently
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* Reset Password Dialog */}
+        <Dialog open={resetPasswordDialogOpen} onOpenChange={(open) => {
+          setResetPasswordDialogOpen(open);
+          if (!open) {
+            setDriverToResetPassword(null);
+            setResetPasswordResult(null);
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {resetPasswordResult ? 'Password Reset Successfully' : 'Reset Driver Password'}
+              </DialogTitle>
+              <DialogDescription>
+                {resetPasswordResult
+                  ? 'Share these temporary credentials with the driver.'
+                  : 'This will generate a new temporary password for the driver.'}
+              </DialogDescription>
+            </DialogHeader>
+            {driverToResetPassword && !resetPasswordResult && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback>
+                      {(driverToResetPassword.fullName || driverToResetPassword.full_name || 'D')?.split(' ').map((n: string) => n[0]).join('') || 'D'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium" data-testid="text-reset-driver-name">{driverToResetPassword.fullName || driverToResetPassword.full_name}</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-reset-driver-email">{driverToResetPassword.email}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {resetPasswordResult && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-md space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Driver</p>
+                    <p className="font-medium" data-testid="text-reset-result-name">{resetPasswordResult.driverName} ({resetPasswordResult.driverCode})</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium" data-testid="text-reset-result-email">{resetPasswordResult.driverEmail}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Temporary Password</p>
+                    <div className="flex items-center gap-2">
+                      <code className="text-lg font-mono font-bold bg-card p-2 rounded border flex-1" data-testid="text-temp-password">{resetPasswordResult.tempPassword}</code>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText(resetPasswordResult.tempPassword);
+                          toast({ title: 'Password copied to clipboard' });
+                        }}
+                        data-testid="button-copy-password"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  The driver will be required to change their password on first login.
+                </p>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setResetPasswordDialogOpen(false);
+                  setDriverToResetPassword(null);
+                  setResetPasswordResult(null);
+                }}
+                data-testid="button-cancel-reset-password"
+              >
+                {resetPasswordResult ? 'Close' : 'Cancel'}
+              </Button>
+              {!resetPasswordResult && (
+                <Button
+                  onClick={() => {
+                    if (driverToResetPassword) {
+                      resetPasswordMutation.mutate(driverToResetPassword.id);
+                    }
+                  }}
+                  disabled={resetPasswordMutation.isPending}
+                  data-testid="button-confirm-reset-password"
+                >
+                  {resetPasswordMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <KeyRound className="h-4 w-4 mr-2" />
+                  )}
+                  Reset Password
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

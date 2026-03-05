@@ -8429,6 +8429,62 @@ export async function registerRoutes(
     }
   }));
 
+  app.post("/api/admin/driver/reset-password", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.substring(7);
+    let userEmail = '';
+    try {
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+      userEmail = payload.email || '';
+    } catch {}
+    const { data: adminCheck } = await supabaseAdmin!.from('admins').select('email').eq('email', userEmail).maybeSingle();
+    if (!adminCheck) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { driverId } = req.body;
+    if (!driverId) {
+      return res.status(400).json({ error: "Driver ID required" });
+    }
+
+    const { data: driver } = await supabaseAdmin!.from('drivers').select('id, email, full_name, driver_code').eq('id', driverId).maybeSingle();
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
+    const response = await fetch(process.env.SUPABASE_URL + '/auth/v1/admin/users/' + driverId, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password: tempPassword })
+    });
+
+    if (!response.ok) {
+      console.error(`[Admin] Failed to reset password for driver ${driver.driver_code}`);
+      return res.status(500).json({ error: "Failed to reset password" });
+    }
+
+    try {
+      await supabaseAdmin!.from('drivers').update({ must_change_password: true }).eq('id', driverId);
+    } catch {}
+
+    console.log(`[Admin] Password reset for driver ${driver.driver_code} (${driver.email}) by admin ${userEmail}`);
+    res.json({ 
+      success: true, 
+      tempPassword,
+      driverCode: driver.driver_code,
+      driverEmail: driver.email,
+      driverName: driver.full_name
+    });
+  }));
+
   app.post("/api/driver/change-password", asyncHandler(async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
