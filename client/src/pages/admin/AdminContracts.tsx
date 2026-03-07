@@ -67,6 +67,8 @@ export default function AdminContracts() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
+  const [showViewTemplateDialog, setShowViewTemplateDialog] = useState(false);
+  const [viewingTemplate, setViewingTemplate] = useState<any>(null);
   const [viewingContract, setViewingContract] = useState<any>(null);
   const [templateTitle, setTemplateTitle] = useState('');
   const [templateContent, setTemplateContent] = useState('');
@@ -262,6 +264,11 @@ export default function AdminContracts() {
       .filter(group => group.drivers.length > 0);
   }, [driversGroupedByVehicle, driverSearchTerm]);
 
+  function openViewTemplate(template: any) {
+    setViewingTemplate(template);
+    setShowViewTemplateDialog(true);
+  }
+
   function openViewContract(contract: any) {
     setViewingContract(contract);
     setShowViewDialog(true);
@@ -321,6 +328,9 @@ export default function AdminContracts() {
                     <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                       <CardTitle className="text-base">{t.title}</CardTitle>
                       <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openViewTemplate(t)} data-testid={`button-view-template-${t.id}`}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
                         <Button size="icon" variant="ghost" onClick={() => openSendDialog(t.id)} data-testid={`button-send-template-${t.id}`}>
                           <Send className="w-4 h-4" />
                         </Button>
@@ -496,6 +506,51 @@ export default function AdminContracts() {
                 {editingTemplate ? 'Update' : 'Create'}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showViewTemplateDialog} onOpenChange={setShowViewTemplateDialog}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle data-testid="text-view-template-title">
+                {viewingTemplate?.title || 'Template'}
+              </DialogTitle>
+            </DialogHeader>
+            {viewingTemplate && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary">
+                    <FileSignature className="w-3 h-3 mr-1" />
+                    Template
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    Created {new Date(viewingTemplate.created_at).toLocaleDateString('en-GB')}
+                  </span>
+                  {viewingTemplate.updated_at && viewingTemplate.updated_at !== viewingTemplate.created_at && (
+                    <span className="text-sm text-muted-foreground">
+                      Updated {new Date(viewingTemplate.updated_at).toLocaleDateString('en-GB')}
+                    </span>
+                  )}
+                </div>
+                <Card>
+                  <CardContent className="py-4">
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed" data-testid="text-template-content-view">
+                      {viewingTemplate.content}
+                    </div>
+                  </CardContent>
+                </Card>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => { setShowViewTemplateDialog(false); openEditTemplate(viewingTemplate); }} data-testid="button-edit-from-view-template">
+                    <Pencil className="w-4 h-4 mr-1.5" />
+                    Edit
+                  </Button>
+                  <Button onClick={() => { setShowViewTemplateDialog(false); openSendDialog(viewingTemplate.id); }} data-testid="button-send-from-view-template">
+                    <Send className="w-4 h-4 mr-1.5" />
+                    Send to Drivers
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
