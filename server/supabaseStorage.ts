@@ -2420,97 +2420,154 @@ export class SupabaseStorage implements IStorage {
     return data?.length || 0;
   }
 
+  private _contractsPool: any = null;
+
+  private async getContractsPool() {
+    if (this._contractsPool) return this._contractsPool;
+    const pgModule = await import('pg');
+    let connStr = '';
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
+      connStr = process.env.DATABASE_URL;
+    } else if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
+      const host = process.env.PGHOST;
+      const port = process.env.PGPORT || '5432';
+      const user = process.env.PGUSER;
+      const password = process.env.PGPASSWORD;
+      const database = process.env.PGDATABASE;
+      connStr = `postgresql://${user}:${password}@${host}:${port}/${database}`;
+    }
+    if (!connStr.includes('sslmode=')) {
+      connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
+    }
+    this._contractsPool = new pgModule.Pool({ connectionString: connStr, max: 3 });
+    return this._contractsPool;
+  }
+
+  private async pgQuery(text: string, params: any[] = []): Promise<any[]> {
+    const pool = await this.getContractsPool();
+    const result = await pool.query(text, params);
+    return result.rows;
+  }
+
   async getContractTemplates(): Promise<any[]> {
-    const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('contract_templates').select('*').order('created_at', { ascending: false });
-    if (error || !data) return [];
-    return data;
+    try {
+      return await this.pgQuery('SELECT * FROM contract_templates ORDER BY created_at DESC');
+    } catch (e: any) {
+      console.error('[Contracts] getContractTemplates error:', e.message);
+      return [];
+    }
   }
 
   async getContractTemplate(id: string): Promise<any | undefined> {
-    const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('contract_templates').select('*').eq('id', id).single();
-    if (error || !data) return undefined;
-    return data;
+    try {
+      const rows = await this.pgQuery('SELECT * FROM contract_templates WHERE id = $1', [id]);
+      return rows[0] || undefined;
+    } catch (e: any) {
+      console.error('[Contracts] getContractTemplate error:', e.message);
+      return undefined;
+    }
   }
 
   async createContractTemplate(templateData: { title: string; content: string }): Promise<any> {
-    const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('contract_templates').insert({
-      title: templateData.title,
-      content: templateData.content,
-    }).select().single();
-    if (error) throw error;
-    return data;
+    const rows = await this.pgQuery(
+      'INSERT INTO contract_templates (title, content) VALUES ($1, $2) RETURNING *',
+      [templateData.title, templateData.content]
+    );
+    return rows[0];
   }
 
   async updateContractTemplate(id: string, templateData: { title?: string; content?: string }): Promise<any | undefined> {
-    const supabase = this.checkSupabase();
-    const updateObj: any = { updated_at: new Date().toISOString() };
-    if (templateData.title !== undefined) updateObj.title = templateData.title;
-    if (templateData.content !== undefined) updateObj.content = templateData.content;
-    const { data, error } = await supabase.from('contract_templates').update(updateObj).eq('id', id).select().single();
-    if (error || !data) return undefined;
-    return data;
+    const sets: string[] = ['updated_at = NOW()'];
+    const params: any[] = [];
+    let paramIdx = 1;
+    if (templateData.title !== undefined) { sets.push(`title = $${paramIdx++}`); params.push(templateData.title); }
+    if (templateData.content !== undefined) { sets.push(`content = $${paramIdx++}`); params.push(templateData.content); }
+    params.push(id);
+    const rows = await this.pgQuery(
+      `UPDATE contract_templates SET ${sets.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+      params
+    );
+    return rows[0] || undefined;
   }
 
   async deleteContractTemplate(id: string): Promise<boolean> {
-    const supabase = this.checkSupabase();
-    const { error } = await supabase.from('contract_templates').delete().eq('id', id);
-    return !error;
+    try {
+      await this.pgQuery('DELETE FROM contract_templates WHERE id = $1', [id]);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async getDriverContracts(filters?: { driverId?: string; status?: string; templateId?: string }): Promise<any[]> {
-    const supabase = this.checkSupabase();
-    let query = supabase.from('driver_contracts').select('*').order('created_at', { ascending: false });
-    if (filters?.driverId) query = query.eq('driver_id', filters.driverId);
-    if (filters?.status) query = query.eq('status', filters.status);
-    if (filters?.templateId) query = query.eq('template_id', filters.templateId);
-    const { data, error } = await query;
-    if (error || !data) return [];
-    return data;
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIdx = 1;
+      if (filters?.driverId) { conditions.push(`driver_id = $${paramIdx++}`); params.push(filters.driverId); }
+      if (filters?.status) { conditions.push(`status = $${paramIdx++}`); params.push(filters.status); }
+      if (filters?.templateId) { conditions.push(`template_id = $${paramIdx++}`); params.push(filters.templateId); }
+      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+      return await this.pgQuery(`SELECT * FROM driver_contracts${where} ORDER BY created_at DESC`, params);
+    } catch (e: any) {
+      console.error('[Contracts] getDriverContracts error:', e.message);
+      return [];
+    }
   }
 
   async getDriverContract(id: string): Promise<any | undefined> {
-    const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('driver_contracts').select('*').eq('id', id).single();
-    if (error || !data) return undefined;
-    return data;
+    try {
+      const rows = await this.pgQuery('SELECT * FROM driver_contracts WHERE id = $1', [id]);
+      return rows[0] || undefined;
+    } catch (e: any) {
+      console.error('[Contracts] getDriverContract error:', e.message);
+      return undefined;
+    }
   }
 
   async getDriverContractByToken(token: string): Promise<any | undefined> {
-    const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('driver_contracts').select('*').eq('token', token).single();
-    if (error || !data) return undefined;
-    return data;
+    try {
+      const rows = await this.pgQuery('SELECT * FROM driver_contracts WHERE token = $1', [token]);
+      return rows[0] || undefined;
+    } catch (e: any) {
+      console.error('[Contracts] getDriverContractByToken error:', e.message);
+      return undefined;
+    }
   }
 
   async createDriverContract(contractData: { templateId: string; driverId: string; driverName: string; driverEmail?: string; contractContent: string; token: string; status: string; sentAt?: string }): Promise<any> {
-    const supabase = this.checkSupabase();
-    const { data, error } = await supabase.from('driver_contracts').insert({
-      template_id: contractData.templateId,
-      driver_id: contractData.driverId,
-      driver_name: contractData.driverName,
-      driver_email: contractData.driverEmail || null,
-      contract_content: contractData.contractContent,
-      token: contractData.token,
-      status: contractData.status,
-      sent_at: contractData.sentAt || null,
-    }).select().single();
-    if (error) throw error;
-    return data;
+    const rows = await this.pgQuery(
+      `INSERT INTO driver_contracts (template_id, driver_id, driver_name, driver_email, contract_content, token, status, sent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        contractData.templateId,
+        contractData.driverId,
+        contractData.driverName,
+        contractData.driverEmail || null,
+        contractData.contractContent,
+        contractData.token,
+        contractData.status,
+        contractData.sentAt || null,
+      ]
+    );
+    return rows[0];
   }
 
   async updateDriverContract(id: string, updateData: Partial<any>): Promise<any | undefined> {
-    const supabase = this.checkSupabase();
-    const dbData: any = {};
-    if (updateData.status !== undefined) dbData.status = updateData.status;
-    if (updateData.signed_at !== undefined) dbData.signed_at = updateData.signed_at;
-    if (updateData.signature_data !== undefined) dbData.signature_data = updateData.signature_data;
-    if (updateData.signed_name !== undefined) dbData.signed_name = updateData.signed_name;
-    if (updateData.sent_at !== undefined) dbData.sent_at = updateData.sent_at;
-    const { data, error } = await supabase.from('driver_contracts').update(dbData).eq('id', id).select().single();
-    if (error || !data) return undefined;
-    return data;
+    const sets: string[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
+    if (updateData.status !== undefined) { sets.push(`status = $${paramIdx++}`); params.push(updateData.status); }
+    if (updateData.signed_at !== undefined) { sets.push(`signed_at = $${paramIdx++}`); params.push(updateData.signed_at); }
+    if (updateData.signature_data !== undefined) { sets.push(`signature_data = $${paramIdx++}`); params.push(updateData.signature_data); }
+    if (updateData.signed_name !== undefined) { sets.push(`signed_name = $${paramIdx++}`); params.push(updateData.signed_name); }
+    if (updateData.sent_at !== undefined) { sets.push(`sent_at = $${paramIdx++}`); params.push(updateData.sent_at); }
+    if (sets.length === 0) return undefined;
+    params.push(id);
+    const rows = await this.pgQuery(
+      `UPDATE driver_contracts SET ${sets.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+      params
+    );
+    return rows[0] || undefined;
   }
 }
