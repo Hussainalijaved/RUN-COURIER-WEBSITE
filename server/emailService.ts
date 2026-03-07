@@ -2598,3 +2598,34 @@ export async function sendDeliveryConfirmationEmail(
 
   return sendEmailNotification(customerEmail, `Delivery Complete - ${jobRef} - Run Courier`, htmlContent, textContent);
 }
+
+export async function sendContractSigningEmail(
+  driverEmail: string,
+  data: { driverName: string; contractTitle: string; signingUrl: string }
+): Promise<boolean> {
+  const content = `
+    <h2 style="color: #1a1a1a; margin-bottom: 16px;">Contract Ready for Signing</h2>
+    <p style="color: #4a4a4a; font-size: 15px; line-height: 1.6;">
+      Hi ${data.driverName},
+    </p>
+    <p style="color: #4a4a4a; font-size: 15px; line-height: 1.6;">
+      A new contract has been prepared for you: <strong>${data.contractTitle}</strong>
+    </p>
+    <p style="color: #4a4a4a; font-size: 15px; line-height: 1.6;">
+      Please review and sign the contract by clicking the button below.
+    </p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.signingUrl}" style="display: inline-block; background-color: #007BFF; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+        Review &amp; Sign Contract
+      </a>
+    </div>
+    <p style="color: #888; font-size: 13px; line-height: 1.6;">
+      If you have any questions about this contract, please contact us at sales@runcourier.co.uk
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'Contract Signing');
+  const textContent = `Contract Ready for Signing\n\nHi ${data.driverName},\n\nA new contract has been prepared for you: ${data.contractTitle}\n\nPlease review and sign at: ${data.signingUrl}\n\nIf you have questions, contact sales@runcourier.co.uk`;
+
+  return sendEmailNotification(driverEmail, `Contract Ready for Signing - ${data.contractTitle} - Run Courier`, htmlContent, textContent);
+}

@@ -727,6 +727,8 @@ export async function registerRoutes(
   // Apply STRICT admin access middleware to all admin-only routes
   // These routes will REJECT requests without valid admin credentials
   app.use('/api/admin', requireAdminAccessStrict);
+  app.use('/api/contract-templates', requireAdminAccessStrict);
+  app.use('/api/driver-contracts', requireAdminAccessStrict);
   app.use('/api/drivers/:id/verify', requireAdminAccessStrict);
   app.use('/api/drivers/:id/deactivate', requireAdminAccessStrict);
   app.use('/api/drivers/:id/reactivate', requireAdminAccessStrict);
@@ -7106,6 +7108,162 @@ export async function registerRoutes(
     }
     console.log(`[Driver Payment] Deleted payment ${req.params.id}`);
     res.json({ success: true });
+  }));
+
+  app.get("/api/contract-templates", asyncHandler(async (req, res) => {
+    const templates = await storage.getContractTemplates();
+    res.json(templates);
+  }));
+
+  app.get("/api/contract-templates/:id", asyncHandler(async (req, res) => {
+    const template = await storage.getContractTemplate(req.params.id);
+    if (!template) return res.status(404).json({ error: "Template not found" });
+    res.json(template);
+  }));
+
+  app.post("/api/contract-templates", asyncHandler(async (req, res) => {
+    const { title, content } = req.body;
+    if (!title || !content) return res.status(400).json({ error: "Title and content are required" });
+    const template = await storage.createContractTemplate({ title, content });
+    res.status(201).json(template);
+  }));
+
+  app.patch("/api/contract-templates/:id", asyncHandler(async (req, res) => {
+    const { title, content } = req.body;
+    const template = await storage.updateContractTemplate(req.params.id, { title, content });
+    if (!template) return res.status(404).json({ error: "Template not found" });
+    res.json(template);
+  }));
+
+  app.delete("/api/contract-templates/:id", asyncHandler(async (req, res) => {
+    const success = await storage.deleteContractTemplate(req.params.id);
+    if (!success) return res.status(404).json({ error: "Template not found" });
+    res.json({ success: true });
+  }));
+
+  app.get("/api/driver-contracts", asyncHandler(async (req, res) => {
+    const { driverId, status, templateId } = req.query;
+    const contracts = await storage.getDriverContracts({
+      driverId: driverId as string | undefined,
+      status: status as string | undefined,
+      templateId: templateId as string | undefined,
+    });
+    res.json(contracts);
+  }));
+
+  app.get("/api/driver-contracts/:id", asyncHandler(async (req, res) => {
+    const contract = await storage.getDriverContract(req.params.id);
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    res.json(contract);
+  }));
+
+  app.post("/api/admin/contracts/send", asyncHandler(async (req, res) => {
+    const { templateId, driverId } = req.body;
+    if (!templateId || !driverId) return res.status(400).json({ error: "Template ID and driver ID are required" });
+
+    const template = await storage.getContractTemplate(templateId);
+    if (!template) return res.status(404).json({ error: "Template not found" });
+
+    const driver = await storage.getDriver(driverId);
+    if (!driver) return res.status(404).json({ error: "Driver not found" });
+
+    const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+    const driverCode = driver.driverCode || driver.id;
+    const contractContent = template.content
+      .replace(/\{\{driver_name\}\}/g, driver.fullName || 'Driver')
+      .replace(/\{\{driver_code\}\}/g, driverCode)
+      .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }))
+      .replace(/\{\{driver_email\}\}/g, driver.email || '')
+      .replace(/\{\{driver_phone\}\}/g, driver.phone || '')
+      .replace(/\{\{vehicle_type\}\}/g, driver.vehicleType || '');
+
+    const contract = await storage.createDriverContract({
+      templateId,
+      driverId: driver.id,
+      driverName: driver.fullName || 'Driver',
+      driverEmail: driver.email || undefined,
+      contractContent,
+      token,
+      status: 'sent',
+      sentAt: new Date().toISOString(),
+    });
+
+    if (driver.email) {
+      try {
+        const { sendContractSigningEmail } = await import('./emailService');
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers.host || 'runcourier.co.uk';
+        const signingUrl = `${protocol}://${host}/contracts/sign/${token}`;
+        await sendContractSigningEmail(driver.email, {
+          driverName: driver.fullName || 'Driver',
+          contractTitle: template.title,
+          signingUrl,
+        });
+        console.log(`[Contracts] Signing email sent to ${driver.email}`);
+      } catch (emailErr) {
+        console.error('[Contracts] Failed to send signing email:', emailErr);
+      }
+    }
+
+    res.status(201).json(contract);
+  }));
+
+  app.post("/api/admin/contracts/resend/:id", asyncHandler(async (req, res) => {
+    const contract = await storage.getDriverContract(req.params.id);
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    if (contract.status === 'signed') return res.status(400).json({ error: "Contract is already signed" });
+
+    if (contract.driver_email) {
+      try {
+        const { sendContractSigningEmail } = await import('./emailService');
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers.host || 'runcourier.co.uk';
+        const signingUrl = `${protocol}://${host}/contracts/sign/${contract.token}`;
+
+        const template = contract.template_id ? await storage.getContractTemplate(contract.template_id) : null;
+        await sendContractSigningEmail(contract.driver_email, {
+          driverName: contract.driver_name,
+          contractTitle: template?.title || 'Contract',
+          signingUrl,
+        });
+        console.log(`[Contracts] Resent signing email to ${contract.driver_email}`);
+      } catch (emailErr) {
+        console.error('[Contracts] Failed to resend signing email:', emailErr);
+      }
+    }
+
+    res.json({ success: true });
+  }));
+
+  app.get("/api/contracts/sign/:token", asyncHandler(async (req, res) => {
+    const contract = await storage.getDriverContractByToken(req.params.token);
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    res.json({
+      id: contract.id,
+      driverName: contract.driver_name,
+      status: contract.status,
+      contractContent: contract.contract_content,
+      signedAt: contract.signed_at,
+      signedName: contract.signed_name,
+    });
+  }));
+
+  app.post("/api/contracts/sign/:token", asyncHandler(async (req, res) => {
+    const contract = await storage.getDriverContractByToken(req.params.token);
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    if (contract.status === 'signed') return res.status(400).json({ error: "Contract is already signed" });
+
+    const { signatureData, signedName } = req.body;
+    if (!signatureData || !signedName) return res.status(400).json({ error: "Signature and name are required" });
+
+    const updated = await storage.updateDriverContract(contract.id, {
+      status: 'signed',
+      signed_at: new Date().toISOString(),
+      signature_data: signatureData,
+      signed_name: signedName,
+    });
+
+    res.json({ success: true, contract: updated });
   }));
 
   const driverStripeAccountCache = new Map<string, string>();

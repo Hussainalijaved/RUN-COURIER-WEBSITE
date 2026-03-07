@@ -78,6 +78,8 @@ const AdminDriverPayments = lazy(() => import("@/pages/admin/AdminDriverPayments
 const AdminBusinessQuote = lazy(() => import("@/pages/admin/AdminBusinessQuote"));
 const AdminInvoices = lazy(() => import("@/pages/admin/AdminInvoices"));
 const AdminPricing = lazy(() => import("@/pages/admin/AdminPricing"));
+const AdminContracts = lazy(() => import("@/pages/admin/AdminContracts"));
+const ContractSign = lazy(() => import("@/pages/ContractSign"));
 
 const CustomerDashboard = lazy(() => import("@/pages/customer/CustomerDashboard"));
 const CustomerOrders = lazy(() => import("@/pages/customer/CustomerOrders"));
@@ -165,6 +167,7 @@ function Router() {
         <Route path="/payment/success" component={PaymentSuccess} />
         <Route path="/payment/cancel" component={PaymentCancel} />
         
+        <Route path="/contracts/sign/:token" component={ContractSign} />
         <Route path="/pay/:token" component={PaymentLink} />
         <Route path="/pay/:token/success" component={PaymentLinkSuccess} />
         
@@ -242,6 +245,11 @@ function Router() {
         <Route path="/admin/pricing">
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminPricing />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/contracts">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminContracts />
           </ProtectedRoute>
         </Route>
 

@@ -2419,4 +2419,98 @@ export class SupabaseStorage implements IStorage {
     }
     return data?.length || 0;
   }
+
+  async getContractTemplates(): Promise<any[]> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('contract_templates').select('*').order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return data;
+  }
+
+  async getContractTemplate(id: string): Promise<any | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('contract_templates').select('*').eq('id', id).single();
+    if (error || !data) return undefined;
+    return data;
+  }
+
+  async createContractTemplate(templateData: { title: string; content: string }): Promise<any> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('contract_templates').insert({
+      title: templateData.title,
+      content: templateData.content,
+    }).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateContractTemplate(id: string, templateData: { title?: string; content?: string }): Promise<any | undefined> {
+    const supabase = this.checkSupabase();
+    const updateObj: any = { updated_at: new Date().toISOString() };
+    if (templateData.title !== undefined) updateObj.title = templateData.title;
+    if (templateData.content !== undefined) updateObj.content = templateData.content;
+    const { data, error } = await supabase.from('contract_templates').update(updateObj).eq('id', id).select().single();
+    if (error || !data) return undefined;
+    return data;
+  }
+
+  async deleteContractTemplate(id: string): Promise<boolean> {
+    const supabase = this.checkSupabase();
+    const { error } = await supabase.from('contract_templates').delete().eq('id', id);
+    return !error;
+  }
+
+  async getDriverContracts(filters?: { driverId?: string; status?: string; templateId?: string }): Promise<any[]> {
+    const supabase = this.checkSupabase();
+    let query = supabase.from('driver_contracts').select('*').order('created_at', { ascending: false });
+    if (filters?.driverId) query = query.eq('driver_id', filters.driverId);
+    if (filters?.status) query = query.eq('status', filters.status);
+    if (filters?.templateId) query = query.eq('template_id', filters.templateId);
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data;
+  }
+
+  async getDriverContract(id: string): Promise<any | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('driver_contracts').select('*').eq('id', id).single();
+    if (error || !data) return undefined;
+    return data;
+  }
+
+  async getDriverContractByToken(token: string): Promise<any | undefined> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('driver_contracts').select('*').eq('token', token).single();
+    if (error || !data) return undefined;
+    return data;
+  }
+
+  async createDriverContract(contractData: { templateId: string; driverId: string; driverName: string; driverEmail?: string; contractContent: string; token: string; status: string; sentAt?: string }): Promise<any> {
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase.from('driver_contracts').insert({
+      template_id: contractData.templateId,
+      driver_id: contractData.driverId,
+      driver_name: contractData.driverName,
+      driver_email: contractData.driverEmail || null,
+      contract_content: contractData.contractContent,
+      token: contractData.token,
+      status: contractData.status,
+      sent_at: contractData.sentAt || null,
+    }).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateDriverContract(id: string, updateData: Partial<any>): Promise<any | undefined> {
+    const supabase = this.checkSupabase();
+    const dbData: any = {};
+    if (updateData.status !== undefined) dbData.status = updateData.status;
+    if (updateData.signed_at !== undefined) dbData.signed_at = updateData.signed_at;
+    if (updateData.signature_data !== undefined) dbData.signature_data = updateData.signature_data;
+    if (updateData.signed_name !== undefined) dbData.signed_name = updateData.signed_name;
+    if (updateData.sent_at !== undefined) dbData.sent_at = updateData.sent_at;
+    const { data, error } = await supabase.from('driver_contracts').update(dbData).eq('id', id).select().single();
+    if (error || !data) return undefined;
+    return data;
+  }
 }

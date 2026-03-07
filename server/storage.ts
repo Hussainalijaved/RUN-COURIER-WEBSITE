@@ -147,6 +147,18 @@ export interface IStorage {
   appendPaymentLinkAuditLog(id: string, event: string, actor?: string, details?: string): Promise<PaymentLink | undefined>;
   cancelPaymentLink(id: string, actor?: string): Promise<PaymentLink | undefined>;
   expirePaymentLinks(): Promise<number>;
+
+  getContractTemplates(): Promise<any[]>;
+  getContractTemplate(id: string): Promise<any | undefined>;
+  createContractTemplate(data: { title: string; content: string }): Promise<any>;
+  updateContractTemplate(id: string, data: { title?: string; content?: string }): Promise<any | undefined>;
+  deleteContractTemplate(id: string): Promise<boolean>;
+
+  getDriverContracts(filters?: { driverId?: string; status?: string; templateId?: string }): Promise<any[]>;
+  getDriverContract(id: string): Promise<any | undefined>;
+  getDriverContractByToken(token: string): Promise<any | undefined>;
+  createDriverContract(data: { templateId: string; driverId: string; driverName: string; driverEmail?: string; contractContent: string; token: string; status: string; sentAt?: string }): Promise<any>;
+  updateDriverContract(id: string, data: Partial<any>): Promise<any | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -1819,6 +1831,17 @@ export class MemStorage implements IStorage {
     
     return expiredCount;
   }
+
+  async getContractTemplates(): Promise<any[]> { return []; }
+  async getContractTemplate(id: string): Promise<any | undefined> { return undefined; }
+  async createContractTemplate(data: { title: string; content: string }): Promise<any> { return { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; }
+  async updateContractTemplate(id: string, data: { title?: string; content?: string }): Promise<any | undefined> { return undefined; }
+  async deleteContractTemplate(id: string): Promise<boolean> { return false; }
+  async getDriverContracts(filters?: { driverId?: string; status?: string; templateId?: string }): Promise<any[]> { return []; }
+  async getDriverContract(id: string): Promise<any | undefined> { return undefined; }
+  async getDriverContractByToken(token: string): Promise<any | undefined> { return undefined; }
+  async createDriverContract(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() }; }
+  async updateDriverContract(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
 }
 
 // Use SupabaseStorage when Supabase is configured, otherwise fall back to MemStorage

@@ -46,6 +46,7 @@ import {
   Wallet,
   Calculator,
   Receipt,
+  FileSignature,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -71,6 +72,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/map', label: 'Live Map', icon: MapPin },
     { href: '/admin/documents', label: 'Documents', icon: FileText },
     { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
+    { href: '/admin/contracts', label: 'Contracts', icon: FileSignature },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   ],
   driver: [
