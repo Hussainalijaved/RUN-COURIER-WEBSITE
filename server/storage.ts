@@ -159,6 +159,7 @@ export interface IStorage {
   getDriverContractByToken(token: string): Promise<any | undefined>;
   createDriverContract(data: { templateId: string; driverId: string; driverName: string; driverEmail?: string; contractContent: string; token: string; status: string; sentAt?: string }): Promise<any>;
   updateDriverContract(id: string, data: Partial<any>): Promise<any | undefined>;
+  deleteDriverContract(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -1842,6 +1843,7 @@ export class MemStorage implements IStorage {
   async getDriverContractByToken(token: string): Promise<any | undefined> { return undefined; }
   async createDriverContract(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() }; }
   async updateDriverContract(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
+  async deleteDriverContract(id: string): Promise<boolean> { return false; }
 }
 
 // Use SupabaseStorage when Supabase is configured, otherwise fall back to MemStorage

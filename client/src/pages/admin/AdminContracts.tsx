@@ -17,15 +17,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -38,6 +29,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Plus,
   Pencil,
@@ -46,10 +38,10 @@ import {
   Eye,
   FileSignature,
   Loader2,
-  RefreshCw,
   CheckCircle,
   Clock,
   Mail,
+  Users,
 } from 'lucide-react';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -73,7 +65,8 @@ export default function AdminContracts() {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+  const [driverSearchTerm, setDriverSearchTerm] = useState('');
   const [viewingContract, setViewingContract] = useState<any>(null);
   const [templateTitle, setTemplateTitle] = useState('');
   const [templateContent, setTemplateContent] = useState('');
@@ -152,18 +145,31 @@ export default function AdminContracts() {
   });
 
   const sendContractMutation = useMutation({
-    mutationFn: async (data: { templateId: string; driverId: string }) => {
+    mutationFn: async (data: { templateId: string; driverIds: string[] }) => {
       const res = await apiRequest('POST', '/api/admin/contracts/send', data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/driver-contracts'] });
       setShowSendDialog(false);
       setSelectedTemplateId('');
-      setSelectedDriverId('');
-      toast({ title: 'Contract sent to driver' });
+      setSelectedDriverIds([]);
+      setDriverSearchTerm('');
+      const count = data?.sent || 1;
+      toast({ title: `Contract sent to ${count} driver${count > 1 ? 's' : ''}` });
     },
     onError: () => toast({ title: 'Failed to send contract', variant: 'destructive' }),
+  });
+
+  const deleteContractMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/admin/contracts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-contracts'] });
+      toast({ title: 'Contract deleted' });
+    },
+    onError: () => toast({ title: 'Failed to delete contract', variant: 'destructive' }),
   });
 
   const resendContractMutation = useMutation({
@@ -215,14 +221,46 @@ export default function AdminContracts() {
 
   function openSendDialog(templateId: string) {
     setSelectedTemplateId(templateId);
-    setSelectedDriverId('');
+    setSelectedDriverIds([]);
+    setDriverSearchTerm('');
     setShowSendDialog(true);
   }
 
-  function handleSendContract() {
-    if (!selectedTemplateId || !selectedDriverId) return;
-    sendContractMutation.mutate({ templateId: selectedTemplateId, driverId: selectedDriverId });
+  function toggleDriverSelection(driverId: string) {
+    setSelectedDriverIds(prev =>
+      prev.includes(driverId) ? prev.filter(id => id !== driverId) : [...prev, driverId]
+    );
   }
+
+  function selectAllDrivers() {
+    const allIds = drivers.map((d: any) => d.id);
+    setSelectedDriverIds(allIds);
+  }
+
+  function deselectAllDrivers() {
+    setSelectedDriverIds([]);
+  }
+
+  function handleSendContract() {
+    if (!selectedTemplateId || selectedDriverIds.length === 0) return;
+    sendContractMutation.mutate({ templateId: selectedTemplateId, driverIds: selectedDriverIds });
+  }
+
+  const filteredDriversGrouped = useMemo(() => {
+    if (!driverSearchTerm.trim()) return driversGroupedByVehicle;
+    const term = driverSearchTerm.toLowerCase();
+    return driversGroupedByVehicle
+      .map(group => ({
+        ...group,
+        drivers: group.drivers.filter((d: any) => {
+          const name = (d.fullName || d.full_name || '').toLowerCase();
+          const code = (d.driverCode || '').toLowerCase();
+          const email = (d.email || '').toLowerCase();
+          return name.includes(term) || code.includes(term) || email.includes(term);
+        }),
+      }))
+      .filter(group => group.drivers.length > 0);
+  }, [driversGroupedByVehicle, driverSearchTerm]);
 
   function openViewContract(contract: any) {
     setViewingContract(contract);
@@ -391,6 +429,19 @@ export default function AdminContracts() {
                                 {resendContractMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                               </Button>
                             )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this contract?')) {
+                                  deleteContractMutation.mutate(c.id);
+                                }
+                              }}
+                              disabled={deleteContractMutation.isPending}
+                              data-testid={`button-delete-contract-${c.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -449,9 +500,9 @@ export default function AdminContracts() {
         </Dialog>
 
         <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle data-testid="text-send-dialog-title">Send Contract to Driver</DialogTitle>
+              <DialogTitle data-testid="text-send-dialog-title">Send Contract to Drivers</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -461,25 +512,61 @@ export default function AdminContracts() {
                 </p>
               </div>
               <div>
-                <Label htmlFor="send-driver-select">Select Driver</Label>
-                <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
-                  <SelectTrigger data-testid="select-send-driver">
-                    <SelectValue placeholder="Choose a driver" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {driversGroupedByVehicle.map((group) => (
-                      <SelectGroup key={group.type}>
-                        <SelectLabel>{group.label}</SelectLabel>
+                <Label>Select Drivers</Label>
+                <Input
+                  placeholder="Search drivers..."
+                  value={driverSearchTerm}
+                  onChange={(e) => setDriverSearchTerm(e.target.value)}
+                  className="mt-1"
+                  data-testid="input-driver-search"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <Button variant="outline" size="sm" onClick={selectAllDrivers} data-testid="button-select-all-drivers">
+                    Select All
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={deselectAllDrivers} data-testid="button-deselect-all-drivers">
+                    Deselect All
+                  </Button>
+                  {selectedDriverIds.length > 0 && (
+                    <Badge variant="secondary">
+                      <Users className="w-3 h-3 mr-1" />
+                      {selectedDriverIds.length} selected
+                    </Badge>
+                  )}
+                </div>
+                <div className="border rounded-md mt-2 max-h-[300px] overflow-y-auto">
+                  {filteredDriversGrouped.length === 0 ? (
+                    <p className="text-sm text-muted-foreground p-3 text-center">No drivers found</p>
+                  ) : (
+                    filteredDriversGrouped.map((group) => (
+                      <div key={group.type}>
+                        <div className="px-3 py-1.5 bg-muted/50 text-xs font-medium text-muted-foreground sticky top-0">
+                          {group.label}
+                        </div>
                         {group.drivers.map((d: any) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.driverCode ? `[${d.driverCode}] ` : ''}{d.fullName || d.full_name || 'Unknown'}
-                            {d.email ? ` (${d.email})` : ''}
-                          </SelectItem>
+                          <label
+                            key={d.id}
+                            className="flex items-center gap-3 px-3 py-2 hover-elevate cursor-pointer"
+                            data-testid={`driver-checkbox-${d.id}`}
+                          >
+                            <Checkbox
+                              checked={selectedDriverIds.includes(d.id)}
+                              onCheckedChange={() => toggleDriverSelection(d.id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium">
+                                {d.driverCode ? `[${d.driverCode}] ` : ''}{d.fullName || d.full_name || 'Unknown'}
+                              </span>
+                              {d.email && (
+                                <span className="block text-xs text-muted-foreground truncate">{d.email}</span>
+                              )}
+                            </div>
+                          </label>
                         ))}
-                      </SelectGroup>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
             <DialogFooter>
@@ -488,12 +575,12 @@ export default function AdminContracts() {
               </Button>
               <Button
                 onClick={handleSendContract}
-                disabled={sendContractMutation.isPending || !selectedDriverId}
+                disabled={sendContractMutation.isPending || selectedDriverIds.length === 0}
                 data-testid="button-confirm-send"
               >
                 {sendContractMutation.isPending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
                 <Send className="w-4 h-4 mr-1.5" />
-                Send Contract
+                Send to {selectedDriverIds.length || ''} Driver{selectedDriverIds.length !== 1 ? 's' : ''}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -2570,4 +2570,14 @@ export class SupabaseStorage implements IStorage {
     );
     return rows[0] || undefined;
   }
+
+  async deleteDriverContract(id: string): Promise<boolean> {
+    try {
+      await this.pgQuery('DELETE FROM driver_contracts WHERE id = $1', [id]);
+      return true;
+    } catch (e: any) {
+      console.error('[Contracts] deleteDriverContract error:', e.message);
+      return false;
+    }
+  }
 }

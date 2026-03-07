@@ -7158,54 +7158,76 @@ export async function registerRoutes(
   }));
 
   app.post("/api/admin/contracts/send", asyncHandler(async (req, res) => {
-    const { templateId, driverId } = req.body;
-    if (!templateId || !driverId) return res.status(400).json({ error: "Template ID and driver ID are required" });
+    const { templateId, driverId, driverIds } = req.body;
+    const ids: string[] = driverIds && Array.isArray(driverIds) ? driverIds : driverId ? [driverId] : [];
+    if (!templateId || ids.length === 0) return res.status(400).json({ error: "Template ID and at least one driver ID are required" });
 
     const template = await storage.getContractTemplate(templateId);
     if (!template) return res.status(404).json({ error: "Template not found" });
 
-    const driver = await storage.getDriver(driverId);
-    if (!driver) return res.status(404).json({ error: "Driver not found" });
+    const results: any[] = [];
+    const errors: string[] = [];
 
-    const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
-    const driverCode = driver.driverCode || driver.id;
-    const contractContent = template.content
-      .replace(/\{\{driver_name\}\}/g, driver.fullName || 'Driver')
-      .replace(/\{\{driver_code\}\}/g, driverCode)
-      .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }))
-      .replace(/\{\{driver_email\}\}/g, driver.email || '')
-      .replace(/\{\{driver_phone\}\}/g, driver.phone || '')
-      .replace(/\{\{vehicle_type\}\}/g, driver.vehicleType || '');
-
-    const contract = await storage.createDriverContract({
-      templateId,
-      driverId: driver.id,
-      driverName: driver.fullName || 'Driver',
-      driverEmail: driver.email || undefined,
-      contractContent,
-      token,
-      status: 'sent',
-      sentAt: new Date().toISOString(),
-    });
-
-    if (driver.email) {
+    for (const id of ids) {
       try {
-        const { sendContractSigningEmail } = await import('./emailService');
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
-        const host = req.headers['x-forwarded-host'] || req.headers.host || 'runcourier.co.uk';
-        const signingUrl = `${protocol}://${host}/contracts/sign/${token}`;
-        await sendContractSigningEmail(driver.email, {
+        const driver = await storage.getDriver(id);
+        if (!driver) { errors.push(`Driver ${id} not found`); continue; }
+
+        const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+        const driverCode = driver.driverCode || driver.id;
+        const contractContent = template.content
+          .replace(/\{\{driver_name\}\}/g, driver.fullName || 'Driver')
+          .replace(/\{\{driver_code\}\}/g, driverCode)
+          .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }))
+          .replace(/\{\{driver_email\}\}/g, driver.email || '')
+          .replace(/\{\{driver_phone\}\}/g, driver.phone || '')
+          .replace(/\{\{vehicle_type\}\}/g, driver.vehicleType || '');
+
+        const contract = await storage.createDriverContract({
+          templateId,
+          driverId: driver.id,
           driverName: driver.fullName || 'Driver',
-          contractTitle: template.title,
-          signingUrl,
+          driverEmail: driver.email || undefined,
+          contractContent,
+          token,
+          status: 'sent',
+          sentAt: new Date().toISOString(),
         });
-        console.log(`[Contracts] Signing email sent to ${driver.email}`);
-      } catch (emailErr) {
-        console.error('[Contracts] Failed to send signing email:', emailErr);
+        results.push(contract);
+
+        if (driver.email) {
+          try {
+            const { sendContractSigningEmail } = await import('./emailService');
+            const protocol = req.headers['x-forwarded-proto'] || 'https';
+            const host = req.headers['x-forwarded-host'] || req.headers.host || 'runcourier.co.uk';
+            const signingUrl = `${protocol}://${host}/contracts/sign/${token}`;
+            await sendContractSigningEmail(driver.email, {
+              driverName: driver.fullName || 'Driver',
+              contractTitle: template.title,
+              signingUrl,
+            });
+            console.log(`[Contracts] Signing email sent to ${driver.email}`);
+          } catch (emailErr) {
+            console.error(`[Contracts] Failed to send signing email to ${driver.email}:`, emailErr);
+          }
+        }
+      } catch (err: any) {
+        console.error(`[Contracts] Error creating contract for driver ${id}:`, err);
+        errors.push(`Failed to create contract for driver ${id}`);
       }
     }
 
-    res.status(201).json(contract);
+    res.status(201).json({ contracts: results, sent: results.length, errors });
+  }));
+
+  app.delete("/api/admin/contracts/:id", asyncHandler(async (req, res) => {
+    console.log(`[Contracts] Delete request for contract ${req.params.id}`);
+    const contract = await storage.getDriverContract(req.params.id);
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+
+    await storage.deleteDriverContract(req.params.id);
+    console.log(`[Contracts] Contract ${req.params.id} deleted`);
+    res.json({ success: true });
   }));
 
   app.post("/api/admin/contracts/resend/:id", asyncHandler(async (req, res) => {
