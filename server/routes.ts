@@ -2801,28 +2801,58 @@ export async function registerRoutes(
       console.log(`[Jobs] Job ${freshJob.id} assigned to driver ${freshJob.driverId} with driver_price £${finalDriverPrice}, coordinates: pickup(${freshJob.pickupLatitude},${freshJob.pickupLongitude}) delivery(${freshJob.deliveryLatitude},${freshJob.deliveryLongitude})`);
       
       // Send push notification to driver's mobile device with coordinates for map
-      sendJobOfferNotification(freshJob.driverId, {
-        jobId: freshJob.id,
-        trackingNumber: freshJob.trackingNumber,
-        jobNumber: freshJob.jobNumber,
-        pickupAddress: freshJob.pickupAddress,
-        pickupPostcode: freshJob.pickupPostcode,
-        pickupLatitude: freshJob.pickupLatitude,
-        pickupLongitude: freshJob.pickupLongitude,
-        deliveryAddress: freshJob.deliveryAddress,
-        deliveryPostcode: freshJob.deliveryPostcode,
-        deliveryLatitude: freshJob.deliveryLatitude,
-        deliveryLongitude: freshJob.deliveryLongitude,
-        recipientName: freshJob.recipientName,
-        recipientPhone: freshJob.recipientPhone,
-        distance: freshJob.distance,
-        driverPrice: finalDriverPrice,
-        vehicleType: freshJob.vehicleType,
-      }).then(result => {
+      (async () => {
+        let multiDropStops: any[] | undefined;
+        if (freshJob.isMultiDrop) {
+          try {
+            const { supabaseAdmin: mdClient } = await import('./supabaseAdmin');
+            if (mdClient) {
+              const { data: stops } = await mdClient
+                .from('multi_drop_stops')
+                .select('stop_order, address, postcode, recipient_name, recipient_phone, instructions, latitude, longitude')
+                .eq('job_id', freshJob.id)
+                .order('stop_order', { ascending: true });
+              if (stops && stops.length > 0) {
+                multiDropStops = stops.map(s => ({
+                  stopOrder: s.stop_order,
+                  address: s.address,
+                  postcode: s.postcode,
+                  recipientName: s.recipient_name,
+                  recipientPhone: s.recipient_phone,
+                  instructions: s.instructions,
+                  latitude: s.latitude,
+                  longitude: s.longitude,
+                }));
+              }
+            }
+          } catch (err: any) {
+            console.error('[Jobs] Failed to fetch multi-drop stops for push:', err.message);
+          }
+        }
+        const result = await sendJobOfferNotification(freshJob.driverId, {
+          jobId: freshJob.id,
+          trackingNumber: freshJob.trackingNumber,
+          jobNumber: freshJob.jobNumber,
+          pickupAddress: freshJob.pickupAddress,
+          pickupPostcode: freshJob.pickupPostcode,
+          pickupLatitude: freshJob.pickupLatitude,
+          pickupLongitude: freshJob.pickupLongitude,
+          deliveryAddress: freshJob.deliveryAddress,
+          deliveryPostcode: freshJob.deliveryPostcode,
+          deliveryLatitude: freshJob.deliveryLatitude,
+          deliveryLongitude: freshJob.deliveryLongitude,
+          recipientName: freshJob.recipientName,
+          recipientPhone: freshJob.recipientPhone,
+          distance: freshJob.distance,
+          driverPrice: finalDriverPrice,
+          vehicleType: freshJob.vehicleType,
+          isMultiDrop: freshJob.isMultiDrop || false,
+          multiDropStops,
+        });
         if (result.success) {
           console.log(`[Jobs] Push notification sent to ${result.sentCount} device(s) for driver ${freshJob.driverId}`);
         }
-      }).catch(err => console.error('[Jobs] Failed to send push notification:', err));
+      })().catch(err => console.error('[Jobs] Failed to send push notification:', err));
     }
     
     // Return the updated job with correct driver price
@@ -10574,9 +10604,56 @@ export async function registerRoutes(
           podNotes: j.podNotes,
           createdAt: j.createdAt,
           updatedAt: j.updatedAt,
+          multiDropStops: [] as any[],
         };
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const multiDropJobIds = safeJobs.filter(j => j.isMultiDrop).map(j => j.id);
+    if (multiDropJobIds.length > 0) {
+      try {
+        const { supabaseAdmin } = await import('./supabaseAdmin');
+        if (supabaseAdmin) {
+          const { data: stops } = await supabaseAdmin
+            .from('multi_drop_stops')
+            .select('id, job_id, stop_order, address, postcode, latitude, longitude, recipient_name, recipient_phone, instructions, status, delivered_at, pod_photo_url, pod_signature_url, pod_recipient_name')
+            .in('job_id', multiDropJobIds)
+            .order('stop_order', { ascending: true });
+
+          if (stops && stops.length > 0) {
+            const stopsMap: Record<string, any[]> = {};
+            for (const stop of stops) {
+              if (!stopsMap[stop.job_id]) stopsMap[stop.job_id] = [];
+              stopsMap[stop.job_id].push({
+                id: stop.id,
+                jobId: stop.job_id,
+                stopOrder: stop.stop_order,
+                address: stop.address,
+                postcode: stop.postcode,
+                latitude: stop.latitude,
+                longitude: stop.longitude,
+                recipientName: stop.recipient_name,
+                recipientPhone: stop.recipient_phone,
+                instructions: stop.instructions,
+                status: stop.status || 'pending',
+                deliveredAt: stop.delivered_at,
+                podPhotoUrl: stop.pod_photo_url,
+                podSignatureUrl: stop.pod_signature_url,
+                podRecipientName: stop.pod_recipient_name,
+              });
+            }
+            for (const job of safeJobs) {
+              if (job.isMultiDrop && stopsMap[job.id]) {
+                job.multiDropStops = stopsMap[job.id];
+              }
+            }
+            console.log(`[Driver Jobs API] Attached multi-drop stops for ${Object.keys(stopsMap).length} jobs`);
+          }
+        }
+      } catch (err: any) {
+        console.error('[Driver Jobs API] Error fetching multi-drop stops:', err.message);
+      }
+    }
     
     console.log(`[Driver Jobs API] Found ${safeJobs.length} jobs for driver ${driverId}`);
     res.json(safeJobs);
@@ -10773,31 +10850,62 @@ export async function registerRoutes(
       });
     }
 
-    // Send push notification to driver's mobile device with coordinates for map
-    sendJobOfferNotification(driverId, {
-      jobId,
-      trackingNumber: freshAssignJob.trackingNumber,
-      jobNumber: freshAssignJob.jobNumber,
-      pickupAddress: freshAssignJob.pickupAddress,
-      pickupPostcode: freshAssignJob.pickupPostcode,
-      pickupLatitude: freshAssignJob.pickupLatitude,
-      pickupLongitude: freshAssignJob.pickupLongitude,
-      deliveryAddress: freshAssignJob.deliveryAddress,
-      deliveryPostcode: freshAssignJob.deliveryPostcode,
-      deliveryLatitude: freshAssignJob.deliveryLatitude,
-      deliveryLongitude: freshAssignJob.deliveryLongitude,
-      recipientName: freshAssignJob.recipientName,
-      recipientPhone: freshAssignJob.recipientPhone,
-      distance: freshAssignJob.distance,
-      driverPrice: driverPrice,
-      vehicleType: freshAssignJob.vehicleType,
-    }).then(result => {
+    // Fetch multi-drop stops if this is a multi-drop job, then send push notification
+    (async () => {
+      let multiDropStops: any[] | undefined;
+      if (freshAssignJob.isMultiDrop) {
+        try {
+          const { supabaseAdmin: mdClient } = await import('./supabaseAdmin');
+          if (mdClient) {
+            const { data: stops } = await mdClient
+              .from('multi_drop_stops')
+              .select('stop_order, address, postcode, recipient_name, recipient_phone, instructions, latitude, longitude')
+              .eq('job_id', jobId)
+              .order('stop_order', { ascending: true });
+            if (stops && stops.length > 0) {
+              multiDropStops = stops.map(s => ({
+                stopOrder: s.stop_order,
+                address: s.address,
+                postcode: s.postcode,
+                recipientName: s.recipient_name,
+                recipientPhone: s.recipient_phone,
+                instructions: s.instructions,
+                latitude: s.latitude,
+                longitude: s.longitude,
+              }));
+            }
+          }
+        } catch (err: any) {
+          console.error('[Job Assignment] Failed to fetch multi-drop stops for push:', err.message);
+        }
+      }
+
+      const result = await sendJobOfferNotification(driverId, {
+        jobId,
+        trackingNumber: freshAssignJob.trackingNumber,
+        jobNumber: freshAssignJob.jobNumber,
+        pickupAddress: freshAssignJob.pickupAddress,
+        pickupPostcode: freshAssignJob.pickupPostcode,
+        pickupLatitude: freshAssignJob.pickupLatitude,
+        pickupLongitude: freshAssignJob.pickupLongitude,
+        deliveryAddress: freshAssignJob.deliveryAddress,
+        deliveryPostcode: freshAssignJob.deliveryPostcode,
+        deliveryLatitude: freshAssignJob.deliveryLatitude,
+        deliveryLongitude: freshAssignJob.deliveryLongitude,
+        recipientName: freshAssignJob.recipientName,
+        recipientPhone: freshAssignJob.recipientPhone,
+        distance: freshAssignJob.distance,
+        driverPrice: driverPrice,
+        vehicleType: freshAssignJob.vehicleType,
+        isMultiDrop: freshAssignJob.isMultiDrop || false,
+        multiDropStops,
+      });
       if (result.success) {
         console.log(`[Job Assignment] Push notification sent to ${result.sentCount} device(s) for driver ${driverId}`);
       } else {
         console.log(`[Job Assignment] No push devices registered for driver ${driverId}`);
       }
-    }).catch(err => console.error('[Job Assignment] Failed to send push notification:', err));
+    })().catch(err => console.error('[Job Assignment] Failed to send push notification:', err));
 
     // Note: SupabaseStorage already handles Supabase writes directly
     // No need for redundant sync here
@@ -10881,19 +10989,50 @@ export async function registerRoutes(
         data: { batchGroupId, assignmentCount: assignments.length },
       });
       
-      // Send push notification for each job in the batch
+      // Send push notification for each job in the batch (with multi-drop data)
       for (const assignment of assignments) {
         const job = await storage.getJob(assignment.jobId);
         if (job) {
-          sendJobOfferNotification(driverId, {
-            jobId: job.id,
-            trackingNumber: job.trackingNumber,
-            jobNumber: job.jobNumber,
-            pickupAddress: job.pickupAddress,
-            deliveryAddress: job.deliveryAddress,
-            driverPrice: driverPrice,
-            vehicleType: job.vehicleType,
-          }).catch(err => console.error('[Batch Assignment] Failed to send push:', err));
+          (async () => {
+            let multiDropStops: any[] | undefined;
+            if (job.isMultiDrop) {
+              try {
+                const { supabaseAdmin: mdClient } = await import('./supabaseAdmin');
+                if (mdClient) {
+                  const { data: stops } = await mdClient
+                    .from('multi_drop_stops')
+                    .select('stop_order, address, postcode, recipient_name, recipient_phone, instructions, latitude, longitude')
+                    .eq('job_id', job.id)
+                    .order('stop_order', { ascending: true });
+                  if (stops && stops.length > 0) {
+                    multiDropStops = stops.map(s => ({
+                      stopOrder: s.stop_order,
+                      address: s.address,
+                      postcode: s.postcode,
+                      recipientName: s.recipient_name,
+                      recipientPhone: s.recipient_phone,
+                      instructions: s.instructions,
+                      latitude: s.latitude,
+                      longitude: s.longitude,
+                    }));
+                  }
+                }
+              } catch (err: any) {
+                console.error('[Batch Assignment] Failed to fetch multi-drop stops:', err.message);
+              }
+            }
+            await sendJobOfferNotification(driverId, {
+              jobId: job.id,
+              trackingNumber: job.trackingNumber,
+              jobNumber: job.jobNumber,
+              pickupAddress: job.pickupAddress,
+              deliveryAddress: job.deliveryAddress,
+              driverPrice: driverPrice,
+              vehicleType: job.vehicleType,
+              isMultiDrop: job.isMultiDrop || false,
+              multiDropStops,
+            });
+          })().catch(err => console.error('[Batch Assignment] Failed to send push:', err));
         }
       }
     }

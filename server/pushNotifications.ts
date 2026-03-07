@@ -214,6 +214,17 @@ export async function sendJobOfferNotification(
     distance?: string | null;
     driverPrice?: string | null;
     vehicleType?: string;
+    isMultiDrop?: boolean;
+    multiDropStops?: Array<{
+      stopOrder: number;
+      address: string;
+      postcode: string;
+      recipientName?: string;
+      recipientPhone?: string;
+      instructions?: string;
+      latitude?: string | null;
+      longitude?: string | null;
+    }>;
   }
 ): Promise<{ success: boolean; sentCount: number }> {
   const devices = await getDriverDevices(driverId);
@@ -229,6 +240,8 @@ export async function sendJobOfferNotification(
 
   const pickupShort = jobDetails.pickupAddress?.split(",")[0] || "Pickup";
   const deliveryShort = jobDetails.deliveryAddress?.split(",")[0] || "Delivery";
+  const isMultiDrop = jobDetails.isMultiDrop && jobDetails.multiDropStops && jobDetails.multiDropStops.length > 0;
+  const dropCount = isMultiDrop ? jobDetails.multiDropStops!.length : 0;
 
   let staticMapUrl: string | null = null;
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -240,11 +253,15 @@ export async function sendJobOfferNotification(
     staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:green|label:P|${pLat},${pLng}&markers=color:red|label:D|${dLat},${dLng}&path=color:0x007BFF|weight:4|${pLat},${pLng}|${dLat},${dLng}&key=${apiKey}`;
   }
 
+  const bodyText = isMultiDrop
+    ? `${pickupShort} → Multi-drop (${dropCount} stops) | ${priceText}`
+    : `${pickupShort} → ${deliveryShort} | ${priceText}`;
+
   const messages: ExpoPushMessage[] = devices.map(device => ({
     to: device.push_token,
     sound: "default",
-    title: "New Job Offer!",
-    body: `${pickupShort} → ${deliveryShort} | ${priceText}`,
+    title: isMultiDrop ? "New Multi-Drop Job Offer!" : "New Job Offer!",
+    body: bodyText,
     data: {
       type: "job_offer",
       jobId: jobDetails.jobId,
@@ -264,6 +281,9 @@ export async function sendJobOfferNotification(
       driverPrice: jobDetails.driverPrice,
       vehicleType: jobDetails.vehicleType,
       staticMapUrl: staticMapUrl,
+      isMultiDrop: isMultiDrop || false,
+      multiDropStops: isMultiDrop ? jobDetails.multiDropStops : undefined,
+      dropCount: dropCount,
       screen: "JobOffers",
     },
     priority: "high",
