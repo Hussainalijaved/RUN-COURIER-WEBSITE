@@ -335,52 +335,41 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (supabaseAdmin) {
-        const { error: tableCheck } = await supabaseAdmin.from('contract_templates').select('id').limit(1);
-        if (tableCheck?.message?.includes('Could not find') || tableCheck?.code === '42P01') {
-          console.log("[MIGRATION] Contract tables do not exist yet.");
-          const { error: rpcError } = await supabaseAdmin.rpc('exec_sql', {
-            query: `
-              CREATE TABLE IF NOT EXISTS contract_templates (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                title TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-              );
-              CREATE TABLE IF NOT EXISTS driver_contracts (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                template_id UUID REFERENCES contract_templates(id),
-                driver_id TEXT NOT NULL,
-                driver_name TEXT NOT NULL,
-                driver_email TEXT,
-                status TEXT NOT NULL DEFAULT 'draft',
-                sent_at TIMESTAMPTZ,
-                signed_at TIMESTAMPTZ,
-                signature_data TEXT,
-                signed_name TEXT,
-                token TEXT UNIQUE NOT NULL,
-                contract_content TEXT,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-              );
-              CREATE INDEX IF NOT EXISTS idx_driver_contracts_driver_id ON driver_contracts(driver_id);
-              CREATE INDEX IF NOT EXISTS idx_driver_contracts_token ON driver_contracts(token);
-              CREATE INDEX IF NOT EXISTS idx_driver_contracts_status ON driver_contracts(status);
-            `
-          });
-          if (rpcError) {
-            console.log("[MIGRATION] Contract tables RPC failed:", rpcError.message);
-            console.log("[MIGRATION] Please run supabase/migrations/032_create_contracts_tables.sql in Supabase SQL Editor");
-          } else {
-            console.log("[MIGRATION] Contract tables created successfully");
-          }
-        } else {
-          console.log("[MIGRATION] Contract tables exist");
-        }
-      }
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS contract_templates (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS driver_contracts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          template_id UUID REFERENCES contract_templates(id),
+          driver_id TEXT NOT NULL,
+          driver_name TEXT NOT NULL,
+          driver_email TEXT,
+          status TEXT NOT NULL DEFAULT 'draft',
+          sent_at TIMESTAMPTZ,
+          signed_at TIMESTAMPTZ,
+          signature_data TEXT,
+          signed_name TEXT,
+          token TEXT UNIQUE NOT NULL,
+          contract_content TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_contracts_driver_id ON driver_contracts(driver_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_contracts_token ON driver_contracts(token)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_contracts_status ON driver_contracts(status)`);
+      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
+      console.log("[MIGRATION] Contract tables created/verified successfully");
     } catch (e: any) {
-      console.warn("[MIGRATION] Contract tables check:", e?.message);
+      console.warn("[MIGRATION] Contract tables migration error:", e?.message);
     }
   })();
 
