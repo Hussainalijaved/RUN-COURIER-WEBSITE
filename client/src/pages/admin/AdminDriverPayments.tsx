@@ -83,11 +83,12 @@ async function getStripePromise(): Promise<Stripe | null> {
   return stripePromiseCache;
 }
 
-function DriverCardPaymentForm({ amount, driverId, driverName, description, onSuccess, onCancel }: {
+function DriverCardPaymentForm({ amount, driverId, driverName, description, driver, onSuccess, onCancel }: {
   amount: string;
   driverId: string;
   driverName: string;
   description: string;
+  driver: Driver;
   onSuccess: () => void;
   onCancel: () => void;
 }) {
@@ -134,11 +135,48 @@ function DriverCardPaymentForm({ amount, driverId, driverName, description, onSu
     }
   };
 
+  const fmtSort = (code: string) => {
+    const digits = code.replace(/\D/g, '');
+    return digits.length === 6 ? `${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4,6)}` : code;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="text-center pb-2">
-        <p className="text-2xl font-bold text-green-600" data-testid="text-card-pay-amount">£{parseFloat(amount).toFixed(2)}</p>
-        <p className="text-sm text-muted-foreground">Card payment to {driverName}</p>
+      <div className="p-3 bg-muted/50 rounded-md space-y-2">
+        <div className="text-center">
+          <p className="text-2xl font-bold text-green-600" data-testid="text-card-pay-amount">£{parseFloat(amount).toFixed(2)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Paying from Run Courier account</p>
+        </div>
+        <div className="border-t pt-2 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Paying to:</span>
+            <span className="font-medium">{driver.accountHolderName || driverName}</span>
+          </div>
+          {driver.bankName && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Bank:</span>
+              <span className="font-medium">{driver.bankName}</span>
+            </div>
+          )}
+          {driver.sortCode && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sort Code:</span>
+              <span className="font-mono font-medium">{fmtSort(driver.sortCode)}</span>
+            </div>
+          )}
+          {driver.accountNumber && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Account:</span>
+              <span className="font-mono font-medium">****{driver.accountNumber.slice(-4)}</span>
+            </div>
+          )}
+          {driver.driverCode && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Driver ID:</span>
+              <span className="font-mono font-medium">{driver.driverCode}</span>
+            </div>
+          )}
+        </div>
       </div>
       <PaymentElement options={{ layout: 'tabs' }} />
       {paymentError && (
@@ -1146,6 +1184,7 @@ export default function AdminDriverPayments() {
                   driverId={payDriver.id}
                   driverName={payDriver.fullName || ''}
                   description={payDescription}
+                  driver={payDriver}
                   onSuccess={() => {
                     queryClient.invalidateQueries({ queryKey: ['/api/driver-payments'] });
                     queryClient.invalidateQueries({ queryKey: ['/api/driver-jobs/weekly'] });
