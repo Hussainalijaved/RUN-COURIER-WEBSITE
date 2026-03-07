@@ -6884,37 +6884,20 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Driver not found" });
     }
 
-    if (!driver.sortCode || !driver.accountNumber) {
-      return res.status(400).json({ error: "Driver has no bank details saved. Please add bank details to the driver profile first." });
-    }
-
-    let stripeAccountId: string;
-    try {
-      const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.ip || '127.0.0.1';
-      stripeAccountId = await getOrCreateDriverStripeAccount(stripe, driver, clientIp);
-    } catch (err: any) {
-      console.error('[Stripe Connect] Failed to create connected account:', err.message);
-      return res.status(400).json({ error: err.message || 'Failed to set up driver payment account' });
-    }
-
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInPence,
       currency: 'gbp',
-      transfer_data: {
-        destination: stripeAccountId,
-      },
       metadata: {
         type: 'driver_payment',
         driverId,
         driverName: driver.fullName || '',
         driverCode: driver.driverCode || '',
         description: description || 'Driver card payment',
-        stripeAccountId,
       },
       description: `Driver payment to ${driver.fullName || driver.driverCode || driverId}`,
     });
 
-    console.log(`[Driver Payment] Created payment intent ${paymentIntent.id} → connected account ${stripeAccountId} for driver ${driver.driverCode} - £${amount}`);
+    console.log(`[Driver Payment] Created payment intent ${paymentIntent.id} for driver ${driver.driverCode} - £${amount}`);
     res.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
