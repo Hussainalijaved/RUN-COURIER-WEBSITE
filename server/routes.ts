@@ -7539,6 +7539,26 @@ export async function registerRoutes(
     }
   }));
 
+  app.delete("/api/driver/notices/:noticeId", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const token = authHeader.replace('Bearer ', '');
+    try {
+      const { verifySupabaseToken } = await import('./supabaseAdmin');
+      const payload = await verifySupabaseToken(token);
+      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
+      const driver = await storage.getDriverByUserId(payload.sub);
+      if (!driver) return res.status(404).json({ error: "Driver not found" });
+      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driver.id);
+      if (!recipient) return res.status(404).json({ error: "Notice not found" });
+      const deleted = await storage.deleteNoticeRecipient(recipient.id, driver.id);
+      if (!deleted) return res.status(500).json({ error: "Failed to delete notice" });
+      res.json({ success: true });
+    } catch (e: any) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+  }));
+
   const driverStripeAccountCache = new Map<string, string>();
 
   async function getOrCreateDriverStripeAccount(stripe: any, driver: any, clientIp?: string): Promise<string> {

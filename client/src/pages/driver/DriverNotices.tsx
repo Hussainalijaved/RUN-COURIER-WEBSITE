@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Bell, CheckCircle, Clock, ChevronLeft, Megaphone, AlertTriangle } from 'lucide-react';
+import { Bell, CheckCircle, Clock, ChevronLeft, Megaphone, AlertTriangle, Trash2 } from 'lucide-react';
 
 const CATEGORY_COLORS: Record<string, string> = {
   emergency: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
@@ -86,6 +86,23 @@ export default function DriverNotices() {
       toast({ title: 'Notice acknowledged' });
     },
     onError: () => toast({ title: 'Failed to acknowledge notice', variant: 'destructive' }),
+  });
+
+  const deleteNoticeMutation = useMutation({
+    mutationFn: async (noticeId: string) => {
+      const res = await fetch(`/api/driver/notices/${noticeId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver/notices'] });
+      toast({ title: 'Notice deleted' });
+      setDetailOpen(false);
+      setSelectedNotice(null);
+    },
+    onError: () => toast({ title: 'Failed to delete notice', variant: 'destructive' }),
   });
 
   function openNotice(notice: any) {
@@ -218,17 +235,28 @@ export default function DriverNotices() {
                 <p>Sent: {selectedNotice.notice_sent_at ? new Date(selectedNotice.notice_sent_at).toLocaleString('en-GB') : '-'}</p>
               </div>
 
-              {selectedNotice.requires_acknowledgement && !selectedNotice.acknowledged_at && (
+              <div className="flex gap-2 flex-wrap">
+                {selectedNotice.requires_acknowledgement && !selectedNotice.acknowledged_at && (
+                  <Button
+                    onClick={() => { acknowledgeMutation.mutate(selectedNotice.notice_id); setDetailOpen(false); }}
+                    disabled={acknowledgeMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-acknowledge"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-1.5" />
+                    {acknowledgeMutation.isPending ? 'Acknowledging...' : 'I Acknowledge'}
+                  </Button>
+                )}
                 <Button
-                  onClick={() => { acknowledgeMutation.mutate(selectedNotice.notice_id); setDetailOpen(false); }}
-                  disabled={acknowledgeMutation.isPending}
-                  className="w-full"
-                  data-testid="button-acknowledge"
+                  variant="outline"
+                  onClick={() => { if (confirm('Delete this notice?')) deleteNoticeMutation.mutate(selectedNotice.notice_id); }}
+                  disabled={deleteNoticeMutation.isPending}
+                  data-testid="button-delete-notice"
                 >
-                  <CheckCircle className="w-4 h-4 mr-1.5" />
-                  {acknowledgeMutation.isPending ? 'Acknowledging...' : 'I Acknowledge'}
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  {deleteNoticeMutation.isPending ? 'Deleting...' : 'Delete'}
                 </Button>
-              )}
+              </div>
             </div>
           )}
         </DialogContent>

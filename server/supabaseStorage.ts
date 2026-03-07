@@ -2755,6 +2755,19 @@ export class SupabaseStorage implements IStorage {
     }
   }
 
+  async deleteNoticeRecipient(id: string, driverId: string): Promise<boolean> {
+    try {
+      const rows = await this.pgQuery(
+        'DELETE FROM driver_notice_recipients WHERE id = $1 AND driver_id = $2 RETURNING id',
+        [id, driverId]
+      );
+      return rows.length > 0;
+    } catch (e: any) {
+      console.error('[Notices] deleteNoticeRecipient error:', e.message);
+      return false;
+    }
+  }
+
   async getDriverNoticeRecipient(noticeId: string, driverId: string): Promise<any | undefined> {
     try {
       const rows = await this.pgQuery(
