@@ -282,6 +282,7 @@ async function runBackgroundTasks() {
         query: `
           ALTER TABLE drivers ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;
           ALTER TABLE drivers ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+          ALTER TABLE drivers ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;
         `
       });
       

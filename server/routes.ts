@@ -6794,6 +6794,76 @@ export async function registerRoutes(
     res.json({ success: true });
   }));
 
+  const driverStripeAccountCache = new Map<string, string>();
+
+  async function getOrCreateDriverStripeAccount(stripe: any, driver: any, clientIp?: string): Promise<string> {
+    const driverRecord = await storage.getDriver(driver.id);
+    const existingAccountId = (driverRecord as any)?.stripeAccountId || driverStripeAccountCache.get(driver.id);
+    if (existingAccountId) {
+      try {
+        const existing = await stripe.accounts.retrieve(existingAccountId);
+        if (existing && !existing.deleted) {
+          return existingAccountId;
+        }
+      } catch (e: any) {
+        console.log(`[Stripe Connect] Existing account ${existingAccountId} invalid, creating new`);
+      }
+    }
+
+    if (!driver.sortCode || !driver.accountNumber) {
+      throw new Error('Driver has no bank details on file. Please add bank details to the driver profile first.');
+    }
+
+    const sortCodeClean = driver.sortCode.replace(/\D/g, '');
+    const accountNumberClean = driver.accountNumber.replace(/\D/g, '');
+
+    const nameParts = (driver.fullName || 'Driver').split(' ');
+    const firstName = nameParts[0] || 'Driver';
+    const lastName = nameParts.slice(1).join(' ') || 'Driver';
+
+    const account = await stripe.accounts.create({
+      type: 'custom',
+      country: 'GB',
+      business_type: 'individual',
+      capabilities: {
+        transfers: { requested: true },
+      },
+      individual: {
+        first_name: firstName,
+        last_name: lastName,
+        email: driver.email || undefined,
+        phone: driver.phone || undefined,
+      },
+      external_account: {
+        object: 'bank_account',
+        country: 'GB',
+        currency: 'gbp',
+        account_holder_name: driver.accountHolderName || driver.fullName || 'Driver',
+        account_holder_type: 'individual',
+        routing_number: sortCodeClean,
+        account_number: accountNumberClean,
+      },
+      tos_acceptance: {
+        date: Math.floor(Date.now() / 1000),
+        ip: clientIp || '127.0.0.1',
+      },
+      metadata: {
+        driverId: driver.id,
+        driverCode: driver.driverCode || '',
+      },
+    });
+
+    driverStripeAccountCache.set(driver.id, account.id);
+    try {
+      await storage.updateDriver(driver.id, { stripeAccountId: account.id } as any);
+    } catch (e) {
+      console.log(`[Stripe Connect] Could not save stripeAccountId to DB column, using in-memory cache`);
+    }
+
+    console.log(`[Stripe Connect] Created connected account ${account.id} for driver ${driver.driverCode}`);
+    return account.id;
+  }
+
   app.post("/api/admin/driver-payments/create-payment-intent", asyncHandler(async (req, res) => {
     const { driverId, amount, description } = req.body;
     if (!driverId || !amount) {
@@ -6814,20 +6884,37 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Driver not found" });
     }
 
+    if (!driver.sortCode || !driver.accountNumber) {
+      return res.status(400).json({ error: "Driver has no bank details saved. Please add bank details to the driver profile first." });
+    }
+
+    let stripeAccountId: string;
+    try {
+      const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.ip || '127.0.0.1';
+      stripeAccountId = await getOrCreateDriverStripeAccount(stripe, driver, clientIp);
+    } catch (err: any) {
+      console.error('[Stripe Connect] Failed to create connected account:', err.message);
+      return res.status(400).json({ error: err.message || 'Failed to set up driver payment account' });
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInPence,
       currency: 'gbp',
+      transfer_data: {
+        destination: stripeAccountId,
+      },
       metadata: {
         type: 'driver_payment',
         driverId,
         driverName: driver.fullName || '',
         driverCode: driver.driverCode || '',
         description: description || 'Driver card payment',
+        stripeAccountId,
       },
       description: `Driver payment to ${driver.fullName || driver.driverCode || driverId}`,
     });
 
-    console.log(`[Driver Payment] Created payment intent ${paymentIntent.id} for driver ${driver.driverCode} - £${amount}`);
+    console.log(`[Driver Payment] Created payment intent ${paymentIntent.id} → connected account ${stripeAccountId} for driver ${driver.driverCode} - £${amount}`);
     res.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,

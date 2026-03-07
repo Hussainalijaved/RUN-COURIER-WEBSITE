@@ -92,7 +92,8 @@ function mapDbToDriver(dbDriver: any): Driver {
     isActive: dbDriver.is_active ?? true,
     deactivatedAt: dbDriver.deactivated_at ? new Date(dbDriver.deactivated_at) : null,
     createdAt: dbDriver.created_at ? new Date(dbDriver.created_at) : new Date(),
-  };
+    stripeAccountId: dbDriver.stripe_account_id || null,
+  } as Driver & { stripeAccountId?: string };
 }
 
 function mapDbToJob(dbJob: any): Job {
@@ -791,6 +792,7 @@ export class SupabaseStorage implements IStorage {
     if (data.sortCode !== undefined) dbData.sort_code = data.sortCode;
     if (data.accountNumber !== undefined) dbData.account_number = data.accountNumber;
     if (data.isActive !== undefined) dbData.is_active = data.isActive;
+    if ((data as any).stripeAccountId !== undefined) dbData.stripe_account_id = (data as any).stripeAccountId;
     
     let { data: updated, error } = await supabase
       .from('drivers')
