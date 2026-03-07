@@ -2009,6 +2009,289 @@ export async function registerRoutes(
     res.json({ success: true });
   }));
 
+  // Driver delivers a multi-drop stop with POD (photo + recipient name)
+  // Called from the mobile app when a driver completes a stop
+  app.patch("/api/jobs/:jobId/stops/:stopId/deliver", asyncHandler(async (req, res) => {
+    const { jobId, stopId } = req.params;
+    const { podRecipientName, podPhotoUrl, podSignatureUrl } = req.body;
+
+    // Authenticate - allow both admin and the assigned driver
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.slice(7);
+    const { supabaseAdmin: supAdmin } = await import('./supabaseAdmin');
+    if (!supAdmin) return res.status(500).json({ error: "Database not available" });
+
+    const { data: { user: authUser } } = await supAdmin.auth.getUser(token);
+    if (!authUser) return res.status(401).json({ error: "Invalid authentication" });
+
+    const isAdmin = await isAdminByEmail(authUser.email || '');
+    const job = await storage.getJob(jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const isAssignedDriver = job.driverId === authUser.id;
+    if (!isAdmin && !isAssignedDriver) {
+      return res.status(403).json({ error: "Access denied - only the assigned driver or admin can deliver stops" });
+    }
+
+    if (!job.isMultiDrop) {
+      return res.status(400).json({ error: "This endpoint is only for multi-drop jobs. Use the standard delivery endpoint for single-drop jobs." });
+    }
+
+    // Verify the stop exists and belongs to this job before updating
+    const { data: existingStop, error: fetchError } = await supAdmin
+      .from('multi_drop_stops')
+      .select('id, status')
+      .eq('id', stopId)
+      .eq('job_id', jobId)
+      .single();
+
+    if (fetchError || !existingStop) {
+      return res.status(404).json({ error: "Stop not found for this job" });
+    }
+
+    if (existingStop.status === 'delivered') {
+      return res.status(400).json({ error: "This stop has already been delivered" });
+    }
+
+    // Update the stop with POD data and mark as delivered
+    const updateData: Record<string, any> = {
+      status: 'delivered',
+      delivered_at: new Date().toISOString(),
+    };
+    if (podRecipientName) updateData.pod_recipient_name = podRecipientName;
+    if (podPhotoUrl) updateData.pod_photo_url = podPhotoUrl;
+    if (podSignatureUrl) updateData.pod_signature_url = podSignatureUrl;
+
+    const { data: updatedStop, error: updateError } = await supAdmin
+      .from('multi_drop_stops')
+      .update(updateData)
+      .eq('id', stopId)
+      .eq('job_id', jobId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('[Stop Deliver] Failed to update stop:', updateError);
+      return res.status(500).json({ error: "Failed to deliver stop" });
+    }
+
+    console.log(`[Stop Deliver] Stop ${stopId} delivered for job ${jobId} by ${isAdmin ? 'admin' : 'driver'}`);
+
+    // Check if ALL stops for this job are now delivered
+    const { data: allStops, error: allStopsError } = await supAdmin
+      .from('multi_drop_stops')
+      .select('id, status, pod_photo_url, pod_recipient_name')
+      .eq('job_id', jobId);
+
+    if (allStopsError) {
+      console.error('[Stop Deliver] Failed to fetch all stops:', allStopsError);
+      cache.clear();
+      return res.json({
+        success: true,
+        stop: {
+          id: updatedStop.id,
+          jobId: updatedStop.job_id,
+          stopOrder: updatedStop.stop_order,
+          status: 'delivered',
+          deliveredAt: updatedStop.delivered_at,
+          podRecipientName: updatedStop.pod_recipient_name,
+          podPhotoUrl: updatedStop.pod_photo_url,
+        },
+        jobCompleted: false,
+        message: "Stop delivered but could not check auto-completion status",
+      });
+    }
+
+    const allDelivered = allStops && allStops.length > 0 && allStops.every(s => s.status === 'delivered');
+
+    if (allDelivered) {
+      console.log(`[Stop Deliver] All ${allStops.length} stops delivered for job ${jobId} - auto-completing job`);
+
+      // Set synthetic POD on the main job via storage (single consistent update)
+      const syntheticPodRecipient = updatedStop.pod_recipient_name || 'Multi-drop complete';
+      const syntheticPodPhoto = allStops.find(s => s.pod_photo_url)?.pod_photo_url || null;
+      await storage.updateJob(jobId, {
+        podNotes: `Multi-drop delivery completed. ${allStops.length} stops delivered.`,
+        podRecipientName: syntheticPodRecipient,
+        podPhotoUrl: syntheticPodPhoto,
+      });
+
+      // Update job status to delivered
+      const deliveredJob = await storage.updateJobStatus(jobId, 'delivered');
+      if (deliveredJob) {
+        console.log(`[Stop Deliver] Job ${jobId} auto-completed after all stops delivered`);
+
+        // Broadcast job status update
+        broadcastJobUpdate({
+          id: deliveredJob.id,
+          trackingNumber: deliveredJob.trackingNumber,
+          status: 'delivered',
+          previousStatus: job.status,
+          customerId: deliveredJob.customerId,
+          driverId: deliveredJob.driverId,
+          updatedAt: deliveredJob.updatedAt,
+        });
+
+        // Send delivery confirmation email
+        try {
+          let customerEmail = (deliveredJob as any).customerEmail;
+          if (!customerEmail && deliveredJob.customerId) {
+            const customer = await storage.getUser(deliveredJob.customerId);
+            customerEmail = customer?.email;
+          }
+          if (!customerEmail) {
+            const { data: sJob } = await supAdmin
+              .from('jobs')
+              .select('customer_email')
+              .eq('id', jobId)
+              .single();
+            if (sJob?.customer_email) customerEmail = sJob.customer_email;
+          }
+          if (customerEmail) {
+            const { sendDeliveryConfirmationEmail } = await import('./emailService');
+            const numberedJob = ensureJobNumber(deliveredJob);
+            await sendDeliveryConfirmationEmail(customerEmail, {
+              trackingNumber: deliveredJob.trackingNumber,
+              jobNumber: numberedJob.jobNumber,
+              pickupAddress: deliveredJob.pickupAddress,
+              pickupPostcode: deliveredJob.pickupPostcode,
+              deliveryAddress: deliveredJob.deliveryAddress,
+              deliveryPostcode: deliveredJob.deliveryPostcode,
+              recipientName: deliveredJob.recipientName,
+              podRecipientName: syntheticPodRecipient,
+              podPhotoUrl: syntheticPodPhoto,
+              deliveredAt: new Date().toISOString(),
+            });
+            console.log(`[Stop Deliver] Delivery confirmation email sent for job ${jobId}`);
+          }
+        } catch (emailErr) {
+          console.error('[Stop Deliver] Failed to send delivery email:', emailErr);
+        }
+      }
+
+      cache.clear();
+      return res.json({
+        success: true,
+        stop: {
+          id: updatedStop.id,
+          jobId: updatedStop.job_id,
+          stopOrder: updatedStop.stop_order,
+          status: 'delivered',
+          deliveredAt: updatedStop.delivered_at,
+          podRecipientName: updatedStop.pod_recipient_name,
+          podPhotoUrl: updatedStop.pod_photo_url,
+        },
+        jobCompleted: true,
+        message: `All ${allStops.length} stops delivered. Job auto-completed.`,
+      });
+    }
+
+    cache.clear();
+    res.json({
+      success: true,
+      stop: {
+        id: updatedStop.id,
+        jobId: updatedStop.job_id,
+        stopOrder: updatedStop.stop_order,
+        status: 'delivered',
+        deliveredAt: updatedStop.delivered_at,
+        podRecipientName: updatedStop.pod_recipient_name,
+        podPhotoUrl: updatedStop.pod_photo_url,
+      },
+      jobCompleted: false,
+      remainingStops: allStops ? allStops.filter(s => s.status !== 'delivered').length : undefined,
+    });
+  }));
+
+  // Upload POD photo for a multi-drop stop (driver-facing)
+  app.post("/api/jobs/:jobId/stops/:stopId/pod/driver-upload", (req, res, next) => {
+    uploadPodImage.single('file')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "File size exceeds 10MB limit" });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  }, asyncHandler(async (req, res) => {
+    const { jobId, stopId } = req.params;
+
+    // Authenticate driver
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.slice(7);
+    const { supabaseAdmin: supAdmin } = await import('./supabaseAdmin');
+    if (!supAdmin) return res.status(500).json({ error: "Storage service unavailable" });
+
+    const { data: { user: authUser } } = await supAdmin.auth.getUser(token);
+    if (!authUser) return res.status(401).json({ error: "Invalid authentication" });
+
+    const job = await storage.getJob(jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const isAdmin = await isAdminByEmail(authUser.email || '');
+    const isAssignedDriver = job.driverId === authUser.id;
+    if (!isAdmin && !isAssignedDriver) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const timestamp = Date.now();
+    const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
+    const finalFilename = `stop_${stopId}_${timestamp}${ext}`;
+    const BUCKET = 'driver-documents';
+    const storagePath = `pod/${jobId}/${finalFilename}`;
+    const contentType = req.file.mimetype || 'image/jpeg';
+    const fileBuffer = req.file.buffer;
+
+    let uploaded = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const { error: uploadError } = await supAdmin.storage
+          .from(BUCKET)
+          .upload(storagePath, fileBuffer, { contentType, upsert: true });
+        if (!uploadError) { uploaded = true; break; }
+        console.warn(`[Stop POD Driver] Upload attempt ${attempt}/3 failed:`, uploadError.message);
+      } catch (err: any) {
+        console.warn(`[Stop POD Driver] Upload attempt ${attempt}/3 error:`, err.message);
+      }
+      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
+
+    if (!uploaded) return res.status(500).json({ error: "Failed to upload POD photo" });
+
+    // Update the stop with the POD photo
+    const { error: updateError } = await supAdmin
+      .from('multi_drop_stops')
+      .update({ pod_photo_url: storagePath })
+      .eq('id', stopId)
+      .eq('job_id', jobId);
+
+    if (updateError) {
+      console.error('[Stop POD Driver] Failed to update stop:', updateError);
+      return res.status(500).json({ error: "Failed to save POD reference" });
+    }
+
+    let signedUrl = storagePath;
+    try {
+      const { data } = await supAdmin.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
+      if (data?.signedUrl) signedUrl = data.signedUrl;
+    } catch {}
+
+    console.log(`[Stop POD Driver] Uploaded POD for stop ${stopId} of job ${jobId}`);
+    res.json({ success: true, podPhotoUrl: signedUrl, storagePath, stopId });
+  }));
+
   app.post("/api/jobs", asyncHandler(async (req, res) => {
     console.log('[Jobs] POST /api/jobs - Creating new job with driverId:', req.body.driverId);
     
@@ -2416,7 +2699,8 @@ export async function registerRoutes(
     }
     
     // Require POD (photo or signature) before marking as delivered
-    if (status === "delivered") {
+    // For multi-drop jobs, POD is collected per stop, so skip this check
+    if (status === "delivered" && !previousJob.isMultiDrop) {
       if (!previousJob.podPhotoUrl && !previousJob.podSignatureUrl) {
         return res.status(400).json({ 
           error: "Proof of Delivery (photo or signature) is required before marking as delivered. POD must be submitted from the mobile app.",

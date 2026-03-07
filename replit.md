@@ -41,6 +41,9 @@ A multi-step application process allows prospective drivers to submit details fo
 ### Mobile API
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities including profile management, location updates, job management, and proof of delivery uploads, authenticated via Supabase JWT. It supports admin-to-driver job assignments.
 
+### Multi-Drop Stop POD & Auto-Complete
+For multi-drop jobs, POD (photo + recipient name) is collected per stop, not on the main job. The driver marks each stop as delivered individually via `PATCH /api/jobs/:jobId/stops/:stopId/deliver` (authenticated by Supabase JWT — allows assigned driver or admin). A separate `POST /api/jobs/:jobId/stops/:stopId/pod/driver-upload` endpoint handles stop POD photo uploads. When ALL stops for a multi-drop job are marked as delivered, the job auto-completes: a synthetic POD is set on the main job, the job status transitions to "delivered", a delivery confirmation email is sent, and a WebSocket broadcast goes out. The main job delivery endpoint (`PATCH /api/jobs/:id/status`) skips the POD photo/signature requirement for multi-drop jobs since POD is collected per stop.
+
 ### Push Notifications
 Real-time push notifications alert drivers instantly when jobs are assigned using Expo Push API. Drivers register their Expo push tokens, which are stored in the `driver_devices` table.
 
