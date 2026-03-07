@@ -72,6 +72,7 @@ import {
   X,
   Upload,
   Camera,
+  Smartphone,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -1587,7 +1588,17 @@ export default function AdminJobs() {
                       </TableCell>
                       <TableCell className="capitalize">{job.vehicleType?.replace('_', ' ')}</TableCell>
                       <TableCell>{getDriverName(job.driverId)}</TableCell>
-                      <TableCell>{getStatusBadge(job.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {getStatusBadge(job.status)}
+                          {job.driverId && !(job as any).driverHidden && !['delivered', 'cancelled', 'failed'].includes(job.status) && (
+                            <Smartphone className="h-3.5 w-3.5 text-green-500" data-testid={`icon-on-mobile-${job.id}`} />
+                          )}
+                          {(job as any).driverHidden && (
+                            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" data-testid={`icon-hidden-${job.id}`} />
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(job.createdAt)}</TableCell>
                       <TableCell className="text-right font-medium">{formatPrice(job.totalPrice)}</TableCell>
                       <TableCell className="text-right">
