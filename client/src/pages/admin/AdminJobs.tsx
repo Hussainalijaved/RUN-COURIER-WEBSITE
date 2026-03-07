@@ -22,6 +22,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -1214,6 +1215,40 @@ export default function AdminJobs() {
     });
   }, [supabaseDrivers, supabaseDriversError, drivers]);
 
+  const vehicleTypeOrder = ['motorbike', 'car', 'small_van', 'medium_van', 'large_van', 'luton_van', 'flatbed'];
+  const vehicleTypeLabels: Record<string, string> = {
+    motorbike: 'Motorbike',
+    car: 'Car',
+    small_van: 'Small Van',
+    medium_van: 'Medium Van',
+    large_van: 'Large Van',
+    luton_van: 'Luton Van',
+    flatbed: 'Flatbed',
+  };
+
+  const driversGroupedByVehicle = useMemo(() => {
+    const groups: { type: string; label: string; drivers: typeof allDriversWithInfo }[] = [];
+    const grouped = new Map<string, typeof allDriversWithInfo>();
+    for (const driver of allDriversWithInfo) {
+      const vt = (driver.vehicleType || 'car').toLowerCase();
+      if (!grouped.has(vt)) grouped.set(vt, []);
+      grouped.get(vt)!.push(driver);
+    }
+    const sortedKeys = [...grouped.keys()].sort((a, b) => {
+      const ai = vehicleTypeOrder.indexOf(a);
+      const bi = vehicleTypeOrder.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+    for (const key of sortedKeys) {
+      groups.push({
+        type: key,
+        label: vehicleTypeLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        drivers: grouped.get(key)!,
+      });
+    }
+    return groups;
+  }, [allDriversWithInfo]);
+
   const availableDrivers = drivers?.filter((d) => d.isAvailable && d.isVerified) || [];
   const allDrivers = drivers || [];
 
@@ -2127,23 +2162,27 @@ export default function AdminJobs() {
                     <SelectTrigger id="assign-driver-select" data-testid="select-assign-driver">
                       <SelectValue placeholder="Choose a driver..." />
                     </SelectTrigger>
-                    <SelectContent>
-                      {allDriversWithInfo.map((driver) => (
-                        <SelectItem 
-                          key={driver.id} 
-                          value={driver.id}
-                        >
-                          <div className="flex items-center gap-2">
-                            {driver.driverCode && (
-                              <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
-                            )}
-                            <span>{driver.name}</span>
-                            <Badge variant="outline" className="capitalize text-xs">{driver.vehicleType?.replace('_', ' ')}</Badge>
-                            {driver.isAvailable && (
-                              <Badge variant="secondary" className="text-xs text-green-600">Online</Badge>
-                            )}
-                          </div>
-                        </SelectItem>
+                    <SelectContent className="max-h-[300px]">
+                      {driversGroupedByVehicle.map((group) => (
+                        <SelectGroup key={group.type}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/50">{group.label} ({group.drivers.length})</div>
+                          {group.drivers.map((driver) => (
+                            <SelectItem 
+                              key={driver.id} 
+                              value={driver.id}
+                            >
+                              <div className="flex items-center gap-2" data-testid={`driver-option-${driver.id}`}>
+                                {driver.driverCode && (
+                                  <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                                )}
+                                <span>{driver.name}</span>
+                                {driver.isAvailable && (
+                                  <Badge variant="secondary" className="text-xs text-green-600">Online</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       ))}
                     </SelectContent>
                   </Select>
@@ -2643,20 +2682,25 @@ export default function AdminJobs() {
                         <SelectTrigger id="edit-driver" data-testid="select-edit-driver">
                           <SelectValue placeholder="Select driver" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-[300px]">
                           <SelectItem value="unassigned">No Driver (Unassigned)</SelectItem>
-                          {allDriversWithInfo.map((driver) => (
-                            <SelectItem key={driver.id} value={driver.id}>
-                              <div className="flex items-center gap-2">
-                                {driver.driverCode && (
-                                  <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
-                                )}
-                                <span>{driver.name}</span>
-                                {driver.isAvailable && (
-                                  <Badge variant="secondary" className="text-xs">Online</Badge>
-                                )}
-                              </div>
-                            </SelectItem>
+                          {driversGroupedByVehicle.map((group) => (
+                            <SelectGroup key={group.type}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/50">{group.label} ({group.drivers.length})</div>
+                              {group.drivers.map((driver) => (
+                                <SelectItem key={driver.id} value={driver.id}>
+                                  <div className="flex items-center gap-2">
+                                    {driver.driverCode && (
+                                      <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                                    )}
+                                    <span>{driver.name}</span>
+                                    {driver.isAvailable && (
+                                      <Badge variant="secondary" className="text-xs">Online</Badge>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           ))}
                         </SelectContent>
                       </Select>
@@ -2909,19 +2953,24 @@ export default function AdminJobs() {
                   <SelectTrigger id="batch-driver" data-testid="select-batch-driver">
                     <SelectValue placeholder="Choose a driver" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {allDriversWithInfo.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        <div className="flex items-center gap-2">
-                          {driver.driverCode && (
-                            <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
-                          )}
-                          <span>{driver.name}</span>
-                          {driver.isAvailable && (
-                            <Badge variant="secondary" className="text-xs">Online</Badge>
-                          )}
-                        </div>
-                      </SelectItem>
+                  <SelectContent className="max-h-[300px]">
+                    {driversGroupedByVehicle.map((group) => (
+                      <SelectGroup key={group.type}>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/50">{group.label} ({group.drivers.length})</div>
+                        {group.drivers.map((driver) => (
+                          <SelectItem key={driver.id} value={driver.id}>
+                            <div className="flex items-center gap-2">
+                              {driver.driverCode && (
+                                <span className="font-mono font-bold text-blue-600">{driver.driverCode}</span>
+                              )}
+                              <span>{driver.name}</span>
+                              {driver.isAvailable && (
+                                <Badge variant="secondary" className="text-xs">Online</Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     ))}
                   </SelectContent>
                 </Select>
