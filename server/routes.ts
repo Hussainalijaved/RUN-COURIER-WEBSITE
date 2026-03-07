@@ -6794,6 +6794,115 @@ export async function registerRoutes(
     res.json({ success: true });
   }));
 
+  app.post("/api/admin/driver-payments/create-payment-intent", asyncHandler(async (req, res) => {
+    const { driverId, amount, description } = req.body;
+    if (!driverId || !amount) {
+      return res.status(400).json({ error: "Driver ID and amount are required" });
+    }
+    const amountInPence = Math.round(parseFloat(amount) * 100);
+    if (amountInPence < 50) {
+      return res.status(400).json({ error: "Amount must be at least £0.50" });
+    }
+
+    const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+    if (!stripe) {
+      return res.status(500).json({ error: "Payment system not configured" });
+    }
+
+    const driver = await storage.getDriver(driverId);
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInPence,
+      currency: 'gbp',
+      metadata: {
+        type: 'driver_payment',
+        driverId,
+        driverName: driver.fullName || '',
+        driverCode: driver.driverCode || '',
+        description: description || 'Driver card payment',
+      },
+      description: `Driver payment to ${driver.fullName || driver.driverCode || driverId}`,
+    });
+
+    console.log(`[Driver Payment] Created payment intent ${paymentIntent.id} for driver ${driver.driverCode} - £${amount}`);
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    });
+  }));
+
+  app.post("/api/admin/driver-payments/confirm-card-payment", asyncHandler(async (req, res) => {
+    const { paymentIntentId, driverId } = req.body;
+    if (!paymentIntentId || !driverId) {
+      return res.status(400).json({ error: "Payment intent ID and driver ID are required" });
+    }
+
+    const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+    if (!stripe) {
+      return res.status(500).json({ error: "Payment system not configured" });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ error: `Payment not completed. Status: ${paymentIntent.status}` });
+    }
+
+    if (paymentIntent.metadata?.type !== 'driver_payment' || paymentIntent.metadata?.driverId !== driverId) {
+      return res.status(400).json({ error: "Payment intent does not match driver" });
+    }
+    if (paymentIntent.currency !== 'gbp') {
+      return res.status(400).json({ error: "Invalid payment currency" });
+    }
+
+    const confirmedAmount = (paymentIntent.amount / 100).toFixed(2);
+    const payoutRef = `CARD-${paymentIntentId.slice(-8).toUpperCase()}`;
+    const description = paymentIntent.metadata?.description || 'Card payment';
+
+    const existingPayments = await storage.getDriverPayments({ driverId });
+    const duplicate = existingPayments.find((p: any) => p.payoutReference === payoutRef);
+    if (duplicate) {
+      console.log(`[Driver Payment] Duplicate confirm for ${payoutRef}, returning existing`);
+      return res.json({ success: true, payment: duplicate });
+    }
+
+    const payment = await storage.createDriverPayment({
+      driverId,
+      amount: confirmedAmount,
+      netAmount: confirmedAmount,
+      platformFee: "0.00",
+      status: 'paid',
+      description,
+      payoutReference: payoutRef,
+      paidAt: new Date().toISOString(),
+    });
+
+    try {
+      const driver = await storage.getDriver(driverId);
+      if (driver?.email) {
+        const { sendDriverPaymentConfirmation } = await import('./emailService');
+        await sendDriverPaymentConfirmation(driver.email, {
+          driverName: driver.fullName || 'Driver',
+          amount: confirmedAmount,
+          description,
+          reference: payoutRef,
+          bankName: undefined,
+          sortCode: undefined,
+          accountNumber: undefined,
+          paidAt: new Date().toISOString(),
+        });
+        console.log(`[Driver Payment] Card payment confirmation email sent to ${driver.email}`);
+      }
+    } catch (emailErr) {
+      console.error('[Driver Payment] Failed to send card payment confirmation:', emailErr);
+    }
+
+    console.log(`[Driver Payment] Card payment confirmed: ${paymentIntentId} for driver ${driverId} - £${confirmedAmount}`);
+    res.json({ success: true, payment });
+  }));
+
   app.get("/api/stripe/config", asyncHandler(async (req, res) => {
     try {
       const publishableKey = await getStripePublishableKey();
