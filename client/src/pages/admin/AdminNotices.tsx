@@ -190,7 +190,7 @@ export default function AdminNotices() {
 
   async function openNoticeDetail(noticeId: string) {
     try {
-      const res = await fetch(`/api/admin/notices/${noticeId}`, { credentials: 'include' });
+      const res = await apiRequest('GET', `/api/admin/notices/${noticeId}`);
       const data = await res.json();
       setDetailNotice(data);
       setDetailOpen(true);
