@@ -84,6 +84,7 @@ export default function AdminContracts() {
 
   const { data: contracts = [], isLoading: contractsLoading } = useQuery<any[]>({
     queryKey: ['/api/driver-contracts'],
+    refetchInterval: 15000,
   });
 
   const { data: drivers = [] } = useQuery<any[]>({
@@ -171,9 +172,18 @@ export default function AdminContracts() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-contracts'] });
       toast({ title: 'Contract email resent' });
     },
-    onError: () => toast({ title: 'Failed to resend email', variant: 'destructive' }),
+    onError: (err: any) => {
+      const msg = err?.message || '';
+      if (msg.includes('already signed')) {
+        toast({ title: 'Contract is already signed', variant: 'destructive' });
+        queryClient.invalidateQueries({ queryKey: ['/api/driver-contracts'] });
+      } else {
+        toast({ title: 'Failed to resend email', variant: 'destructive' });
+      }
+    },
   });
 
   function resetTemplateForm() {

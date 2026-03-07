@@ -7209,30 +7209,42 @@ export async function registerRoutes(
   }));
 
   app.post("/api/admin/contracts/resend/:id", asyncHandler(async (req, res) => {
+    console.log(`[Contracts] Resend request for contract ${req.params.id}`);
     const contract = await storage.getDriverContract(req.params.id);
-    if (!contract) return res.status(404).json({ error: "Contract not found" });
-    if (contract.status === 'signed') return res.status(400).json({ error: "Contract is already signed" });
-
-    if (contract.driver_email) {
-      try {
-        const { sendContractSigningEmail } = await import('./emailService');
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
-        const host = req.headers['x-forwarded-host'] || req.headers.host || 'runcourier.co.uk';
-        const signingUrl = `${protocol}://${host}/contracts/sign/${contract.token}`;
-
-        const template = contract.template_id ? await storage.getContractTemplate(contract.template_id) : null;
-        await sendContractSigningEmail(contract.driver_email, {
-          driverName: contract.driver_name,
-          contractTitle: template?.title || 'Contract',
-          signingUrl,
-        });
-        console.log(`[Contracts] Resent signing email to ${contract.driver_email}`);
-      } catch (emailErr) {
-        console.error('[Contracts] Failed to resend signing email:', emailErr);
-      }
+    if (!contract) {
+      console.log(`[Contracts] Contract ${req.params.id} not found for resend`);
+      return res.status(404).json({ error: "Contract not found" });
+    }
+    if (contract.status === 'signed') {
+      console.log(`[Contracts] Contract ${req.params.id} already signed, cannot resend`);
+      return res.status(400).json({ error: "Contract is already signed" });
     }
 
-    res.json({ success: true });
+    if (!contract.driver_email) {
+      console.log(`[Contracts] Contract ${req.params.id} has no driver email`);
+      return res.status(400).json({ error: "No email address for this driver" });
+    }
+
+    try {
+      const { sendContractSigningEmail } = await import('./emailService');
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers['x-forwarded-host'] || req.headers.host || 'runcourier.co.uk';
+      const signingUrl = `${protocol}://${host}/contracts/sign/${contract.token}`;
+
+      const template = contract.template_id ? await storage.getContractTemplate(contract.template_id) : null;
+      await sendContractSigningEmail(contract.driver_email, {
+        driverName: contract.driver_name,
+        contractTitle: template?.title || 'Contract',
+        signingUrl,
+      });
+      console.log(`[Contracts] Resent signing email to ${contract.driver_email}`);
+
+      await storage.updateDriverContract(contract.id, { sent_at: new Date().toISOString() });
+      res.json({ success: true });
+    } catch (emailErr: any) {
+      console.error('[Contracts] Failed to resend signing email:', emailErr);
+      res.status(500).json({ error: "Failed to send email: " + (emailErr.message || 'Unknown error') });
+    }
   }));
 
   app.get("/api/contracts/sign/:token", asyncHandler(async (req, res) => {
@@ -7249,9 +7261,16 @@ export async function registerRoutes(
   }));
 
   app.post("/api/contracts/sign/:token", asyncHandler(async (req, res) => {
+    console.log(`[Contracts] Sign request for token ${req.params.token.substring(0, 8)}...`);
     const contract = await storage.getDriverContractByToken(req.params.token);
-    if (!contract) return res.status(404).json({ error: "Contract not found" });
-    if (contract.status === 'signed') return res.status(400).json({ error: "Contract is already signed" });
+    if (!contract) {
+      console.log(`[Contracts] Contract not found for signing token`);
+      return res.status(404).json({ error: "Contract not found" });
+    }
+    if (contract.status === 'signed') {
+      console.log(`[Contracts] Contract ${contract.id} already signed`);
+      return res.status(400).json({ error: "Contract is already signed" });
+    }
 
     const { signatureData, signedName } = req.body;
     if (!signatureData || !signedName) return res.status(400).json({ error: "Signature and name are required" });
@@ -7263,6 +7282,7 @@ export async function registerRoutes(
       signed_name: signedName,
     });
 
+    console.log(`[Contracts] Contract ${contract.id} signed by ${signedName}, updated status: ${updated?.status}`);
     res.json({ success: true, contract: updated });
   }));
 
