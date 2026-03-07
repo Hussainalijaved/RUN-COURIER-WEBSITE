@@ -118,19 +118,14 @@ function DriverCardPaymentForm({ amount, driverId, driverName, description, onSu
     if (paymentIntent?.status === 'succeeded') {
       setPaymentIntentId(paymentIntent.id);
       try {
-        const resp = await fetch('/api/admin/driver-payments/confirm-card-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentIntentId: paymentIntent.id, driverId }),
+        await apiRequest('POST', '/api/admin/driver-payments/confirm-card-payment', {
+          paymentIntentId: paymentIntent.id, driverId,
         });
-        if (resp.ok) {
-          onSuccess();
-        } else {
-          const data = await resp.json();
-          setPaymentError(data.error || 'Failed to record payment');
-        }
-      } catch {
-        setPaymentError('Payment succeeded but failed to record. Contact support with ref: ' + paymentIntent.id);
+        onSuccess();
+      } catch (err: any) {
+        setPaymentError(err?.message?.includes('Payment not completed') || err?.message?.includes('does not match')
+          ? err.message
+          : 'Payment succeeded but failed to record. Contact support with ref: ' + paymentIntent.id);
       }
       setIsProcessing(false);
     } else {
@@ -397,22 +392,20 @@ export default function AdminDriverPayments() {
       }
       setStripeInstance(stripeInst);
 
-      const resp = await fetch('/api/admin/driver-payments/create-payment-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverId: payDriver.id, amount: payAmount, description: payDescription || 'Driver card payment' }),
+      const resp = await apiRequest('POST', '/api/admin/driver-payments/create-payment-intent', {
+        driverId: payDriver.id, amount: payAmount, description: payDescription || 'Driver card payment',
       });
       const data = await resp.json();
-      if (!resp.ok || !data.clientSecret) {
-        toast({ title: 'Failed to start payment', description: data.error || 'Please try again', variant: 'destructive' });
+      if (!data.clientSecret) {
+        toast({ title: 'Failed to start payment', description: 'No payment session returned', variant: 'destructive' });
         setCardLoading(false);
         return;
       }
       setCardClientSecret(data.clientSecret);
       setCardPaymentIntentId(data.paymentIntentId);
       setPayStep('card');
-    } catch {
-      toast({ title: 'Payment error', description: 'Could not connect to payment system', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Payment error', description: err?.message || 'Could not connect to payment system', variant: 'destructive' });
     }
     setCardLoading(false);
   };
