@@ -123,6 +123,7 @@ const COUNTRIES = [
 
 export default function AdminDrivers() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'available' | 'pending'>('all');
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [documentsDialogOpen, setDocumentsDialogOpen] = useState(false);
@@ -662,6 +663,10 @@ export default function AdminDrivers() {
   );
 
   const filteredDrivers = drivers?.filter((driver) => {
+    if (statusFilter === 'verified' && !driver.isVerified) return false;
+    if (statusFilter === 'available' && !driver.isAvailable) return false;
+    if (statusFilter === 'pending' && driver.isVerified) return false;
+
     const info = getDriverInfo(driver);
     const searchLower = searchQuery.toLowerCase();
     return (
@@ -755,7 +760,11 @@ export default function AdminDrivers() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <Card data-testid="stat-total-drivers">
+          <Card
+            className={`cursor-pointer hover-elevate transition-colors ${statusFilter === 'all' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setStatusFilter('all')}
+            data-testid="stat-total-drivers"
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -770,7 +779,11 @@ export default function AdminDrivers() {
               </div>
             </CardContent>
           </Card>
-          <Card data-testid="stat-verified-drivers">
+          <Card
+            className={`cursor-pointer hover-elevate transition-colors ${statusFilter === 'verified' ? 'ring-2 ring-green-500' : ''}`}
+            onClick={() => setStatusFilter(statusFilter === 'verified' ? 'all' : 'verified')}
+            data-testid="stat-verified-drivers"
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -785,7 +798,11 @@ export default function AdminDrivers() {
               </div>
             </CardContent>
           </Card>
-          <Card data-testid="stat-available-drivers">
+          <Card
+            className={`cursor-pointer hover-elevate transition-colors ${statusFilter === 'available' ? 'ring-2 ring-blue-500' : ''}`}
+            onClick={() => setStatusFilter(statusFilter === 'available' ? 'all' : 'available')}
+            data-testid="stat-available-drivers"
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -800,7 +817,11 @@ export default function AdminDrivers() {
               </div>
             </CardContent>
           </Card>
-          <Card data-testid="stat-pending-drivers">
+          <Card
+            className={`cursor-pointer hover-elevate transition-colors ${statusFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}`}
+            onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+            data-testid="stat-pending-drivers"
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -830,6 +851,22 @@ export default function AdminDrivers() {
                   data-testid="input-search-drivers"
                 />
               </div>
+              {statusFilter !== 'all' && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer"
+                    onClick={() => setStatusFilter('all')}
+                    data-testid="badge-active-filter"
+                  >
+                    {statusFilter === 'verified' && 'Verified'}
+                    {statusFilter === 'available' && 'Available Now'}
+                    {statusFilter === 'pending' && 'Pending Verification'}
+                    {' '} ({filteredDrivers.length})
+                    <span className="ml-1.5 text-xs opacity-60">✕</span>
+                  </Badge>
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
