@@ -11885,6 +11885,236 @@ export async function registerRoutes(
     res.json(settings.bankDetails);
   }));
 
+  // ========== Company Saved Card for Driver Payments ==========
+
+  app.get("/api/admin/company-card", asyncHandler(async (req, res) => {
+    const settings = getCompanySettings();
+    const cardInfo = settings.companyCard;
+    if (!cardInfo?.stripeCustomerId || !cardInfo?.paymentMethodId) {
+      return res.json(null);
+    }
+
+    try {
+      const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+      if (!stripe) return res.json(null);
+
+      const pm = await stripe.paymentMethods.retrieve(cardInfo.paymentMethodId);
+      res.json({
+        last4: pm.card?.last4,
+        brand: pm.card?.brand,
+        expMonth: pm.card?.exp_month,
+        expYear: pm.card?.exp_year,
+        savedAt: cardInfo.savedAt,
+      });
+    } catch (err: any) {
+      console.error('[Company Card] Failed to retrieve card:', err.message);
+      res.json(null);
+    }
+  }));
+
+  app.post("/api/admin/company-card/setup", asyncHandler(async (req, res) => {
+    const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+    if (!stripe) {
+      return res.status(500).json({ error: "Payment system not configured" });
+    }
+
+    const settings = getCompanySettings();
+    let customerId = settings.companyCard?.stripeCustomerId;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        name: 'Run Courier Ltd',
+        description: 'Company card for driver payments',
+        metadata: { type: 'company_payment_card' },
+      });
+      customerId = customer.id;
+    }
+
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      metadata: { type: 'company_driver_payment_card' },
+    });
+
+    settings.companyCard = {
+      ...settings.companyCard,
+      stripeCustomerId: customerId,
+    };
+    saveCompanySettings(settings);
+
+    console.log(`[Company Card] Setup intent created: ${setupIntent.id} for customer ${customerId}`);
+    res.json({
+      clientSecret: setupIntent.client_secret,
+      customerId,
+    });
+  }));
+
+  app.post("/api/admin/company-card/confirm", asyncHandler(async (req, res) => {
+    const { setupIntentId } = req.body;
+    if (!setupIntentId) {
+      return res.status(400).json({ error: "Setup intent ID is required" });
+    }
+
+    const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+    if (!stripe) {
+      return res.status(500).json({ error: "Payment system not configured" });
+    }
+
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+    if (setupIntent.status !== 'succeeded') {
+      return res.status(400).json({ error: `Card setup not completed. Status: ${setupIntent.status}` });
+    }
+
+    const paymentMethodId = typeof setupIntent.payment_method === 'string'
+      ? setupIntent.payment_method
+      : setupIntent.payment_method?.id;
+
+    if (!paymentMethodId) {
+      return res.status(400).json({ error: "No payment method found" });
+    }
+
+    const settings = getCompanySettings();
+    const customerId = settings.companyCard?.stripeCustomerId;
+
+    if (customerId) {
+      await stripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+    }
+
+    settings.companyCard = {
+      ...settings.companyCard,
+      paymentMethodId,
+      savedAt: new Date().toISOString(),
+    };
+    saveCompanySettings(settings);
+
+    const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+    console.log(`[Company Card] Card saved: ${pm.card?.brand} ****${pm.card?.last4}`);
+
+    res.json({
+      success: true,
+      card: {
+        last4: pm.card?.last4,
+        brand: pm.card?.brand,
+        expMonth: pm.card?.exp_month,
+        expYear: pm.card?.exp_year,
+      },
+    });
+  }));
+
+  app.delete("/api/admin/company-card", asyncHandler(async (req, res) => {
+    const settings = getCompanySettings();
+    const cardInfo = settings.companyCard;
+
+    if (cardInfo?.paymentMethodId) {
+      try {
+        const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+        if (stripe) {
+          await stripe.paymentMethods.detach(cardInfo.paymentMethodId);
+        }
+      } catch (err: any) {
+        console.warn('[Company Card] Failed to detach payment method:', err.message);
+      }
+    }
+
+    delete settings.companyCard;
+    saveCompanySettings(settings);
+    console.log('[Company Card] Saved card removed');
+    res.json({ success: true });
+  }));
+
+  app.post("/api/admin/company-card/pay-driver", asyncHandler(async (req, res) => {
+    const { driverId, amount, description } = req.body;
+    if (!driverId || !amount) {
+      return res.status(400).json({ error: "Driver ID and amount are required" });
+    }
+
+    const amountInPence = Math.round(parseFloat(amount) * 100);
+    if (amountInPence < 50) {
+      return res.status(400).json({ error: "Amount must be at least £0.50" });
+    }
+
+    const settings = getCompanySettings();
+    const cardInfo = settings.companyCard;
+    if (!cardInfo?.stripeCustomerId || !cardInfo?.paymentMethodId) {
+      return res.status(400).json({ error: "No company card saved. Please set up a card first." });
+    }
+
+    const stripe = await (await import('./stripeClient')).getUncachableStripeClient();
+    if (!stripe) {
+      return res.status(500).json({ error: "Payment system not configured" });
+    }
+
+    const driver = await storage.getDriver(driverId);
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInPence,
+      currency: 'gbp',
+      customer: cardInfo.stripeCustomerId,
+      payment_method: cardInfo.paymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata: {
+        type: 'driver_payment_saved_card',
+        driverId,
+        driverName: driver.fullName || '',
+        driverCode: driver.driverCode || '',
+        description: description || 'Saved card payment',
+      },
+      description: `Driver payment to ${driver.fullName || driver.driverCode || driverId}`,
+    });
+
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({
+        error: `Payment failed. Status: ${paymentIntent.status}`,
+        requiresAction: paymentIntent.status === 'requires_action',
+      });
+    }
+
+    const confirmedAmount = (paymentIntent.amount / 100).toFixed(2);
+    const payoutRef = `SAVED-${paymentIntent.id.slice(-8).toUpperCase()}`;
+
+    const existingPayments = await storage.getDriverPayments({ driverId });
+    const duplicate = existingPayments.find((p: any) => p.payoutReference === payoutRef);
+    if (duplicate) {
+      return res.json({ success: true, payment: duplicate });
+    }
+
+    const payment = await storage.createDriverPayment({
+      driverId,
+      amount: confirmedAmount,
+      netAmount: confirmedAmount,
+      platformFee: "0.00",
+      status: 'paid',
+      description: description || 'Saved card payment',
+      payoutReference: payoutRef,
+      paidAt: new Date().toISOString(),
+    });
+
+    try {
+      if (driver.email) {
+        const { sendDriverPaymentConfirmation } = await import('./emailService');
+        await sendDriverPaymentConfirmation(driver.email, {
+          driverName: driver.fullName || 'Driver',
+          amount: confirmedAmount,
+          description: description || 'Saved card payment',
+          reference: payoutRef,
+          paidAt: new Date().toISOString(),
+        });
+        console.log(`[Company Card] Payment confirmation email sent to ${driver.email}`);
+      }
+    } catch (emailErr) {
+      console.error('[Company Card] Failed to send payment email:', emailErr);
+    }
+
+    console.log(`[Company Card] Instant payment: £${confirmedAmount} to ${driver.fullName || driver.driverCode} via saved card`);
+    res.json({ success: true, payment });
+  }));
+
   // Admin: Generate and send payment link for a job
   app.post("/api/admin/payment-links", asyncHandler(async (req, res) => {
     const { jobId, adminId, customerEmail: providedEmail, customerName: providedName } = req.body;

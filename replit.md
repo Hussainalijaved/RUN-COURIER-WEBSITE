@@ -87,6 +87,9 @@ Admins can pay drivers directly from the admin panel via two methods:
 
 Both methods send email confirmation to the driver upon success. Payment history includes delete functionality. The system uses `POST /api/driver-payments` to record payments and `DELETE /api/driver-payments/:id` to remove them.
 
+### Saved Company Card (Instant Payments)
+Admins can save a company card once via Stripe SetupIntent (`POST /api/admin/company-card/setup` + `/confirm`), then use it for one-click instant driver payments (`POST /api/admin/company-card/pay-driver`). The saved card info (Stripe customer ID + payment method ID) is stored in `data/company-settings.json`. The payment dialog defaults to the saved card when available. Card details can be retrieved (`GET /api/admin/company-card`) or removed (`DELETE /api/admin/company-card`). Each instant payment creates a PaymentIntent with `off_session: true, confirm: true`, records the payment, and sends an email confirmation.
+
 ### Driver Profile & Document Storage
 Drivers can update their profile and upload documents via the mobile app or during website application. Documents are stored in Supabase Storage bucket `DRIVER-DOCUMENTS` (uppercase) with mobile-compatible path format: `{authUserId}/{docType}_{timestamp}_{filename}`. The `driver_documents` table tracks all documents with `driver_id`, `doc_type`, `file_url`, `storage_path`, and `bucket` fields. When a driver applies via the website, documents are initially uploaded to `driver-documents` bucket under `drivers/pending/{type}/{file}`, then copied to the driver's permanent path in `DRIVER-DOCUMENTS` bucket during approval. Document types use mobile-app-compatible names: `driving_licence`, `driving_licence_back`, `dbs_certificate`, `goods_in_transit`, `hire_and_reward`, `profile_picture`, `vehicle_photos_*`. The `DOC_TYPE_GROUPS` alias system in routes.ts maps between different naming conventions (e.g., `driving_license` ↔ `driving_licence`).
 

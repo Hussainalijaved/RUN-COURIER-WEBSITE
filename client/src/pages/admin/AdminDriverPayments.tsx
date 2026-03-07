@@ -198,6 +198,71 @@ function DriverCardPaymentForm({ amount, driverId, driverName, description, driv
   );
 }
 
+function SaveCardForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setIsProcessing(true);
+    setError(null);
+
+    const { error: submitError, setupIntent } = await stripe.confirmSetup({
+      elements,
+      confirmParams: { return_url: `${window.location.origin}/admin/driver-payments` },
+      redirect: 'if_required',
+    });
+
+    if (submitError) {
+      setError(submitError.message || 'Card setup failed');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (setupIntent?.status === 'succeeded') {
+      try {
+        await apiRequest('POST', '/api/admin/company-card/confirm', {
+          setupIntentId: setupIntent.id,
+        });
+        onSuccess();
+      } catch (err: any) {
+        setError(err?.message || 'Failed to save card');
+      }
+    } else {
+      setError('Card setup was not completed');
+    }
+    setIsProcessing(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="p-3 bg-muted/50 rounded-md text-sm text-center">
+        <p className="font-medium">Save your company card for instant driver payments</p>
+        <p className="text-xs text-muted-foreground mt-1">Your card details are securely stored by Stripe. You can remove it at any time.</p>
+      </div>
+      <PaymentElement options={{ layout: 'tabs' }} />
+      {error && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-md flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing} className="flex-1" data-testid="button-cancel-setup-card">
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!stripe || isProcessing} className="flex-1" data-testid="button-save-card">
+          {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
+          {isProcessing ? 'Saving...' : 'Save Card'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 interface CompanyBankDetails {
   bankName: string;
   accountHolderName: string;
@@ -228,8 +293,16 @@ interface DriverJobGroup {
   totalEarnings: number;
 }
 
-type PayStep = 'amount' | 'confirm' | 'success' | 'card';
-type PayMethod = 'bank' | 'card';
+interface SavedCard {
+  last4: string;
+  brand: string;
+  expMonth: number;
+  expYear: number;
+  savedAt: string;
+}
+
+type PayStep = 'amount' | 'confirm' | 'success' | 'card' | 'setup-card' | 'saved-card-confirm';
+type PayMethod = 'bank' | 'card' | 'saved-card';
 
 export default function AdminDriverPayments() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -246,6 +319,8 @@ export default function AdminDriverPayments() {
   const [cardLoading, setCardLoading] = useState(false);
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<string[]>([]);
+  const [savedCardLoading, setSavedCardLoading] = useState(false);
+  const [setupCardSecret, setSetupCardSecret] = useState<string | null>(null);
   const [editingCompanyBank, setEditingCompanyBank] = useState(false);
   const [showCompanyAccountNumber, setShowCompanyAccountNumber] = useState(false);
   const [companyBankForm, setCompanyBankForm] = useState<CompanyBankDetails>({
@@ -274,6 +349,10 @@ export default function AdminDriverPayments() {
 
   const { data: companyBankDetails, isLoading: companyBankLoading } = useQuery<CompanyBankDetails | null>({
     queryKey: ['/api/admin/company-bank-details'],
+  });
+
+  const { data: savedCard, isLoading: savedCardQueryLoading } = useQuery<SavedCard | null>({
+    queryKey: ['/api/admin/company-card'],
   });
 
   useEffect(() => {
@@ -400,9 +479,10 @@ export default function AdminDriverPayments() {
     setPayReference('');
     setPayDescription('');
     setPayStep('amount');
-    setPayMethod('bank');
+    setPayMethod(savedCard ? 'saved-card' : 'bank');
     setCardClientSecret(null);
     setCardPaymentIntentId(null);
+    setSetupCardSecret(null);
     setPayDialogOpen(true);
   };
 
@@ -413,9 +493,10 @@ export default function AdminDriverPayments() {
     setPayReference('');
     setPayDescription('');
     setPayStep('amount');
-    setPayMethod('bank');
+    setPayMethod(savedCard ? 'saved-card' : 'bank');
     setCardClientSecret(null);
     setCardPaymentIntentId(null);
+    setSetupCardSecret(null);
   };
 
   const startCardPayment = async () => {
@@ -448,6 +529,70 @@ export default function AdminDriverPayments() {
     setCardLoading(false);
   };
 
+  const startSetupCard = async () => {
+    setSavedCardLoading(true);
+    try {
+      const stripeInst = await getStripePromise();
+      if (!stripeInst) {
+        toast({ title: 'Stripe not configured', variant: 'destructive' });
+        setSavedCardLoading(false);
+        return;
+      }
+      setStripeInstance(stripeInst);
+      const resp = await apiRequest('POST', '/api/admin/company-card/setup');
+      const data = await resp.json();
+      if (!data.clientSecret) {
+        toast({ title: 'Failed to start card setup', variant: 'destructive' });
+        setSavedCardLoading(false);
+        return;
+      }
+      setSetupCardSecret(data.clientSecret);
+      setPayStep('setup-card');
+    } catch (err: any) {
+      toast({ title: 'Card setup error', description: err?.message || 'Could not connect to payment system', variant: 'destructive' });
+    }
+    setSavedCardLoading(false);
+  };
+
+  const removeSavedCardMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('DELETE', '/api/admin/company-card');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/company-card'] });
+      toast({ title: 'Saved card removed' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to remove card', variant: 'destructive' });
+    },
+  });
+
+  const savedCardPayMutation = useMutation({
+    mutationFn: async ({ driverId, amount, description }: { driverId: string; amount: string; description: string }) => {
+      const resp = await apiRequest('POST', '/api/admin/company-card/pay-driver', {
+        driverId, amount, description: description || 'Saved card payment',
+      });
+      return resp.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/driver-jobs/weekly'] });
+      setPayStep('success');
+    },
+    onError: (err: any) => {
+      toast({ title: 'Payment failed', description: err?.message || 'Could not process payment', variant: 'destructive' });
+    },
+  });
+
+  const handleSavedCardPay = () => {
+    if (!payDriver || !payAmount) return;
+    savedCardPayMutation.mutate({
+      driverId: payDriver.id,
+      amount: payAmount,
+      description: payDescription,
+    });
+  };
+
   const handleSendPayment = () => {
     if (!payDriver || !payAmount) return;
     sendPaymentMutation.mutate({
@@ -456,6 +601,14 @@ export default function AdminDriverPayments() {
       reference: payReference,
       description: payDescription,
     });
+  };
+
+  const getBrandIcon = (brand: string) => {
+    const b = brand?.toLowerCase();
+    if (b === 'visa') return 'Visa';
+    if (b === 'mastercard') return 'Mastercard';
+    if (b === 'amex') return 'Amex';
+    return brand?.charAt(0).toUpperCase() + brand?.slice(1);
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -1031,7 +1184,7 @@ export default function AdminDriverPayments() {
       </div>
 
       <Dialog open={payDialogOpen} onOpenChange={(open) => { if (!open) closePayDialog(); }}>
-        <DialogContent className={payStep === 'card' ? 'max-w-md' : 'max-w-sm'}>
+        <DialogContent className={['card', 'setup-card'].includes(payStep) ? 'max-w-md' : 'max-w-sm'}>
           {payStep === 'amount' && payDriver && (
             <>
               <DialogHeader>
@@ -1043,7 +1196,7 @@ export default function AdminDriverPayments() {
               <div className="space-y-4 py-2">
                 <div>
                   <Label className="text-sm font-medium mb-2 block">Payment Method</Label>
-                  <div className="flex gap-2" data-testid="payment-method-toggle">
+                  <div className="flex gap-2 flex-wrap" data-testid="payment-method-toggle">
                     <Button
                       type="button"
                       variant={payMethod === 'bank' ? 'default' : 'outline'}
@@ -1054,17 +1207,69 @@ export default function AdminDriverPayments() {
                       <Banknote className="w-4 h-4 mr-2" />
                       Bank Transfer
                     </Button>
-                    <Button
-                      type="button"
-                      variant={payMethod === 'card' ? 'default' : 'outline'}
-                      className="flex-1"
-                      onClick={() => setPayMethod('card')}
-                      data-testid="button-method-card"
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Card Payment
-                    </Button>
+                    {savedCard ? (
+                      <Button
+                        type="button"
+                        variant={payMethod === 'saved-card' ? 'default' : 'outline'}
+                        className="flex-1"
+                        onClick={() => setPayMethod('saved-card')}
+                        data-testid="button-method-saved-card"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        {getBrandIcon(savedCard.brand)} ****{savedCard.last4}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant={payMethod === 'card' ? 'default' : 'outline'}
+                        className="flex-1"
+                        onClick={() => setPayMethod('card')}
+                        data-testid="button-method-card"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Card Payment
+                      </Button>
+                    )}
                   </div>
+                  {savedCard && (
+                    <div className="flex items-center justify-between mt-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground"
+                        onClick={() => setPayMethod('card')}
+                        data-testid="button-use-different-card"
+                      >
+                        Use different card
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground"
+                        onClick={() => removeSavedCardMutation.mutate()}
+                        disabled={removeSavedCardMutation.isPending}
+                        data-testid="button-remove-saved-card"
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Remove saved card
+                      </Button>
+                    </div>
+                  )}
+                  {!savedCard && payMethod === 'card' && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      You can save a company card for instant future payments.{' '}
+                      <button
+                        type="button"
+                        className="underline"
+                        onClick={startSetupCard}
+                        data-testid="button-setup-saved-card"
+                      >
+                        Set up saved card
+                      </button>
+                    </p>
+                  )}
                 </div>
 
                 {payMethod === 'bank' && payDriver.bankName && (
@@ -1128,7 +1333,7 @@ export default function AdminDriverPayments() {
                   />
                 </div>
 
-                {payMethod === 'bank' ? (
+                {payMethod === 'bank' && (
                   <Button
                     className="w-full"
                     disabled={!payAmount || parseFloat(payAmount) <= 0}
@@ -1138,7 +1343,8 @@ export default function AdminDriverPayments() {
                     Continue
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
-                ) : (
+                )}
+                {payMethod === 'card' && (
                   <Button
                     className="w-full"
                     disabled={!payAmount || parseFloat(payAmount) <= 0 || cardLoading}
@@ -1151,6 +1357,17 @@ export default function AdminDriverPayments() {
                       <CreditCard className="w-4 h-4 mr-2" />
                     )}
                     {cardLoading ? 'Setting up...' : 'Continue to Card Payment'}
+                  </Button>
+                )}
+                {payMethod === 'saved-card' && savedCard && (
+                  <Button
+                    className="w-full"
+                    disabled={!payAmount || parseFloat(payAmount) <= 0}
+                    onClick={() => setPayStep('saved-card-confirm')}
+                    data-testid="button-continue-saved-card"
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Pay with {getBrandIcon(savedCard.brand)} ****{savedCard.last4}
                   </Button>
                 )}
               </div>
@@ -1193,6 +1410,116 @@ export default function AdminDriverPayments() {
                   onCancel={() => setPayStep('amount')}
                 />
               </Elements>
+            </>
+          )}
+
+          {payStep === 'setup-card' && setupCardSecret && stripeInstance && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Save Company Card
+                </DialogTitle>
+              </DialogHeader>
+              <Elements
+                stripe={stripeInstance}
+                options={{
+                  clientSecret: setupCardSecret,
+                  appearance: {
+                    theme: 'stripe',
+                    variables: {
+                      colorPrimary: '#007BFF',
+                      fontFamily: 'system-ui, sans-serif',
+                      borderRadius: '8px',
+                    },
+                  },
+                }}
+              >
+                <SaveCardForm
+                  onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: ['/api/admin/company-card'] });
+                    setPayStep('amount');
+                    setPayMethod('saved-card');
+                    toast({ title: 'Card saved', description: 'You can now use this card for instant driver payments' });
+                  }}
+                  onCancel={() => setPayStep('amount')}
+                />
+              </Elements>
+            </>
+          )}
+
+          {payStep === 'saved-card-confirm' && payDriver && savedCard && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Confirm Instant Payment
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="text-center py-4">
+                  <p className="text-3xl font-bold text-green-600" data-testid="text-saved-card-amount">
+                    £{parseFloat(payAmount).toFixed(2)}
+                  </p>
+                  <p className="text-muted-foreground mt-1">to {payDriver.fullName}</p>
+                </div>
+
+                <div className="p-3 bg-muted/50 rounded-md space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Payment from:</span>
+                    <span className="font-medium">{getBrandIcon(savedCard.brand)} ****{savedCard.last4}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Paying to:</span>
+                    <span className="font-medium">{payDriver.fullName}</span>
+                  </div>
+                  {payDriver.driverCode && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Driver ID:</span>
+                      <span className="font-mono font-medium">{payDriver.driverCode}</span>
+                    </div>
+                  )}
+                  {payDescription && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Description:</span>
+                      <span className="font-medium">{payDescription}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                    <p className="text-sm text-blue-700 dark:text-blue-400">
+                      This will charge your saved card instantly and record the payment. {payDriver.fullName} will receive an email confirmation.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setPayStep('amount')}
+                    className="flex-1"
+                    data-testid="button-back-saved-card"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleSavedCardPay}
+                    disabled={savedCardPayMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-confirm-saved-card-pay"
+                  >
+                    {savedCardPayMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4 mr-2" />
+                    )}
+                    {savedCardPayMutation.isPending ? 'Processing...' : `Pay £${parseFloat(payAmount).toFixed(2)}`}
+                  </Button>
+                </div>
+              </div>
             </>
           )}
 
