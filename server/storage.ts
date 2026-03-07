@@ -160,6 +160,23 @@ export interface IStorage {
   createDriverContract(data: { templateId: string; driverId: string; driverName: string; driverEmail?: string; contractContent: string; token: string; status: string; sentAt?: string }): Promise<any>;
   updateDriverContract(id: string, data: Partial<any>): Promise<any | undefined>;
   deleteDriverContract(id: string): Promise<boolean>;
+
+  getNoticeTemplates(filters?: { category?: string; isActive?: boolean }): Promise<any[]>;
+  getNoticeTemplate(id: string): Promise<any | undefined>;
+  createNoticeTemplate(data: { title: string; subject: string; message: string; category: string; requires_acknowledgement: boolean; created_by?: string }): Promise<any>;
+  updateNoticeTemplate(id: string, data: Partial<any>): Promise<any | undefined>;
+  deleteNoticeTemplate(id: string): Promise<boolean>;
+
+  getDriverNotices(filters?: { status?: string }): Promise<any[]>;
+  getDriverNotice(id: string): Promise<any | undefined>;
+  createDriverNotice(data: { template_id?: string; title: string; subject: string; message: string; category: string; sent_by?: string; sent_at?: string; target_type: string; requires_acknowledgement: boolean; status: string }): Promise<any>;
+  updateDriverNotice(id: string, data: Partial<any>): Promise<any | undefined>;
+
+  getNoticeRecipients(noticeId: string): Promise<any[]>;
+  createNoticeRecipient(data: { notice_id: string; driver_id: string; driver_email?: string; delivery_channel: string }): Promise<any>;
+  updateNoticeRecipient(id: string, data: Partial<any>): Promise<any | undefined>;
+  getDriverNoticeRecipients(driverId: string): Promise<any[]>;
+  getDriverNoticeRecipient(noticeId: string, driverId: string): Promise<any | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -1844,6 +1861,21 @@ export class MemStorage implements IStorage {
   async createDriverContract(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() }; }
   async updateDriverContract(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
   async deleteDriverContract(id: string): Promise<boolean> { return false; }
+
+  async getNoticeTemplates(filters?: { category?: string; isActive?: boolean }): Promise<any[]> { return []; }
+  async getNoticeTemplate(id: string): Promise<any | undefined> { return undefined; }
+  async createNoticeTemplate(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() }; }
+  async updateNoticeTemplate(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
+  async deleteNoticeTemplate(id: string): Promise<boolean> { return false; }
+  async getDriverNotices(filters?: { status?: string }): Promise<any[]> { return []; }
+  async getDriverNotice(id: string): Promise<any | undefined> { return undefined; }
+  async createDriverNotice(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data }; }
+  async updateDriverNotice(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
+  async getNoticeRecipients(noticeId: string): Promise<any[]> { return []; }
+  async createNoticeRecipient(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data }; }
+  async updateNoticeRecipient(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
+  async getDriverNoticeRecipients(driverId: string): Promise<any[]> { return []; }
+  async getDriverNoticeRecipient(noticeId: string, driverId: string): Promise<any | undefined> { return undefined; }
 }
 
 // Use SupabaseStorage when Supabase is configured, otherwise fall back to MemStorage

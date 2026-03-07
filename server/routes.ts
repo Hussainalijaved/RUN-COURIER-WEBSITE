@@ -729,6 +729,7 @@ export async function registerRoutes(
   app.use('/api/admin', requireAdminAccessStrict);
   app.use('/api/contract-templates', requireAdminAccessStrict);
   app.use('/api/driver-contracts', requireAdminAccessStrict);
+  app.use('/api/notice-templates', requireAdminAccessStrict);
   app.use('/api/drivers/:id/verify', requireAdminAccessStrict);
   app.use('/api/drivers/:id/deactivate', requireAdminAccessStrict);
   app.use('/api/drivers/:id/reactivate', requireAdminAccessStrict);
@@ -7306,6 +7307,236 @@ export async function registerRoutes(
 
     console.log(`[Contracts] Contract ${contract.id} signed by ${signedName}, updated status: ${updated?.status}`);
     res.json({ success: true, contract: updated });
+  }));
+
+  // ============================================
+  // NOTICE TEMPLATES (Admin CRUD)
+  // ============================================
+  app.get("/api/notice-templates", asyncHandler(async (req, res) => {
+    const templates = await storage.getNoticeTemplates({ isActive: true });
+    res.json(templates);
+  }));
+
+  app.get("/api/notice-templates/:id", asyncHandler(async (req, res) => {
+    const template = await storage.getNoticeTemplate(req.params.id);
+    if (!template) return res.status(404).json({ error: "Template not found" });
+    res.json(template);
+  }));
+
+  app.post("/api/notice-templates", asyncHandler(async (req, res) => {
+    const { title, subject, message, category, requires_acknowledgement } = req.body;
+    if (!title || !message) return res.status(400).json({ error: "Title and message are required" });
+    const template = await storage.createNoticeTemplate({
+      title, subject: subject || '', message, category: category || 'general',
+      requires_acknowledgement: requires_acknowledgement || false,
+      created_by: (req as any).adminUser?.email || 'admin',
+    });
+    res.json(template);
+  }));
+
+  app.patch("/api/notice-templates/:id", asyncHandler(async (req, res) => {
+    const updated = await storage.updateNoticeTemplate(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: "Template not found" });
+    res.json(updated);
+  }));
+
+  app.delete("/api/notice-templates/:id", asyncHandler(async (req, res) => {
+    await storage.deleteNoticeTemplate(req.params.id);
+    res.json({ success: true });
+  }));
+
+  // ============================================
+  // DRIVER NOTICES (Admin)
+  // ============================================
+  app.get("/api/admin/notices", asyncHandler(async (req, res) => {
+    const status = req.query.status as string | undefined;
+    const notices = await storage.getDriverNotices(status ? { status } : undefined);
+    res.json(notices);
+  }));
+
+  app.get("/api/admin/notices/:id", asyncHandler(async (req, res) => {
+    const notice = await storage.getDriverNotice(req.params.id);
+    if (!notice) return res.status(404).json({ error: "Notice not found" });
+    const recipients = await storage.getNoticeRecipients(req.params.id);
+    const drivers = await storage.getDrivers();
+    const enrichedRecipients = recipients.map((r: any) => {
+      const driver = drivers.find((d: any) => d.id === r.driver_id);
+      return { ...r, driver_name: driver ? `${driver.firstName} ${driver.lastName}` : r.driver_id, driver_code: driver?.driverCode || '' };
+    });
+    res.json({ ...notice, recipients: enrichedRecipients });
+  }));
+
+  app.post("/api/admin/notices/send", asyncHandler(async (req, res) => {
+    const { title, subject, message, category, requires_acknowledgement, target_type, driver_ids, template_id, send_email } = req.body;
+    if (!title || !message) return res.status(400).json({ error: "Title and message are required" });
+
+    const allDrivers = await storage.getDrivers();
+    const activeApprovedDrivers = allDrivers.filter((d: any) => d.isVerified && d.isActive !== false);
+
+    let targetDrivers: any[];
+    if (target_type === 'selected') {
+      if (!driver_ids?.length) return res.status(400).json({ error: "No drivers selected" });
+      targetDrivers = activeApprovedDrivers.filter((d: any) => driver_ids.includes(d.id));
+    } else {
+      targetDrivers = activeApprovedDrivers;
+    }
+
+    if (targetDrivers.length === 0) return res.status(400).json({ error: "No eligible drivers found" });
+
+    const notice = await storage.createDriverNotice({
+      template_id: template_id || undefined,
+      title, subject: subject || '', message, category: category || 'general',
+      sent_by: (req as any).adminUser?.email || 'admin',
+      sent_at: new Date().toISOString(),
+      target_type: target_type || 'all',
+      requires_acknowledgement: requires_acknowledgement || false,
+      status: 'sent',
+    });
+
+    for (const driver of targetDrivers) {
+      await storage.createNoticeRecipient({
+        notice_id: notice.id,
+        driver_id: driver.id,
+        driver_email: driver.email || null,
+        delivery_channel: 'dashboard',
+      });
+    }
+
+    if (send_email) {
+      try {
+        const { sendEmailNotification } = await import('./emailService');
+        for (const driver of targetDrivers) {
+          if (driver.email) {
+            try {
+              await sendEmailNotification(
+                driver.email,
+                subject || title,
+                `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #1a1a1a;">${title}</h2>
+                  ${subject ? `<p style="color: #666; font-size: 14px;">${subject}</p>` : ''}
+                  <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+                    ${message.replace(/\n/g, '<br>')}
+                  </div>
+                  ${requires_acknowledgement ? '<p style="color: #e55; font-weight: bold;">This notice requires your acknowledgement. Please log in to your driver account to acknowledge.</p>' : ''}
+                  <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
+                </div>`,
+                message
+              );
+            } catch (emailErr: any) {
+              console.warn(`[Notices] Failed to email ${driver.email}:`, emailErr.message);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('[Notices] Email service error:', e.message);
+      }
+    }
+
+    console.log(`[Notices] Notice "${title}" sent to ${targetDrivers.length} drivers by ${(req as any).adminUser?.email || 'admin'}`);
+    res.json({ success: true, notice, recipientCount: targetDrivers.length });
+  }));
+
+  app.patch("/api/admin/notices/:id/archive", asyncHandler(async (req, res) => {
+    const updated = await storage.updateDriverNotice(req.params.id, { status: 'archived' });
+    if (!updated) return res.status(404).json({ error: "Notice not found" });
+    res.json(updated);
+  }));
+
+  app.post("/api/admin/notices/:id/resend", asyncHandler(async (req, res) => {
+    const notice = await storage.getDriverNotice(req.params.id);
+    if (!notice) return res.status(404).json({ error: "Notice not found" });
+    const recipients = await storage.getNoticeRecipients(req.params.id);
+    try {
+      const { sendEmailNotification } = await import('./emailService');
+      let sentCount = 0;
+      for (const r of recipients) {
+        if (r.driver_email) {
+          try {
+            await sendEmailNotification(
+              r.driver_email,
+              notice.subject || notice.title,
+              `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #1a1a1a;">${notice.title}</h2>
+                ${notice.subject ? `<p style="color: #666; font-size: 14px;">${notice.subject}</p>` : ''}
+                <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+                  ${notice.message.replace(/\n/g, '<br>')}
+                </div>
+                <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
+              </div>`,
+              notice.message
+            );
+            sentCount++;
+          } catch (e: any) { console.warn(`[Notices] Resend email failed for ${r.driver_email}`); }
+        }
+      }
+      res.json({ success: true, sentCount });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Failed to resend emails' });
+    }
+  }));
+
+  // ============================================
+  // DRIVER NOTICES (Driver-facing)
+  // ============================================
+  app.get("/api/driver/notices", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const token = authHeader.replace('Bearer ', '');
+    try {
+      const { verifySupabaseToken } = await import('./supabaseAdmin');
+      const payload = await verifySupabaseToken(token);
+      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
+      const driver = await storage.getDriverByUserId(payload.sub);
+      if (!driver) return res.status(404).json({ error: "Driver not found" });
+      const notices = await storage.getDriverNoticeRecipients(driver.id);
+      res.json(notices);
+    } catch (e: any) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+  }));
+
+  app.patch("/api/driver/notices/:noticeId/view", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const token = authHeader.replace('Bearer ', '');
+    try {
+      const { verifySupabaseToken } = await import('./supabaseAdmin');
+      const payload = await verifySupabaseToken(token);
+      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
+      const driver = await storage.getDriverByUserId(payload.sub);
+      if (!driver) return res.status(404).json({ error: "Driver not found" });
+      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driver.id);
+      if (!recipient) return res.status(404).json({ error: "Notice not found" });
+      if (!recipient.viewed_at) {
+        await storage.updateNoticeRecipient(recipient.id, { viewed_at: new Date().toISOString(), status: 'viewed' });
+      }
+      res.json({ success: true });
+    } catch (e: any) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+  }));
+
+  app.patch("/api/driver/notices/:noticeId/acknowledge", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const token = authHeader.replace('Bearer ', '');
+    try {
+      const { verifySupabaseToken } = await import('./supabaseAdmin');
+      const payload = await verifySupabaseToken(token);
+      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
+      const driver = await storage.getDriverByUserId(payload.sub);
+      if (!driver) return res.status(404).json({ error: "Driver not found" });
+      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driver.id);
+      if (!recipient) return res.status(404).json({ error: "Notice not found" });
+      await storage.updateNoticeRecipient(recipient.id, {
+        viewed_at: recipient.viewed_at || new Date().toISOString(),
+        acknowledged_at: new Date().toISOString(),
+        status: 'acknowledged',
+      });
+      res.json({ success: true });
+    } catch (e: any) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
   }));
 
   const driverStripeAccountCache = new Map<string, string>();

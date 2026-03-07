@@ -79,6 +79,7 @@ const AdminBusinessQuote = lazy(() => import("@/pages/admin/AdminBusinessQuote")
 const AdminInvoices = lazy(() => import("@/pages/admin/AdminInvoices"));
 const AdminPricing = lazy(() => import("@/pages/admin/AdminPricing"));
 const AdminContracts = lazy(() => import("@/pages/admin/AdminContracts"));
+const AdminNotices = lazy(() => import("@/pages/admin/AdminNotices"));
 const ContractSign = lazy(() => import("@/pages/ContractSign"));
 
 const CustomerDashboard = lazy(() => import("@/pages/customer/CustomerDashboard"));
@@ -97,6 +98,7 @@ const DriverPayments = lazy(() => import("@/pages/driver/DriverPayments"));
 const DriverApplication = lazy(() => import("@/pages/driver/DriverApplication"));
 const DriverApplicationSuccess = lazy(() => import("@/pages/driver/ApplicationSuccess"));
 const DriverChangePassword = lazy(() => import("@/pages/driver/DriverChangePassword"));
+const DriverNotices = lazy(() => import("@/pages/driver/DriverNotices"));
 
 const DispatcherDashboard = lazy(() => import("@/pages/dispatcher/DispatcherDashboard"));
 const VendorDashboard = lazy(() => import("@/pages/vendor/VendorDashboard"));
@@ -252,6 +254,11 @@ function Router() {
             <AdminContracts />
           </ProtectedRoute>
         </Route>
+        <Route path="/admin/notices">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminNotices />
+          </ProtectedRoute>
+        </Route>
 
         <Route path="/customer">
           <ProtectedRoute allowedRoles={['customer']}>
@@ -312,6 +319,11 @@ function Router() {
         <Route path="/driver/documents">
           <ProtectedRoute allowedRoles={['driver']}>
             <DriverDocuments />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/driver/notices">
+          <ProtectedRoute allowedRoles={['driver']}>
+            <DriverNotices />
           </ProtectedRoute>
         </Route>
         <Route path="/driver/profile">

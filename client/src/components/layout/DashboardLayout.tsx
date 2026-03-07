@@ -47,6 +47,7 @@ import {
   Calculator,
   Receipt,
   FileSignature,
+  Megaphone,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -73,6 +74,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/documents', label: 'Documents', icon: FileText },
     { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
     { href: '/admin/contracts', label: 'Contracts', icon: FileSignature },
+    { href: '/admin/notices', label: 'Driver Notices', icon: Megaphone },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   ],
   driver: [
@@ -82,6 +84,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/driver/history', label: 'History', icon: Clock },
     { href: '/driver/payments', label: 'Payments', icon: Wallet },
     { href: '/driver/documents', label: 'Documents', icon: FileText },
+    { href: '/driver/notices', label: 'Notices', icon: Megaphone },
     { href: '/driver/profile', label: 'Profile', icon: User },
   ],
   customer: [

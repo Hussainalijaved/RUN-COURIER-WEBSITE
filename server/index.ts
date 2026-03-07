@@ -375,6 +375,62 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS notice_templates (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          title TEXT NOT NULL,
+          subject TEXT NOT NULL DEFAULT '',
+          message TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'general',
+          requires_acknowledgement BOOLEAN NOT NULL DEFAULT false,
+          created_by TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          is_active BOOLEAN NOT NULL DEFAULT true
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS driver_notices (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          template_id UUID REFERENCES notice_templates(id),
+          title TEXT NOT NULL,
+          subject TEXT NOT NULL DEFAULT '',
+          message TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'general',
+          sent_by TEXT,
+          sent_at TIMESTAMPTZ,
+          target_type TEXT NOT NULL DEFAULT 'all',
+          requires_acknowledgement BOOLEAN NOT NULL DEFAULT false,
+          status TEXT NOT NULL DEFAULT 'draft'
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS driver_notice_recipients (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          notice_id UUID NOT NULL REFERENCES driver_notices(id) ON DELETE CASCADE,
+          driver_id TEXT NOT NULL,
+          driver_email TEXT,
+          delivery_channel TEXT NOT NULL DEFAULT 'dashboard',
+          sent_at TIMESTAMPTZ DEFAULT NOW(),
+          viewed_at TIMESTAMPTZ,
+          acknowledged_at TIMESTAMPTZ,
+          status TEXT NOT NULL DEFAULT 'sent'
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notice_recipients_notice_id ON driver_notice_recipients(notice_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notice_recipients_driver_id ON driver_notice_recipients(driver_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_notices_status ON driver_notices(status)`);
+      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
+      console.log("[MIGRATION] Notice tables created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Notice tables migration error:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
       const { hydrateLocationCache } = await import('./realtime');
       await hydrateLocationCache();
       console.log("[BACKGROUND] Cache hydrated");

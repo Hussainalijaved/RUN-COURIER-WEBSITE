@@ -2580,4 +2580,191 @@ export class SupabaseStorage implements IStorage {
       return false;
     }
   }
+
+  async getNoticeTemplates(filters?: { category?: string; isActive?: boolean }): Promise<any[]> {
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let idx = 1;
+      if (filters?.category) { conditions.push(`category = $${idx++}`); params.push(filters.category); }
+      if (filters?.isActive !== undefined) { conditions.push(`is_active = $${idx++}`); params.push(filters.isActive); }
+      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+      return await this.pgQuery(`SELECT * FROM notice_templates${where} ORDER BY created_at DESC`, params);
+    } catch (e: any) {
+      console.error('[Notices] getNoticeTemplates error:', e.message);
+      return [];
+    }
+  }
+
+  async getNoticeTemplate(id: string): Promise<any | undefined> {
+    try {
+      const rows = await this.pgQuery('SELECT * FROM notice_templates WHERE id = $1', [id]);
+      return rows[0] || undefined;
+    } catch (e: any) {
+      console.error('[Notices] getNoticeTemplate error:', e.message);
+      return undefined;
+    }
+  }
+
+  async createNoticeTemplate(data: { title: string; subject: string; message: string; category: string; requires_acknowledgement: boolean; created_by?: string }): Promise<any> {
+    const rows = await this.pgQuery(
+      'INSERT INTO notice_templates (title, subject, message, category, requires_acknowledgement, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [data.title, data.subject, data.message, data.category, data.requires_acknowledgement, data.created_by || null]
+    );
+    return rows[0];
+  }
+
+  async updateNoticeTemplate(id: string, data: Partial<any>): Promise<any | undefined> {
+    const sets: string[] = ['updated_at = NOW()'];
+    const params: any[] = [];
+    let idx = 1;
+    if (data.title !== undefined) { sets.push(`title = $${idx++}`); params.push(data.title); }
+    if (data.subject !== undefined) { sets.push(`subject = $${idx++}`); params.push(data.subject); }
+    if (data.message !== undefined) { sets.push(`message = $${idx++}`); params.push(data.message); }
+    if (data.category !== undefined) { sets.push(`category = $${idx++}`); params.push(data.category); }
+    if (data.requires_acknowledgement !== undefined) { sets.push(`requires_acknowledgement = $${idx++}`); params.push(data.requires_acknowledgement); }
+    if (data.is_active !== undefined) { sets.push(`is_active = $${idx++}`); params.push(data.is_active); }
+    params.push(id);
+    const rows = await this.pgQuery(
+      `UPDATE notice_templates SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+    return rows[0] || undefined;
+  }
+
+  async deleteNoticeTemplate(id: string): Promise<boolean> {
+    try {
+      await this.pgQuery('DELETE FROM notice_templates WHERE id = $1', [id]);
+      return true;
+    } catch { return false; }
+  }
+
+  async getDriverNotices(filters?: { status?: string }): Promise<any[]> {
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let idx = 1;
+      if (filters?.status) { conditions.push(`status = $${idx++}`); params.push(filters.status); }
+      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+      const notices = await this.pgQuery(`SELECT * FROM driver_notices${where} ORDER BY sent_at DESC NULLS LAST, id DESC`, params);
+      for (const notice of notices) {
+        const stats = await this.pgQuery(
+          `SELECT COUNT(*) as total, COUNT(viewed_at) as viewed, COUNT(acknowledged_at) as acknowledged FROM driver_notice_recipients WHERE notice_id = $1`,
+          [notice.id]
+        );
+        notice.recipient_count = parseInt(stats[0]?.total || '0');
+        notice.viewed_count = parseInt(stats[0]?.viewed || '0');
+        notice.acknowledged_count = parseInt(stats[0]?.acknowledged || '0');
+      }
+      return notices;
+    } catch (e: any) {
+      console.error('[Notices] getDriverNotices error:', e.message);
+      return [];
+    }
+  }
+
+  async getDriverNotice(id: string): Promise<any | undefined> {
+    try {
+      const rows = await this.pgQuery('SELECT * FROM driver_notices WHERE id = $1', [id]);
+      if (!rows[0]) return undefined;
+      const notice = rows[0];
+      const stats = await this.pgQuery(
+        `SELECT COUNT(*) as total, COUNT(viewed_at) as viewed, COUNT(acknowledged_at) as acknowledged FROM driver_notice_recipients WHERE notice_id = $1`,
+        [id]
+      );
+      notice.recipient_count = parseInt(stats[0]?.total || '0');
+      notice.viewed_count = parseInt(stats[0]?.viewed || '0');
+      notice.acknowledged_count = parseInt(stats[0]?.acknowledged || '0');
+      return notice;
+    } catch (e: any) {
+      console.error('[Notices] getDriverNotice error:', e.message);
+      return undefined;
+    }
+  }
+
+  async createDriverNotice(data: { template_id?: string; title: string; subject: string; message: string; category: string; sent_by?: string; sent_at?: string; target_type: string; requires_acknowledgement: boolean; status: string }): Promise<any> {
+    const rows = await this.pgQuery(
+      `INSERT INTO driver_notices (template_id, title, subject, message, category, sent_by, sent_at, target_type, requires_acknowledgement, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [data.template_id || null, data.title, data.subject, data.message, data.category, data.sent_by || null, data.sent_at || null, data.target_type, data.requires_acknowledgement, data.status]
+    );
+    return rows[0];
+  }
+
+  async updateDriverNotice(id: string, data: Partial<any>): Promise<any | undefined> {
+    const sets: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+    if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
+    if (data.sent_at !== undefined) { sets.push(`sent_at = $${idx++}`); params.push(data.sent_at); }
+    if (sets.length === 0) return undefined;
+    params.push(id);
+    const rows = await this.pgQuery(
+      `UPDATE driver_notices SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+    return rows[0] || undefined;
+  }
+
+  async getNoticeRecipients(noticeId: string): Promise<any[]> {
+    try {
+      return await this.pgQuery('SELECT * FROM driver_notice_recipients WHERE notice_id = $1 ORDER BY sent_at DESC', [noticeId]);
+    } catch (e: any) {
+      console.error('[Notices] getNoticeRecipients error:', e.message);
+      return [];
+    }
+  }
+
+  async createNoticeRecipient(data: { notice_id: string; driver_id: string; driver_email?: string; delivery_channel: string }): Promise<any> {
+    const rows = await this.pgQuery(
+      'INSERT INTO driver_notice_recipients (notice_id, driver_id, driver_email, delivery_channel) VALUES ($1, $2, $3, $4) RETURNING *',
+      [data.notice_id, data.driver_id, data.driver_email || null, data.delivery_channel]
+    );
+    return rows[0];
+  }
+
+  async updateNoticeRecipient(id: string, data: Partial<any>): Promise<any | undefined> {
+    const sets: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+    if (data.viewed_at !== undefined) { sets.push(`viewed_at = $${idx++}`); params.push(data.viewed_at); }
+    if (data.acknowledged_at !== undefined) { sets.push(`acknowledged_at = $${idx++}`); params.push(data.acknowledged_at); }
+    if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
+    if (sets.length === 0) return undefined;
+    params.push(id);
+    const rows = await this.pgQuery(
+      `UPDATE driver_notice_recipients SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+    return rows[0] || undefined;
+  }
+
+  async getDriverNoticeRecipients(driverId: string): Promise<any[]> {
+    try {
+      return await this.pgQuery(
+        `SELECT r.*, n.title, n.subject, n.message, n.category, n.requires_acknowledgement, n.sent_at as notice_sent_at, n.status as notice_status
+         FROM driver_notice_recipients r
+         JOIN driver_notices n ON r.notice_id = n.id
+         WHERE r.driver_id = $1 AND n.status != 'draft'
+         ORDER BY r.sent_at DESC`,
+        [driverId]
+      );
+    } catch (e: any) {
+      console.error('[Notices] getDriverNoticeRecipients error:', e.message);
+      return [];
+    }
+  }
+
+  async getDriverNoticeRecipient(noticeId: string, driverId: string): Promise<any | undefined> {
+    try {
+      const rows = await this.pgQuery(
+        'SELECT * FROM driver_notice_recipients WHERE notice_id = $1 AND driver_id = $2',
+        [noticeId, driverId]
+      );
+      return rows[0] || undefined;
+    } catch (e: any) {
+      console.error('[Notices] getDriverNoticeRecipient error:', e.message);
+      return undefined;
+    }
+  }
 }

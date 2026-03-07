@@ -1,0 +1,225 @@
+Build a professional Driver Notice / Broadcast system for Run Courier admin panel and driver app/website using the existing Supabase backend.
+
+IMPORTANT RULES
+- Do not change existing Supabase structure unless necessary
+- Keep everything synced between website admin, driver website portal, and mobile app
+- Notices must be saved in Supabase, not locally
+- Only admin users can create, edit, send, or archive notices
+- Only approved active drivers should receive notices
+- The system must be fast, simple, and professional
+
+FEATURE TO BUILD
+Create a new admin feature called:
+Driver Notices
+
+This feature must allow admin to:
+1. Create notice templates
+2. Send a notice to all active approved drivers at once
+3. Send a notice to selected drivers only
+4. Mark notice as:
+   - information only
+   - requires acknowledgement
+5. Track which drivers have seen the notice
+6. Track which drivers have acknowledged the notice
+7. Save full history of all sent notices
+8. Show notices inside driver dashboard and mobile app
+9. Optionally send email notification when a notice is sent
+10. Keep a full audit trail with sent date, sender, and recipients
+
+SUPABASE DATABASE
+Create the minimum required tables safely.
+
+1) notice_templates
+Fields:
+- id
+- title
+- subject
+- message
+- category (general, legal, payment, rates, system, compliance, emergency)
+- requires_acknowledgement (boolean)
+- created_by
+- created_at
+- updated_at
+- is_active
+
+2) driver_notices
+Fields:
+- id
+- template_id (nullable in case admin writes one manually)
+- title
+- subject
+- message
+- category
+- sent_by
+- sent_at
+- target_type ('all' or 'selected')
+- requires_acknowledgement (boolean)
+- status ('draft','sent','archived')
+
+3) driver_notice_recipients
+Fields:
+- id
+- notice_id
+- driver_id
+- driver_email
+- delivery_channel ('dashboard','email','push')
+- sent_at
+- viewed_at
+- acknowledged_at
+- status ('sent','viewed','acknowledged')
+
+IMPORTANT
+- driver_id must link to the existing drivers collection/table
+- only drivers with approved status and active status should receive notices
+- keep foreign keys correct
+- add indexes for notice_id and driver_id for speed
+
+ADMIN PANEL UI
+Add a new left menu item:
+Driver Notices
+
+Inside the page create these tabs:
+1. Templates
+2. Sent Notices
+3. Create Notice
+
+TEMPLATES TAB
+- list all templates
+- search by title/category
+- create new template
+- edit template
+- duplicate template
+- archive template
+
+CREATE NOTICE PAGE
+Admin can:
+- choose an existing template OR write a custom notice
+- enter title
+- enter subject
+- enter message
+- choose category
+- toggle requires acknowledgement yes/no
+- choose recipients:
+  - all active approved drivers
+  - selected drivers only
+- preview notice before sending
+- click Send Notice
+
+Before sending:
+- show confirmation popup:
+  “Are you sure you want to send this notice?”
+- if sending to all drivers, show recipient count
+
+SENT NOTICES TAB
+For each sent notice show:
+- title
+- category
+- sent date
+- recipient count
+- viewed count
+- acknowledged count
+- status
+
+When admin clicks a notice, open detail page with:
+- full message
+- who sent it
+- sent date/time
+- all recipients
+- who viewed it
+- who acknowledged it
+- resend option
+- archive option
+
+DRIVER WEBSITE PORTAL
+Add a new section in the driver dashboard:
+Notices
+
+Show:
+- unread notices first
+- notice title
+- category
+- sent date
+- short preview
+- badge: New / Requires Acknowledgement
+
+When driver opens a notice:
+- show full title
+- subject
+- full message
+- sent date
+- sender = Run Courier Admin
+- if acknowledgement required, show button:
+  “I Acknowledge”
+- save timestamp to Supabase when viewed
+- save timestamp to Supabase when acknowledged
+
+MOBILE APP
+Add the same Notices section in the driver mobile app.
+Requirements:
+- identical sync with Supabase
+- unread notices badge
+- tap to open full notice
+- acknowledgement button if required
+- mark viewed when opened
+- fast loading
+- professional clean UI
+
+EMAIL OPTIONAL
+If email sending is already available in system:
+- when admin sends a notice, also email the driver
+- email subject = notice subject
+- email body = notice message
+- include line:
+  “Please also review this notice in your Run Courier driver account.”
+
+If email is not already configured:
+- build the database and dashboard flow first without breaking anything
+- keep email sending ready for future integration
+
+BUSINESS RULES
+- only admins can send notices
+- drivers cannot delete notices
+- drivers can only view notices sent to them
+- if requires_acknowledgement = true, admin must be able to see who has not acknowledged yet
+- notices must remain visible for future reference unless archived by admin
+- archived notices should stay in admin history
+- do not remove old data
+
+EXTRA PROFESSIONAL FEATURES
+Add these useful filters:
+- all
+- unread
+- acknowledged
+- requires acknowledgement
+- archived
+
+Add dashboard statistics cards:
+- total notices sent
+- unread by drivers
+- acknowledgement pending
+- acknowledged
+
+SECURITY
+- use Supabase row level security correctly
+- admin can manage all notices
+- drivers can only read their own notice recipient records
+- drivers can only update viewed_at and acknowledged_at for their own records
+- protect from unauthorized access
+
+UX
+- keep design consistent with existing Run Courier admin panel
+- use simple professional layout
+- responsive on desktop and mobile
+- no slow loading
+- no unnecessary popups
+- clean and modern style
+
+FINAL REQUIREMENT
+After implementation:
+- test sending to all active approved drivers
+- test sending to selected drivers
+- test notice appears in driver dashboard
+- test notice appears in mobile app
+- test viewed and acknowledged timestamps save correctly
+- test admin tracking page works correctly
+- do not break any current contracts, drivers, jobs, or documents features

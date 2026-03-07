@@ -1,11 +1,9 @@
 # Run Courier - Logistics Platform
 
 ## Overview
-
 Run Courier is a full-stack web application designed for comprehensive courier and delivery management in the UK. It connects customers, drivers, dispatchers, administrators, and vendors, facilitating services like same-day delivery, multi-drop routing, specialized transport, and live tracking. The platform aims to enhance operational efficiency through role-based dashboards, real-time updates, and an advanced pricing engine, with a business vision to optimize logistics, provide a seamless user experience, and secure a significant share of the UK delivery market.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
@@ -26,32 +24,28 @@ Supabase Auth manages user authentication and session management. Role-based acc
 A WebSocket server (`ws` library) at `/ws/realtime` enables live driver location tracking, real-time job status updates, broadcasting, and offline detection. It uses secure token-based authentication with Supabase JWT verification. Job status updates are pushed via WebSocket, with administrators receiving all updates and customers receiving updates for their own jobs.
 
 ### GPS Tracking Architecture
-Driver GPS locations flow through two parallel paths:
-1. **WebSocket** (`driver:update_location` messages) — real-time, low-latency updates broadcast to admin map observers via `realtime.ts` location cache.
-2. **REST** (`PATCH /api/mobile/v1/driver/location` and `POST /api/driver/status`) — persistent updates written to `drivers` table (`current_latitude`/`current_longitude`) and `driver_locations` table (dedicated GPS table with speed/heading/accuracy).
-
-The `driver_locations` Supabase table (migration: `031_create_driver_locations.sql`) stores one row per driver (upserted on `driver_id`), enabling Supabase Realtime subscriptions from the frontend. The `useDriverLocations` hook merges WebSocket and Supabase Realtime data using timestamp-based deduplication. At server startup, the location cache is hydrated from the `drivers` table. The admin live map shows ALL active drivers: those with live GPS at full opacity, and those without GPS at their postcode-geocoded location (0.7 opacity, labeled "POSTCODE"). Postcode geocoding is awaited synchronously on the `/api/drivers` endpoint to ensure coordinates are always available. The driver list polls every 15 seconds regardless of WebSocket status.
+Driver GPS locations flow through two parallel paths: WebSocket for real-time updates and REST for persistent storage in the `drivers` and `driver_locations` tables. The `driver_locations` table stores one row per driver, enabling Supabase Realtime subscriptions. The admin live map shows active drivers with live GPS and those without, using postcode-geocoded locations.
 
 ### Booking State Persistence
 A global `BookingContext` persists booking data to `localStorage` with a 24-hour expiry.
 
 ### Driver Application System
-A multi-step application process allows prospective drivers to submit details for admin review and approval. This includes phone verification via SMS OTP using Twilio, and postcode autocomplete using Google Maps Places API.
+A multi-step application process allows prospective drivers to submit details for admin review and approval, including phone verification via SMS OTP and postcode autocomplete.
 
 ### Mobile API
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities including profile management, location updates, job management, and proof of delivery uploads, authenticated via Supabase JWT. It supports admin-to-driver job assignments.
 
 ### Multi-Drop Stop POD & Auto-Complete
-For multi-drop jobs, POD (photo + recipient name) is collected per stop, not on the main job. The driver marks each stop as delivered individually via `PATCH /api/jobs/:jobId/stops/:stopId/deliver` (authenticated by Supabase JWT — allows assigned driver or admin). A separate `POST /api/jobs/:jobId/stops/:stopId/pod/driver-upload` endpoint handles stop POD photo uploads. When ALL stops for a multi-drop job are marked as delivered, the job auto-completes: a synthetic POD is set on the main job, the job status transitions to "delivered", a delivery confirmation email is sent, and a WebSocket broadcast goes out. The main job delivery endpoint (`PATCH /api/jobs/:id/status`) skips the POD photo/signature requirement for multi-drop jobs since POD is collected per stop.
+For multi-drop jobs, Proof of Delivery (POD) (photo + recipient name) is collected per stop. The driver marks each stop as delivered individually. When all stops for a multi-drop job are delivered, the job auto-completes, setting a synthetic POD on the main job, changing its status to "delivered," sending a delivery confirmation email, and broadcasting a WebSocket update.
 
 ### Push Notifications
-Real-time push notifications alert drivers instantly when jobs are assigned using Expo Push API. Drivers register their Expo push tokens, which are stored in the `driver_devices` table.
+Real-time push notifications alert drivers instantly when jobs are assigned using Expo Push API. Driver Expo push tokens are stored in the `driver_devices` table.
 
 ### Pay Later & Invoicing
 Approved business customers can use a "Pay Later" option, leading to weekly invoicing. An "Invoices" section provides invoice history and PDF download options.
 
 ### Pricing Engine
-A TypeScript-based pricing engine calculates delivery costs, considering vehicle type, distance, surcharges, multi-drop fees, and waiting times. Pricing configurations are synchronized between client and server. All pages calculating quotes use identical distance logic via the `/api/maps/optimized-route` API for consistency, with multi-drop logic determining distances and counts.
+A TypeScript-based pricing engine calculates delivery costs, considering vehicle type, distance, surcharges, multi-drop fees, and waiting times. Pricing configurations are synchronized between client and server. All pages calculating quotes use identical distance logic via the `/api/maps/optimized-route` API for consistency.
 
 ### Price Isolation
 Strict separation between `customer_price` (stored as `total_price`) and `driver_price` is maintained. This is enforced through RLS policies, role-specific views (`admin_jobs_view`, `driver_jobs_view`, `customer_jobs_view`), explicit column selection in API endpoints, and WebSocket payload filtering.
@@ -75,24 +69,27 @@ Admins can assign multiple jobs to a single driver transactionally via PostgreSQ
 Supabase is the single source of truth for all data, handling authentication, database, real-time subscriptions, and Edge Functions for privileged operations. RLS policies control granular data access.
 
 ### Web-Mobile Integration
-The web admin dashboard and Expo mobile app share a unified backend. This includes synchronized job assignment, real-time events via WebSockets, push notifications for drivers, and synchronized driver profiles. The mobile app must register push tokens and connect to the WebSocket for real-time updates.
+The web admin dashboard and Expo mobile app share a unified backend. This includes synchronized job assignment, real-time events via WebSockets, push notifications for drivers, and synchronized driver profiles.
 
 ### Job Geocoding
 Jobs are automatically geocoded using Google Maps API to obtain coordinates, which are synced to Supabase for display on the driver mobile app's map.
 
 ### Driver Payment System
-Admins can pay drivers via bank transfer from the admin panel. The multi-step flow shows driver bank details (name, bank, sort code, account number), accepts an amount and optional reference, confirms the payment, and records it. Company bank details for Run Courier are stored in `data/company-settings.json`. Email confirmation is sent to the driver upon success. Payment history includes delete functionality. The system uses `POST /api/driver-payments` to record payments and `DELETE /api/driver-payments/:id` to remove them. Note: Stripe card payment for drivers was removed — money transfers are done directly from the company bank account to the driver's bank account.
+Admins can pay drivers via bank transfer from the admin panel. The multi-step flow shows driver bank details, accepts an amount, confirms the payment, and records it. Email confirmation is sent to the driver upon success. Payment history includes delete functionality.
 
 ### Driver Profile & Document Storage
-Drivers can update their profile and upload documents via the mobile app or during website application. Documents are stored in Supabase Storage bucket `DRIVER-DOCUMENTS` (uppercase) with mobile-compatible path format: `{authUserId}/{docType}_{timestamp}_{filename}`. The `driver_documents` table tracks all documents with `driver_id`, `doc_type`, `file_url`, `storage_path`, and `bucket` fields. When a driver applies via the website, documents are initially uploaded to `driver-documents` bucket under `drivers/pending/{type}/{file}`, then copied to the driver's permanent path in `DRIVER-DOCUMENTS` bucket during approval. Document types use mobile-app-compatible names: `driving_licence`, `driving_licence_back`, `dbs_certificate`, `goods_in_transit`, `hire_and_reward`, `profile_picture`, `vehicle_photos_*`. The `DOC_TYPE_GROUPS` alias system in routes.ts maps between different naming conventions (e.g., `driving_license` ↔ `driving_licence`).
+Drivers can update their profile and upload documents via the mobile app or during website application. Documents are stored in the Supabase Storage bucket `DRIVER-DOCUMENTS` with mobile-compatible path format: `{authUserId}/{docType}_{timestamp}_{filename}`. The `driver_documents` table tracks all documents.
 
 ### Driver Contract Management
-Admins can create contract templates with placeholder variables (`{{driver_name}}`, `{{driver_code}}`, `{{date}}`, `{{driver_email}}`, `{{driver_phone}}`, `{{vehicle_type}}`), send contracts to multiple drivers at once via email, delete contracts after review, and track signing status. The send dialog uses checkbox-based multi-driver selection with search filtering and Select All/Deselect All controls. Drivers receive an email with a public signing link (`/contracts/sign/:token`) requiring no login. The signing page includes a canvas-based signature pad. Signed contracts with signature data are stored permanently. The admin contracts list auto-refreshes every 15 seconds to pick up signed status changes. Tables: `contract_templates` (id, title, content, created_at, updated_at) and `driver_contracts` (id, template_id, driver_id, driver_name, driver_email, status, sent_at, signed_at, signature_data, signed_name, token, contract_content, created_at). Contract tables are created at startup via direct PostgreSQL queries (not Supabase PostgREST) due to schema cache limitations. All contract CRUD operations use direct `pg` Pool queries. API routes: `/api/contract-templates` (CRUD), `/api/driver-contracts` (list/get), `/api/admin/contracts/send` (send to one or multiple drivers via `driverIds` array), `/api/admin/contracts/:id` (DELETE), `/api/admin/contracts/resend/:id` (resend email), `/api/contracts/sign/:token` (GET/POST for public signing). Frontend: `AdminContracts.tsx` (admin page with Templates and Sent Contracts tabs), `ContractSign.tsx` (public signing page).
+Admins can create contract templates with placeholder variables, send contracts to multiple drivers at once via email, and track signing status. Drivers receive an email with a public signing link, leading to a canvas-based signature pad. Signed contracts with signature data are stored permanently.
+
+### Driver Notice / Broadcast System
+Admins can create notice templates, send notices to all active approved drivers or selected drivers, and track viewing/acknowledgement status. Notices can optionally require driver acknowledgement and trigger email notifications.
 
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.
 -   **Supabase Services**: Authentication, database, real-time subscriptions, and Edge Functions.
 -   **Stripe**: Integrated via Edge Functions for payment processing and managing customer IDs for "Pay Later" invoicing.
--   **Resend**: Used for sending transactional emails via `server/emailService.ts` and the `send-email` Edge Function. A global rate limiter (600ms minimum between sends) prevents hitting Resend's 2 req/s limit. New booking notifications are sent to both `sales@runcourier.co.uk` and `runcourier1@gmail.com`. Customer confirmation emails are sent when `customerEmail` is available from the booking request. Delivery confirmation emails with POD (photo, recipient name, signature) are sent automatically when a job is marked as delivered — triggered from both the mobile app and admin dashboard.
+-   **Resend**: Used for sending transactional emails via `server/emailService.ts` and the `send-email` Edge Function for booking confirmations and delivery confirmations.
 -   **Twilio**: Used for SMS OTP verification during the driver application process.
