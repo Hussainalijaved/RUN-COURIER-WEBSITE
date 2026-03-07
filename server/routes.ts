@@ -23,7 +23,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
@@ -7402,12 +7402,13 @@ export async function registerRoutes(
       });
     }
 
+    console.log(`[Notices] send_email=${send_email}, targetDrivers=${targetDrivers.length}`);
     if (send_email) {
       try {
-        const { sendEmailNotification } = await import('./emailService');
         for (const driver of targetDrivers) {
           if (driver.email) {
             try {
+              console.log(`[Notices] Sending email to driver: ${driver.email}`);
               await sendEmailNotification(
                 driver.email,
                 subject || title,
@@ -7447,7 +7448,6 @@ export async function registerRoutes(
     if (!notice) return res.status(404).json({ error: "Notice not found" });
     const recipients = await storage.getNoticeRecipients(req.params.id);
     try {
-      const { sendEmailNotification } = await import('./emailService');
       let sentCount = 0;
       for (const r of recipients) {
         if (r.driver_email) {
