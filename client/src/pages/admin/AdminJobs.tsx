@@ -74,6 +74,8 @@ import {
   Upload,
   Camera,
   Smartphone,
+  PoundSterling,
+  FileText,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -1442,6 +1444,15 @@ export default function AdminJobs() {
     printWindow.document.close();
   };
 
+  const financialSummary = useMemo(() => {
+    if (!jobs) return { completedTotal: 0, unpaidTotal: 0, paidTotal: 0 };
+    const completedJobs = jobs.filter(j => j.status === 'delivered');
+    const completedTotal = completedJobs.reduce((sum, j) => sum + parseFloat(String(j.totalPrice || 0)), 0);
+    const paidTotal = jobs.filter(j => j.paymentStatus === 'paid').reduce((sum, j) => sum + parseFloat(String(j.totalPrice || 0)), 0);
+    const unpaidTotal = jobs.filter(j => j.paymentStatus !== 'paid' && j.status !== 'cancelled').reduce((sum, j) => sum + parseFloat(String(j.totalPrice || 0)), 0);
+    return { completedTotal, unpaidTotal, paidTotal };
+  }, [jobs]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -1490,6 +1501,45 @@ export default function AdminJobs() {
               </Button>
             )}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card data-testid="stat-completed-total">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed Jobs Total</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-completed-total">
+                £{financialSummary.completedTotal.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">{jobs?.filter(j => j.status === 'delivered').length || 0} delivered jobs</p>
+            </CardContent>
+          </Card>
+          <Card data-testid="stat-unpaid-total">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Invoices Not Paid</CardTitle>
+              <FileText className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-unpaid-total">
+                £{financialSummary.unpaidTotal.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">{jobs?.filter(j => j.paymentStatus !== 'paid' && j.status !== 'cancelled').length || 0} unpaid jobs</p>
+            </CardContent>
+          </Card>
+          <Card data-testid="stat-paid-total">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+              <PoundSterling className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-paid-total">
+                £{financialSummary.paidTotal.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">{jobs?.filter(j => j.paymentStatus === 'paid').length || 0} paid jobs</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
