@@ -2846,6 +2846,18 @@ export async function registerRoutes(
     res.json(ensureJobNumber(updatedJob));
   }));
 
+  app.patch("/api/jobs/:id/payment-status", asyncHandler(async (req, res) => {
+    const { paymentStatus } = req.body;
+    const job = await storage.getJob(req.params.id);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (!['pending', 'paid', 'awaiting_payment', 'failed'].includes(paymentStatus)) {
+      return res.status(400).json({ error: "Invalid payment status" });
+    }
+    const updatedJob = await storage.updateJob(req.params.id, { paymentStatus });
+    console.log(`[Jobs] Payment status manually updated for job ${req.params.id}: ${paymentStatus}`);
+    res.json(ensureJobNumber(updatedJob));
+  }));
+
   app.post("/api/jobs/:id/geocode", asyncHandler(async (req, res) => {
     const job = await storage.getJob(req.params.id);
     if (!job) {

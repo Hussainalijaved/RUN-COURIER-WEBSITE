@@ -690,6 +690,21 @@ export default function AdminJobs() {
     },
   });
 
+  const updatePaymentStatusMutation = useMutation({
+    mutationFn: async ({ jobId, paymentStatus }: { jobId: string; paymentStatus: string }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/payment-status`, { paymentStatus });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ 
+        title: variables.paymentStatus === 'paid' ? 'Invoice marked as paid' : 'Invoice marked as unpaid',
+      });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update invoice status', variant: 'destructive' });
+    },
+  });
+
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
       return apiRequest('DELETE', `/api/jobs/${jobId}`);
@@ -1685,7 +1700,24 @@ export default function AdminJobs() {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(job.createdAt)}</TableCell>
-                      <TableCell className="text-right font-medium">{formatPrice(job.totalPrice)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="font-medium">{formatPrice(job.totalPrice)}</span>
+                          {job.status !== 'cancelled' && (
+                            <Badge 
+                              variant="default"
+                              className={`text-xs cursor-pointer ${job.paymentStatus === 'paid' ? 'bg-green-600' : 'bg-orange-500'}`}
+                              onClick={() => updatePaymentStatusMutation.mutate({ 
+                                jobId: job.id, 
+                                paymentStatus: job.paymentStatus === 'paid' ? 'pending' : 'paid' 
+                              })}
+                              data-testid={`badge-invoice-${job.id}`}
+                            >
+                              {job.paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         {job.driverPrice ? (
                           <div className="flex flex-col items-end gap-1">
@@ -1771,6 +1803,27 @@ export default function AdminJobs() {
                                 )}
                                 Resend Payment Link
                               </DropdownMenuItem>
+                            )}
+                            {job.status !== 'cancelled' && (
+                              job.paymentStatus !== 'paid' ? (
+                                <DropdownMenuItem
+                                  onClick={() => updatePaymentStatusMutation.mutate({ jobId: job.id, paymentStatus: 'paid' })}
+                                  disabled={updatePaymentStatusMutation.isPending}
+                                  data-testid={`menu-mark-invoice-paid-${job.id}`}
+                                >
+                                  <PoundSterling className="mr-2 h-4 w-4" />
+                                  Mark Invoice Paid
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => updatePaymentStatusMutation.mutate({ jobId: job.id, paymentStatus: 'pending' })}
+                                  disabled={updatePaymentStatusMutation.isPending}
+                                  data-testid={`menu-mark-invoice-unpaid-${job.id}`}
+                                >
+                                  <PoundSterling className="mr-2 h-4 w-4" />
+                                  Mark Invoice Unpaid
+                                </DropdownMenuItem>
+                              )
                             )}
                             {job.status !== 'delivered' && job.status !== 'cancelled' && (
                               <DropdownMenuItem 
@@ -1910,6 +1963,62 @@ export default function AdminJobs() {
                     <p className="font-medium">{formatPrice(selectedJob.totalPrice)}</p>
                   </div>
                 </div>
+                {selectedJob.status !== 'cancelled' && (
+                  <div className="p-3 bg-muted/50 rounded-md space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">Invoice Status</p>
+                      <Badge 
+                        variant="default"
+                        className={`cursor-pointer ${selectedJob.paymentStatus === 'paid' ? 'bg-green-600' : 'bg-orange-500'}`}
+                        onClick={() => updatePaymentStatusMutation.mutate({ 
+                          jobId: selectedJob.id, 
+                          paymentStatus: selectedJob.paymentStatus === 'paid' ? 'pending' : 'paid' 
+                        })}
+                        data-testid="badge-invoice-payment-status"
+                      >
+                        {selectedJob.paymentStatus === 'paid' ? 'PAID' : selectedJob.paymentStatus === 'awaiting_payment' ? 'AWAITING PAYMENT' : 'UNPAID'}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      {selectedJob.paymentStatus !== 'paid' ? (
+                        <Button 
+                          size="sm" 
+                          variant="default"
+                          className="bg-green-600"
+                          onClick={() => updatePaymentStatusMutation.mutate({ 
+                            jobId: selectedJob.id, 
+                            paymentStatus: 'paid' 
+                          })}
+                          disabled={updatePaymentStatusMutation.isPending}
+                          data-testid="button-mark-invoice-paid"
+                        >
+                          {updatePaymentStatusMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <PoundSterling className="h-4 w-4 mr-1" />
+                          )}
+                          Mark Invoice Paid
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => updatePaymentStatusMutation.mutate({ 
+                            jobId: selectedJob.id, 
+                            paymentStatus: 'pending' 
+                          })}
+                          disabled={updatePaymentStatusMutation.isPending}
+                          data-testid="button-mark-invoice-unpaid"
+                        >
+                          {updatePaymentStatusMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : null}
+                          Mark Invoice Unpaid
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {selectedJob.driverPrice && (
                   <div className="p-3 bg-muted/50 rounded-md space-y-2">
                     <div className="flex items-center justify-between">
