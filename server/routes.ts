@@ -7462,8 +7462,7 @@ export async function registerRoutes(
                   ${requires_acknowledgement ? '<p style="color: #e55; font-weight: bold;">This notice requires your acknowledgement. Please log in to your driver account to acknowledge.</p>' : ''}
                   <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
                 </div>`,
-                message,
-                'RUN COURIER <support@runcourier.co.uk>'
+                message
               );
             } catch (emailErr: any) {
               console.warn(`[Notices] Failed to email ${driver.email}:`, emailErr.message);
@@ -7505,8 +7504,7 @@ export async function registerRoutes(
                 </div>
                 <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
               </div>`,
-              notice.message,
-              'RUN COURIER <support@runcourier.co.uk>'
+              notice.message
             );
             sentCount++;
           } catch (e: any) { console.warn(`[Notices] Resend email failed for ${r.driver_email}`); }
