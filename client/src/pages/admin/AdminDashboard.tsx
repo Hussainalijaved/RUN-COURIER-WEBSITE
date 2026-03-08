@@ -144,7 +144,7 @@ export default function AdminDashboard() {
   };
 
   const pendingDocCount = documents?.filter(d => d.status === 'pending').length || 0;
-  const unverifiedDrivers = drivers?.filter(d => !d.isVerified).length || 0;
+  const unverifiedDrivers = drivers?.filter(d => !d.isVerified && d.isActive !== false && d.status === 'approved').length || 0;
   const pendingApplications = applications?.filter(a => a.status === 'pending').length || 0;
 
   return (
