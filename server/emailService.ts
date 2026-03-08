@@ -131,7 +131,7 @@ async function getResendCredentials() {
       {
         headers: {
           'Accept': 'application/json',
-          'X_REPLIT_TOKEN': xReplitToken
+          'X-Replit-Token': xReplitToken
         }
       }
     ).then(res => res.json()).then(data => data.items?.[0]);

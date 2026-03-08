@@ -1514,6 +1514,29 @@ export async function registerRoutes(
     res.json({ success: true, message: "Test email sent", result });
   }));
 
+  app.post("/api/test-admin-booking-email", asyncHandler(async (req, res) => {
+    const testJobDetails = {
+      id: 'test-0',
+      trackingNumber: 'RCTEST' + Date.now().toString().slice(-6),
+      pickupPostcode: 'SW1A 1AA',
+      pickupAddress: '10 Downing Street, Westminster',
+      deliveryPostcode: 'EC1A 1BB',
+      deliveryAddress: '1 London Wall, City of London',
+      recipientName: 'Test Recipient',
+      recipientPhone: '+44 7700 900456',
+      vehicleType: 'small_van',
+      totalPrice: 45.00,
+      paymentStatus: 'paid',
+      status: 'pending',
+      createdAt: new Date()
+    };
+    
+    console.log('[Test] Sending test admin booking notification email...');
+    const result = await sendNewJobNotification('test-0', testJobDetails);
+    console.log('[Test] Admin booking email result:', result);
+    res.json({ success: result, message: result ? "Test booking email sent to admin addresses" : "Failed to send test email - check server logs" });
+  }));
+
   // Weekly driver jobs for payment reference
   app.get("/api/driver-jobs/weekly", asyncHandler(async (req, res) => {
     const { db } = await import("./db");
