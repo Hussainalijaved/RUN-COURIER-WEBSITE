@@ -248,6 +248,25 @@ export default function AdminContracts() {
     sendContractMutation.mutate({ templateId: selectedTemplateId, driverIds: selectedDriverIds });
   }
 
+  const driverContractStatus = useMemo(() => {
+    const statusMap = new Map<string, 'signed' | 'sent'>();
+    const latestByDriver = new Map<string, any>();
+    for (const c of contracts) {
+      const prev = latestByDriver.get(c.driver_id);
+      if (!prev || new Date(c.sent_at || c.created_at || 0) > new Date(prev.sent_at || prev.created_at || 0)) {
+        latestByDriver.set(c.driver_id, c);
+      }
+    }
+    for (const [driverId, c] of latestByDriver) {
+      statusMap.set(driverId, c.status === 'signed' ? 'signed' : 'sent');
+    }
+    return statusMap;
+  }, [contracts]);
+
+  const newDriverIds = useMemo(() => {
+    return drivers.filter((d: any) => !driverContractStatus.has(d.id)).map((d: any) => d.id);
+  }, [drivers, driverContractStatus]);
+
   const filteredDriversGrouped = useMemo(() => {
     if (!driverSearchTerm.trim()) return driversGroupedByVehicle;
     const term = driverSearchTerm.toLowerCase();
@@ -369,6 +388,25 @@ export default function AdminContracts() {
           </TabsContent>
 
           <TabsContent value="sent" className="space-y-4">
+            {drivers.length > 0 && (
+              <div className="flex items-center gap-4 flex-wrap" data-testid="text-contract-summary">
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
+                  <span className="font-medium">{newDriverIds.length}</span>
+                  <span className="text-muted-foreground">new driver{newDriverIds.length !== 1 ? 's' : ''} (no contract sent)</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
+                  <span className="font-medium">{[...driverContractStatus.values()].filter(s => s === 'sent').length}</span>
+                  <span className="text-muted-foreground">awaiting signature</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-600 inline-block" />
+                  <span className="font-medium">{[...driverContractStatus.values()].filter(s => s === 'signed').length}</span>
+                  <span className="text-muted-foreground">signed</span>
+                </div>
+              </div>
+            )}
             {contractsLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
@@ -575,10 +613,21 @@ export default function AdminContracts() {
                   className="mt-1"
                   data-testid="input-driver-search"
                 />
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <Button variant="outline" size="sm" onClick={selectAllDrivers} data-testid="button-select-all-drivers">
                     Select All
                   </Button>
+                  {newDriverIds.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedDriverIds(newDriverIds)}
+                      data-testid="button-select-new-drivers"
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      Select New Only ({newDriverIds.length})
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={deselectAllDrivers} data-testid="button-deselect-all-drivers">
                     Deselect All
                   </Button>
@@ -598,26 +647,46 @@ export default function AdminContracts() {
                         <div className="px-3 py-1.5 bg-muted/50 text-xs font-medium text-muted-foreground sticky top-0">
                           {group.label}
                         </div>
-                        {group.drivers.map((d: any) => (
-                          <label
-                            key={d.id}
-                            className="flex items-center gap-3 px-3 py-2 hover-elevate cursor-pointer"
-                            data-testid={`driver-checkbox-${d.id}`}
-                          >
-                            <Checkbox
-                              checked={selectedDriverIds.includes(d.id)}
-                              onCheckedChange={() => toggleDriverSelection(d.id)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium">
-                                {d.driverCode ? `[${d.driverCode}] ` : ''}{d.fullName || d.full_name || 'Unknown'}
-                              </span>
-                              {d.email && (
-                                <span className="block text-xs text-muted-foreground truncate">{d.email}</span>
-                              )}
-                            </div>
-                          </label>
-                        ))}
+                        {group.drivers.map((d: any) => {
+                          const contractStatus = driverContractStatus.get(d.id);
+                          return (
+                            <label
+                              key={d.id}
+                              className="flex items-center gap-3 px-3 py-2 hover-elevate cursor-pointer"
+                              data-testid={`driver-checkbox-${d.id}`}
+                            >
+                              <Checkbox
+                                checked={selectedDriverIds.includes(d.id)}
+                                onCheckedChange={() => toggleDriverSelection(d.id)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-sm font-medium">
+                                    {d.driverCode ? `[${d.driverCode}] ` : ''}{d.fullName || d.full_name || 'Unknown'}
+                                  </span>
+                                  {contractStatus === 'signed' ? (
+                                    <Badge variant="default" className="bg-green-600 text-[10px] px-1.5 py-0">
+                                      <CheckCircle className="w-2.5 h-2.5 mr-0.5" />
+                                      Signed
+                                    </Badge>
+                                  ) : contractStatus === 'sent' ? (
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                      <Mail className="w-2.5 h-2.5 mr-0.5" />
+                                      Sent
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="default" className="bg-blue-600 text-[10px] px-1.5 py-0">
+                                      New
+                                    </Badge>
+                                  )}
+                                </div>
+                                {d.email && (
+                                  <span className="block text-xs text-muted-foreground truncate">{d.email}</span>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
                       </div>
                     ))
                   )}
