@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { MapFallback } from '@/components/ui/map-fallback';
 import { getMapCenter, geocodePostcode } from '@/lib/maps';
 import { useGoogleMaps } from '@/hooks/useGoogleMaps';
-import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User, Maximize2 } from 'lucide-react';
+import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User, Maximize2, Search, X } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useDriverLocations } from '@/hooks/useDriverLocations';
 import { useToast } from '@/hooks/use-toast';
@@ -67,6 +67,7 @@ export default function AdminMap() {
   const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
   const [driverPriceForAssign, setDriverPriceForAssign] = useState<string>('');
   const [hasInitialFit, setHasInitialFit] = useState(false);
+  const [driverSearchQuery, setDriverSearchQuery] = useState('');
   const { toast } = useToast();
 
   const { 
@@ -225,6 +226,32 @@ export default function AdminMap() {
         }
         google.maps.event.removeListener(listener);
       });
+    }
+  }, [activeDrivers, getDriverLocation]);
+
+  const filteredDrivers = driverSearchQuery.trim()
+    ? activeDrivers.filter(d => {
+        const q = driverSearchQuery.trim().toUpperCase();
+        return (d.driverCode || '').toUpperCase().includes(q) ||
+               (d.fullName || '').toUpperCase().includes(q) ||
+               (d.vehicleRegistration || '').toUpperCase().includes(q);
+      })
+    : activeDrivers;
+
+  const handleDriverSearch = useCallback((query: string) => {
+    setDriverSearchQuery(query);
+    if (!query.trim()) return;
+    const q = query.trim().toUpperCase();
+    const match = activeDrivers.find(d => (d.driverCode || '').toUpperCase() === q);
+    if (match) {
+      const location = getDriverLocation(match);
+      const map = mapInstanceRef.current;
+      if (map && location.source) {
+        map.panTo({ lat: location.lat, lng: location.lng });
+        map.setZoom(16);
+      }
+      setSelectedDriver(match);
+      setSelectedJob(null);
     }
   }, [activeDrivers, getDriverLocation]);
 
@@ -937,14 +964,45 @@ export default function AdminMap() {
             </CardHeader>
 
             <TabsContent value="drivers" className="flex-1 flex flex-col mt-0 overflow-hidden">
+              <div className="p-3 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search driver code e.g. RC28R"
+                    value={driverSearchQuery}
+                    onChange={(e) => handleDriverSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleDriverSearch(driverSearchQuery);
+                      }
+                    }}
+                    className="pl-8 pr-8"
+                    data-testid="input-driver-search"
+                  />
+                  {driverSearchQuery && (
+                    <button
+                      onClick={() => { setDriverSearchQuery(''); setSelectedDriver(null); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover-elevate rounded-sm"
+                      data-testid="button-clear-driver-search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {driverSearchQuery && (
+                  <p className="text-xs text-muted-foreground mt-1.5" data-testid="text-search-results-count">
+                    {filteredDrivers.length} driver{filteredDrivers.length !== 1 ? 's' : ''} found
+                  </p>
+                )}
+              </div>
               <ScrollArea className="flex-1">
                 <div className="p-4 space-y-3">
                   {driversLoading ? (
                     [1, 2, 3].map(i => (
                       <Skeleton key={i} className="h-20 w-full" />
                     ))
-                  ) : activeDrivers.length > 0 ? (
-                    activeDrivers.map((driver) => {
+                  ) : filteredDrivers.length > 0 ? (
+                    filteredDrivers.map((driver) => {
                       const currentJob = getDriverCurrentJob(driver.id);
                       const isLive = realtimeLocations.has(driver.id);
                       const driverLoc = getDriverLocation(driver);
@@ -1057,7 +1115,18 @@ export default function AdminMap() {
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Truck className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No active drivers</p>
+                      <p className="text-sm">{driverSearchQuery ? 'No drivers match your search' : 'No active drivers'}</p>
+                      {driverSearchQuery && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => { setDriverSearchQuery(''); setSelectedDriver(null); }}
+                          data-testid="button-clear-search-empty"
+                        >
+                          Clear search
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
