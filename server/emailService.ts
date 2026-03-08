@@ -307,10 +307,11 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
   const content = `
     <h2 style="color: #333; margin-top: 0;">New Booking Received</h2>
     
-    <!-- Tracking & Status -->
+    <!-- Job Number & Tracking -->
     <div style="background-color: #007BFF; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center;">
-      <p style="margin: 0; font-size: 14px;">Tracking Number</p>
-      <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; letter-spacing: 2px;">${jobDetails.trackingNumber || 'N/A'}</p>
+      <p style="margin: 0; font-size: 14px;">Job Number</p>
+      <p style="margin: 5px 0 0; font-size: 28px; font-weight: bold; letter-spacing: 2px;">#${jobDetails.id || jobId}</p>
+      <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.85;">Tracking: ${jobDetails.trackingNumber || 'N/A'}</p>
     </div>
     
     <div style="background-color: white; border-radius: 0 0 8px 8px; padding: 20px; border: 1px solid #eee; border-top: none;">
@@ -568,6 +569,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
   
   const textContent = `NEW BOOKING RECEIVED
 
+Job Number: #${jobDetails.id || jobId}
 Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
 
 PICKUP DETAILS
@@ -610,7 +612,7 @@ Run Courier - https://runcourier.co.uk`;
   let anySuccess = false;
   for (const email of adminEmails) {
     try {
-      const result = await sendEmailNotification(email, `New Booking - ${jobDetails.trackingNumber}`, htmlContent, textContent);
+      const result = await sendEmailNotification(email, `New Booking #${jobDetails.id || jobId} - ${jobDetails.trackingNumber}`, htmlContent, textContent);
       if (result) anySuccess = true;
     } catch (err) {
       console.error(`[Email] Failed to send admin notification to ${email}:`, err);
