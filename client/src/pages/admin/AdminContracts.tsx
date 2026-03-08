@@ -86,9 +86,14 @@ export default function AdminContracts() {
     queryKey: ['/api/drivers'],
   });
 
+  const activeApprovedDrivers = useMemo(() =>
+    drivers.filter((d: any) => d.isActive !== false && d.status === 'approved'),
+    [drivers]
+  );
+
   const driversGroupedByVehicle = useMemo(() => {
     const groups: Record<string, any[]> = {};
-    for (const d of drivers) {
+    for (const d of activeApprovedDrivers) {
       const vt = d.vehicleType || 'other';
       if (!groups[vt]) groups[vt] = [];
       groups[vt].push(d);
@@ -105,7 +110,20 @@ export default function AdminContracts() {
       }
     }
     return ordered;
-  }, [drivers]);
+  }, [activeApprovedDrivers]);
+
+  const driversGroupedNewFirst = useMemo(() => {
+    return driversGroupedByVehicle.map(group => ({
+      ...group,
+      drivers: [...group.drivers].sort((a, b) => {
+        const aNew = !driverContractStatus.has(a.id);
+        const bNew = !driverContractStatus.has(b.id);
+        if (aNew && !bNew) return -1;
+        if (!aNew && bNew) return 1;
+        return (a.driverCode || '').localeCompare(b.driverCode || '');
+      }),
+    }));
+  }, [driversGroupedByVehicle, driverContractStatus]);
 
   const createTemplateMutation = useMutation({
     mutationFn: async (data: { title: string; content: string }) => {
@@ -235,7 +253,7 @@ export default function AdminContracts() {
   }
 
   function selectAllDrivers() {
-    const allIds = drivers.map((d: any) => d.id);
+    const allIds = activeApprovedDrivers.map((d: any) => d.id);
     setSelectedDriverIds(allIds);
   }
 
@@ -264,13 +282,13 @@ export default function AdminContracts() {
   }, [contracts]);
 
   const newDriverIds = useMemo(() => {
-    return drivers.filter((d: any) => !driverContractStatus.has(d.id)).map((d: any) => d.id);
-  }, [drivers, driverContractStatus]);
+    return activeApprovedDrivers.filter((d: any) => !driverContractStatus.has(d.id)).map((d: any) => d.id);
+  }, [activeApprovedDrivers, driverContractStatus]);
 
   const filteredDriversGrouped = useMemo(() => {
-    if (!driverSearchTerm.trim()) return driversGroupedByVehicle;
+    if (!driverSearchTerm.trim()) return driversGroupedNewFirst;
     const term = driverSearchTerm.toLowerCase();
-    return driversGroupedByVehicle
+    return driversGroupedNewFirst
       .map(group => ({
         ...group,
         drivers: group.drivers.filter((d: any) => {
@@ -281,7 +299,7 @@ export default function AdminContracts() {
         }),
       }))
       .filter(group => group.drivers.length > 0);
-  }, [driversGroupedByVehicle, driverSearchTerm]);
+  }, [driversGroupedNewFirst, driverSearchTerm]);
 
   function openViewTemplate(template: any) {
     setViewingTemplate(template);

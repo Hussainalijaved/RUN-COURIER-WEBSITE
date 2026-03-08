@@ -167,6 +167,7 @@ export interface IStorage {
   updateNoticeTemplate(id: string, data: Partial<any>): Promise<any | undefined>;
   deleteNoticeTemplate(id: string): Promise<boolean>;
 
+  getAllNoticeRecipientDriverIds(): Promise<string[]>;
   getDriverNotices(filters?: { status?: string }): Promise<any[]>;
   getDriverNotice(id: string): Promise<any | undefined>;
   createDriverNotice(data: { template_id?: string; title: string; subject: string; message: string; category: string; sent_by?: string; sent_at?: string; target_type: string; requires_acknowledgement: boolean; status: string }): Promise<any>;
@@ -1868,6 +1869,7 @@ export class MemStorage implements IStorage {
   async createNoticeTemplate(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() }; }
   async updateNoticeTemplate(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
   async deleteNoticeTemplate(id: string): Promise<boolean> { return false; }
+  async getAllNoticeRecipientDriverIds(): Promise<string[]> { return []; }
   async getDriverNotices(filters?: { status?: string }): Promise<any[]> { return []; }
   async getDriverNotice(id: string): Promise<any | undefined> { return undefined; }
   async createDriverNotice(data: any): Promise<any> { return { id: crypto.randomUUID(), ...data }; }

@@ -67,6 +67,7 @@ export default function AdminNotices() {
   const { data: templates = [], isLoading: templatesLoading } = useQuery<any[]>({ queryKey: ['/api/notice-templates'] });
   const { data: sentNotices = [], isLoading: noticesLoading } = useQuery<any[]>({ queryKey: ['/api/admin/notices'] });
   const { data: drivers = [] } = useQuery<any[]>({ queryKey: ['/api/drivers'] });
+  const { data: noticeRecipientDriverIds = [] } = useQuery<string[]>({ queryKey: ['/api/admin/notices/recipient-driver-ids'] });
 
   const activeApprovedDrivers = useMemo(() =>
     drivers.filter((d: any) => d.isVerified && d.isActive !== false),
@@ -79,15 +80,31 @@ export default function AdminNotices() {
     return templates.filter((t: any) => t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
   }, [templates, searchQuery]);
 
+  const recipientDriverIdSet = useMemo(() => new Set(noticeRecipientDriverIds), [noticeRecipientDriverIds]);
+
+  const newDriverIdsForNotices = useMemo(() => {
+    return activeApprovedDrivers.filter((d: any) => !recipientDriverIdSet.has(d.id)).map((d: any) => d.id);
+  }, [activeApprovedDrivers, recipientDriverIdSet]);
+
+  const sortedActiveDrivers = useMemo(() => {
+    return [...activeApprovedDrivers].sort((a, b) => {
+      const aNew = !recipientDriverIdSet.has(a.id);
+      const bNew = !recipientDriverIdSet.has(b.id);
+      if (aNew && !bNew) return -1;
+      if (!aNew && bNew) return 1;
+      return (a.driverCode || '').localeCompare(b.driverCode || '');
+    });
+  }, [activeApprovedDrivers, recipientDriverIdSet]);
+
   const filteredDrivers = useMemo(() => {
-    if (!driverSearchQuery) return activeApprovedDrivers;
+    if (!driverSearchQuery) return sortedActiveDrivers;
     const q = driverSearchQuery.toLowerCase();
-    return activeApprovedDrivers.filter((d: any) =>
+    return sortedActiveDrivers.filter((d: any) =>
       `${d.firstName} ${d.lastName}`.toLowerCase().includes(q) ||
       (d.driverCode || '').toLowerCase().includes(q) ||
       (d.email || '').toLowerCase().includes(q)
     );
-  }, [activeApprovedDrivers, driverSearchQuery]);
+  }, [sortedActiveDrivers, driverSearchQuery]);
 
   const stats = useMemo(() => {
     const total = sentNotices.filter((n: any) => n.status === 'sent').length;
@@ -121,6 +138,7 @@ export default function AdminNotices() {
     mutationFn: async (data: any) => { const r = await apiRequest('POST', '/api/admin/notices/send', data); return r.json(); },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/notices/recipient-driver-ids'] });
       toast({ title: 'Notice sent', description: `Sent to ${data.recipientCount} drivers` });
       setConfirmSendOpen(false);
       setCreateNoticeOpen(false);
@@ -482,8 +500,14 @@ export default function AdminNotices() {
                   <div className="space-y-3 border rounded-md p-4">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <Label>Select Drivers ({selectedDriverIds.length} selected)</Label>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => setSelectedDriverIds(activeApprovedDrivers.map((d: any) => d.id))} data-testid="button-select-all-drivers">Select All</Button>
+                        {newDriverIdsForNotices.length > 0 && (
+                          <Button size="sm" variant="outline" onClick={() => setSelectedDriverIds(newDriverIdsForNotices)} data-testid="button-select-new-drivers">
+                            <Users className="w-3 h-3 mr-1" />
+                            Select New Only ({newDriverIdsForNotices.length})
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" onClick={() => setSelectedDriverIds([])} data-testid="button-deselect-all-drivers">Deselect All</Button>
                       </div>
                     </div>
@@ -491,19 +515,44 @@ export default function AdminNotices() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input placeholder="Search drivers..." value={driverSearchQuery} onChange={(e) => setDriverSearchQuery(e.target.value)} className="pl-10" data-testid="input-search-notice-drivers" />
                     </div>
+                    {newDriverIdsForNotices.length > 0 && (
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
+                          {newDriverIdsForNotices.length} new (no notices received)
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-green-600 inline-block" />
+                          {activeApprovedDrivers.length - newDriverIdsForNotices.length} already received notices
+                        </span>
+                      </div>
+                    )}
                     <div className="max-h-48 overflow-y-auto space-y-1">
-                      {filteredDrivers.map((d: any) => (
-                        <label key={d.id} className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer" data-testid={`checkbox-driver-${d.id}`}>
-                          <Checkbox
-                            checked={selectedDriverIds.includes(d.id)}
-                            onCheckedChange={(checked) => {
-                              setSelectedDriverIds(prev => checked ? [...prev, d.id] : prev.filter(id => id !== d.id));
-                            }}
-                          />
-                          <span className="text-sm">{d.driverCode && <span className="font-mono mr-1.5">{d.driverCode}</span>}{d.firstName} {d.lastName}</span>
-                          {d.email && <span className="text-xs text-muted-foreground ml-auto">{d.email}</span>}
-                        </label>
-                      ))}
+                      {filteredDrivers.map((d: any) => {
+                        const isNew = !recipientDriverIdSet.has(d.id);
+                        return (
+                          <label key={d.id} className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer" data-testid={`checkbox-driver-${d.id}`}>
+                            <Checkbox
+                              checked={selectedDriverIds.includes(d.id)}
+                              onCheckedChange={(checked) => {
+                                setSelectedDriverIds(prev => checked ? [...prev, d.id] : prev.filter(id => id !== d.id));
+                              }}
+                            />
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                              <span className="text-sm">{d.driverCode && <span className="font-mono mr-1.5">{d.driverCode}</span>}{d.firstName} {d.lastName}</span>
+                              {isNew ? (
+                                <Badge variant="default" className="bg-blue-600 text-[10px] px-1.5 py-0">New</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  <CheckCircle className="w-2.5 h-2.5 mr-0.5" />
+                                  Received
+                                </Badge>
+                              )}
+                            </div>
+                            {d.email && <span className="text-xs text-muted-foreground">{d.email}</span>}
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

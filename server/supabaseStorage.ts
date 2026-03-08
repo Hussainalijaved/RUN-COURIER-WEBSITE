@@ -2581,6 +2581,16 @@ export class SupabaseStorage implements IStorage {
     }
   }
 
+  async getAllNoticeRecipientDriverIds(): Promise<string[]> {
+    try {
+      const rows = await this.pgQuery('SELECT DISTINCT driver_id FROM driver_notice_recipients');
+      return rows.map((r: any) => r.driver_id);
+    } catch (e: any) {
+      console.error('[Notices] getAllNoticeRecipientDriverIds error:', e.message);
+      return [];
+    }
+  }
+
   async getNoticeTemplates(filters?: { category?: string; isActive?: boolean }): Promise<any[]> {
     try {
       const conditions: string[] = [];
