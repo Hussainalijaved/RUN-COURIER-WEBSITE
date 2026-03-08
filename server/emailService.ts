@@ -764,7 +764,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
     <!-- Track Your Delivery CTA -->
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${BASE_URL}/track/${jobDetails.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+      <a href="${BASE_URL}/track?ref=${jobDetails.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
         Track Your Delivery
       </a>
     </div>
@@ -814,7 +814,7 @@ ${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 
 TOTAL AMOUNT: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
 Payment Status: ${jobDetails.paymentStatus === 'paid' ? 'CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER' : 'PENDING'}
 
-Track your delivery: ${BASE_URL}/track/${jobDetails.trackingNumber}
+Track your delivery: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}
 
 Need help? Call +44 7311 121 217 or email info@runcourier.co.uk
 
@@ -1753,7 +1753,7 @@ export async function sendPaymentConfirmationEmail(
     </div>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${BASE_URL}/track/${data.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+      <a href="${BASE_URL}/track?ref=${data.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
         Track Your Delivery
       </a>
     </div>
@@ -1782,7 +1782,7 @@ Booking Details:
 - Pickup: ${data.pickupAddress} (${data.pickupPostcode})
 - Delivery: ${data.deliveryAddress} (${data.deliveryPostcode})
 
-Track your delivery: ${BASE_URL}/track/${data.trackingNumber}
+Track your delivery: ${BASE_URL}/track?ref=${data.trackingNumber}
 
 Run Courier - https://runcourier.co.uk`;
 
@@ -2584,14 +2584,14 @@ export async function sendDeliveryConfirmationEmail(
       Thank you for choosing Run Courier. We hope you had a great experience!
     </p>
     <div style="text-align: center; margin-top: 20px;">
-      <a href="${BASE_URL}/track/${jobDetails.trackingNumber}" style="display: inline-block; background-color: #007BFF; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">
+      <a href="${BASE_URL}/track?ref=${jobDetails.trackingNumber}" style="display: inline-block; background-color: #007BFF; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">
         View Delivery Details
       </a>
     </div>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Delivery Complete');
-  const textContent = `Your Delivery is Complete\n\nGreat news! Your parcel has been successfully delivered.\n\nJob Reference: ${jobRef}\nTracking: ${jobDetails.trackingNumber}\nDelivered To: ${jobDetails.deliveryAddress || ''} ${jobDetails.deliveryPostcode || ''}\nReceived By: ${signedByName}\nDelivered At: ${deliveredTime}\n\nThank you for choosing Run Courier!\n\nTrack: ${BASE_URL}/track/${jobDetails.trackingNumber}`;
+  const textContent = `Your Delivery is Complete\n\nGreat news! Your parcel has been successfully delivered.\n\nJob Reference: ${jobRef}\nTracking: ${jobDetails.trackingNumber}\nDelivered To: ${jobDetails.deliveryAddress || ''} ${jobDetails.deliveryPostcode || ''}\nReceived By: ${signedByName}\nDelivered At: ${deliveredTime}\n\nThank you for choosing Run Courier!\n\nTrack: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}`;
 
   return sendEmailNotification(customerEmail, `Delivery Complete - ${jobRef} - Run Courier`, htmlContent, textContent);
 }
