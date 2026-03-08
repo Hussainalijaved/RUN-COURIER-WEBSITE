@@ -648,11 +648,21 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
     <h2 style="color: #333; margin-top: 0;">Thank You for Your Booking!</h2>
     <p style="color: #333; font-size: 16px;">Your delivery has been confirmed and is being processed. Here are your booking details:</p>
     
-    <!-- Tracking Number Banner -->
+    <!-- Job Number & Tracking Banner -->
     <div style="background-color: #007BFF; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-      <p style="margin: 0; font-size: 14px;">Your Tracking Number</p>
-      <p style="margin: 10px 0 5px; font-size: 28px; font-weight: bold; letter-spacing: 3px;">${jobDetails.trackingNumber || 'N/A'}</p>
-      <p style="margin: 0; font-size: 12px; opacity: 0.9;">Use this to track your delivery at runcourier.co.uk</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="text-align: center; padding: 0 10px; width: 50%; border-right: 1px solid rgba(255,255,255,0.3);">
+            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Job Number</p>
+            <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold;">#${jobDetails.id || 'N/A'}</p>
+          </td>
+          <td style="text-align: center; padding: 0 10px; width: 50%;">
+            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Tracking Number</p>
+            <p style="margin: 5px 0 0; font-size: 18px; font-weight: bold; letter-spacing: 1px;">${jobDetails.trackingNumber || 'N/A'}</p>
+          </td>
+        </tr>
+      </table>
+      <p style="margin: 12px 0 0; font-size: 12px; opacity: 0.85;">Use your tracking number to track your delivery at runcourier.co.uk</p>
     </div>
     
     <div style="background-color: white; border-radius: 8px; padding: 20px; border: 1px solid #eee;">
@@ -791,7 +801,8 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
 Thank you for booking with Run Courier!
 
-Your Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
+Job Number: #${jobDetails.id || 'N/A'}
+Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
 
 COLLECTION DETAILS
 ------------------
