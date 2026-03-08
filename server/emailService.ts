@@ -764,7 +764,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
     <!-- Track Your Delivery CTA -->
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${BASE_URL}/track?ref=${jobDetails.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+      <a href="${BASE_URL}/track/${jobDetails.trackingNumber}" style="background-color: #007BFF; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
         Track Your Delivery
       </a>
     </div>
@@ -814,7 +814,7 @@ ${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 
 TOTAL AMOUNT: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
 Payment Status: ${jobDetails.paymentStatus === 'paid' ? 'CONFIRMED' : jobDetails.paymentStatus === 'pay_later' ? 'PAY LATER' : 'PENDING'}
 
-Track your delivery: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}
+Track your delivery: ${BASE_URL}/track/${jobDetails.trackingNumber}
 
 Need help? Call +44 7311 121 217 or email info@runcourier.co.uk
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearch } from 'wouter';
+import { useSearch, useParams } from 'wouter';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,8 +68,9 @@ const REFRESH_INTERVAL = 10000; // Refresh every 10 seconds for live updates
 
 export default function Track() {
   const searchParams = useSearch();
-  const params = new URLSearchParams(searchParams);
-  const initialId = params.get('ref') || params.get('id') || '';
+  const queryParams = new URLSearchParams(searchParams);
+  const routeParams = useParams<{ trackingNumber?: string }>();
+  const initialId = routeParams.trackingNumber || queryParams.get('ref') || queryParams.get('id') || '';
   
   const [trackingNumber, setTrackingNumber] = useState(initialId);
   const [isLoading, setIsLoading] = useState(false);
