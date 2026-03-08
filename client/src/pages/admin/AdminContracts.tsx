@@ -112,19 +112,6 @@ export default function AdminContracts() {
     return ordered;
   }, [activeApprovedDrivers]);
 
-  const driversGroupedNewFirst = useMemo(() => {
-    return driversGroupedByVehicle.map(group => ({
-      ...group,
-      drivers: [...group.drivers].sort((a, b) => {
-        const aNew = !driverContractStatus.has(a.id);
-        const bNew = !driverContractStatus.has(b.id);
-        if (aNew && !bNew) return -1;
-        if (!aNew && bNew) return 1;
-        return (a.driverCode || '').localeCompare(b.driverCode || '');
-      }),
-    }));
-  }, [driversGroupedByVehicle, driverContractStatus]);
-
   const createTemplateMutation = useMutation({
     mutationFn: async (data: { title: string; content: string }) => {
       const res = await apiRequest('POST', '/api/contract-templates', data);
@@ -284,6 +271,19 @@ export default function AdminContracts() {
   const newDriverIds = useMemo(() => {
     return activeApprovedDrivers.filter((d: any) => !driverContractStatus.has(d.id)).map((d: any) => d.id);
   }, [activeApprovedDrivers, driverContractStatus]);
+
+  const driversGroupedNewFirst = useMemo(() => {
+    return driversGroupedByVehicle.map(group => ({
+      ...group,
+      drivers: [...group.drivers].sort((a, b) => {
+        const aNew = !driverContractStatus.has(a.id);
+        const bNew = !driverContractStatus.has(b.id);
+        if (aNew && !bNew) return -1;
+        if (!aNew && bNew) return 1;
+        return (a.driverCode || '').localeCompare(b.driverCode || '');
+      }),
+    }));
+  }, [driversGroupedByVehicle, driverContractStatus]);
 
   const filteredDriversGrouped = useMemo(() => {
     if (!driverSearchTerm.trim()) return driversGroupedNewFirst;
