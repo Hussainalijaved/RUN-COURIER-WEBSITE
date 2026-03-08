@@ -1480,6 +1480,7 @@ export async function registerRoutes(
     }
     
     const testJobDetails = {
+      id: 285,
       trackingNumber: 'RCTEST123456',
       pickupPostcode: 'SW1A 1AA',
       pickupAddress: '10 Downing Street, Westminster',
