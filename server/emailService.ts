@@ -143,7 +143,8 @@ export async function sendEmailNotification(
   recipient: string,
   subject: string,
   htmlContent: string,
-  textContent?: string
+  textContent?: string,
+  fromEmail?: string
 ): Promise<boolean> {
   console.log(`[Email] Attempting to send "${subject}" to ${recipient}`);
   try {
@@ -159,12 +160,13 @@ export async function sendEmailNotification(
       await new Promise(resolve => setTimeout(resolve, EMAIL_MIN_INTERVAL_MS - elapsed));
     }
 
+    const senderEmail = fromEmail || credentials.fromEmail;
     const resend = new Resend(credentials.apiKey);
-    console.log(`[Email] Sending from ${credentials.fromEmail} to ${recipient}`);
+    console.log(`[Email] Sending from ${senderEmail} to ${recipient}`);
     lastEmailSentAt = Date.now();
     
     const result = await resend.emails.send({
-      from: credentials.fromEmail,
+      from: senderEmail,
       to: recipient,
       subject,
       html: htmlContent,
@@ -2624,5 +2626,5 @@ export async function sendContractSigningEmail(
   const htmlContent = wrapEmailContent(content, 'Contract Signing');
   const textContent = `Contract Ready for Signing\n\nHi ${data.driverName},\n\nA new contract has been prepared for you: ${data.contractTitle}\n\nPlease review and sign at: ${data.signingUrl}\n\nIf you have questions, contact sales@runcourier.co.uk`;
 
-  return sendEmailNotification(driverEmail, `Contract Ready for Signing - ${data.contractTitle} - Run Courier`, htmlContent, textContent);
+  return sendEmailNotification(driverEmail, `Contract Ready for Signing - ${data.contractTitle} - Run Courier`, htmlContent, textContent, 'RUN COURIER <support@runcourier.co.uk>');
 }
