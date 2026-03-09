@@ -490,10 +490,12 @@ export default function AdminApplications() {
           />
         )}
         {isPdf && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <FileText className="h-3 w-3" />
-            PDF document - click to view
-          </div>
+          <iframe
+            src={resolvedUrl}
+            className="mt-1 w-full h-48 rounded border"
+            title={label}
+            data-testid={`iframe-pdf-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+          />
         )}
       </div>
     );

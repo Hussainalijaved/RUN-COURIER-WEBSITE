@@ -573,11 +573,12 @@ export default function AdminDocuments() {
                             </a>
                           </div>
                           {isPdf ? (
-                            <div className="flex flex-col items-center justify-center h-64 bg-muted rounded">
-                              <FileText className="h-16 w-16 text-muted-foreground mb-3" />
-                              <p className="text-sm text-muted-foreground">PDF Document</p>
-                              <p className="text-xs text-muted-foreground mt-1">Click "Open in new tab" above to view</p>
-                            </div>
+                            <iframe
+                              src={previewUrl}
+                              className="w-full h-[500px] rounded border"
+                              title={selectedDoc.fileName || 'PDF Document'}
+                              data-testid="iframe-pdf-preview"
+                            />
                           ) : (
                             <img
                               src={previewUrl}
