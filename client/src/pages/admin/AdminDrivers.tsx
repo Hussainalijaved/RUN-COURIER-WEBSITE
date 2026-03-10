@@ -1520,7 +1520,6 @@ export default function AdminDrivers() {
                     <p className="text-sm text-muted-foreground">Member Since</p>
                   </div>
                 </div>
-              </div>
 
                 <Separator />
 
