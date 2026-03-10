@@ -8404,8 +8404,30 @@ export async function registerRoutes(
       console.warn(`[Driver Application] No phone token provided but phoneVerified=true, allowing submission`);
     }
 
-    const data = insertDriverApplicationSchema.parse(req.body);
-    const application = await storage.createDriverApplication(data);
+    let data;
+    try {
+      data = insertDriverApplicationSchema.parse(req.body);
+    } catch (zodError: any) {
+      console.error('[Driver Application] Zod validation error:', JSON.stringify(zodError.errors || zodError.issues || zodError.message, null, 2));
+      console.error('[Driver Application] Body keys:', Object.keys(req.body));
+      const missingFields = (zodError.errors || zodError.issues || [])
+        .filter((e: any) => e.code === 'invalid_type' && e.received === 'undefined')
+        .map((e: any) => e.path?.join('.'));
+      return res.status(400).json({ 
+        error: `Validation failed: ${missingFields.length > 0 ? `Missing fields: ${missingFields.join(', ')}` : zodError.message || 'Invalid data'}`,
+        details: zodError.errors || zodError.issues
+      });
+    }
+
+    let application;
+    try {
+      application = await storage.createDriverApplication(data);
+    } catch (dbError: any) {
+      console.error('[Driver Application] Database insert error:', dbError.message || dbError, dbError.details || '', dbError.code || '');
+      return res.status(500).json({ 
+        error: `Application could not be saved: ${dbError.message || 'Database error'}` 
+      });
+    }
 
     sendDriverApplicationNotification(data.fullName, 'New Application Submitted')
       .then(sent => {

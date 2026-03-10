@@ -1859,23 +1859,32 @@ export class SupabaseStorage implements IStorage {
     };
     
     let { data, error } = await supabase.from('driver_applications').insert(dbApp).select().single();
-    if (error && (error.message?.includes('vehicle_registration') || error.code === 'PGRST204')) {
+    if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('vehicle_make') || error.message?.includes('vehicle_model') || error.message?.includes('vehicle_color') || error.code === 'PGRST204')) {
+      console.log(`[Driver Application] First insert failed (${error.message}), retrying without vehicle detail columns`);
+      const savedVehicleInfo = {
+        registration: application.vehicleRegistration,
+        make: application.vehicleMake,
+        model: application.vehicleModel,
+        color: application.vehicleColor,
+      };
       delete dbApp.vehicle_registration;
       delete dbApp.vehicle_make;
       delete dbApp.vehicle_model;
       delete dbApp.vehicle_color;
-      if (application.vehicleRegistration) {
-        dbApp.vehicle_type = `${application.vehicleType}|${application.vehicleRegistration}`;
-      }
       const retry = await supabase.from('driver_applications').insert(dbApp).select().single();
       data = retry.data;
       error = retry.error;
+      if (!error && data) {
+        const result = mapDbToDriverApplication(data);
+        result.vehicleRegistration = savedVehicleInfo.registration || null;
+        result.vehicleMake = savedVehicleInfo.make || null;
+        result.vehicleModel = savedVehicleInfo.model || null;
+        result.vehicleColor = savedVehicleInfo.color || null;
+        return result;
+      }
     }
     if (error) throw error;
     const result = mapDbToDriverApplication(data);
-    if (application.vehicleRegistration) {
-      result.vehicleRegistration = application.vehicleRegistration;
-    }
     return result;
   }
 
@@ -1894,15 +1903,12 @@ export class SupabaseStorage implements IStorage {
     if (data.vehicleColor !== undefined) dbData.vehicle_color = data.vehicleColor;
     
     let { data: updated, error } = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
-    if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('column'))) {
+    if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('vehicle_make') || error.message?.includes('vehicle_model') || error.message?.includes('vehicle_color') || error.message?.includes('column'))) {
+      console.log(`[Driver Application] Update failed (${error.message}), retrying without vehicle detail columns`);
       delete dbData.vehicle_registration;
-      if (data.vehicleRegistration && data.vehicleType) {
-        dbData.vehicle_type = `${data.vehicleType}|${data.vehicleRegistration}`;
-      } else if (data.vehicleRegistration) {
-        const existing = await supabase.from('driver_applications').select('vehicle_type').eq('id', id).single();
-        const baseType = existing.data?.vehicle_type?.split('|')[0] || 'car';
-        dbData.vehicle_type = `${baseType}|${data.vehicleRegistration}`;
-      }
+      delete dbData.vehicle_make;
+      delete dbData.vehicle_model;
+      delete dbData.vehicle_color;
       const retry = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
       updated = retry.data;
       error = retry.error;
