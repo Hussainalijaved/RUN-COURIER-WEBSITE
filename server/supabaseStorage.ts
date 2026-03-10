@@ -365,7 +365,7 @@ export class SupabaseStorage implements IStorage {
         name: "Motorbike",
         description: "Fast delivery for small items up to 5kg",
         maxWeight: 5,
-        baseCharge: "7.00",
+        baseCharge: "10.00",
         perMileRate: "3.00",
         rushHourRate: "3.00",
         iconUrl: null,
@@ -1460,6 +1460,19 @@ export class SupabaseStorage implements IStorage {
           });
         }
         console.log(`[SupabaseStorage] Loaded ${data.length} vehicles from database`);
+        
+        const motorbikeVehicle = data.find((v: any) => v.type === 'motorbike');
+        if (motorbikeVehicle && parseFloat(motorbikeVehicle.base_charge) < 10) {
+          console.log(`[SupabaseStorage] Updating motorbike base charge from £${motorbikeVehicle.base_charge} to £10.00`);
+          await supabase
+            .from('vehicles')
+            .update({ base_charge: 10.00 })
+            .eq('type', 'motorbike');
+          const existing = this.vehicles.get('motorbike');
+          if (existing) {
+            existing.baseCharge = "10.00";
+          }
+        }
       } else {
         console.log('[SupabaseStorage] No vehicles found in database, inserting defaults');
         for (const [, vehicle] of this.vehicles) {

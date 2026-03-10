@@ -25,7 +25,7 @@ export const defaultPricingConfig: PricingConfig = {
   vehicles: {
     motorbike: {
       name: "Motorbike",
-      baseCharge: 7,
+      baseCharge: 10,
       perMileRate: 1.3,
       rushHourRate: 1.5,
       maxWeight: 5,

@@ -40,7 +40,7 @@ interface JobData {
 const validVehicleTypes = ["motorbike", "car", "small_van", "medium_van"];
 
 const vehicleConfig: Record<string, { baseCharge: number; perMileRate: number }> = {
-  motorbike: { baseCharge: 7, perMileRate: 1.3 },
+  motorbike: { baseCharge: 10, perMileRate: 1.3 },
   car: { baseCharge: 19, perMileRate: 1.2 },
   small_van: { baseCharge: 25, perMileRate: 1.3 },
   medium_van: { baseCharge: 30, perMileRate: 1.4 },

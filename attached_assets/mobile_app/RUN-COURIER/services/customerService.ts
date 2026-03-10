@@ -429,7 +429,7 @@ export const customerService = {
     if (Object.keys(vehiclePricing).length === 0) {
       return {
         vehiclePricing: {
-          motorbike: { basePrice: 7.00, ratePerMile: 1.30, rushHourRate: 1.50 },
+          motorbike: { basePrice: 10.00, ratePerMile: 1.30, rushHourRate: 1.50 },
           car: { basePrice: 17.00, ratePerMile: 1.20, rushHourRate: 1.40 },
           small_van: { basePrice: 21.00, ratePerMile: 1.30, rushHourRate: 1.50 },
           medium_van: { basePrice: 25.00, ratePerMile: 1.40, rushHourRate: 1.60 },
