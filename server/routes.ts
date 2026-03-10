@@ -7534,9 +7534,8 @@ export async function registerRoutes(
       const { verifySupabaseToken } = await import('./supabaseAdmin');
       const payload = await verifySupabaseToken(token);
       if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driver = await storage.getDriverByUserId(payload.sub);
-      if (!driver) return res.status(404).json({ error: "Driver not found" });
-      const notices = await storage.getDriverNoticeRecipients(driver.id);
+      const driverId = payload.sub;
+      const notices = await storage.getDriverNoticeRecipients(driverId);
       res.json(notices);
     } catch (e: any) {
       return res.status(401).json({ error: "Invalid token" });
@@ -7551,9 +7550,8 @@ export async function registerRoutes(
       const { verifySupabaseToken } = await import('./supabaseAdmin');
       const payload = await verifySupabaseToken(token);
       if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driver = await storage.getDriverByUserId(payload.sub);
-      if (!driver) return res.status(404).json({ error: "Driver not found" });
-      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driver.id);
+      const driverId = payload.sub;
+      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driverId);
       if (!recipient) return res.status(404).json({ error: "Notice not found" });
       if (!recipient.viewed_at) {
         await storage.updateNoticeRecipient(recipient.id, { viewed_at: new Date().toISOString(), status: 'viewed' });
@@ -7572,9 +7570,8 @@ export async function registerRoutes(
       const { verifySupabaseToken } = await import('./supabaseAdmin');
       const payload = await verifySupabaseToken(token);
       if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driver = await storage.getDriverByUserId(payload.sub);
-      if (!driver) return res.status(404).json({ error: "Driver not found" });
-      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driver.id);
+      const driverId = payload.sub;
+      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driverId);
       if (!recipient) return res.status(404).json({ error: "Notice not found" });
       await storage.updateNoticeRecipient(recipient.id, {
         viewed_at: recipient.viewed_at || new Date().toISOString(),
@@ -7595,11 +7592,10 @@ export async function registerRoutes(
       const { verifySupabaseToken } = await import('./supabaseAdmin');
       const payload = await verifySupabaseToken(token);
       if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driver = await storage.getDriverByUserId(payload.sub);
-      if (!driver) return res.status(404).json({ error: "Driver not found" });
-      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driver.id);
+      const driverId = payload.sub;
+      const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driverId);
       if (!recipient) return res.status(404).json({ error: "Notice not found" });
-      const deleted = await storage.deleteNoticeRecipient(recipient.id, driver.id);
+      const deleted = await storage.deleteNoticeRecipient(recipient.id, driverId);
       if (!deleted) return res.status(500).json({ error: "Failed to delete notice" });
       res.json({ success: true });
     } catch (e: any) {

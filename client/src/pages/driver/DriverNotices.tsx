@@ -173,7 +173,7 @@ export default function DriverNotices() {
             {sortedNotices.map((n: any) => (
               <Card
                 key={n.id}
-                className={`cursor-pointer hover-elevate ${!n.viewed_at ? 'border-l-4 border-l-blue-500' : ''}`}
+                className={`cursor-pointer hover-elevate ${!n.viewed_at ? 'ring-1 ring-blue-500' : ''}`}
                 onClick={() => openNotice(n)}
                 data-testid={`card-notice-${n.id}`}
               >
