@@ -7531,13 +7531,16 @@ export async function registerRoutes(
     if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
     const token = authHeader.replace('Bearer ', '');
     try {
-      const { verifySupabaseToken } = await import('./supabaseAdmin');
-      const payload = await verifySupabaseToken(token);
-      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driverId = payload.sub;
+      const { verifyAccessToken } = await import('./supabaseAdmin');
+      const user = await verifyAccessToken(token);
+      if (!user) return res.status(401).json({ error: "Invalid token" });
+      const driverId = user.id;
+      console.log('[Driver Notices] Fetching notices for driver:', driverId);
       const notices = await storage.getDriverNoticeRecipients(driverId);
+      console.log('[Driver Notices] Found', notices.length, 'notices');
       res.json(notices);
     } catch (e: any) {
+      console.error('[Driver Notices] Error:', e.message);
       return res.status(401).json({ error: "Invalid token" });
     }
   }));
@@ -7547,10 +7550,10 @@ export async function registerRoutes(
     if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
     const token = authHeader.replace('Bearer ', '');
     try {
-      const { verifySupabaseToken } = await import('./supabaseAdmin');
-      const payload = await verifySupabaseToken(token);
-      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driverId = payload.sub;
+      const { verifyAccessToken } = await import('./supabaseAdmin');
+      const user = await verifyAccessToken(token);
+      if (!user) return res.status(401).json({ error: "Invalid token" });
+      const driverId = user.id;
       const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driverId);
       if (!recipient) return res.status(404).json({ error: "Notice not found" });
       if (!recipient.viewed_at) {
@@ -7567,10 +7570,10 @@ export async function registerRoutes(
     if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
     const token = authHeader.replace('Bearer ', '');
     try {
-      const { verifySupabaseToken } = await import('./supabaseAdmin');
-      const payload = await verifySupabaseToken(token);
-      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driverId = payload.sub;
+      const { verifyAccessToken } = await import('./supabaseAdmin');
+      const user = await verifyAccessToken(token);
+      if (!user) return res.status(401).json({ error: "Invalid token" });
+      const driverId = user.id;
       const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driverId);
       if (!recipient) return res.status(404).json({ error: "Notice not found" });
       await storage.updateNoticeRecipient(recipient.id, {
@@ -7589,10 +7592,10 @@ export async function registerRoutes(
     if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
     const token = authHeader.replace('Bearer ', '');
     try {
-      const { verifySupabaseToken } = await import('./supabaseAdmin');
-      const payload = await verifySupabaseToken(token);
-      if (!payload?.sub) return res.status(401).json({ error: "Invalid token" });
-      const driverId = payload.sub;
+      const { verifyAccessToken } = await import('./supabaseAdmin');
+      const user = await verifyAccessToken(token);
+      if (!user) return res.status(401).json({ error: "Invalid token" });
+      const driverId = user.id;
       const recipient = await storage.getDriverNoticeRecipient(req.params.noticeId, driverId);
       if (!recipient) return res.status(404).json({ error: "Notice not found" });
       const deleted = await storage.deleteNoticeRecipient(recipient.id, driverId);
