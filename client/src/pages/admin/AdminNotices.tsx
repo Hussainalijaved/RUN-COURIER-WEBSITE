@@ -159,6 +159,12 @@ export default function AdminNotices() {
     onError: (e: any) => toast({ title: 'Failed to resend', description: e.message, variant: 'destructive' }),
   });
 
+  const deleteNoticeMutation = useMutation({
+    mutationFn: async (id: string) => { const r = await apiRequest('DELETE', `/api/admin/notices/${id}`); return r.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/admin/notices'] }); toast({ title: 'Notice deleted' }); setDetailOpen(false); },
+    onError: () => toast({ title: 'Failed to delete notice', variant: 'destructive' }),
+  });
+
   function resetTemplateForm() {
     setEditingTemplate(null);
     setTemplateForm({ title: '', subject: '', message: '', category: 'general', requires_acknowledgement: false });
@@ -411,6 +417,9 @@ export default function AdminNotices() {
                                   <Archive className="w-4 h-4" />
                                 </Button>
                               )}
+                              <Button size="icon" variant="ghost" onClick={() => { if (confirm('Delete this notice and all its recipient records permanently?')) deleteNoticeMutation.mutate(n.id); }} data-testid={`button-delete-notice-${n.id}`}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -707,6 +716,9 @@ export default function AdminNotices() {
                 )}
                 <Button size="sm" variant="outline" onClick={() => resendNoticeMutation.mutate(detailNotice.id)} disabled={resendNoticeMutation.isPending} data-testid="button-detail-resend">
                   <RotateCw className="w-3.5 h-3.5 mr-1" /> Resend Emails
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { if (confirm('Delete this notice and all its recipient records permanently?')) deleteNoticeMutation.mutate(detailNotice.id); }} disabled={deleteNoticeMutation.isPending} data-testid="button-detail-delete">
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
                 </Button>
               </div>
 

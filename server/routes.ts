@@ -7521,6 +7521,12 @@ export async function registerRoutes(
     res.json({ success: true, notice, recipientCount: targetDrivers.length });
   }));
 
+  app.delete("/api/admin/notices/:id", asyncHandler(async (req, res) => {
+    const deleted = await storage.deleteDriverNotice(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Notice not found" });
+    res.json({ success: true });
+  }));
+
   app.patch("/api/admin/notices/:id/archive", asyncHandler(async (req, res) => {
     const updated = await storage.updateDriverNotice(req.params.id, { status: 'archived' });
     if (!updated) return res.status(404).json({ error: "Notice not found" });

@@ -2668,6 +2668,17 @@ export class SupabaseStorage implements IStorage {
     } catch { return false; }
   }
 
+  async deleteDriverNotice(id: string): Promise<boolean> {
+    try {
+      await this.pgQuery('DELETE FROM driver_notice_recipients WHERE notice_id = $1', [id]);
+      await this.pgQuery('DELETE FROM driver_notices WHERE id = $1', [id]);
+      return true;
+    } catch (e: any) {
+      console.error('[Notices] deleteDriverNotice error:', e.message);
+      return false;
+    }
+  }
+
   async getDriverNotices(filters?: { status?: string }): Promise<any[]> {
     try {
       const conditions: string[] = [];
