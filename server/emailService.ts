@@ -355,11 +355,10 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
   const content = `
     <h2 style="color: #333; margin-top: 0;">New Booking Received</h2>
     
-    <!-- Job Number & Tracking -->
+    <!-- Job Reference -->
     <div style="background-color: #007BFF; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center;">
-      <p style="margin: 0; font-size: 14px;">Job Number</p>
-      <p style="margin: 5px 0 0; font-size: 28px; font-weight: bold; letter-spacing: 2px;">#${jobDetails.id || jobId}</p>
-      <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.85;">Tracking: ${jobDetails.trackingNumber || 'N/A'}</p>
+      <p style="margin: 0; font-size: 14px;">Job Reference</p>
+      <p style="margin: 5px 0 0; font-size: 28px; font-weight: bold; letter-spacing: 2px;">${jobDetails.trackingNumber || 'N/A'}</p>
     </div>
     
     <div style="background-color: white; border-radius: 0 0 8px 8px; padding: 20px; border: 1px solid #eee; border-top: none;">
@@ -617,8 +616,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
   
   const textContent = `NEW BOOKING RECEIVED
 
-Job Number: #${jobDetails.id || jobId}
-Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
+Job Reference: ${jobDetails.trackingNumber || 'N/A'}
 
 PICKUP DETAILS
 --------------
@@ -660,7 +658,7 @@ Run Courier - https://runcourier.co.uk`;
   let anySuccess = false;
   for (const email of adminEmails) {
     try {
-      const result = await sendEmailNotification(email, `New Booking #${jobDetails.id || jobId} - ${jobDetails.trackingNumber}`, htmlContent, textContent);
+      const result = await sendEmailNotification(email, `New Booking ${jobDetails.trackingNumber || jobId}`, htmlContent, textContent);
       if (result) anySuccess = true;
     } catch (err) {
       console.error(`[Email] Failed to send admin notification to ${email}:`, err);
@@ -696,21 +694,11 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
     <h2 style="color: #333; margin-top: 0;">Thank You for Your Booking!</h2>
     <p style="color: #333; font-size: 16px;">Your delivery has been confirmed and is being processed. Here are your booking details:</p>
     
-    <!-- Job Number & Tracking Banner -->
+    <!-- Job Reference Banner -->
     <div style="background-color: #007BFF; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="text-align: center; padding: 0 10px; width: 50%; border-right: 1px solid rgba(255,255,255,0.3);">
-            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Job Number</p>
-            <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold;">#${jobDetails.id || 'N/A'}</p>
-          </td>
-          <td style="text-align: center; padding: 0 10px; width: 50%;">
-            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Tracking Number</p>
-            <p style="margin: 5px 0 0; font-size: 18px; font-weight: bold; letter-spacing: 1px;">${jobDetails.trackingNumber || 'N/A'}</p>
-          </td>
-        </tr>
-      </table>
-      <p style="margin: 12px 0 0; font-size: 12px; opacity: 0.85;">Use your tracking number to track your delivery at runcourier.co.uk</p>
+      <p style="margin: 0; font-size: 12px; opacity: 0.9;">Your Job Reference</p>
+      <p style="margin: 5px 0 0; font-size: 28px; font-weight: bold; letter-spacing: 2px;">${jobDetails.trackingNumber || 'N/A'}</p>
+      <p style="margin: 12px 0 0; font-size: 12px; opacity: 0.85;">Use this reference to track your delivery at runcourier.co.uk</p>
     </div>
     
     <div style="background-color: white; border-radius: 8px; padding: 20px; border: 1px solid #eee;">
@@ -849,8 +837,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
 Thank you for booking with Run Courier!
 
-Job Number: #${jobDetails.id || 'N/A'}
-Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
+Job Reference: ${jobDetails.trackingNumber || 'N/A'}
 
 COLLECTION DETAILS
 ------------------
@@ -2589,7 +2576,7 @@ export async function sendDeliveryConfirmationEmail(
     ? new Date(jobDetails.deliveredAt).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' })
     : new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' });
 
-  const jobRef = jobDetails.jobNumber || jobDetails.trackingNumber;
+  const jobRef = jobDetails.trackingNumber || jobDetails.jobNumber;
 
   let podImageHtml = '';
   const photoUrl = jobDetails.podPhotoUrl || (jobDetails.podPhotos && jobDetails.podPhotos.length > 0 ? jobDetails.podPhotos[0] : null);
