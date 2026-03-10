@@ -7395,6 +7395,11 @@ export async function registerRoutes(
     res.json(driverIds);
   }));
 
+  app.get("/api/admin/notices/driver/:driverId", asyncHandler(async (req, res) => {
+    const notices = await storage.getDriverNoticeRecipients(req.params.driverId);
+    res.json(notices);
+  }));
+
   app.get("/api/admin/notices/:id", asyncHandler(async (req, res) => {
     const notice = await storage.getDriverNotice(req.params.id);
     if (!notice) return res.status(404).json({ error: "Notice not found" });

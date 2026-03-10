@@ -74,6 +74,9 @@ import {
   Trash2,
   KeyRound,
   Copy,
+  Bell,
+  CheckCheck,
+  EyeOff,
 } from 'lucide-react';
 import { cn, normalizeDocUrl } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -243,6 +246,11 @@ export default function AdminDrivers() {
       return res.json();
     },
     enabled: !!selectedDriver?.id,
+  });
+
+  const { data: selectedDriverNotices, isLoading: selectedDriverNoticesLoading } = useQuery<any[]>({
+    queryKey: [`/api/admin/notices/driver/${selectedDriver?.id}`],
+    enabled: !!selectedDriver?.id && profileDialogOpen,
   });
 
   const { data: users } = useQuery<User[]>({
@@ -1511,6 +1519,71 @@ export default function AdminDrivers() {
                     </div>
                     <p className="text-sm text-muted-foreground">Member Since</p>
                   </div>
+                </div>
+              </div>
+
+                <Separator />
+
+                <div className="space-y-3" data-testid="section-driver-notices">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    Notices Sent
+                    {selectedDriverNotices && selectedDriverNotices.length > 0 && (
+                      <Badge variant="secondary">{selectedDriverNotices.length}</Badge>
+                    )}
+                  </h4>
+                  {selectedDriverNoticesLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading notices...
+                    </div>
+                  ) : !selectedDriverNotices || selectedDriverNotices.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No notices sent to this driver yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {selectedDriverNotices.map((notice: any) => (
+                        <div key={notice.id} className="border rounded-md p-3 space-y-1" data-testid={`notice-item-${notice.id}`}>
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{notice.title || notice.subject || 'Untitled'}</span>
+                            <div className="flex items-center gap-1.5">
+                              {notice.acknowledged_at ? (
+                                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" data-testid={`notice-status-${notice.id}`}>
+                                  <CheckCheck className="h-3 w-3 mr-1" />
+                                  Acknowledged
+                                </Badge>
+                              ) : notice.viewed_at ? (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" data-testid={`notice-status-${notice.id}`}>
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Seen
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" data-testid={`notice-status-${notice.id}`}>
+                                  <EyeOff className="h-3 w-3 mr-1" />
+                                  Not Seen
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          {notice.category && (
+                            <Badge variant="outline" className="text-xs">{notice.category}</Badge>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Sent: {notice.sent_at ? new Date(notice.sent_at).toLocaleString('en-GB') : '—'}
+                          </p>
+                          {notice.viewed_at && (
+                            <p className="text-xs text-muted-foreground">
+                              Viewed: {new Date(notice.viewed_at).toLocaleString('en-GB')}
+                            </p>
+                          )}
+                          {notice.acknowledged_at && (
+                            <p className="text-xs text-muted-foreground">
+                              Acknowledged: {new Date(notice.acknowledged_at).toLocaleString('en-GB')}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
