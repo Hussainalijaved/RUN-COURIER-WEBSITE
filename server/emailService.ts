@@ -355,10 +355,20 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
   const content = `
     <h2 style="color: #333; margin-top: 0;">New Booking Received</h2>
     
-    <!-- Job Reference -->
+    <!-- Job Number & Tracking -->
     <div style="background-color: #007BFF; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center;">
-      <p style="margin: 0; font-size: 14px;">Job Reference</p>
-      <p style="margin: 5px 0 0; font-size: 28px; font-weight: bold; letter-spacing: 2px;">${jobDetails.trackingNumber || 'N/A'}</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="text-align: center; padding: 0 10px; width: 50%; border-right: 1px solid rgba(255,255,255,0.3);">
+            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Job Number</p>
+            <p style="margin: 5px 0 0; font-size: 28px; font-weight: bold; letter-spacing: 2px;">${jobDetails.jobNumber || 'N/A'}</p>
+          </td>
+          <td style="text-align: center; padding: 0 10px; width: 50%;">
+            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Tracking Number</p>
+            <p style="margin: 5px 0 0; font-size: 18px; font-weight: bold; letter-spacing: 1px;">${jobDetails.trackingNumber || 'N/A'}</p>
+          </td>
+        </tr>
+      </table>
     </div>
     
     <div style="background-color: white; border-radius: 0 0 8px 8px; padding: 20px; border: 1px solid #eee; border-top: none;">
@@ -616,7 +626,8 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
   
   const textContent = `NEW BOOKING RECEIVED
 
-Job Reference: ${jobDetails.trackingNumber || 'N/A'}
+Job Number: ${jobDetails.jobNumber || 'N/A'}
+Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
 
 PICKUP DETAILS
 --------------
@@ -658,7 +669,7 @@ Run Courier - https://runcourier.co.uk`;
   let anySuccess = false;
   for (const email of adminEmails) {
     try {
-      const result = await sendEmailNotification(email, `New Booking ${jobDetails.trackingNumber || jobId}`, htmlContent, textContent);
+      const result = await sendEmailNotification(email, `New Booking #${jobDetails.jobNumber || 'N/A'} - ${jobDetails.trackingNumber || 'N/A'}`, htmlContent, textContent);
       if (result) anySuccess = true;
     } catch (err) {
       console.error(`[Email] Failed to send admin notification to ${email}:`, err);
@@ -694,11 +705,21 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
     <h2 style="color: #333; margin-top: 0;">Thank You for Your Booking!</h2>
     <p style="color: #333; font-size: 16px;">Your delivery has been confirmed and is being processed. Here are your booking details:</p>
     
-    <!-- Job Reference Banner -->
+    <!-- Job Number & Tracking Banner -->
     <div style="background-color: #007BFF; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-      <p style="margin: 0; font-size: 12px; opacity: 0.9;">Your Job Reference</p>
-      <p style="margin: 5px 0 0; font-size: 28px; font-weight: bold; letter-spacing: 2px;">${jobDetails.trackingNumber || 'N/A'}</p>
-      <p style="margin: 12px 0 0; font-size: 12px; opacity: 0.85;">Use this reference to track your delivery at runcourier.co.uk</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="text-align: center; padding: 0 10px; width: 50%; border-right: 1px solid rgba(255,255,255,0.3);">
+            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Job Number</p>
+            <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold;">${jobDetails.jobNumber || 'N/A'}</p>
+          </td>
+          <td style="text-align: center; padding: 0 10px; width: 50%;">
+            <p style="margin: 0; font-size: 12px; opacity: 0.9;">Tracking Number</p>
+            <p style="margin: 5px 0 0; font-size: 18px; font-weight: bold; letter-spacing: 1px;">${jobDetails.trackingNumber || 'N/A'}</p>
+          </td>
+        </tr>
+      </table>
+      <p style="margin: 12px 0 0; font-size: 12px; opacity: 0.85;">Use your tracking number to track your delivery at runcourier.co.uk</p>
     </div>
     
     <div style="background-color: white; border-radius: 8px; padding: 20px; border: 1px solid #eee;">
@@ -837,7 +858,8 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
 
 Thank you for booking with Run Courier!
 
-Job Reference: ${jobDetails.trackingNumber || 'N/A'}
+Job Number: ${jobDetails.jobNumber || 'N/A'}
+Tracking Number: ${jobDetails.trackingNumber || 'N/A'}
 
 COLLECTION DETAILS
 ------------------
@@ -872,7 +894,7 @@ Need help? Call +44 7311 121 217 or email info@runcourier.co.uk
 Run Courier - Same Day Delivery Across the UK
 runcourier.co.uk`;
 
-  return sendEmailNotification(customerEmail, `Booking Confirmed - ${jobDetails.trackingNumber}`, htmlContent, textContent);
+  return sendEmailNotification(customerEmail, `Booking Confirmed #${jobDetails.jobNumber || 'N/A'} - ${jobDetails.trackingNumber}`, htmlContent, textContent);
 }
 
 export async function sendDriverApplicationNotification(
@@ -2576,7 +2598,7 @@ export async function sendDeliveryConfirmationEmail(
     ? new Date(jobDetails.deliveredAt).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' })
     : new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' });
 
-  const jobRef = jobDetails.trackingNumber || jobDetails.jobNumber;
+  const jobRef = jobDetails.jobNumber || jobDetails.trackingNumber;
 
   let podImageHtml = '';
   const photoUrl = jobDetails.podPhotoUrl || (jobDetails.podPhotos && jobDetails.podPhotos.length > 0 ? jobDetails.podPhotos[0] : null);
@@ -2608,8 +2630,8 @@ export async function sendDeliveryConfirmationEmail(
     <div style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 20px 0;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 8px 0; color: #777; font-size: 14px; width: 140px;">Job Reference:</td>
-          <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: 600;">${jobRef}</td>
+          <td style="padding: 8px 0; color: #777; font-size: 14px; width: 140px;">Job Number:</td>
+          <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: 600;">#${jobRef}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #777; font-size: 14px;">Tracking Number:</td>
@@ -2644,9 +2666,9 @@ export async function sendDeliveryConfirmationEmail(
   `;
 
   const htmlContent = wrapEmailContent(content, 'Delivery Complete');
-  const textContent = `Your Delivery is Complete\n\nGreat news! Your parcel has been successfully delivered.\n\nJob Reference: ${jobRef}\nTracking: ${jobDetails.trackingNumber}\nDelivered To: ${jobDetails.deliveryAddress || ''} ${jobDetails.deliveryPostcode || ''}\nReceived By: ${signedByName}\nDelivered At: ${deliveredTime}\n\nThank you for choosing Run Courier!\n\nTrack: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}`;
+  const textContent = `Your Delivery is Complete\n\nGreat news! Your parcel has been successfully delivered.\n\nJob Number: #${jobRef}\nTracking Number: ${jobDetails.trackingNumber}\nDelivered To: ${jobDetails.deliveryAddress || ''} ${jobDetails.deliveryPostcode || ''}\nReceived By: ${signedByName}\nDelivered At: ${deliveredTime}\n\nThank you for choosing Run Courier!\n\nTrack: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}`;
 
-  return sendEmailNotification(customerEmail, `Delivery Complete - ${jobRef} - Run Courier`, htmlContent, textContent);
+  return sendEmailNotification(customerEmail, `Delivery Complete #${jobRef} - ${jobDetails.trackingNumber} - Run Courier`, htmlContent, textContent);
 }
 
 export async function sendContractSigningEmail(

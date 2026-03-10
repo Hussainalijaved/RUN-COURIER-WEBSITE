@@ -1563,6 +1563,7 @@ export async function registerRoutes(
   app.post("/api/test-admin-booking-email", asyncHandler(async (req, res) => {
     const testJobDetails = {
       id: 'test-0',
+      jobNumber: String(100000 + Math.floor(Math.random() * 900000)),
       trackingNumber: 'RCTEST' + Date.now().toString().slice(-6),
       pickupPostcode: 'SW1A 1AA',
       pickupAddress: '10 Downing Street, Westminster',
@@ -2596,18 +2597,19 @@ export async function registerRoutes(
     const customerEmail = req.body.customerEmail || (job as any).customerEmail;
     const jobWithStops = {
       ...job,
+      jobNumber,
       customerEmail,
       multiDropStops: req.body.multiDropStops || null,
       returnToSameLocation: req.body.returnToSameLocation ?? true,
       returnAddress: req.body.returnAddress || null,
       returnPostcode: req.body.returnPostcode || null,
     };
-    console.log(`[Email] Sending admin new booking notification for job ${job.trackingNumber}`);
+    console.log(`[Email] Sending admin new booking notification for job #${jobNumber} (${job.trackingNumber})`);
     await sendNewJobNotification(job.id, jobWithStops).catch(err => console.error('[Email] Failed to send admin job notification:', err));
     // Send customer confirmation if email available
     if (customerEmail) {
-      console.log(`[Email] Sending customer booking confirmation to ${customerEmail} for job ${job.trackingNumber}`);
-      await sendCustomerBookingConfirmation(customerEmail, { ...finalJob, customerEmail }).catch(err => console.error('[Email] Failed to send customer confirmation:', err));
+      console.log(`[Email] Sending customer booking confirmation to ${customerEmail} for job #${jobNumber} (${job.trackingNumber})`);
+      await sendCustomerBookingConfirmation(customerEmail, { ...finalJob, jobNumber, customerEmail }).catch(err => console.error('[Email] Failed to send customer confirmation:', err));
     } else {
       console.log(`[Email] No customer email available for job ${job.trackingNumber} - skipping customer confirmation`);
     }
@@ -8098,11 +8100,11 @@ export async function registerRoutes(
 
     // Send email notifications
     const embeddedCustomerEmail = (job as any).customerEmail || metadata.customerEmail;
-    const jobWithEmail = { ...job, customerEmail: embeddedCustomerEmail };
-    console.log(`[Email] Sending admin new booking notification for embedded job ${job.trackingNumber}`);
+    const jobWithEmail = { ...job, jobNumber: job.jobNumber || jobNumber, customerEmail: embeddedCustomerEmail };
+    console.log(`[Email] Sending admin new booking notification for embedded job #${job.jobNumber || jobNumber} (${job.trackingNumber})`);
     await sendNewJobNotification(job.id, jobWithEmail).catch(err => console.error('[Email] Failed to send admin notification:', err));
     if (embeddedCustomerEmail) {
-      console.log(`[Email] Sending customer booking confirmation to ${embeddedCustomerEmail} for job ${job.trackingNumber}`);
+      console.log(`[Email] Sending customer booking confirmation to ${embeddedCustomerEmail} for job #${job.jobNumber || jobNumber} (${job.trackingNumber})`);
       await sendCustomerBookingConfirmation(embeddedCustomerEmail, jobWithEmail).catch(err => console.error('[Email] Failed to send customer confirmation:', err));
     } else {
       console.log(`[Email] No customer email available for embedded job ${job.trackingNumber} - skipping customer confirmation`);
@@ -8213,11 +8215,11 @@ export async function registerRoutes(
     
     // Send email notifications
     const customerEmailForNotification = bookingData.customerEmail || customer.email;
-    const jobWithEmail = { ...job, customerEmail: customerEmailForNotification };
-    console.log(`[Email] Sending admin new booking notification for pay-later job ${job.trackingNumber}`);
+    const jobWithEmail = { ...job, jobNumber: job.jobNumber || jobNumber, customerEmail: customerEmailForNotification };
+    console.log(`[Email] Sending admin new booking notification for pay-later job #${job.jobNumber || jobNumber} (${job.trackingNumber})`);
     await sendNewJobNotification(job.id, jobWithEmail).catch(err => console.error('[Email] Failed to send admin notification:', err));
     if (customerEmailForNotification) {
-      console.log(`[Email] Sending customer booking confirmation to ${customerEmailForNotification} for job ${job.trackingNumber}`);
+      console.log(`[Email] Sending customer booking confirmation to ${customerEmailForNotification} for job #${job.jobNumber || jobNumber} (${job.trackingNumber})`);
       await sendCustomerBookingConfirmation(customerEmailForNotification, jobWithEmail).catch(err => console.error('[Email] Failed to send customer confirmation:', err));
     } else {
       console.log(`[Email] No customer email available for pay-later job ${job.trackingNumber} - skipping customer confirmation`);
@@ -8312,11 +8314,11 @@ export async function registerRoutes(
     
     // Send email notifications
     const customerEmailForConfirmation = metadata.customerEmail || session.customer_email;
-    const jobWithEmail = { ...job, customerEmail: customerEmailForConfirmation };
-    console.log(`[Email] Sending admin new booking notification for Stripe job ${job.trackingNumber}`);
+    const jobWithEmail = { ...job, jobNumber: job.jobNumber || jobNumber, customerEmail: customerEmailForConfirmation };
+    console.log(`[Email] Sending admin new booking notification for Stripe job #${job.jobNumber || jobNumber} (${job.trackingNumber})`);
     await sendNewJobNotification(job.id, jobWithEmail).catch(err => console.error('[Email] Failed to send admin notification:', err));
     if (customerEmailForConfirmation) {
-      console.log(`[Email] Sending customer booking confirmation to ${customerEmailForConfirmation} for job ${job.trackingNumber}`);
+      console.log(`[Email] Sending customer booking confirmation to ${customerEmailForConfirmation} for job #${job.jobNumber || jobNumber} (${job.trackingNumber})`);
       await sendCustomerBookingConfirmation(customerEmailForConfirmation, jobWithEmail).catch(err => console.error('[Email] Failed to send customer confirmation:', err));
     } else {
       console.log(`[Email] No customer email available for Stripe job ${job.trackingNumber} - skipping customer confirmation`);
