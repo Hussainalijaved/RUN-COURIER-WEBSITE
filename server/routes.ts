@@ -11333,8 +11333,10 @@ export async function registerRoutes(
       .filter(j => !j.driverHidden)
       .map(j => {
         const assignmentPrice = assignmentPriceMap.get(String(j.id));
+        const numbered = ensureJobNumber(j);
         return {
           id: j.id,
+          jobNumber: numbered.jobNumber,
           trackingNumber: j.trackingNumber,
           customerId: j.customerId,
           driverId: j.driverId,
@@ -11587,7 +11589,7 @@ export async function registerRoutes(
     await storage.createNotification({
       userId: driverUserId,
       title: "New Job Assignment",
-      message: `You have been assigned a new job (${freshAssignJob.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
+      message: `You have been assigned a new job #${freshAssignJob.jobNumber || ''} (${freshAssignJob.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
       type: "job_assigned",
       data: { assignmentId: assignment.id, jobId },
     });
@@ -12203,9 +12205,9 @@ export async function registerRoutes(
       await storage.createNotification({
         userId: driver.userId,
         title: "Job Unassigned",
-        message: `Job ${job.trackingNumber} has been unassigned from you by admin.${reason ? ` Reason: ${reason}` : ""}`,
+        message: `Job #${job.jobNumber || ''} (${job.trackingNumber}) has been unassigned from you by admin.${reason ? ` Reason: ${reason}` : ""}`,
         type: "job_unassigned",
-        data: { jobId, trackingNumber: job.trackingNumber },
+        data: { jobId, jobNumber: job.jobNumber, trackingNumber: job.trackingNumber },
       });
     }
 
