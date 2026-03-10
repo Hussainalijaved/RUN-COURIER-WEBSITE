@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,26 +22,33 @@ const CATEGORY_COLORS: Record<string, string> = {
   general: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300',
 };
 
+async function getAccessToken(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token || null;
+}
+
 export default function DriverNotices() {
   const { toast } = useToast();
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [selectedNotice, setSelectedNotice] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread' | 'acknowledged' | 'requires_ack'>('all');
 
-  const token = session?.access_token;
-
   const { data: notices = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/driver/notices'],
     queryFn: async () => {
+      const token = await getAccessToken();
       if (!token) return [];
       const res = await fetch('/api/driver/notices', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        console.error('[DriverNotices] Failed to fetch notices:', res.status);
+        return [];
+      }
       return res.json();
     },
-    enabled: !!token,
+    enabled: !!user,
   });
 
   const filteredNotices = useMemo(() => {
@@ -65,6 +73,8 @@ export default function DriverNotices() {
 
   const markViewedMutation = useMutation({
     mutationFn: async (noticeId: string) => {
+      const token = await getAccessToken();
+      if (!token) return;
       await fetch(`/api/driver/notices/${noticeId}/view`, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -75,6 +85,8 @@ export default function DriverNotices() {
 
   const acknowledgeMutation = useMutation({
     mutationFn: async (noticeId: string) => {
+      const token = await getAccessToken();
+      if (!token) throw new Error('Not authenticated');
       const res = await fetch(`/api/driver/notices/${noticeId}/acknowledge`, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -90,6 +102,8 @@ export default function DriverNotices() {
 
   const deleteNoticeMutation = useMutation({
     mutationFn: async (noticeId: string) => {
+      const token = await getAccessToken();
+      if (!token) throw new Error('Not authenticated');
       const res = await fetch(`/api/driver/notices/${noticeId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
