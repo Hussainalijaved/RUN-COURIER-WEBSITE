@@ -86,14 +86,14 @@ export default function AdminContracts() {
     queryKey: ['/api/drivers'],
   });
 
-  const activeApprovedDrivers = useMemo(() =>
-    drivers.filter((d: any) => d.isActive !== false && d.status === 'approved'),
+  const activeDrivers = useMemo(() =>
+    drivers.filter((d: any) => d.isActive !== false),
     [drivers]
   );
 
   const driversGroupedByVehicle = useMemo(() => {
     const groups: Record<string, any[]> = {};
-    for (const d of activeApprovedDrivers) {
+    for (const d of activeDrivers) {
       const vt = d.vehicleType || 'other';
       if (!groups[vt]) groups[vt] = [];
       groups[vt].push(d);
@@ -110,7 +110,7 @@ export default function AdminContracts() {
       }
     }
     return ordered;
-  }, [activeApprovedDrivers]);
+  }, [activeDrivers]);
 
   const createTemplateMutation = useMutation({
     mutationFn: async (data: { title: string; content: string }) => {
@@ -240,7 +240,7 @@ export default function AdminContracts() {
   }
 
   function selectAllDrivers() {
-    const allIds = activeApprovedDrivers.map((d: any) => d.id);
+    const allIds = activeDrivers.map((d: any) => d.id);
     setSelectedDriverIds(allIds);
   }
 
@@ -269,8 +269,8 @@ export default function AdminContracts() {
   }, [contracts]);
 
   const newDriverIds = useMemo(() => {
-    return activeApprovedDrivers.filter((d: any) => !driverContractStatus.has(d.id)).map((d: any) => d.id);
-  }, [activeApprovedDrivers, driverContractStatus]);
+    return activeDrivers.filter((d: any) => !driverContractStatus.has(d.id)).map((d: any) => d.id);
+  }, [activeDrivers, driverContractStatus]);
 
   const driversGroupedNewFirst = useMemo(() => {
     return driversGroupedByVehicle.map(group => ({
