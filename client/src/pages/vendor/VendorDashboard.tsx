@@ -371,7 +371,7 @@ export default function VendorDashboard() {
                     Include your API key in the Authorization header:
                   </p>
                   <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
-{`Authorization: Bearer sk_live_your_api_key`}
+{`Authorization: Bearer YOUR_API_KEY_HERE`}
                   </pre>
                 </div>
 
