@@ -28,6 +28,51 @@ import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
 import { geocodeAddress } from "./geocoding";
+import { Pool } from "pg";
+
+function generateReadableTempPassword(): string {
+  const words = ['Run', 'Fast', 'Drive', 'Go', 'Ace', 'Top', 'Jet', 'Max', 'Pro', 'Key', 'Win', 'Zip', 'Fly', 'Red', 'Blu',
+    'Dash', 'Bold', 'Star', 'Pace', 'Rush', 'Keen', 'Snap', 'Grip', 'Lift', 'Peak', 'Core', 'Edge', 'Volt', 'True', 'Firm'];
+  const { randomInt } = require('crypto');
+  const word1 = words[randomInt(words.length)];
+  const word2 = words[randomInt(words.length)];
+  const word3 = words[randomInt(words.length)];
+  const num = randomInt(100, 1000);
+  return `${word1}${word2}${word3}${num}`;
+}
+
+let pgPool: Pool | null = null;
+function getPgPool(): Pool {
+  if (!pgPool) {
+    pgPool = new Pool({
+      host: process.env.PGHOST,
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE,
+      port: parseInt(process.env.PGPORT || '5432'),
+      ssl: { rejectUnauthorized: false },
+      max: 3,
+    });
+  }
+  return pgPool;
+}
+
+async function setMustChangePassword(userId: string, value: boolean): Promise<void> {
+  try {
+    await getPgPool().query('UPDATE drivers SET must_change_password = $1 WHERE id = $2', [value, userId]);
+  } catch (err) {
+    console.warn('[Driver] Failed to set must_change_password:', err);
+  }
+}
+
+async function getMustChangePassword(userId: string): Promise<boolean> {
+  try {
+    const result = await getPgPool().query('SELECT must_change_password FROM drivers WHERE id = $1', [userId]);
+    return result.rows[0]?.must_change_password === true;
+  } catch {
+    return false;
+  }
+}
 import { sendJobOfferNotification, sendJobWithdrawalNotification } from "./pushNotifications";
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
 import { cache, CACHE_TTL } from "./cache";
@@ -9057,7 +9102,7 @@ export async function registerRoutes(
           } else if (!driver) {
             console.log(`[Driver Application] No driver found for email ${application.email} - creating account automatically`);
             try {
-              const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
+              const tempPassword = generateReadableTempPassword();
               
               let oldAuthUser: any = null;
               try {
@@ -9152,7 +9197,7 @@ export async function registerRoutes(
                 } else {
                   console.log(`[Driver Application] Driver ${driverCode} created for ${application.email} (vehicle: ${application.vehicleType} ${application.vehicleMake || ''} ${application.vehicleModel || ''}, reg: ${application.vehicleRegistration || 'none'})`);
 
-                  try { await supabaseAdmin.from('drivers').update({ must_change_password: true }).eq('id', userId); } catch {}
+                  await setMustChangePassword(userId, true);
 
                   await upsertDocRecords(userId, copiedDocs);
 
@@ -9209,7 +9254,7 @@ export async function registerRoutes(
       .ilike('email', application.email)
       .maybeSingle();
 
-    const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
+    const tempPassword = generateReadableTempPassword();
 
     if (!driver) {
       console.log(`[Resend Approval] No driver account found for ${application.email} - creating one now`);
@@ -9287,6 +9332,8 @@ export async function registerRoutes(
         driver = { id: userId, driver_code: driverCode, email: application.email };
         console.log(`[Resend Approval] Created driver ${driverCode} for ${application.email}`);
 
+        await setMustChangePassword(userId, true);
+
         const allDocMappings = [
           { url: application.profilePictureUrl, type: 'profile_picture', col: 'profile_picture_url', label: 'Profile Picture' },
           { url: application.drivingLicenceFrontUrl, type: 'driving_licence', col: 'driving_licence_front_url', label: 'Driving Licence (Front)' },
@@ -9330,7 +9377,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to reset password" });
       }
       try {
-        await supabaseAdmin!.from('drivers').update({ must_change_password: true }).eq('id', driver.id);
+        await setMustChangePassword(driver.id, true);
       } catch {}
     }
 
@@ -9357,26 +9404,8 @@ export async function registerRoutes(
       return res.status(401).json({ error: "Invalid token" });
     }
 
-    const { data: driver, error: driverErr } = await supabaseAdmin!
-      .from('drivers')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (!driver) {
-      return res.json({ mustChangePassword: false });
-    }
-
-    try {
-      const { data: driverFull } = await supabaseAdmin!
-        .from('drivers')
-        .select('must_change_password')
-        .eq('id', user.id)
-        .maybeSingle();
-      res.json({ mustChangePassword: driverFull?.must_change_password === true });
-    } catch {
-      res.json({ mustChangePassword: false });
-    }
+    const mustChange = await getMustChangePassword(user.id);
+    res.json({ mustChangePassword: mustChange });
   }));
 
   app.post("/api/admin/driver/reset-password", asyncHandler(async (req, res) => {
@@ -9405,7 +9434,7 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Driver not found" });
     }
 
-    const tempPassword = `RC${Date.now().toString(36).toUpperCase().slice(-6)}!`;
+    const tempPassword = generateReadableTempPassword();
     const response = await fetch(process.env.SUPABASE_URL + '/auth/v1/admin/users/' + driverId, {
       method: 'PUT',
       headers: {
@@ -9421,9 +9450,7 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Failed to reset password" });
     }
 
-    try {
-      await supabaseAdmin!.from('drivers').update({ must_change_password: true }).eq('id', driverId);
-    } catch {}
+    await setMustChangePassword(driverId, true);
 
     console.log(`[Admin] Password reset for driver ${driver.driver_code} (${driver.email}) by admin ${userEmail}`);
     res.json({ 
@@ -9468,11 +9495,7 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Failed to update password" });
     }
 
-    try {
-      await supabaseAdmin!.from('drivers').update({
-        must_change_password: false
-      }).eq('id', user.id);
-    } catch {}
+    await setMustChangePassword(user.id, false);
 
     res.json({ success: true, message: "Password changed successfully" });
   }));

@@ -1396,7 +1396,9 @@ export async function sendDriverApprovalEmail(
           </tr>
           <tr>
             <td style="padding: 8px 0; color: #333;"><strong>Temporary Password:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 15px; font-family: monospace; letter-spacing: 1px;">${tempPassword}</td>
+            <td style="padding: 8px 0;">
+              <span style="display: inline-block; background-color: #e8f4fd; border: 2px solid #007BFF; border-radius: 6px; padding: 8px 16px; color: #333; font-size: 18px; font-family: monospace; font-weight: bold; letter-spacing: 2px;">${tempPassword}</span>
+            </td>
           </tr>
         </table>
       </div>
