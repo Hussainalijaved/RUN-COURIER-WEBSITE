@@ -194,6 +194,68 @@ export async function sendAdminNotification(
   return sendEmailNotification('info@runcourier.co.uk', subject, htmlContent, textContent);
 }
 
+export async function sendQuoteNotification(data: {
+  pickupPostcode: string;
+  deliveryPostcode: string;
+  vehicleType: string;
+  weight: number;
+  distance: number;
+  totalPrice: number;
+  isMultiDrop?: boolean;
+  multiDropStops?: string[];
+  isReturnTrip?: boolean;
+  pickupDate?: string;
+  pickupTime?: string;
+}): Promise<boolean> {
+  const vehicleNames: Record<string, string> = {
+    motorbike: 'Motorbike',
+    car: 'Car',
+    small_van: 'Small Van',
+    medium_van: 'Medium Van',
+  };
+  const vehicle = vehicleNames[data.vehicleType] || data.vehicleType;
+  const dateStr = data.pickupDate ? new Date(data.pickupDate).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Not specified';
+  const timeStr = data.pickupTime || 'Not specified';
+
+  const stopsHtml = data.isMultiDrop && data.multiDropStops?.length
+    ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Multi-Drop Stops</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.multiDropStops.join(' → ')}</td></tr>`
+    : '';
+
+  const htmlContent = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#1a1a2e;padding:20px;text-align:center;">
+        <h1 style="color:#fff;margin:0;font-size:20px;">New Quote Request</h1>
+      </div>
+      <div style="padding:20px;background:#f9f9f9;">
+        <p style="color:#333;margin-bottom:16px;">A customer has requested a delivery quote on the website.</p>
+        <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;">
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;width:40%;">Pickup</td><td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${data.pickupPostcode}</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Delivery</td><td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${data.deliveryPostcode}</td></tr>
+          ${stopsHtml}
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Vehicle</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${vehicle}</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Weight</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.weight} kg</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Distance</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.distance.toFixed(1)} miles</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Return Trip</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.isReturnTrip ? 'Yes' : 'No'}</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Pickup Date</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${dateStr}</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Pickup Time</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${timeStr}</td></tr>
+          <tr style="background:#f0fdf4;"><td style="padding:10px 12px;color:#555;font-weight:600;">Quoted Price</td><td style="padding:10px 12px;font-weight:700;font-size:18px;color:#16a34a;">£${data.totalPrice.toFixed(2)}</td></tr>
+        </table>
+        <p style="color:#888;font-size:12px;margin-top:16px;">This quote was generated on the website. The customer has not yet completed a booking.</p>
+      </div>
+    </div>
+  `;
+
+  const textContent = `New Quote Request\nPickup: ${data.pickupPostcode}\nDelivery: ${data.deliveryPostcode}\nVehicle: ${vehicle}\nWeight: ${data.weight}kg\nDistance: ${data.distance.toFixed(1)} miles\nDate: ${dateStr} ${timeStr}\nQuoted Price: £${data.totalPrice.toFixed(2)}`;
+
+  return sendEmailNotification(
+    'info@runcourier.co.uk',
+    `Quote Request: ${data.pickupPostcode} → ${data.deliveryPostcode} (£${data.totalPrice.toFixed(2)})`,
+    htmlContent,
+    textContent,
+    'RUN COURIER <info@runcourier.co.uk>'
+  );
+}
+
 export async function sendWelcomeEmail(
   email: string,
   name: string,

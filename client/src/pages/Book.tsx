@@ -500,6 +500,23 @@ export default function Book() {
             title: 'Quote Ready',
             description: `Your delivery quote is £${calculatedQuote.totalPrice.toFixed(2)}`,
           });
+          fetch('/api/quote-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pickupPostcode,
+              deliveryPostcode,
+              vehicleType: finalVehicleType,
+              weight,
+              distance: totalDistance,
+              totalPrice: calculatedQuote.totalPrice,
+              isMultiDrop,
+              multiDropStops: isMultiDrop ? multiDropStops.filter(Boolean) : undefined,
+              isReturnTrip,
+              pickupDate: form.getValues('pickupDate'),
+              pickupTime: form.getValues('pickupTime'),
+            }),
+          }).catch(() => {});
         } else {
           toast({
             title: 'Unable to Calculate',

@@ -23,7 +23,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
@@ -6990,6 +6990,43 @@ export async function registerRoutes(
     const data = bookingQuoteSchema.parse(req.body);
     const quote = await storage.calculateQuote(data);
     res.json(quote);
+  }));
+
+  const quoteNotificationLimiter = new Map<string, number[]>();
+  app.post("/api/quote-notification", asyncHandler(async (req, res) => {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const windowMs = 60_000;
+    const maxPerWindow = 5;
+    const timestamps = (quoteNotificationLimiter.get(ip) || []).filter(t => now - t < windowMs);
+    if (timestamps.length >= maxPerWindow) {
+      return res.status(429).json({ error: "Too many requests" });
+    }
+    timestamps.push(now);
+    quoteNotificationLimiter.set(ip, timestamps);
+
+    const { pickupPostcode, deliveryPostcode, vehicleType, weight, distance, totalPrice, isMultiDrop, multiDropStops, isReturnTrip, pickupDate, pickupTime } = req.body;
+    if (!pickupPostcode || !deliveryPostcode || !vehicleType || typeof totalPrice !== 'number' || typeof distance !== 'number') {
+      return res.status(400).json({ error: "Missing or invalid fields" });
+    }
+    const validVehicles = ['motorbike', 'car', 'small_van', 'medium_van'];
+    if (!validVehicles.includes(vehicleType)) {
+      return res.status(400).json({ error: "Invalid vehicle type" });
+    }
+    sendQuoteNotification({
+      pickupPostcode: String(pickupPostcode).slice(0, 20),
+      deliveryPostcode: String(deliveryPostcode).slice(0, 20),
+      vehicleType,
+      weight: Math.max(0, Number(weight) || 0),
+      distance: Math.max(0, distance),
+      totalPrice: Math.max(0, totalPrice),
+      isMultiDrop: !!isMultiDrop,
+      multiDropStops: Array.isArray(multiDropStops) ? multiDropStops.slice(0, 20).map((s: any) => String(s).slice(0, 20)) : undefined,
+      isReturnTrip: !!isReturnTrip,
+      pickupDate: pickupDate ? String(pickupDate).slice(0, 20) : undefined,
+      pickupTime: pickupTime ? String(pickupTime).slice(0, 10) : undefined,
+    }).catch(err => console.error('[Quote Notification] Email error:', err));
+    res.json({ success: true });
   }));
 
   app.get("/api/notifications", asyncHandler(async (req, res) => {
