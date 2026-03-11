@@ -471,44 +471,41 @@ export default function AdminInvoices() {
       toast({ title: 'Please allow popups to print', variant: 'destructive' });
       return;
     }
-    
-    const jobsTable = jobDetails.length > 0 ? `
-      <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+
+    const statusClass = invoice.status === 'paid' ? 'status-paid' : invoice.status === 'overdue' ? 'status-overdue' : 'status-pending';
+    const logoUrl = `${window.location.origin}/run-loader.png`;
+
+    const jobsTableHtml = jobDetails.length > 0 ? `
+      <table>
         <thead>
-          <tr style="background: #f8f9fa;">
-            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Job No.</th>
-            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Route Details</th>
-            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Date</th>
-            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Amount</th>
+          <tr>
+            <th>Job No.</th>
+            <th>Date</th>
+            <th>Description</th>
+            <th style="text-align:right;">Amount</th>
           </tr>
         </thead>
         <tbody>
           ${jobDetails.map((job: any) => {
             const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
-            const stopsHtml = isMultiDrop ? `
-              <div style="margin-top: 4px;">
-                <div style="font-weight: 600; color: #111; margin-bottom: 4px;">Same-Day Delivery &mdash; ${job.multiDropStops.length} drop-offs</div>
-                <div style="color: #333; font-size: 12px; margin-bottom: 2px;">Collected from: ${job.pickupAddress || 'N/A'}</div>
-                ${job.multiDropStops.map((stop: any, index: number) => `
-                  <div style="color: #333; font-size: 12px; padding-left: 12px; border-left: 2px solid #007BFF70; margin: 2px 0;">
-                    Stop ${stop.stopOrder || (index + 1)}: ${stop.address || stop.postcode}${stop.recipientName ? ` &mdash; ${stop.recipientName}` : ''}
-                  </div>
-                `).join('')}
-              </div>
+            const desc = isMultiDrop ? `
+              <div style="font-weight:600;color:#111;margin-bottom:4px;">Same-Day Delivery &mdash; ${job.multiDropStops.length} drop-offs</div>
+              <div style="color:#555;font-size:11px;margin-bottom:2px;">Collected from: ${job.pickupAddress || 'N/A'}</div>
+              ${job.multiDropStops.map((stop: any, i: number) => `
+                <div style="font-size:11px;padding-left:10px;border-left:2px solid rgba(0,123,255,0.4);margin:2px 0;color:#444;">
+                  Stop ${stop.stopOrder || (i + 1)}: ${stop.address || stop.postcode}${stop.recipientName ? ` &mdash; ${stop.recipientName}` : ''}
+                </div>
+              `).join('')}
             ` : `
-              <div>
-                <div style="font-weight: 600; color: #111; margin-bottom: 2px;">Same-Day Delivery</div>
-                <div style="color: #333; font-size: 12px;">${job.pickupAddress || 'N/A'} &rarr; ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
-              </div>
+              <div style="font-weight:600;color:#111;margin-bottom:2px;">Same-Day Delivery</div>
+              <div style="font-size:11px;color:#555;">${job.pickupAddress || 'N/A'} &rarr; ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
             `;
-            return `
-              <tr style="vertical-align: top;">
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.jobNumber || job.trackingNumber || 'N/A'}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; max-width: 300px;">${stopsHtml}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${job.scheduledDate || 'N/A'}</td>
-                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">£${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}</td>
-              </tr>
-            `;
+            return `<tr style="vertical-align:top;">
+              <td style="font-family:monospace;font-size:11px;">${job.jobNumber || job.trackingNumber || 'N/A'}</td>
+              <td>${job.scheduledDate || 'N/A'}</td>
+              <td>${desc}</td>
+              <td style="text-align:right;font-weight:600;">£${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}</td>
+            </tr>`;
           }).join('')}
         </tbody>
       </table>
@@ -520,68 +517,117 @@ export default function AdminInvoices() {
       <head>
         <title>Invoice ${invoice.invoice_number}</title>
         <style>
-          body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #111; }
-          .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
-          .company { font-size: 24px; font-weight: bold; color: #007BFF; }
-          .invoice-title { font-size: 28px; color: #111; text-align: right; }
-          .invoice-number { color: #333; text-align: right; font-weight: 600; }
-          .details { display: flex; justify-content: space-between; margin-bottom: 30px; }
-          .bill-to, .invoice-info { width: 45%; }
-          .label { color: #444; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
-          .value { font-size: 14px; margin-bottom: 15px; color: #111; }
-          .total-section { background: #f8f9fa; padding: 20px; margin-top: 30px; text-align: right; }
-          .total { font-size: 24px; font-weight: bold; color: #007BFF; }
-          .bank-details { margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 8px; color: #111; }
-          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #444; font-size: 12px; }
+          body { font-family: Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #007BFF; }
+          .company-header { display: flex; align-items: flex-start; gap: 15px; }
+          .company-logo { width: 56px; height: 56px; object-fit: contain; }
+          .company-name { font-size: 24px; font-weight: bold; color: #007BFF; margin-bottom: 4px; }
+          .company-details { font-size: 11px; color: #555; line-height: 1.6; }
+          .invoice-right { text-align: right; }
+          .invoice-label { font-size: 12px; color: #007BFF; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+          .invoice-number { font-size: 18px; font-weight: bold; color: #111; margin-top: 6px; }
+          .status { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          .status-paid { background: #d4edda; color: #155724; }
+          .status-pending { background: #fff3cd; color: #856404; }
+          .status-overdue { background: #f8d7da; color: #721c24; }
+          .addresses { display: flex; justify-content: space-between; margin: 24px 0; }
+          .address-block { width: 45%; }
+          .address-block h3 { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 8px; }
+          .address-block p { margin: 3px 0; font-size: 12px; }
+          .meta { background: #f8f9fa; padding: 14px 16px; margin: 16px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+          .meta-item { text-align: center; }
+          .meta-item label { font-size: 9px; color: #888; text-transform: uppercase; display: block; margin-bottom: 4px; }
+          .meta-item span { font-size: 12px; font-weight: bold; color: #111; }
+          table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+          th { background: #007BFF; color: white; padding: 10px 12px; text-align: left; font-size: 10px; text-transform: uppercase; }
+          td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 12px; vertical-align: top; }
+          .totals-wrap { display: flex; justify-content: flex-end; margin-top: 8px; }
+          .totals { width: 260px; }
+          .totals-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #eee; }
+          .totals-row.grand { border-top: 2px solid #333; border-bottom: none; font-size: 16px; font-weight: bold; padding-top: 12px; }
+          .totals-row.grand span:last-child { color: #007BFF; }
+          .notes { background: #fff8e1; border-left: 3px solid #ffc107; padding: 12px 16px; margin: 16px 0; font-size: 12px; }
+          .payment-section { margin-top: 28px; padding-top: 20px; border-top: 2px solid #eee; }
+          .payment-box { background: #f0f7ff; padding: 16px; margin-top: 10px; }
+          .payment-box h4 { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #333; margin: 0 0 12px 0; }
+          .payment-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px; }
+          .payment-grid div { display: flex; justify-content: space-between; }
+          .payment-grid label { color: #666; }
+          .payment-ref { margin-top: 10px; font-size: 11px; color: #555; }
+          .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #999; line-height: 1.8; }
           @media print {
-            body { margin: 0; padding: 15mm 10mm; }
-            @page { margin: 10mm 10mm; size: A4; }
-            .bank-details { break-inside: avoid; }
-            .total-section { break-inside: avoid; }
+            body { padding: 0; margin: 0; }
+            @page { margin: 12mm 10mm; size: A4; }
           }
         </style>
       </head>
       <body>
         <div class="header">
-          <div class="company">RUN COURIER</div>
-          <div>
-            <div class="invoice-title">INVOICE</div>
+          <div class="company-header">
+            <img src="${logoUrl}" alt="Run Courier" class="company-logo" />
+            <div>
+              <div class="company-name">RUN COURIER</div>
+              <div class="company-details">
+                Run Courier Ltd<br>
+                71-75 Shelton Street, London, WC2H 9JQ<br>
+                United Kingdom<br>
+                info@runcourier.co.uk
+              </div>
+            </div>
+          </div>
+          <div class="invoice-right">
+            <div class="invoice-label">Invoice</div>
             <div class="invoice-number">${invoice.invoice_number}</div>
+            <div class="status ${statusClass}">${invoice.status.toUpperCase()}</div>
           </div>
         </div>
-        <div class="details">
-          <div class="bill-to">
-            <div class="label">Bill To</div>
-            <div class="value" style="font-weight: bold;">${invoice.customer_name}</div>
-            ${invoice.company_name ? `<div class="value">${invoice.company_name}</div>` : ''}
-            ${invoice.business_address ? `<div class="value">${invoice.business_address}</div>` : ''}
-            <div class="value">${invoice.customer_email}</div>
+        <div class="addresses">
+          <div class="address-block">
+            <h3>From</h3>
+            <p style="font-weight:bold;">Run Courier Ltd</p>
+            <p>71-75 Shelton Street</p>
+            <p>London, WC2H 9JQ</p>
+            <p>info@runcourier.co.uk</p>
           </div>
-          <div class="invoice-info">
-            <div class="label">Invoice Date</div>
-            <div class="value">${formatDate(invoice.created_at)}</div>
-            <div class="label">Due Date</div>
-            <div class="value" style="color: #d9534f; font-weight: bold;">${formatDate(invoice.due_date)}</div>
-            <div class="label">Period</div>
-            <div class="value">${formatDate(invoice.period_start)} - ${formatDate(invoice.period_end)}</div>
+          <div class="address-block">
+            <h3>Bill To</h3>
+            <p style="font-weight:bold;">${invoice.company_name || invoice.customer_name}</p>
+            ${invoice.company_name ? `<p>${invoice.customer_name}</p>` : ''}
+            <p>${invoice.customer_email}</p>
+            ${invoice.business_address ? `<p>${invoice.business_address}</p>` : ''}
           </div>
         </div>
-        ${jobsTable}
-        ${invoice.notes ? `<div style="background: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 8px;"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
-        <div class="total-section">
-          <div style="margin-bottom: 5px;">Subtotal: ${formatPrice(invoice.subtotal)}</div>
-          <div style="margin-bottom: 10px;">VAT: ${formatPrice(invoice.vat)}</div>
-          <div class="total">Total: ${formatPrice(invoice.total)}</div>
+        <div class="meta">
+          <div class="meta-item"><label>Invoice Date</label><span>${formatDate(invoice.created_at)}</span></div>
+          <div class="meta-item"><label>Due Date</label><span style="color:${invoice.status === 'overdue' ? '#c0392b' : '#111'};">${formatDate(invoice.due_date)}</span></div>
+          <div class="meta-item"><label>Period Start</label><span>${formatDate(invoice.period_start)}</span></div>
+          <div class="meta-item"><label>Period End</label><span>${formatDate(invoice.period_end)}</span></div>
         </div>
-        <div class="bank-details">
-          <strong>Bank Transfer Details</strong><br>
-          Account Name: RUN COURIER<br>
-          Sort Code: 30-99-50<br>
-          Account Number: 36113363<br>
-          Reference: ${invoice.invoice_number}
+        ${jobsTableHtml}
+        ${jobDetails.length === 0 ? `<div style="text-align:center;padding:24px;color:#888;border:1px solid #eee;margin:16px 0;font-size:13px;">No job details attached to this invoice</div>` : ''}
+        ${invoice.notes ? `<div class="notes"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
+        <div class="totals-wrap">
+          <div class="totals">
+            <div class="totals-row"><span>Subtotal</span><span>${formatPrice(invoice.subtotal)}</span></div>
+            <div class="totals-row"><span>VAT</span><span>${formatPrice(invoice.vat)}</span></div>
+            <div class="totals-row grand"><span>Total Due</span><span>${formatPrice(invoice.total)}</span></div>
+          </div>
+        </div>
+        <div class="payment-section">
+          <div class="payment-box">
+            <h4>Bank Transfer Details</h4>
+            <div class="payment-grid">
+              <div><label>Account Name:</label><span>RUN COURIER</span></div>
+              <div><label>Sort Code:</label><span>30-99-50</span></div>
+              <div><label>Account Number:</label><span>36113363</span></div>
+            </div>
+            <p class="payment-ref">Please use invoice number <strong>${invoice.invoice_number}</strong> as your payment reference.</p>
+          </div>
         </div>
         <div class="footer">
-          RUN COURIER | info@runcourier.co.uk | runcourier.co.uk
+          Run Courier Ltd | info@runcourier.co.uk | www.runcourier.co.uk<br>
+          71-75 Shelton Street, London, WC2H 9JQ, United Kingdom<br>
+          Thank you for your business
         </div>
       </body>
       </html>
@@ -610,19 +656,32 @@ export default function AdminInvoices() {
     doc.setTextColor(0, 123, 255);
     doc.setFont('helvetica', 'bold');
     doc.text('RUN COURIER', margin, y + 7);
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Run Courier Ltd', margin, y + 13);
+    doc.text('71-75 Shelton Street, London, WC2H 9JQ', margin, y + 18);
+    doc.text('info@runcourier.co.uk', margin, y + 23);
 
     doc.setFontSize(22);
     doc.setTextColor(17, 17, 17);
+    doc.setFont('helvetica', 'bold');
     doc.text('INVOICE', pageWidth - margin, y + 7, { align: 'right' });
-    y += 10;
     doc.setFontSize(11);
     doc.setTextColor(51, 51, 51);
+    doc.text(invoice.invoice_number, pageWidth - margin, y + 14, { align: 'right' });
+    const statusLabel = invoice.status.toUpperCase();
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text(invoice.invoice_number, pageWidth - margin, y + 5, { align: 'right' });
-    y += 15;
+    const statusColor = invoice.status === 'paid' ? [21, 87, 36] : invoice.status === 'overdue' ? [114, 28, 36] : [133, 100, 4];
+    doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+    doc.text(statusLabel, pageWidth - margin, y + 21, { align: 'right' });
+    y += 30;
 
-    doc.setDrawColor(200, 200, 200);
+    doc.setDrawColor(0, 123, 255);
+    doc.setLineWidth(0.8);
     doc.line(margin, y, pageWidth - margin, y);
+    doc.setLineWidth(0.2);
     y += 8;
 
     doc.setFontSize(9);

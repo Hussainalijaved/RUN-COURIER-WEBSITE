@@ -77,14 +77,11 @@ const COMPANY_DETAILS = {
   city: 'London',
   postcode: 'WC2H 9JQ',
   country: 'United Kingdom',
-  companyNumber: '12345678',
-  phone: '+44 20 7123 4567',
-  email: 'accounts@runcourier.co.uk',
+  email: 'info@runcourier.co.uk',
   website: 'www.runcourier.co.uk',
-  bankName: 'Barclays Business',
-  accountName: 'Run Courier Ltd',
-  sortCode: '20-00-00',
-  accountNumber: '12345678',
+  accountName: 'RUN COURIER',
+  sortCode: '30-99-50',
+  accountNumber: '36113363',
 };
 
 function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs; onClose: () => void }) {
@@ -192,8 +189,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
                 <p>{COMPANY_DETAILS.address}</p>
                 <p>{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
                 <p>{COMPANY_DETAILS.country}</p>
-                <p className="mt-2">Tel: {COMPANY_DETAILS.phone}</p>
-                <p>Email: {COMPANY_DETAILS.email}</p>
+                <p className="mt-2">Email: {COMPANY_DETAILS.email}</p>
               </div>
             </div>
           </div>
@@ -216,7 +212,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             <p className="font-semibold text-sm text-gray-900">{COMPANY_DETAILS.name}</p>
             <p className="text-sm text-gray-800">{COMPANY_DETAILS.address}</p>
             <p className="text-sm text-gray-800">{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
-            <p className="text-sm text-gray-800 mt-2">Company No: {COMPANY_DETAILS.companyNumber}</p>
+            <p className="text-sm text-gray-800 mt-2">{COMPANY_DETAILS.email}</p>
           </div>
           <div>
             <h3 className="text-xs font-semibold text-gray-700 uppercase mb-2 pb-1 border-b">Bill To</h3>
@@ -310,10 +306,6 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             <h4 className="font-semibold text-sm uppercase text-gray-900 mb-3">Payment Details</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-700">Bank:</span>
-                <span className="font-medium text-gray-900">{COMPANY_DETAILS.bankName}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-gray-700">Account Name:</span>
                 <span className="font-medium text-gray-900">{COMPANY_DETAILS.accountName}</span>
               </div>
@@ -333,8 +325,8 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
         </div>
 
         <div className="mt-6 text-center text-xs text-gray-600 leading-relaxed">
-          <p>{COMPANY_DETAILS.name} | Registered in England & Wales | Company No: {COMPANY_DETAILS.companyNumber}</p>
-          <p>Registered Office: {COMPANY_DETAILS.address}, {COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
+          <p>{COMPANY_DETAILS.name} | {COMPANY_DETAILS.email} | {COMPANY_DETAILS.website}</p>
+          <p>{COMPANY_DETAILS.address}, {COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
           <p className="mt-2">Thank you for your business</p>
         </div>
       </div>

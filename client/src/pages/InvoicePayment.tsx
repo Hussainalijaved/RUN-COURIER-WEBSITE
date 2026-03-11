@@ -421,7 +421,7 @@ export default function InvoicePayment() {
           </p>
           <div className="bg-muted rounded-lg p-4 text-left text-sm">
             <p className="font-medium mb-2">Bank Details:</p>
-            <p>Account Name: ROMANIA LTD-RUN COURIER</p>
+            <p>Account Name: RUN COURIER</p>
             <p>Sort Code: 30-99-50</p>
             <p>Account Number: 36113363</p>
             <p className="mt-2">Reference: <span className="font-mono font-bold">{invoiceData.invoiceNumber}</span></p>
