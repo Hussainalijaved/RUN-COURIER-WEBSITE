@@ -839,8 +839,12 @@ export default function Book() {
                                   max={selectedVehicle?.maxWeight || 50}
                                   step={0.1}
                                   placeholder="Enter weight in kg"
-                                  value={field.value}
-                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  value={field.value === 0 ? '' : field.value}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val === '' ? 0 : parseFloat(val));
+                                  }}
+                                  onFocus={(e) => { if (field.value === 0) e.target.value = ''; }}
                                   data-testid="input-weight"
                                 />
                               </FormControl>
