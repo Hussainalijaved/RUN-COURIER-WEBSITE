@@ -71,6 +71,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { User as UserType, Job } from '@shared/schema';
+import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 
 const createInvoiceFormSchema = z.object({
   customerId: z.string().min(1, "Please select a customer or Manual Invoice"),
@@ -83,6 +84,7 @@ const createInvoiceFormSchema = z.object({
   manualCustomerEmail: z.string().optional(),
   manualCompanyName: z.string().optional(),
   manualBusinessAddress: z.string().optional(),
+  manualPostcode: z.string().optional(),
   // Manual amount for invoices without jobs
   manualAmount: z.string().optional(),
   manualDescription: z.string().optional(),
@@ -183,6 +185,7 @@ export default function AdminInvoices() {
       manualCustomerEmail: '',
       manualCompanyName: '',
       manualBusinessAddress: '',
+      manualPostcode: '',
       manualAmount: '',
       manualDescription: '',
     },
@@ -838,6 +841,16 @@ export default function AdminInvoices() {
     return { subtotal: total, vat: 0, total };
   };
 
+  const buildBusinessAddress = (address?: string, postcode?: string) => {
+    const addr = address?.trim() || '';
+    const pc = postcode?.trim() || '';
+    if (!addr && !pc) return null;
+    if (!addr) return pc;
+    if (!pc) return addr;
+    if (addr.toUpperCase().includes(pc.toUpperCase())) return addr;
+    return `${addr}, ${pc}`;
+  };
+
   const onSubmit = (formData: CreateInvoiceFormData) => {
     // For manual invoices, use the manual amount
     if (isManualInvoice) {
@@ -857,7 +870,7 @@ export default function AdminInvoices() {
         customerName: formData.manualCustomerName,
         customerEmail: formData.manualCustomerEmail,
         companyName: formData.manualCompanyName || null,
-        businessAddress: formData.manualBusinessAddress || null,
+        businessAddress: buildBusinessAddress(formData.manualBusinessAddress, formData.manualPostcode),
         vatNumber: null,
         subtotal: manualTotal,
         vat: 0,
@@ -891,7 +904,7 @@ export default function AdminInvoices() {
         customerName: formData.manualCustomerName,
         customerEmail: formData.manualCustomerEmail,
         companyName: formData.manualCompanyName || null,
-        businessAddress: formData.manualBusinessAddress || null,
+        businessAddress: buildBusinessAddress(formData.manualBusinessAddress, formData.manualPostcode),
         vatNumber: null,
         subtotal,
         vat,
@@ -1790,18 +1803,41 @@ export default function AdminInvoices() {
                         />
                         <FormField
                           control={form.control}
-                          name="manualBusinessAddress"
+                          name="manualPostcode"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Business Address</FormLabel>
+                              <FormLabel>Postcode</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="Business address (optional)" data-testid="input-manual-address" />
+                                <PostcodeAutocomplete
+                                  value={field.value || ''}
+                                  onChange={(postcode, fullAddress) => {
+                                    field.onChange(postcode);
+                                    if (fullAddress) {
+                                      form.setValue('manualBusinessAddress', fullAddress);
+                                    }
+                                  }}
+                                  placeholder="Enter postcode"
+                                  data-testid="input-manual-postcode"
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
+                      <FormField
+                        control={form.control}
+                        name="manualBusinessAddress"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Business Address</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Business address (auto-filled from postcode or enter manually)" data-testid="input-manual-address" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </CardContent>
                   </Card>
                 )}
