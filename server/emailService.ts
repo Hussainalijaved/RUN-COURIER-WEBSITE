@@ -233,7 +233,7 @@ export async function sendQuoteNotification(data: {
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Delivery</td><td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${data.deliveryPostcode}</td></tr>
           ${stopsHtml}
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Vehicle</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${vehicle}</td></tr>
-          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Weight</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.weight} kg</td></tr>
+          ${data.weight && Number(data.weight) > 0 ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Weight</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.weight} kg</td></tr>` : ''}
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Distance</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.distance.toFixed(1)} miles</td></tr>
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Return Trip</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.isReturnTrip ? 'Yes' : 'No'}</td></tr>
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Pickup Date</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${dateStr}</td></tr>
@@ -245,7 +245,7 @@ export async function sendQuoteNotification(data: {
     </div>
   `;
 
-  const textContent = `New Quote Request\nPickup: ${data.pickupPostcode}\nDelivery: ${data.deliveryPostcode}\nVehicle: ${vehicle}\nWeight: ${data.weight}kg\nDistance: ${data.distance.toFixed(1)} miles\nDate: ${dateStr} ${timeStr}\nQuoted Price: £${data.totalPrice.toFixed(2)}`;
+  const textContent = `New Quote Request\nPickup: ${data.pickupPostcode}\nDelivery: ${data.deliveryPostcode}\nVehicle: ${vehicle}\n${data.weight && Number(data.weight) > 0 ? `Weight: ${data.weight}kg\n` : ''}Distance: ${data.distance.toFixed(1)} miles\nDate: ${dateStr} ${timeStr}\nQuoted Price: £${data.totalPrice.toFixed(2)}`;
 
   return sendEmailNotification(
     'info@runcourier.co.uk',
@@ -497,10 +497,10 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
           <td style="padding: 8px 0; color: #333; width: 140px;"><strong>Vehicle Type:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
         </tr>
-        <tr>
+        ${jobDetails.weight && Number(jobDetails.weight) > 0 ? `<tr>
           <td style="padding: 8px 0; color: #333;"><strong>Weight:</strong></td>
-          <td style="padding: 8px 0; color: #333;">${jobDetails.weight || '0'} kg</td>
-        </tr>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.weight} kg</td>
+        </tr>` : ''}
         <tr>
           <td style="padding: 8px 0; color: #333;"><strong>Distance:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.distance || '0'} miles</td>
@@ -648,8 +648,7 @@ ${jobDetails.deliveryInstructions ? `Instructions: ${jobDetails.deliveryInstruct
 DELIVERY OPTIONS
 ----------------
 Vehicle: ${vehicleDisplay}
-Weight: ${jobDetails.weight || '0'} kg
-Distance: ${jobDetails.distance || '0'} miles
+${jobDetails.weight && Number(jobDetails.weight) > 0 ? `Weight: ${jobDetails.weight} kg\n` : ''}Distance: ${jobDetails.distance || '0'} miles
 ${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 'Return Trip: Yes\n' : ''}${jobDetails.isCentralLondon ? 'Central London: Yes\n' : ''}
 
 PRICING
@@ -795,10 +794,10 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
           <td style="padding: 8px 0; color: #333; width: 130px;"><strong>Vehicle:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleDisplay}</td>
         </tr>
-        <tr>
+        ${jobDetails.weight && Number(jobDetails.weight) > 0 ? `<tr>
           <td style="padding: 8px 0; color: #333;"><strong>Weight:</strong></td>
-          <td style="padding: 8px 0; color: #333;">${jobDetails.weight || '0'} kg</td>
-        </tr>
+          <td style="padding: 8px 0; color: #333;">${jobDetails.weight} kg</td>
+        </tr>` : ''}
         <tr>
           <td style="padding: 8px 0; color: #333;"><strong>Distance:</strong></td>
           <td style="padding: 8px 0; color: #333;">${jobDetails.distance || '0'} miles</td>
@@ -880,8 +879,7 @@ ${jobDetails.deliveryInstructions ? `Instructions: ${jobDetails.deliveryInstruct
 SERVICE DETAILS
 ---------------
 Vehicle: ${vehicleDisplay}
-Weight: ${jobDetails.weight || '0'} kg
-Distance: ${jobDetails.distance || '0'} miles
+${jobDetails.weight && Number(jobDetails.weight) > 0 ? `Weight: ${jobDetails.weight} kg\n` : ''}Distance: ${jobDetails.distance || '0'} miles
 ${jobDetails.isMultiDrop ? 'Multi-Drop: Yes\n' : ''}${jobDetails.isReturnTrip ? 'Return Trip: Yes\n' : ''}
 
 TOTAL AMOUNT: £${parseFloat(jobDetails.totalPrice || 0).toFixed(2)}
@@ -1683,10 +1681,10 @@ export async function sendPaymentLinkEmail(
           <td style="padding: 8px 0; color: #333;"><strong>Vehicle:</strong></td>
           <td style="padding: 8px 0; color: #333;">${vehicleName}</td>
         </tr>
-        <tr>
+        ${data.weight && Number(data.weight) > 0 ? `<tr>
           <td style="padding: 8px 0; color: #333;"><strong>Weight:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.weight} kg</td>
-        </tr>
+        </tr>` : ''}
         <tr>
           <td style="padding: 8px 0; color: #333;"><strong>Distance:</strong></td>
           <td style="padding: 8px 0; color: #333;">${data.distance} miles</td>
@@ -1757,8 +1755,7 @@ Your delivery booking has been created and is awaiting payment.
 Booking Details:
 - Tracking #: ${data.trackingNumber}
 - Vehicle: ${vehicleName}
-- Weight: ${data.weight} kg
-- Distance: ${data.distance} miles
+${data.weight && Number(data.weight) > 0 ? `- Weight: ${data.weight} kg\n` : ''}- Distance: ${data.distance} miles
 
 Route${data.isMultiDrop ? ' (Multi-Drop)' : ''}${data.isReturnTrip ? ' + Return' : ''}:
 - Pickup: ${data.pickupAddress} (${data.pickupPostcode})

@@ -1950,10 +1950,12 @@ export default function AdminJobs() {
                     <p className="text-sm text-muted-foreground">Vehicle</p>
                     <p className="font-medium capitalize">{selectedJob.vehicleType?.replace('_', ' ')}</p>
                   </div>
+                  {selectedJob.weight && Number(selectedJob.weight) > 0 ? (
                   <div>
                     <p className="text-sm text-muted-foreground">Weight</p>
                     <p className="font-medium">{selectedJob.weight} kg</p>
                   </div>
+                  ) : null}
                   <div>
                     <p className="text-sm text-muted-foreground">Distance</p>
                     <p className="font-medium">{selectedJob.distance || '—'} miles</p>

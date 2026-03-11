@@ -165,7 +165,7 @@ export default function DispatcherDashboard() {
                       </div>
                       <div className="flex gap-2 mt-2 flex-wrap">
                         <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
-                        <Badge variant="outline">{job.weight}kg</Badge>
+                        {job.weight && Number(job.weight) > 0 && <Badge variant="outline">{job.weight}kg</Badge>}
                         {(job as any).isUrgent && <Badge className="bg-red-500 text-white">Urgent</Badge>}
                       </div>
                     </div>

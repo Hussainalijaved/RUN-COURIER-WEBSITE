@@ -217,11 +217,13 @@ export default function PaymentLink() {
                 <p className="text-xs text-muted-foreground">Vehicle</p>
                 <p className="font-medium text-sm">{formatVehicleName(linkData.vehicleType)}</p>
               </div>
+              {linkData.weight && Number(linkData.weight) > 0 ? (
               <div className="space-y-1">
                 <Scale className="h-5 w-5 mx-auto text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">Weight</p>
                 <p className="font-medium text-sm">{linkData.weight} kg</p>
               </div>
+              ) : null}
               <div className="space-y-1">
                 <Navigation className="h-5 w-5 mx-auto text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">Distance</p>

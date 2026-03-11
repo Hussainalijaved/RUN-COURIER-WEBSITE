@@ -435,7 +435,7 @@ export default function DriverJobs() {
                           <span>{job.pickupPostcode} → {job.deliveryPostcode}</span>
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          {job.distance} miles • {job.weight}kg
+                          {job.distance} miles{job.weight && Number(job.weight) > 0 ? ` • ${job.weight}kg` : ''}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -506,7 +506,7 @@ export default function DriverJobs() {
                           <span>{job.pickupPostcode} → {job.deliveryPostcode}</span>
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          {job.distance} miles • {job.weight}kg
+                          {job.distance} miles{job.weight && Number(job.weight) > 0 ? ` • ${job.weight}kg` : ''}
                         </div>
                       </div>
                       <div className="text-right">
@@ -784,10 +784,12 @@ export default function DriverJobs() {
                     <span className="text-muted-foreground">Distance</span>
                     <p className="font-medium">{selectedJobForDetails.distance} miles</p>
                   </div>
+                  {selectedJobForDetails.weight && Number(selectedJobForDetails.weight) > 0 ? (
                   <div>
                     <span className="text-muted-foreground">Weight</span>
                     <p className="font-medium">{selectedJobForDetails.weight} kg</p>
                   </div>
+                  ) : null}
                   <div>
                     <span className="text-muted-foreground">Vehicle</span>
                     <p className="font-medium capitalize">{selectedJobForDetails.vehicleType?.replace(/_/g, ' ')}</p>

@@ -331,7 +331,7 @@ export default function DriverDashboard() {
                           {job.pickupPostcode} → {job.deliveryPostcode}
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          {job.distance} miles • {job.weight}kg
+                          {job.distance} miles{job.weight && Number(job.weight) > 0 ? ` • ${job.weight}kg` : ''}
                         </div>
                       </div>
                       <div className="text-right">

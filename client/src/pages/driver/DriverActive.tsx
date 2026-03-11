@@ -186,10 +186,12 @@ export default function DriverActive() {
               <div className="p-4 bg-muted rounded-lg">
                 <h4 className="font-medium mb-2">Parcel Details</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  {activeJob.weight && Number(activeJob.weight) > 0 ? (
                   <div>
                     <span className="text-muted-foreground">Weight</span>
                     <p className="font-medium">{activeJob.weight}kg</p>
                   </div>
+                  ) : null}
                   <div>
                     <span className="text-muted-foreground">Distance</span>
                     <p className="font-medium">{activeJob.distance} miles</p>
