@@ -190,7 +190,7 @@ export function CompletedJobsScreen() {
                       </ThemedText>
                     </View>
                     <ThemedText type="caption" color="secondary">
-                      #{job.tracking_number || String(job.id).slice(0, 8).toUpperCase()}
+                      #{job.job_number || job.tracking_number || String(job.id).slice(0, 8).toUpperCase()}
                     </ThemedText>
                   </View>
 

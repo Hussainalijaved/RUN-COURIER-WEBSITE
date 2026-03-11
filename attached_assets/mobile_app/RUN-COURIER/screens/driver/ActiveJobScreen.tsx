@@ -1472,7 +1472,7 @@ export function ActiveJobScreen({ navigation }: any) {
 
           <ThemedView style={styles.jobCard}>
             <View style={styles.header}>
-              <ThemedText style={styles.jobId}>Job #{activeJob.tracking_number || String(activeJob.id).slice(0, 8).toUpperCase()}</ThemedText>
+              <ThemedText style={styles.jobId}>Job #{activeJob.job_number || activeJob.tracking_number || String(activeJob.id).slice(0, 8).toUpperCase()}</ThemedText>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(activeJob.status as JobStatus) }]}>
                 <ThemedText style={styles.statusText}>
                   {STATUS_LABELS[activeJob.status as JobStatus] || activeJob.status}

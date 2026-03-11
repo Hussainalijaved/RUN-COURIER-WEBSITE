@@ -903,7 +903,7 @@ export function JobOffersScreen({ navigation }: any) {
                 const pickupLocation = job.pickup_address || 'Pickup location';
                 const dropoffLocation = job.dropoff_address || job.delivery_address || 'Delivery location';
                   
-                const jobNumber = job.tracking_number || (job.id ? String(job.id).slice(0, 8).toUpperCase() : 'N/A');
+                const jobNumber = job.job_number || job.tracking_number || (job.id ? String(job.id).slice(0, 8).toUpperCase() : 'N/A');
                 
                 return (
                   <Card key={job.id} variant="glass" style={styles.jobCard}>

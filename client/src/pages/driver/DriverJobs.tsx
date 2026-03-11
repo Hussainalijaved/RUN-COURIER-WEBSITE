@@ -370,7 +370,7 @@ export default function DriverJobs() {
                     </div>
                     
                     <p className="text-sm text-muted-foreground mb-4">
-                      Job #{assignment.jobId.substring(0, 8)} has been offered to you by dispatch. 
+                      Job #{(assignment as any).jobNumber || assignment.jobId.substring(0, 8)} has been offered to you by dispatch. 
                       Accept to take this delivery or decline to let another driver handle it.
                     </p>
                     
@@ -426,7 +426,7 @@ export default function DriverJobs() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <span className="font-mono font-medium">{job.trackingNumber}</span>
+                          <span className="font-mono font-medium">#{(job as any).jobNumber || job.trackingNumber}</span>
                           {getStatusBadge(job.status)}
                           <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
                         </div>
@@ -497,7 +497,7 @@ export default function DriverJobs() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <span className="font-mono font-medium">{job.trackingNumber}</span>
+                          <span className="font-mono font-medium">#{(job as any).jobNumber || job.trackingNumber}</span>
                           {getStatusBadge(job.status)}
                           <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
                         </div>
@@ -544,7 +544,7 @@ export default function DriverJobs() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <span className="font-mono font-medium">{job.trackingNumber}</span>
+                          <span className="font-mono font-medium">#{(job as any).jobNumber || job.trackingNumber}</span>
                           {getStatusBadge(job.status)}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -709,10 +709,14 @@ export default function DriverJobs() {
           
           {selectedJobForDetails && (
             <div className="space-y-4">
-              {/* Status & Tracking */}
+              {/* Job Number & Tracking */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Job Number</span>
+                <span className="font-mono font-medium">#{(selectedJobForDetails as any).jobNumber || selectedJobForDetails.trackingNumber}</span>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Tracking #</span>
-                <span className="font-mono font-medium">{selectedJobForDetails.trackingNumber}</span>
+                <span className="font-mono font-medium text-xs text-muted-foreground">{selectedJobForDetails.trackingNumber}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>

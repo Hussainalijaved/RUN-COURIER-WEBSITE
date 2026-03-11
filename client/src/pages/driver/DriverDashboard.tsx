@@ -323,7 +323,7 @@ export default function DriverDashboard() {
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-sm font-medium">{job.trackingNumber}</span>
+                          <span className="font-mono text-sm font-medium">#{(job as any).jobNumber || job.trackingNumber}</span>
                           <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">

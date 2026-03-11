@@ -105,7 +105,7 @@ export default function DriverActive() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" />
-                  {activeJob.trackingNumber}
+                  Job #{(activeJob as any).jobNumber || activeJob.trackingNumber}
                 </CardTitle>
                 <Badge className="bg-primary" data-testid="badge-current-status">
                   {getStatusLabel(activeJob.status)}

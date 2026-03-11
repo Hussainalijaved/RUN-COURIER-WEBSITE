@@ -43,6 +43,7 @@ export default function DriverHistory() {
   ) || [];
   
   const filteredJobs = completedJobs.filter((job) => 
+    ((job as any).jobNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.pickupPostcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.deliveryPostcode?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -139,7 +140,7 @@ export default function DriverHistory() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="font-mono font-medium">{job.trackingNumber}</span>
+                        <span className="font-mono font-medium">#{(job as any).jobNumber || job.trackingNumber}</span>
                         <Badge variant="secondary" className="text-green-600">
                           <CheckCircle className="mr-1 h-3 w-3" />
                           Delivered
