@@ -590,8 +590,8 @@ export default function AdminInvoices() {
             <h3>Bill To</h3>
             <p style="font-weight:bold;">${invoice.company_name || invoice.customer_name}</p>
             ${invoice.company_name ? `<p>${invoice.customer_name}</p>` : ''}
-            <p>${invoice.customer_email}</p>
             ${invoice.business_address ? `<p>${invoice.business_address}</p>` : ''}
+            <p>${invoice.customer_email}</p>
           </div>
         </div>
         <div class="meta">

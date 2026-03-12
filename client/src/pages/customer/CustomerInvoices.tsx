@@ -212,8 +212,8 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
           <div>
             <h3 className="text-xs font-semibold text-gray-700 uppercase mb-2 pb-1 border-b">Bill To</h3>
             <p className="font-semibold text-sm text-gray-900">{invoice.companyName || invoice.customerName}</p>
-            <p className="text-sm text-gray-800">{invoice.customerEmail}</p>
             {invoice.businessAddress && <p className="text-sm text-gray-800">{invoice.businessAddress}</p>}
+            <p className="text-sm text-gray-800">{invoice.customerEmail}</p>
           </div>
         </div>
 
