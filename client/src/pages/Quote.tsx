@@ -569,12 +569,11 @@ export default function Quote() {
                               >
                                 <div className="text-sm font-semibold">{cfg.label}</div>
                                 <div className="text-xs text-muted-foreground mt-0.5">
-                                  {cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}
+                                  {cfg.description}
                                 </div>
                               </button>
                             ))}
                           </div>
-                          <p className="text-xs text-muted-foreground">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
                         </div>
 
                         <FormField

@@ -830,6 +830,28 @@ export default function Book() {
                           )}
                         />
 
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium leading-none">Service Level</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                data-testid={`button-service-type-${key}`}
+                                onClick={() => updateBooking({ serviceType: key })}
+                                className={`rounded-md border p-3 text-left transition-colors ${
+                                  bookingServiceType === key
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-background hover-elevate'
+                                }`}
+                              >
+                                <div className="text-sm font-semibold">{cfg.label}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{cfg.description}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
                         <FormField
                           control={form.control}
                           name="weight"
