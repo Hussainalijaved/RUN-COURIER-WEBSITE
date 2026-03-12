@@ -122,7 +122,7 @@ export default function AdminCreateJob() {
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [driverPrice, setDriverPrice] = useState<number | null>(null);
   const [isEditingDriverPrice, setIsEditingDriverPrice] = useState(false);
-  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>('standard');
+  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>('flexible');
 
   // Multi-drop state
   const [drops, setDrops] = useState<DropPoint[]>([]);
@@ -1332,7 +1332,6 @@ export default function AdminCreateJob() {
                             }`}
                           >
                             <div className="text-xs font-semibold">{cfg.label}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
                           </button>
                         ))}
                       </div>

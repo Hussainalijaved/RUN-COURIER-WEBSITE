@@ -659,7 +659,6 @@ export default function AdminBusinessQuote() {
                             }`}
                           >
                             <div className="text-xs font-semibold">{cfg.label}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
                           </button>
                         ))}
                       </div>
