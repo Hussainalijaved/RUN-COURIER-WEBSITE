@@ -14,6 +14,54 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     
     <title>Run Courier - Same Day Delivery UK</title>
+
+    <script>
+      // Patch WebSocket to silently swallow Vite HMR fallback connections to invalid URLs.
+      // This MUST run before ANY other script so Vite's @vite/client uses the patched constructor.
+      (function() {
+        var OrigWS = window.WebSocket;
+        function PatchedWS(url, protocols) {
+          // Vite falls back to wss://localhost:undefined/ when HMR host is unknown in Replit.
+          // Silently fail by returning a dummy inert WebSocket-like object instead of throwing.
+          if (typeof url === 'string' && url.indexOf('localhost:undefined') !== -1) {
+            // Return an inert object that looks like a WebSocket but never connects
+            var dummy = Object.create(OrigWS.prototype);
+            dummy.readyState = 3; // CLOSED
+            dummy.url = url;
+            dummy.protocol = '';
+            dummy.bufferedAmount = 0;
+            dummy.extensions = '';
+            dummy.binaryType = 'blob';
+            dummy.send = function() {};
+            dummy.close = function() {};
+            dummy.addEventListener = function() {};
+            dummy.removeEventListener = function() {};
+            dummy.dispatchEvent = function() { return false; };
+            dummy.onopen = null;
+            dummy.onerror = null;
+            dummy.onclose = null;
+            dummy.onmessage = null;
+            // Dispatch close event asynchronously so Vite thinks connection was refused
+            setTimeout(function() {
+              if (typeof dummy.onclose === 'function') {
+                dummy.onclose({ code: 1006, reason: '', wasClean: false });
+              }
+            }, 0);
+            return dummy;
+          }
+          if (protocols !== undefined) {
+            return new OrigWS(url, protocols);
+          }
+          return new OrigWS(url);
+        }
+        PatchedWS.prototype = OrigWS.prototype;
+        PatchedWS.CONNECTING = 0;
+        PatchedWS.OPEN = 1;
+        PatchedWS.CLOSING = 2;
+        PatchedWS.CLOSED = 3;
+        window.WebSocket = PatchedWS;
+      })();
+    </script>
     
     <style>
       #initial-loader {

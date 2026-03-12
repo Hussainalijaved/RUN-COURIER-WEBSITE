@@ -16,9 +16,20 @@ window.onerror = (message, source, lineno, colno, error) => {
   return false;
 };
 
-window.onunhandledrejection = (event) => {
+// Suppress Vite HMR WebSocket errors - these are internal Vite errors that
+// occur in the Replit environment and must not trigger the error overlay.
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = event.reason?.message || String(event.reason || '');
+  if (
+    msg.includes('wss://localhost:undefined') ||
+    msg.includes('Failed to construct \'WebSocket\'') ||
+    msg.includes('WebSocket') && msg.includes('invalid')
+  ) {
+    event.preventDefault();
+    return;
+  }
   console.error('[Unhandled Promise Rejection]', event.reason);
-};
+});
 
 const rootElement = document.getElementById("root");
 if (rootElement) {
