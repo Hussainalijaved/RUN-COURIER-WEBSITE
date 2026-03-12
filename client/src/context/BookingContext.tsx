@@ -86,8 +86,8 @@ const defaultBookingDraft: BookingDraft = {
   deliveryDate: '',
   deliveryTime: '',
   
-  serviceType: 'standard' as ServiceType,
-  serviceTypePercent: 10,
+  serviceType: 'flexible' as ServiceType,
+  serviceTypePercent: 0,
   serviceTypeAmount: 0,
 
   totalPrice: 0,

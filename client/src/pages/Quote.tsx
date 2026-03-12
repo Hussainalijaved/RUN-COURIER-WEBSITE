@@ -82,7 +82,7 @@ export default function Quote() {
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [pickupDate, setPickupDate] = useState(getTodayDate());
   const [pickupTime, setPickupTime] = useState(getCurrentTime());
-  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>('standard');
+  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>('flexible');
 
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),

@@ -201,7 +201,7 @@ export default function Book() {
     : 0;
   const priceAfterDiscount = quote ? quote.totalPrice - discountAmount : 0;
   // Service type is chosen on Quote page and stored in BookingContext
-  const bookingServiceType = (booking.serviceType || 'standard') as ServiceType;
+  const bookingServiceType = (booking.serviceType || 'flexible') as ServiceType;
   const serviceTypeAdj = applyServiceTypeAdjustment(priceAfterDiscount, bookingServiceType);
   const finalPrice = serviceTypeAdj.total;
 
