@@ -1312,6 +1312,35 @@ export default function AdminCreateJob() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Service Level Selector - always visible */}
+                    <div>
+                      <p className="text-sm font-medium mb-2">Service Level</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            data-testid={`button-service-type-${key}`}
+                            onClick={() => {
+                              setSelectedServiceType(key);
+                              setPriceOverride(null);
+                            }}
+                            className={`rounded-md border p-2.5 text-left transition-colors ${
+                              selectedServiceType === key
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-background hover-elevate'
+                            }`}
+                          >
+                            <div className="text-xs font-semibold">{cfg.label}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
+                    </div>
+
+                    <Separator />
+
                     {/* Calculate Quote Button - shown when no quote */}
                     {!quote && !isCalculating && (
                       <div className="space-y-4">
@@ -1386,35 +1415,6 @@ export default function AdminCreateJob() {
                           )}
                         </div>
                         
-                        <Separator />
-
-                        {/* Service Level Selector */}
-                        <div>
-                          <p className="text-sm font-medium mb-2">Service Level</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
-                              <button
-                                key={key}
-                                type="button"
-                                data-testid={`button-service-type-${key}`}
-                                onClick={() => {
-                                  setSelectedServiceType(key);
-                                  setPriceOverride(null);
-                                }}
-                                className={`rounded-md border p-2.5 text-left transition-colors ${
-                                  selectedServiceType === key
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border bg-background hover-elevate'
-                                }`}
-                              >
-                                <div className="text-xs font-semibold">{cfg.label}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1.5">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
-                        </div>
-
                         <Separator />
                         
                         <div className="space-y-4">
