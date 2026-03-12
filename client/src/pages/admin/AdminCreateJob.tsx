@@ -33,7 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { calculateQuote, formatPrice, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, formatPrice, type QuoteBreakdown, SERVICE_TYPE_CONFIG, applyServiceTypeAdjustment, type ServiceType } from '@/lib/pricing';
 import { calculateDistanceFromPostcodes } from '@/lib/maps';
 import { RouteMapPreview } from '@/components/RouteMapPreview';
 import type { Driver, VehicleType, CustomerType } from '@shared/schema';
@@ -122,7 +122,8 @@ export default function AdminCreateJob() {
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [driverPrice, setDriverPrice] = useState<number | null>(null);
   const [isEditingDriverPrice, setIsEditingDriverPrice] = useState(false);
-  
+  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>('standard');
+
   // Multi-drop state
   const [drops, setDrops] = useState<DropPoint[]>([]);
   const [isMultiDropMode, setIsMultiDropMode] = useState(false);
@@ -395,7 +396,9 @@ export default function AdminCreateJob() {
 
   const createJobMutation = useMutation({
     mutationFn: async (data: CreateJobInput) => {
-      const finalPrice = priceOverride !== null ? priceOverride : (quote?.totalPrice || 0);
+      const baseQuoteTotal = quote?.totalPrice || 0;
+      const adj = applyServiceTypeAdjustment(baseQuoteTotal, selectedServiceType);
+      const finalPrice = priceOverride !== null ? priceOverride : adj.total;
       
       const scheduledPickupTime = data.pickupDate && data.pickupTime 
         ? new Date(`${data.pickupDate}T${data.pickupTime}`).toISOString()
@@ -446,6 +449,9 @@ export default function AdminCreateJob() {
         centralLondonCharge: quote?.congestionZoneCharge?.toString() || '0',
         returnTripCharge: quote?.returnTripCharge.toString() || '0',
         waitingTimeCharge: quote?.waitingTimeCharge?.toString() || '0',
+        serviceType: selectedServiceType,
+        serviceTypePercent: String(priceOverride !== null ? 0 : (serviceTypeAdj?.percent ?? 0)),
+        serviceTypeAmount: String(priceOverride !== null ? 0 : (serviceTypeAdj?.amount ?? 0)),
         totalPrice: finalPrice.toString(),
         driverPrice: driverPrice !== null ? driverPrice.toString() : null,
         paymentStatus: 'pending',
@@ -524,9 +530,11 @@ export default function AdminCreateJob() {
     createJobMutation.mutate(data);
   };
 
+  const serviceTypeAdj = quote ? applyServiceTypeAdjustment(quote.totalPrice, selectedServiceType) : null;
+
   const getFinalPrice = () => {
     if (priceOverride !== null) return priceOverride;
-    return quote?.totalPrice || 0;
+    return serviceTypeAdj ? serviceTypeAdj.total : (quote?.totalPrice || 0);
   };
 
   return (
@@ -1379,12 +1387,53 @@ export default function AdminCreateJob() {
                         </div>
                         
                         <Separator />
+
+                        {/* Service Level Selector */}
+                        <div>
+                          <p className="text-sm font-medium mb-2">Service Level</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                data-testid={`button-service-type-${key}`}
+                                onClick={() => {
+                                  setSelectedServiceType(key);
+                                  setPriceOverride(null);
+                                }}
+                                className={`rounded-md border p-2.5 text-left transition-colors ${
+                                  selectedServiceType === key
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-background hover-elevate'
+                                }`}
+                              >
+                                <div className="text-xs font-semibold">{cfg.label}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1.5">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
+                        </div>
+
+                        <Separator />
                         
                         <div className="space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold">Calculated Total</span>
-                            <span className="text-lg" data-testid="text-calculated-total">
-                              {formatPrice(quote.totalPrice)}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-muted-foreground">Base Quote</span>
+                              <span data-testid="text-calculated-total">{formatPrice(quote.totalPrice)}</span>
+                            </div>
+                            {serviceTypeAdj && serviceTypeAdj.amount > 0 && (
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">{SERVICE_TYPE_CONFIG[selectedServiceType].label} surcharge (+{serviceTypeAdj.percent}%)</span>
+                                <span>+{formatPrice(serviceTypeAdj.amount)}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center font-semibold">
+                            <span>Calculated Total</span>
+                            <span className="text-lg">
+                              {formatPrice(serviceTypeAdj ? serviceTypeAdj.total : quote.totalPrice)}
                             </span>
                           </div>
                           
@@ -1414,7 +1463,7 @@ export default function AdminCreateJob() {
                                   type="number"
                                   step="0.01"
                                   min="0"
-                                  value={priceOverride !== null ? priceOverride : quote.totalPrice}
+                                  value={priceOverride !== null ? priceOverride : (serviceTypeAdj ? serviceTypeAdj.total : quote.totalPrice)}
                                   onChange={(e) => setPriceOverride(parseFloat(e.target.value) || 0)}
                                   className="pl-10 text-lg font-bold"
                                   data-testid="input-price-override"
@@ -1425,7 +1474,7 @@ export default function AdminCreateJob() {
                                 <span className="font-bold text-xl" data-testid="text-final-price">
                                   {formatPrice(getFinalPrice())}
                                 </span>
-                                {priceOverride !== null && priceOverride !== quote.totalPrice && (
+                                {priceOverride !== null && priceOverride !== (serviceTypeAdj ? serviceTypeAdj.total : quote.totalPrice) && (
                                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                                     Modified
                                   </Badge>
