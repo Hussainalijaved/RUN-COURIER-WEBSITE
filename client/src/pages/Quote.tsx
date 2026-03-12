@@ -552,6 +552,31 @@ export default function Quote() {
                           </div>
                         </div>
 
+                        <div className="space-y-3">
+                          <Label>Service Level</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                data-testid={`button-service-type-${key}`}
+                                onClick={() => setSelectedServiceType(key)}
+                                className={`rounded-md border p-3 text-left transition-colors ${
+                                  selectedServiceType === key
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-background hover-elevate'
+                                }`}
+                              >
+                                <div className="text-sm font-semibold">{cfg.label}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
+                        </div>
+
                         <FormField
                           control={form.control}
                           name="weight"
@@ -769,29 +794,6 @@ export default function Quote() {
                               See Pricing &amp; Service Policy
                             </a>
                           </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-medium mb-2">Service Level</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
-                              <button
-                                key={key}
-                                type="button"
-                                data-testid={`button-service-type-${key}`}
-                                onClick={() => setSelectedServiceType(key)}
-                                className={`rounded-md border p-2.5 text-left transition-colors ${
-                                  selectedServiceType === key
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border bg-background hover-elevate'
-                                }`}
-                              >
-                                <div className="text-xs font-semibold">{cfg.label}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1.5">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
                         </div>
 
                         <div className="space-y-2 text-sm">
