@@ -122,7 +122,7 @@ function loadBookingFromStorage(): BookingDraft {
       
       if (savedTime && (now.getTime() - savedTime.getTime()) < BOOKING_EXPIRY_MS) {
         console.log('[Booking] Restored booking draft from localStorage');
-        return { ...defaultBookingDraft, ...data };
+        return { ...defaultBookingDraft, ...data, serviceType: 'flexible' as ServiceType, serviceTypePercent: 0, serviceTypeAmount: 0 };
       }
       
       localStorage.removeItem(BOOKING_STORAGE_KEY);

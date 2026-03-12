@@ -703,94 +703,90 @@ export default function Book() {
                           />
                         </div>
 
-                        <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="grid md:grid-cols-2 gap-4">
                           <div className="space-y-3">
                             <Label className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-primary" />
                               Pickup Date & Time
                             </Label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <FormField
-                                control={form.control}
-                                name="pickupDate"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm">Date</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="date"
-                                        min={getTodayDate()}
-                                        {...field}
-                                        data-testid="input-pickup-date"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="pickupTime"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm">Time</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="time"
-                                        step="900"
-                                        {...field}
-                                        data-testid="input-pickup-time"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
+                            <FormField
+                              control={form.control}
+                              name="pickupDate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm">Date</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      min={getTodayDate()}
+                                      {...field}
+                                      data-testid="input-pickup-date"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="pickupTime"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm">Time</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="time"
+                                      step="900"
+                                      {...field}
+                                      data-testid="input-pickup-time"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-primary" />
                               Delivery Date & Time (optional)
                             </Label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <FormField
-                                control={form.control}
-                                name="deliveryDate"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm">Date</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="date"
-                                        min={form.watch('pickupDate') || getTodayDate()}
-                                        {...field}
-                                        data-testid="input-delivery-date"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="deliveryTime"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm">Time</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="time"
-                                        step="900"
-                                        {...field}
-                                        data-testid="input-delivery-time"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
+                            <FormField
+                              control={form.control}
+                              name="deliveryDate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm">Date</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      min={form.watch('pickupDate') || getTodayDate()}
+                                      {...field}
+                                      data-testid="input-delivery-date"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="deliveryTime"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm">Time</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="time"
+                                      step="900"
+                                      {...field}
+                                      data-testid="input-delivery-time"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                             <FormDescription className="text-xs">
                               Leave empty for ASAP delivery
                             </FormDescription>
