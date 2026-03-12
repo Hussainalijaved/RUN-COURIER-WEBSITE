@@ -131,9 +131,10 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; }
             .payment-info { background: #f8f9fa; padding: 20px; margin-top: 20px; }
             .payment-info h4 { margin: 0 0 15px 0; font-size: 13px; text-transform: uppercase; color: #333; }
-            .payment-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px; }
-            .payment-grid div { display: flex; justify-content: space-between; }
-            .payment-grid label { color: #666; }
+            .payment-row { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid #dce8f5; font-size: 12px; }
+            .payment-row:last-of-type { border-bottom: none; }
+            .payment-row label { color: #666; width: 140px; flex-shrink: 0; }
+            .payment-row span { font-weight: 600; color: #111; font-family: monospace; font-size: 12px; }
             .legal-footer { margin-top: 30px; font-size: 10px; color: #999; text-align: center; line-height: 1.8; }
             .status { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
             .status-paid { background: #d4edda; color: #155724; }
@@ -303,22 +304,22 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
 
         <div className="mt-8 pt-6 border-t-2">
           <div className="bg-gray-50 p-4">
-            <h4 className="font-semibold text-sm uppercase text-gray-900 mb-3">Payment Details</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-700">Account Name:</span>
-                <span className="font-medium text-gray-900">{COMPANY_DETAILS.accountName}</span>
+            <h4 className="font-semibold text-sm uppercase text-gray-900 mb-3">Bank Transfer Details</h4>
+            <div className="text-sm divide-y divide-blue-100">
+              <div className="flex items-center py-2">
+                <span className="text-gray-500 w-36 flex-shrink-0">Account Name</span>
+                <span className="font-semibold text-gray-900 font-mono">{COMPANY_DETAILS.accountName}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700">Sort Code:</span>
-                <span className="font-medium text-gray-900">{COMPANY_DETAILS.sortCode}</span>
+              <div className="flex items-center py-2">
+                <span className="text-gray-500 w-36 flex-shrink-0">Sort Code</span>
+                <span className="font-semibold text-gray-900 font-mono">{COMPANY_DETAILS.sortCode}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700">Account Number:</span>
-                <span className="font-medium text-gray-900">{COMPANY_DETAILS.accountNumber}</span>
+              <div className="flex items-center py-2">
+                <span className="text-gray-500 w-36 flex-shrink-0">Account Number</span>
+                <span className="font-semibold text-gray-900 font-mono">{COMPANY_DETAILS.accountNumber}</span>
               </div>
             </div>
-            <p className="mt-4 text-xs text-gray-700">
+            <p className="mt-3 pt-3 border-t border-dashed border-blue-200 text-xs text-gray-600">
               Please use invoice number <span className="font-bold text-gray-900">{invoice.invoiceNumber}</span> as your payment reference.
             </p>
           </div>

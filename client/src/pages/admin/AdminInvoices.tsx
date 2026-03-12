@@ -548,12 +548,13 @@ export default function AdminInvoices() {
           .totals-row.grand span:last-child { color: #007BFF; }
           .notes { background: #fff8e1; border-left: 3px solid #ffc107; padding: 12px 16px; margin: 16px 0; font-size: 12px; }
           .payment-section { margin-top: 28px; padding-top: 20px; border-top: 2px solid #eee; }
-          .payment-box { background: #f0f7ff; padding: 16px; margin-top: 10px; }
-          .payment-box h4 { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #333; margin: 0 0 12px 0; }
-          .payment-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px; }
-          .payment-grid div { display: flex; justify-content: space-between; }
-          .payment-grid label { color: #666; }
-          .payment-ref { margin-top: 10px; font-size: 11px; color: #555; }
+          .payment-box { background: #f0f7ff; padding: 16px 20px; margin-top: 10px; }
+          .payment-box h4 { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #333; margin: 0 0 14px 0; letter-spacing: 0.5px; }
+          .payment-row { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid #dce8f5; font-size: 12px; }
+          .payment-row:last-of-type { border-bottom: none; }
+          .payment-row label { color: #666; width: 140px; flex-shrink: 0; }
+          .payment-row span { font-weight: 600; color: #111; font-family: monospace; font-size: 12px; }
+          .payment-ref { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #b0cce8; font-size: 11px; color: #555; }
           .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #999; line-height: 1.8; }
           @media print {
             body { padding: 0; margin: 0; }
@@ -617,11 +618,9 @@ export default function AdminInvoices() {
         <div class="payment-section">
           <div class="payment-box">
             <h4>Bank Transfer Details</h4>
-            <div class="payment-grid">
-              <div><label>Account Name:</label><span>RUN COURIER</span></div>
-              <div><label>Sort Code:</label><span>30-99-50</span></div>
-              <div><label>Account Number:</label><span>36113363</span></div>
-            </div>
+            <div class="payment-row"><label>Account Name</label><span>RUN COURIER</span></div>
+            <div class="payment-row"><label>Sort Code</label><span>30-99-50</span></div>
+            <div class="payment-row"><label>Account Number</label><span>36113363</span></div>
             <p class="payment-ref">Please use invoice number <strong>${invoice.invoice_number}</strong> as your payment reference.</p>
           </div>
         </div>
