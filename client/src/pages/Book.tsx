@@ -753,12 +753,13 @@ export default function Book() {
                               <Clock className="h-4 w-4 text-primary" />
                               Delivery Date & Time (optional)
                             </Label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <FormField
                                 control={form.control}
                                 name="deliveryDate"
                                 render={({ field }) => (
                                   <FormItem>
+                                    <FormLabel className="text-sm">Date</FormLabel>
                                     <FormControl>
                                       <Input
                                         type="date"
@@ -776,6 +777,7 @@ export default function Book() {
                                 name="deliveryTime"
                                 render={({ field }) => (
                                   <FormItem>
+                                    <FormLabel className="text-sm">Time</FormLabel>
                                     <FormControl>
                                       <Input
                                         type="time"
