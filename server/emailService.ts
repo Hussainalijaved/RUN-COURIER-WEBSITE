@@ -206,6 +206,8 @@ export async function sendQuoteNotification(data: {
   isReturnTrip?: boolean;
   pickupDate?: string;
   pickupTime?: string;
+  serviceType?: string;
+  serviceTypePercent?: number;
 }): Promise<boolean> {
   const vehicleNames: Record<string, string> = {
     motorbike: 'Motorbike',
@@ -216,6 +218,15 @@ export async function sendQuoteNotification(data: {
   const vehicle = vehicleNames[data.vehicleType] || data.vehicleType;
   const dateStr = data.pickupDate ? new Date(data.pickupDate).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Not specified';
   const timeStr = data.pickupTime || 'Not specified';
+
+  const serviceLevelNames: Record<string, string> = {
+    flexible: 'Flexible',
+    standard: 'Standard',
+    urgent: 'Urgent',
+    dedicated: 'Dedicated / Direct',
+  };
+  const serviceLevelDisplay = data.serviceType ? serviceLevelNames[data.serviceType] || data.serviceType : 'Flexible';
+  const serviceLevelPercent = data.serviceTypePercent ?? 0;
 
   const stopsHtml = data.isMultiDrop && data.multiDropStops?.length
     ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Multi-Drop Stops</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.multiDropStops.join(' → ')}</td></tr>`
@@ -238,6 +249,7 @@ export async function sendQuoteNotification(data: {
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Return Trip</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${data.isReturnTrip ? 'Yes' : 'No'}</td></tr>
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Pickup Date</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${dateStr}</td></tr>
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Pickup Time</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">${timeStr}</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;">Service Level</td><td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${serviceLevelDisplay}${serviceLevelPercent > 0 ? ` (+${serviceLevelPercent}%)` : ''}</td></tr>
           <tr style="background:#f0fdf4;"><td style="padding:10px 12px;color:#555;font-weight:600;">Quoted Price</td><td style="padding:10px 12px;font-weight:700;font-size:18px;color:#16a34a;">£${data.totalPrice.toFixed(2)}</td></tr>
         </table>
         <p style="color:#888;font-size:12px;margin-top:16px;">This quote was generated on the website. The customer has not yet completed a booking.</p>
@@ -245,7 +257,7 @@ export async function sendQuoteNotification(data: {
     </div>
   `;
 
-  const textContent = `New Quote Request\nPickup: ${data.pickupPostcode}\nDelivery: ${data.deliveryPostcode}\nVehicle: ${vehicle}\n${data.weight && Number(data.weight) > 0 ? `Weight: ${data.weight}kg\n` : ''}Distance: ${data.distance.toFixed(1)} miles\nDate: ${dateStr} ${timeStr}\nQuoted Price: £${data.totalPrice.toFixed(2)}`;
+  const textContent = `New Quote Request\nPickup: ${data.pickupPostcode}\nDelivery: ${data.deliveryPostcode}\nVehicle: ${vehicle}\n${data.weight && Number(data.weight) > 0 ? `Weight: ${data.weight}kg\n` : ''}Distance: ${data.distance.toFixed(1)} miles\nDate: ${dateStr} ${timeStr}\nService Level: ${serviceLevelDisplay}\nQuoted Price: £${data.totalPrice.toFixed(2)}`;
 
   return sendEmailNotification(
     'info@runcourier.co.uk',
@@ -582,6 +594,23 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
           <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.waitingTimeCharge).toFixed(2)}</td>
         </tr>
         ` : ''}
+        ${jobDetails.serviceType && jobDetails.serviceType !== 'flexible' ? `
+        <tr>
+          <td style="padding: 8px 0; color: #333;"><strong>Service Level:</strong></td>
+          <td style="padding: 8px 0; color: #333;">${{ flexible: 'Flexible', standard: 'Standard', urgent: 'Urgent', dedicated: 'Dedicated / Direct' }[jobDetails.serviceType as string] || jobDetails.serviceType}${jobDetails.serviceTypePercent > 0 ? ` (+${jobDetails.serviceTypePercent}%)` : ''}</td>
+        </tr>
+        ${parseFloat(jobDetails.serviceTypeAmount || 0) > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #333;"><strong>Service Surcharge:</strong></td>
+          <td style="padding: 8px 0; color: #333;">£${parseFloat(jobDetails.serviceTypeAmount).toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ` : `
+        <tr>
+          <td style="padding: 8px 0; color: #333;"><strong>Service Level:</strong></td>
+          <td style="padding: 8px 0; color: #333;">Flexible</td>
+        </tr>
+        `}
       </table>
       <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: right;">
         <span style="color: #333; font-size: 16px;">Total: </span>

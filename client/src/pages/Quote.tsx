@@ -276,6 +276,7 @@ export default function Quote() {
             title: 'Quote Ready',
             description: `Your delivery quote is £${calculatedQuote.totalPrice.toFixed(2)}`,
           });
+          const stAdj = applyServiceTypeAdjustment(calculatedQuote.totalPrice, selectedServiceType);
           fetch('/api/quote-notification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -285,12 +286,14 @@ export default function Quote() {
               vehicleType: finalVehicleType,
               weight,
               distance: totalDistance,
-              totalPrice: calculatedQuote.totalPrice,
+              totalPrice: stAdj.total,
               isMultiDrop,
               multiDropStops: isMultiDrop ? multiDropStops.filter(Boolean) : undefined,
               isReturnTrip,
               pickupDate,
               pickupTime,
+              serviceType: selectedServiceType,
+              serviceTypePercent: stAdj.percent,
             }),
           }).catch(() => {});
         } else {

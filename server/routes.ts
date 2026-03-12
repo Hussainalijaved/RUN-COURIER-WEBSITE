@@ -7052,7 +7052,7 @@ export async function registerRoutes(
     timestamps.push(now);
     quoteNotificationLimiter.set(ip, timestamps);
 
-    const { pickupPostcode, deliveryPostcode, vehicleType, weight, distance, totalPrice, isMultiDrop, multiDropStops, isReturnTrip, pickupDate, pickupTime } = req.body;
+    const { pickupPostcode, deliveryPostcode, vehicleType, weight, distance, totalPrice, isMultiDrop, multiDropStops, isReturnTrip, pickupDate, pickupTime, serviceType, serviceTypePercent } = req.body;
     if (!pickupPostcode || !deliveryPostcode || !vehicleType || typeof totalPrice !== 'number' || typeof distance !== 'number') {
       return res.status(400).json({ error: "Missing or invalid fields" });
     }
@@ -7072,6 +7072,8 @@ export async function registerRoutes(
       isReturnTrip: !!isReturnTrip,
       pickupDate: pickupDate ? String(pickupDate).slice(0, 20) : undefined,
       pickupTime: pickupTime ? String(pickupTime).slice(0, 10) : undefined,
+      serviceType: serviceType ? String(serviceType) : 'flexible',
+      serviceTypePercent: typeof serviceTypePercent === 'number' ? serviceTypePercent : 0,
     }).catch(err => console.error('[Quote Notification] Email error:', err));
     res.json({ success: true });
   }));
