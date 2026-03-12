@@ -568,12 +568,7 @@ export default function AdminInvoices() {
             <img src="${logoUrl}" alt="Run Courier" class="company-logo" />
             <div>
               <div class="company-name">RUN COURIER</div>
-              <div class="company-details">
-                Run Courier<br>
-                112 Bridgwater Road, Ruislip, HA4 6LW<br>
-                London, United Kingdom<br>
-                info@runcourier.co.uk
-              </div>
+              <div class="company-details">Same Day Delivery</div>
             </div>
           </div>
           <div class="invoice-right">
@@ -659,9 +654,7 @@ export default function AdminInvoices() {
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'normal');
-    doc.text('Run Courier', margin, y + 13);
-    doc.text('112 Bridgwater Road, Ruislip, HA4 6LW, London', margin, y + 18);
-    doc.text('info@runcourier.co.uk', margin, y + 23);
+    doc.text('Same Day Delivery', margin, y + 14);
 
     doc.setFontSize(22);
     doc.setTextColor(17, 17, 17);

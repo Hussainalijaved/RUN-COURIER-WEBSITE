@@ -185,13 +185,7 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             />
             <div>
               <h1 className="text-2xl font-bold text-primary">{COMPANY_DETAILS.tradingName}</h1>
-              <div className="text-xs text-gray-800 mt-2 leading-relaxed">
-                <p>{COMPANY_DETAILS.name}</p>
-                <p>{COMPANY_DETAILS.address}</p>
-                <p>{COMPANY_DETAILS.city}, {COMPANY_DETAILS.postcode}</p>
-                <p>{COMPANY_DETAILS.country}</p>
-                <p className="mt-2">Email: {COMPANY_DETAILS.email}</p>
-              </div>
+              <p className="text-sm text-gray-600 mt-1">Same Day Delivery</p>
             </div>
           </div>
           <div className="text-right">
