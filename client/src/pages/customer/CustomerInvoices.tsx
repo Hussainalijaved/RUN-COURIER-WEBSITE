@@ -71,7 +71,7 @@ interface InvoiceWithJobs {
 }
 
 const COMPANY_DETAILS = {
-  name: 'Run Courier Ltd',
+  name: 'Run Courier',
   tradingName: 'RUN COURIER',
   address: '112 Bridgwater Road',
   city: 'Ruislip',

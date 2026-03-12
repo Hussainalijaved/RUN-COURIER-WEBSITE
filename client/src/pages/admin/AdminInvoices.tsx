@@ -568,7 +568,7 @@ export default function AdminInvoices() {
             <div>
               <div class="company-name">RUN COURIER</div>
               <div class="company-details">
-                Run Courier Ltd<br>
+                Run Courier<br>
                 112 Bridgwater Road, Ruislip, HA4 6LW<br>
                 London, United Kingdom<br>
                 info@runcourier.co.uk
@@ -584,7 +584,7 @@ export default function AdminInvoices() {
         <div class="addresses">
           <div class="address-block">
             <h3>From</h3>
-            <p style="font-weight:bold;">Run Courier Ltd</p>
+            <p style="font-weight:bold;">Run Courier</p>
             <p>112 Bridgwater Road</p>
             <p>Ruislip, HA4 6LW</p>
             <p>London, United Kingdom</p>
@@ -626,7 +626,7 @@ export default function AdminInvoices() {
           </div>
         </div>
         <div class="footer">
-          Run Courier Ltd | info@runcourier.co.uk | www.runcourier.co.uk<br>
+          Run Courier | info@runcourier.co.uk | www.runcourier.co.uk<br>
           112 Bridgwater Road, Ruislip, HA4 6LW, London, United Kingdom<br>
           Thank you for your business
         </div>
@@ -660,7 +660,7 @@ export default function AdminInvoices() {
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'normal');
-    doc.text('Run Courier Ltd', margin, y + 13);
+    doc.text('Run Courier', margin, y + 13);
     doc.text('112 Bridgwater Road, Ruislip, HA4 6LW, London', margin, y + 18);
     doc.text('info@runcourier.co.uk', margin, y + 23);
 
@@ -869,7 +869,7 @@ export default function AdminInvoices() {
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
     doc.setFont('helvetica', 'normal');
-    doc.text('Run Courier Ltd | 112 Bridgwater Road, Ruislip, HA4 6LW, London | info@runcourier.co.uk | runcourier.co.uk', pageWidth / 2, 290, { align: 'center' });
+    doc.text('Run Courier | 112 Bridgwater Road, Ruislip, HA4 6LW, London | info@runcourier.co.uk | runcourier.co.uk', pageWidth / 2, 290, { align: 'center' });
 
     doc.save(`${invoice.invoice_number}.pdf`);
     toast({ title: 'PDF downloaded', description: `${invoice.invoice_number}.pdf saved` });
