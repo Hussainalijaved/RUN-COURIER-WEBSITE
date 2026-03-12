@@ -1,0 +1,117 @@
+Update the Run Courier website and pricing system to support service-level pricing (Flexible, Standard, Urgent, Dedicated) but DO NOT show the detailed price breakdown to customers. The customer must see only the final total price exactly like the current system.
+
+GOAL
+Add service type pricing logic across the whole system but keep the customer interface simple. The system must calculate different prices internally but only display the final result.
+
+SERVICE TYPES TO ADD
+
+- Flexible
+- Standard
+- Urgent
+- Dedicated / Direct
+
+PRICE RULES
+
+Apply percentage adjustment AFTER the normal Run Courier price is calculated.
+
+Flexible = 0%
+Standard = +10%
+Urgent = +25%
+Dedicated = +40%
+
+IMPORTANT:
+These adjustments must happen in the backend only.
+
+KEEP CURRENT PRICING
+
+Do not change existing logic:
+- base charge
+- per mile
+- vehicle pricing
+- rush hour pricing
+- waiting time
+- congestion zone
+- multi-drop
+- return trip
+- admin approval pricing
+
+Service type must be added on top of final calculated price.
+
+CUSTOMER VIEW RULES
+
+Customer must see ONLY:
+
+Total price £XX.XX
+
+Do NOT show:
+- percentage
+- surcharge lines
+- service multiplier
+- breakdown list
+
+The UI must look exactly like now.
+
+BOOKING FORM
+
+Add Service Type selector but simple.
+
+Show only:
+
+Service type:
+Flexible
+Standard
+Urgent
+Dedicated
+
+No price explanation needed.
+
+PRICE DISPLAY
+
+When customer changes service type, only update the total price.
+
+Do not show calculation.
+
+ADMIN PANEL
+
+Admin must see full breakdown:
+- base price
+- mileage
+- surcharges
+- service type %
+- final total
+
+Customer must not see this.
+
+DATABASE
+
+Add field:
+serviceType
+
+Values:
+flexible
+standard
+urgent
+dedicated
+
+Also store:
+
+serviceTypePercent
+serviceTypeAmount
+
+DEFAULT
+
+If no service type selected → Standard
+
+INVOICE / EMAIL
+
+Customer invoice → show only final price
+
+Admin invoice → show full details
+
+IMPORTANT
+
+Do not change design
+Do not break current quote system
+Do not show calculation to customer
+Do not remove existing pricing logic
+Only extend it internally

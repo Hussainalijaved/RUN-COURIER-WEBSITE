@@ -47,7 +47,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType } from '@shared/schema';
-import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown, SERVICE_TYPE_CONFIG, applyServiceTypeAdjustment, type ServiceType } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance, calculateOptimizedRoute } from '@/lib/maps';
 
 // Helper functions for default date/time
@@ -82,6 +82,7 @@ export default function Quote() {
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [pickupDate, setPickupDate] = useState(getTodayDate());
   const [pickupTime, setPickupTime] = useState(getCurrentTime());
+  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>('standard');
 
   const form = useForm<BookingQuoteInput>({
     resolver: zodResolver(bookingQuoteSchema),
@@ -364,7 +365,12 @@ export default function Quote() {
     return params.toString();
   };
 
+  const serviceTypeAdjustment = quote ? applyServiceTypeAdjustment(quote.totalPrice, selectedServiceType) : null;
+  const finalQuotePrice = serviceTypeAdjustment ? serviceTypeAdjustment.total : (quote?.totalPrice || 0);
+
   const saveBookingToContext = () => {
+    const baseQuoteTotal = quote?.totalPrice || 0;
+    const adjustment = applyServiceTypeAdjustment(baseQuoteTotal, selectedServiceType);
     updateBooking({
       pickupPostcode,
       deliveryPostcode,
@@ -377,11 +383,14 @@ export default function Quote() {
       multiDropStops,
       distance,
       estimatedTime,
-      totalPrice: quote?.totalPrice || 0,
+      serviceType: selectedServiceType,
+      serviceTypePercent: adjustment.percent,
+      serviceTypeAmount: adjustment.amount,
+      totalPrice: adjustment.total,
       basePrice: quote?.baseCharge || 0,
       distancePrice: quote?.distanceCharge || 0,
       weightSurcharge: quote?.weightSurcharge || 0,
-      rushHourCharge: quote?.rushHourApplied ? (quote.totalPrice * 0.15) : 0,
+      rushHourCharge: quote?.rushHourApplied ? (baseQuoteTotal * 0.15) : 0,
       centralLondonCharge: quote?.congestionZoneCharge || 0,
       multiDropCharge: quote?.multiDropCharge || 0,
       returnTripCharge: quote?.returnTripCharge || 0,
@@ -744,12 +753,40 @@ export default function Quote() {
                   </CardHeader>
                   <CardContent>
                     {quote ? (
-                      <div className="space-y-6">
-                        <div className="bg-primary/10 rounded-lg p-6 text-center">
+                      <div className="space-y-5">
+                        <div className="bg-primary/10 rounded-lg p-5 text-center">
                           <div className="text-4xl font-bold text-primary" data-testid="text-total-price">
-                            £{quote.totalPrice.toFixed(2)}
+                            £{finalQuotePrice.toFixed(2)}
                           </div>
-                          <p className="text-muted-foreground text-sm mt-2">Total delivery cost</p>
+                          <p className="text-muted-foreground text-sm mt-1">Total delivery cost</p>
+                          {serviceTypeAdjustment && serviceTypeAdjustment.amount > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              incl. {SERVICE_TYPE_CONFIG[selectedServiceType].label} surcharge (£{serviceTypeAdjustment.amount.toFixed(2)})
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-medium mb-2">Service Level</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                data-testid={`button-service-type-${key}`}
+                                onClick={() => setSelectedServiceType(key)}
+                                className={`rounded-md border p-2.5 text-left transition-colors ${
+                                  selectedServiceType === key
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-background hover-elevate'
+                                }`}
+                              >
+                                <div className="text-xs font-semibold">{cfg.label}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1.5">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -765,6 +802,21 @@ export default function Quote() {
                                 ? `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`
                                 : `${estimatedTime} mins`}
                             </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Base fare</span>
+                            <span className="font-medium">£{quote.totalPrice.toFixed(2)}</span>
+                          </div>
+                          {serviceTypeAdjustment && serviceTypeAdjustment.amount > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">{SERVICE_TYPE_CONFIG[selectedServiceType].label} surcharge</span>
+                              <span className="font-medium">+£{serviceTypeAdjustment.amount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <Separator />
+                          <div className="flex justify-between font-semibold">
+                            <span>Total</span>
+                            <span>£{finalQuotePrice.toFixed(2)}</span>
                           </div>
                         </div>
 
@@ -843,8 +895,8 @@ export default function Quote() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="bg-muted/50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-primary">£{quote?.totalPrice.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">Your quoted price</p>
+              <p className="text-2xl font-bold text-primary">£{finalQuotePrice.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground">{SERVICE_TYPE_CONFIG[selectedServiceType].label} — Your quoted price</p>
             </div>
             <Button 
               className="w-full gap-2" 

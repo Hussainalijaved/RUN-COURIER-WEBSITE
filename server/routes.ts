@@ -7889,6 +7889,14 @@ export async function registerRoutes(
     const vehicleName = bookingData.vehicleType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
     const description = `Run Courier Delivery - ${vehicleName} - ${bookingData.pickupPostcode} to ${bookingData.deliveryPostcode}`;
 
+    // Apply service type adjustment server-side
+    const serviceType = (bookingData.serviceType || 'standard') as string;
+    const serviceTypePercents: Record<string, number> = { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
+    const serviceTypePercent = serviceTypePercents[serviceType] ?? 10;
+    const baseTotal = bookingData.totalPrice;
+    const serviceTypeAmount = Math.round(baseTotal * (serviceTypePercent / 100) * 100) / 100;
+    const finalTotal = Math.round((baseTotal + serviceTypeAmount) * 100) / 100;
+
     const metadataForStripe: Record<string, string> = {
       bookingType: 'courier_delivery',
       pickupPostcode: bookingData.pickupPostcode,
@@ -7905,7 +7913,17 @@ export async function registerRoutes(
       deliveryInstructions: (bookingData.deliveryInstructions || '').substring(0, 200),
       vehicleType: bookingData.vehicleType,
       weight: String(bookingData.weight || 1),
-      totalPrice: String(bookingData.totalPrice),
+      totalPrice: String(finalTotal),
+      basePrice: String(bookingData.basePrice || 0),
+      distancePrice: String(bookingData.distancePrice || 0),
+      weightSurcharge: String(bookingData.weightSurcharge || 0),
+      multiDropCharge: String(bookingData.multiDropCharge || 0),
+      returnTripCharge: String(bookingData.returnTripCharge || 0),
+      centralLondonCharge: String(bookingData.centralLondonCharge || 0),
+      waitingTimeCharge: String(bookingData.waitingTimeCharge || 0),
+      serviceType,
+      serviceTypePercent: String(serviceTypePercent),
+      serviceTypeAmount: String(serviceTypeAmount),
       distance: String(bookingData.distance || 0),
       estimatedTime: String(bookingData.estimatedTime || 0),
       isMultiDrop: String(bookingData.isMultiDrop || false),
@@ -7916,7 +7934,7 @@ export async function registerRoutes(
 
     // Create Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(bookingData.totalPrice * 100),
+      amount: Math.round(finalTotal * 100),
       currency: 'gbp',
       customer: customerId,
       description,
@@ -7977,6 +7995,9 @@ export async function registerRoutes(
       returnTripCharge: metadata.returnTripCharge || '0',
       centralLondonCharge: metadata.centralLondonCharge || '0',
       waitingTimeCharge: metadata.waitingTimeCharge || '0',
+      serviceType: metadata.serviceType || 'standard',
+      serviceTypePercent: String(metadata.serviceTypePercent || '10'),
+      serviceTypeAmount: String(metadata.serviceTypeAmount || '0'),
       totalPrice: String(totalPrice),
       distance: metadata.distance || '0',
       customerId: metadata.customerId || '',
@@ -8167,6 +8188,14 @@ export async function registerRoutes(
 
     const trackingNumber = await generateTrackingNumber();
     const jobNumber = await generateJobNumber();
+
+    // Apply service type adjustment for pay-later bookings
+    const plServiceType = bookingData.serviceType || 'standard';
+    const plServiceTypePercents: Record<string, number> = { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
+    const plServiceTypePercent = plServiceTypePercents[plServiceType] ?? 10;
+    const plBaseTotal = bookingData.totalPrice;
+    const plServiceTypeAmount = Math.round(plBaseTotal * (plServiceTypePercent / 100) * 100) / 100;
+    const plFinalTotal = Math.round((plBaseTotal + plServiceTypeAmount) * 100) / 100;
     
     const jobData = {
       trackingNumber,
@@ -8192,7 +8221,10 @@ export async function registerRoutes(
       returnTripCharge: String(bookingData.returnTripCharge || 0),
       centralLondonCharge: String(bookingData.centralLondonCharge || 0),
       waitingTimeCharge: String(bookingData.waitingTimeCharge || 0),
-      totalPrice: String(bookingData.totalPrice || 0),
+      serviceType: (bookingData.serviceType || 'standard'),
+      serviceTypePercent: String(plServiceTypePercent),
+      serviceTypeAmount: String(plServiceTypeAmount),
+      totalPrice: String(plFinalTotal),
       distance: String(bookingData.distance || 0),
       customerId: bookingData.customerId,
       customerEmail: bookingData.customerEmail || customer.email,

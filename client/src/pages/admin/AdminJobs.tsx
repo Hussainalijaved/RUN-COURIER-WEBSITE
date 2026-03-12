@@ -1964,6 +1964,12 @@ export default function AdminJobs() {
                     <p className="text-sm text-muted-foreground">Customer Amount</p>
                     <p className="font-medium">{formatPrice(selectedJob.totalPrice)}</p>
                   </div>
+                  {selectedJob.serviceType && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Service Level</p>
+                      <p className="font-medium capitalize">{selectedJob.serviceType}</p>
+                    </div>
+                  )}
                 </div>
                 {selectedJob.status !== 'cancelled' && (
                   <div className="p-3 bg-muted/50 rounded-md space-y-2">

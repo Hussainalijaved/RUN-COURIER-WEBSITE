@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { VehicleType } from '@shared/schema';
+import type { ServiceType } from '@/lib/pricing';
 
 export interface BookingDraft {
   pickupPostcode: string;
@@ -33,6 +34,10 @@ export interface BookingDraft {
   deliveryDate: string;
   deliveryTime: string;
   
+  serviceType: ServiceType;
+  serviceTypePercent: number;
+  serviceTypeAmount: number;
+
   totalPrice: number;
   basePrice: number;
   distancePrice: number;
@@ -81,6 +86,10 @@ const defaultBookingDraft: BookingDraft = {
   deliveryDate: '',
   deliveryTime: '',
   
+  serviceType: 'standard' as ServiceType,
+  serviceTypePercent: 10,
+  serviceTypeAmount: 0,
+
   totalPrice: 0,
   basePrice: 0,
   distancePrice: 0,

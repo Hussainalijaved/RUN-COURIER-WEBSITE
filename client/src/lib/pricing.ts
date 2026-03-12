@@ -1,6 +1,25 @@
 import type { VehicleType, PricingSettings, Vehicle } from "@shared/schema";
 import { congestionZonePostcodes } from "./congestionZonePostcodes";
 
+export type ServiceType = 'flexible' | 'standard' | 'urgent' | 'dedicated';
+
+export const SERVICE_TYPE_CONFIG: Record<ServiceType, { label: string; percent: number; description: string }> = {
+  flexible:  { label: 'Flexible',         percent: 0,  description: 'Best value, flexible timing' },
+  standard:  { label: 'Standard',         percent: 10, description: 'Reliable same-day delivery' },
+  urgent:    { label: 'Urgent',           percent: 25, description: 'Priority same-day delivery' },
+  dedicated: { label: 'Dedicated / Direct', percent: 40, description: 'Exclusive dedicated courier' },
+};
+
+export function applyServiceTypeAdjustment(
+  baseTotal: number,
+  serviceType: ServiceType
+): { total: number; percent: number; amount: number } {
+  const config = SERVICE_TYPE_CONFIG[serviceType] ?? SERVICE_TYPE_CONFIG.standard;
+  const amount = Math.round(baseTotal * (config.percent / 100) * 100) / 100;
+  const total = Math.round((baseTotal + amount) * 100) / 100;
+  return { total, percent: config.percent, amount };
+}
+
 export interface PricingConfig {
   vehicles: {
     [key in VehicleType]: {

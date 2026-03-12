@@ -52,7 +52,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { bookingQuoteSchema, type BookingQuoteInput, type VehicleType, type User as UserType, type DeliveryContact } from '@shared/schema';
-import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, defaultPricingConfig, shouldSwitchVehicle, type QuoteBreakdown, SERVICE_TYPE_CONFIG, applyServiceTypeAdjustment, type ServiceType } from '@/lib/pricing';
 import { geocodePostcode, calculateDistance, calculateETA, calculateOptimizedRoute } from '@/lib/maps';
 import { EmbeddedPayment } from '@/components/EmbeddedPayment';
 import { useBooking } from '@/context/BookingContext';
@@ -199,7 +199,11 @@ export default function Book() {
   const discountAmount = isEligibleForNewCustomerDiscount && quote 
     ? quote.totalPrice * newCustomerDiscountPercent 
     : 0;
-  const finalPrice = quote ? quote.totalPrice - discountAmount : 0;
+  const priceAfterDiscount = quote ? quote.totalPrice - discountAmount : 0;
+  // Service type is chosen on Quote page and stored in BookingContext
+  const bookingServiceType = (booking.serviceType || 'standard') as ServiceType;
+  const serviceTypeAdj = applyServiceTypeAdjustment(priceAfterDiscount, bookingServiceType);
+  const finalPrice = serviceTypeAdj.total;
 
   const getTodayDate = () => {
     const today = new Date();
@@ -1043,10 +1047,10 @@ export default function Book() {
                             ) : (
                               <>
                                 <p className="text-2xl font-bold text-primary" data-testid="text-final-price">
-                                  £{quote.totalPrice.toFixed(2)}
+                                  £{finalPrice.toFixed(2)}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Total delivery cost
+                                  {SERVICE_TYPE_CONFIG[bookingServiceType].label} — Total delivery cost
                                 </p>
                               </>
                             )}
@@ -1427,6 +1431,12 @@ export default function Book() {
                             <span>-£{discountAmount.toFixed(2)}</span>
                           </div>
                         )}
+                        {serviceTypeAdj.amount > 0 && (
+                          <div className="flex justify-between text-muted-foreground" data-testid="order-service-type-line">
+                            <span>{SERVICE_TYPE_CONFIG[bookingServiceType].label} surcharge (+{serviceTypeAdj.percent}%)</span>
+                            <span>+£{serviceTypeAdj.amount.toFixed(2)}</span>
+                          </div>
+                        )}
                         <Separator className="my-2" />
                         <div className="flex justify-between font-bold text-lg text-primary" data-testid="order-total">
                           <span>Total to Pay</span>
@@ -1549,7 +1559,10 @@ export default function Book() {
                           returnTripCharge: quote.returnTripCharge || 0,
                           centralLondonCharge: quote.congestionZoneCharge || 0,
                           waitingTimeCharge: 0,
-                          totalPrice: finalPrice,
+                          serviceType: bookingServiceType,
+                          serviceTypePercent: serviceTypeAdj.percent,
+                          serviceTypeAmount: serviceTypeAdj.amount,
+                          totalPrice: priceAfterDiscount,
                           distance,
                           estimatedTime,
                           isMultiDrop,

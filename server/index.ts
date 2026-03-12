@@ -431,6 +431,19 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT DEFAULT 'standard'`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_percent DECIMAL(5,2) DEFAULT 10`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_amount DECIMAL(10,2) DEFAULT 0`);
+      console.log("[MIGRATION] Service type columns created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Service type columns migration error:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
       const { hydrateLocationCache } = await import('./realtime');
       await hydrateLocationCache();
       console.log("[BACKGROUND] Cache hydrated");

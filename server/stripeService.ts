@@ -38,6 +38,9 @@ export interface BookingData {
   scheduledPickupTime?: string | null;
   scheduledDeliveryTime?: string | null;
   payLater?: boolean;
+  serviceType?: string;
+  serviceTypePercent?: number;
+  serviceTypeAmount?: number;
 }
 
 export class StripeService {
