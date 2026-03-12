@@ -6,14 +6,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, Package, Save, Clock, MapPin, Weight, Layers, RotateCcw, Loader2 } from 'lucide-react';
+import { Bike, Car, Truck, Package, Save, Clock, MapPin, Weight, Layers, RotateCcw, Loader2, Gauge } from 'lucide-react';
 import { defaultPricingConfig, clearPricingCache, type PricingConfig } from '@/lib/pricing';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { PricingSettings, Vehicle, VehicleType } from '@shared/schema';
 
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  flexible: 'Flexible',
+  standard: 'Standard',
+  urgent: 'Urgent',
+  dedicated: 'Dedicated / Direct',
+};
+
 export default function AdminPricing() {
   const { toast } = useToast();
   const [config, setConfig] = useState<PricingConfig>(defaultPricingConfig);
+  const [serviceTypePricing, setServiceTypePricing] = useState<Record<string, number>>({
+    flexible: 0,
+    standard: 10,
+    urgent: 25,
+    dedicated: 40,
+  });
 
   // Fetch pricing settings from API
   const { data: pricingSettings, isLoading: pricingLoading } = useQuery<PricingSettings>({
@@ -77,6 +90,16 @@ export default function AdminPricing() {
         waitingTimePerMinute: parseFloat(pricingSettings.waitingTimePerMinute || '0.50'),
         rushHourPeriods,
       });
+
+      if (pricingSettings.serviceTypePricing) {
+        const stp = pricingSettings.serviceTypePricing as Record<string, number>;
+        setServiceTypePricing({
+          flexible: stp.flexible ?? 0,
+          standard: stp.standard ?? 10,
+          urgent: stp.urgent ?? 25,
+          dedicated: stp.dedicated ?? 40,
+        });
+      }
     }
   }, [pricingSettings, vehicles]);
 
@@ -125,6 +148,7 @@ export default function AdminPricing() {
         rushHourStartEvening: eveningPeriod.start,
         rushHourEndEvening: eveningPeriod.end,
         weightSurcharges,
+        serviceTypePricing,
       });
 
       // Save vehicle pricing for each vehicle
@@ -398,6 +422,44 @@ export default function AdminPricing() {
                   data-testid="input-waiting-time"
                 />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gauge className="h-5 w-5 text-primary" />
+              Service Type Pricing
+            </CardTitle>
+            <CardDescription>
+              Set the percentage surcharge applied to the base price for each service level.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {(['flexible', 'standard', 'urgent', 'dedicated'] as const).map((key) => (
+                <div key={key} className="space-y-2">
+                  <Label className="text-sm font-medium">{SERVICE_TYPE_LABELS[key]}</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="200"
+                      value={serviceTypePricing[key] ?? 0}
+                      onChange={(e) =>
+                        setServiceTypePricing((prev) => ({
+                          ...prev,
+                          [key]: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      data-testid={`input-service-type-${key}`}
+                    />
+                    <span className="text-muted-foreground text-sm">%</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

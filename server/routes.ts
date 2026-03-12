@@ -7891,7 +7891,8 @@ export async function registerRoutes(
 
     // Apply service type adjustment server-side
     const serviceType = (bookingData.serviceType || 'standard') as string;
-    const serviceTypePercents: Record<string, number> = { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
+    const storedPricingSettings = await storage.getPricingSettings();
+    const serviceTypePercents: Record<string, number> = (storedPricingSettings.serviceTypePricing as Record<string, number>) || { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
     const serviceTypePercent = serviceTypePercents[serviceType] ?? 10;
     const baseTotal = bookingData.totalPrice;
     const serviceTypeAmount = Math.round(baseTotal * (serviceTypePercent / 100) * 100) / 100;
@@ -8191,7 +8192,8 @@ export async function registerRoutes(
 
     // Apply service type adjustment for pay-later bookings
     const plServiceType = bookingData.serviceType || 'standard';
-    const plServiceTypePercents: Record<string, number> = { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
+    const plPricingSettings = await storage.getPricingSettings();
+    const plServiceTypePercents: Record<string, number> = (plPricingSettings.serviceTypePricing as Record<string, number>) || { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
     const plServiceTypePercent = plServiceTypePercents[plServiceType] ?? 10;
     const plBaseTotal = bookingData.totalPrice;
     const plServiceTypeAmount = Math.round(plBaseTotal * (plServiceTypePercent / 100) * 100) / 100;

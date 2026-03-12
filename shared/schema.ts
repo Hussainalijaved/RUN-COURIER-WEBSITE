@@ -115,6 +115,12 @@ export const pricingSettings = pgTable("pricing_settings", {
     "30-50": 20,
     "50+": 50
   }),
+  serviceTypePricing: jsonb("service_type_pricing").$type<Record<string, number>>().default({
+    "flexible": 0,
+    "standard": 10,
+    "urgent": 25,
+    "dedicated": 40
+  }),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

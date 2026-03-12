@@ -1971,6 +1971,32 @@ export default function AdminJobs() {
                     </div>
                   )}
                 </div>
+
+                {selectedJob.serviceType && selectedJob.serviceTypePercent !== undefined && selectedJob.serviceTypeAmount !== undefined && (
+                  <div className="p-3 bg-muted/30 rounded-md space-y-1.5 text-sm">
+                    <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide mb-2">Pricing Breakdown (Admin)</p>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Base delivery price</span>
+                      <span className="font-medium">
+                        £{(parseFloat(String(selectedJob.totalPrice || 0)) - parseFloat(String(selectedJob.serviceTypeAmount || 0))).toFixed(2)}
+                      </span>
+                    </div>
+                    {parseFloat(String(selectedJob.serviceTypePercent || 0)) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground capitalize">
+                          {selectedJob.serviceType} surcharge (+{parseFloat(String(selectedJob.serviceTypePercent)).toFixed(0)}%)
+                        </span>
+                        <span className="font-medium text-amber-600 dark:text-amber-400">
+                          +£{parseFloat(String(selectedJob.serviceTypeAmount || 0)).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-border pt-1.5 mt-1">
+                      <span className="font-semibold">Final customer total</span>
+                      <span className="font-bold">{formatPrice(selectedJob.totalPrice)}</span>
+                    </div>
+                  </div>
+                )}
                 {selectedJob.status !== 'cancelled' && (
                   <div className="p-3 bg-muted/50 rounded-md space-y-2">
                     <div className="flex items-center justify-between">

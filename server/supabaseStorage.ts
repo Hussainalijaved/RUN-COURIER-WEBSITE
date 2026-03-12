@@ -355,6 +355,12 @@ export class SupabaseStorage implements IStorage {
         "30-50": 20,
         "50+": 50
       },
+      serviceTypePricing: {
+        "flexible": 0,
+        "standard": 10,
+        "urgent": 25,
+        "dedicated": 40
+      },
       updatedAt: new Date(),
     };
 
@@ -1405,6 +1411,7 @@ export class SupabaseStorage implements IStorage {
           rushHourStartEvening: data.rush_hour_start_evening ?? this.pricingSettings.rushHourStartEvening,
           rushHourEndEvening: data.rush_hour_end_evening ?? this.pricingSettings.rushHourEndEvening,
           weightSurcharges: data.weight_surcharges ?? this.pricingSettings.weightSurcharges,
+          serviceTypePricing: data.service_type_pricing ?? this.pricingSettings.serviceTypePricing,
           updatedAt: data.updated_at ? new Date(data.updated_at) : new Date(),
         };
         console.log('[SupabaseStorage] Loaded pricing settings from database');
@@ -1526,6 +1533,7 @@ export class SupabaseStorage implements IStorage {
       if (data.rushHourStartEvening !== undefined) dbData.rush_hour_start_evening = data.rushHourStartEvening;
       if (data.rushHourEndEvening !== undefined) dbData.rush_hour_end_evening = data.rushHourEndEvening;
       if (data.weightSurcharges !== undefined) dbData.weight_surcharges = data.weightSurcharges;
+      if (data.serviceTypePricing !== undefined) dbData.service_type_pricing = data.serviceTypePricing;
 
       const { error } = await supabase
         .from('pricing_settings')

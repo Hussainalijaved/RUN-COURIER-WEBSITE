@@ -1,0 +1,150 @@
+Update the Run Courier website, booking system, and price calculator to support Service Type pricing (Flexible, Standard, Urgent, Dedicated) across the entire system, but do not change the current customer price display.
+
+IMPORTANT
+
+Do not change current UI.
+Do not show price breakdown to customer.
+Do not remove existing pricing logic.
+Only extend the calculation internally.
+
+GOAL
+
+Add service level pricing that adjusts the final price depending on urgency.
+
+SERVICE TYPES
+
+Add new field:
+
+Service Type
+
+Options:
+
+Flexible
+Standard
+Urgent
+Dedicated
+
+Default = Standard
+
+PRICE RULES
+
+After the system calculates the normal Run Courier price, apply service type multiplier.
+
+Flexible = +0%
+Standard = +10%
+Urgent = +25%
+Dedicated = +40%
+
+Example:
+
+Base price = £40
+
+Flexible = £40
+Standard = £44
+Urgent = £50
+Dedicated = £56
+
+Apply this after:
+
+vehicle pricing
+distance pricing
+rush hour
+waiting time
+central london
+multi drop
+return trip
+weight surcharge
+
+CUSTOMER VIEW
+
+Customer must see only:
+
+Total price £XX
+
+Do not show:
+
+percentages
+extra lines
+surcharge list
+calculation steps
+
+UI must look exactly like now.
+
+BOOKING FORM
+
+Add Service Type selector.
+
+Place after vehicle selection.
+
+Show simple dropdown or buttons:
+
+Flexible
+Standard
+Urgent
+Dedicated
+
+When user changes service type, update total price only.
+
+Do not show calculation.
+
+DATABASE
+
+Add fields to jobs / quotes:
+
+serviceType
+servicePercent
+serviceExtraAmount
+
+Values allowed:
+
+flexible
+standard
+urgent
+dedicated
+
+ADMIN PANEL
+
+Admin must see full calculation:
+
+base price
+mile price
+surcharges
+service type %
+final price
+
+Customer must not see this.
+
+SETTINGS
+
+Add admin settings:
+
+serviceTypePricing
+
+flexible = 0
+standard = 10
+urgent = 25
+dedicated = 40
+
+Admin must be able to change these.
+
+DEFAULT RULE
+
+Old bookings = Standard
+
+EMAIL / INVOICE
+
+Customer invoice → show only final price
+Admin invoice → show full breakdown
+
+DESIGN
+
+Keep current design
+Keep blue theme
+Keep mobile responsive
+Do not break booking
+Do not remove features
+
+RESULT
+
+System must support service types internally,
+but customer only sees final total.
