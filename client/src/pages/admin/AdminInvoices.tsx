@@ -569,8 +569,8 @@ export default function AdminInvoices() {
               <div class="company-name">RUN COURIER</div>
               <div class="company-details">
                 Run Courier Ltd<br>
-                71-75 Shelton Street, London, WC2H 9JQ<br>
-                United Kingdom<br>
+                112 Bridgwater Road, Ruislip, HA4 6LW<br>
+                London, United Kingdom<br>
                 info@runcourier.co.uk
               </div>
             </div>
@@ -585,8 +585,9 @@ export default function AdminInvoices() {
           <div class="address-block">
             <h3>From</h3>
             <p style="font-weight:bold;">Run Courier Ltd</p>
-            <p>71-75 Shelton Street</p>
-            <p>London, WC2H 9JQ</p>
+            <p>112 Bridgwater Road</p>
+            <p>Ruislip, HA4 6LW</p>
+            <p>London, United Kingdom</p>
             <p>info@runcourier.co.uk</p>
           </div>
           <div class="address-block">
@@ -626,7 +627,7 @@ export default function AdminInvoices() {
         </div>
         <div class="footer">
           Run Courier Ltd | info@runcourier.co.uk | www.runcourier.co.uk<br>
-          71-75 Shelton Street, London, WC2H 9JQ, United Kingdom<br>
+          112 Bridgwater Road, Ruislip, HA4 6LW, London, United Kingdom<br>
           Thank you for your business
         </div>
       </body>
@@ -660,7 +661,7 @@ export default function AdminInvoices() {
     doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'normal');
     doc.text('Run Courier Ltd', margin, y + 13);
-    doc.text('71-75 Shelton Street, London, WC2H 9JQ', margin, y + 18);
+    doc.text('112 Bridgwater Road, Ruislip, HA4 6LW, London', margin, y + 18);
     doc.text('info@runcourier.co.uk', margin, y + 23);
 
     doc.setFontSize(22);
@@ -868,7 +869,7 @@ export default function AdminInvoices() {
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
     doc.setFont('helvetica', 'normal');
-    doc.text('RUN COURIER | info@runcourier.co.uk | runcourier.co.uk', pageWidth / 2, 290, { align: 'center' });
+    doc.text('Run Courier Ltd | 112 Bridgwater Road, Ruislip, HA4 6LW, London | info@runcourier.co.uk | runcourier.co.uk', pageWidth / 2, 290, { align: 'center' });
 
     doc.save(`${invoice.invoice_number}.pdf`);
     toast({ title: 'PDF downloaded', description: `${invoice.invoice_number}.pdf saved` });
