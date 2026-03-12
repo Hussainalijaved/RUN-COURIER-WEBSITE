@@ -21,6 +21,7 @@ const footerLinks = {
   legal: [
     { href: '/terms', label: 'Terms & Conditions' },
     { href: '/privacy', label: 'Privacy Policy' },
+    { href: '/pricing-policy', label: 'Pricing & Service Policy' },
   ],
   portals: [
     { href: '/login', label: 'Customer Login' },

@@ -764,6 +764,11 @@ export default function Quote() {
                               incl. {SERVICE_TYPE_CONFIG[selectedServiceType].label} surcharge (£{serviceTypeAdjustment.amount.toFixed(2)})
                             </p>
                           )}
+                          <p className="mt-2">
+                            <a href="/pricing-policy" className="text-xs text-primary underline underline-offset-2 hover:opacity-80">
+                              See Pricing &amp; Service Policy
+                            </a>
+                          </p>
                         </div>
 
                         <div>

@@ -1,0 +1,160 @@
+Update the Run Courier website to add a new Pricing & Service Policy page and link it to the website, without changing the current booking system, pricing calculator, or customer price display.
+
+IMPORTANT
+Do not modify the current quote logic.
+Do not change how the price is shown to the customer.
+Do not add extra price breakdown to the booking page.
+Only create a separate policy page and link to it.
+
+GOAL
+
+Create a new page called:
+
+Pricing & Service Policy
+
+This page must explain how delivery prices are calculated and explain service types, but must not affect the price calculation UI.
+
+PAGE URL
+
+Create page at:
+
+/pricing-policy
+
+Also allow access from footer and terms page.
+
+FOOTER LINK
+
+Add link in footer menu:
+
+Pricing & Service Policy
+
+Place near:
+
+Terms & Conditions
+Privacy Policy
+Contact
+
+Do not change footer design, only add link.
+
+PAGE CONTENT
+
+Add the following text exactly:
+
+--------------------------------------------------
+
+Pricing & Service Policy
+
+1. Pricing Structure
+
+Run Courier prices are calculated automatically based on distance, vehicle type, service level, time of booking, waiting time, and delivery requirements.
+
+The price shown during booking is the total delivery price unless additional changes are required.
+
+Run Courier may adjust pricing if incorrect information is provided or if delivery conditions change.
+
+2. Service Types
+
+Run Courier offers different service levels depending on urgency and availability.
+
+Flexible Delivery  
+Flexible delivery is the most economical option. Jobs may be scheduled within available routes.
+
+Standard Same-Day  
+Standard same-day delivery is the default service and will be dispatched as soon as possible.
+
+Urgent Priority  
+Urgent delivery is prioritised and assigned to the nearest available driver.
+
+Dedicated / Direct Delivery  
+Dedicated delivery means the driver will go directly from collection to delivery without additional stops.
+
+Different service types may affect the final delivery price.
+
+3. Vehicle Pricing
+
+Delivery cost depends on the selected vehicle type, including:
+
+Motorbike  
+Car  
+Small Van  
+Medium Van  
+
+Each vehicle has different operating costs and capacity limits.
+
+4. Distance Charges
+
+Distance is calculated automatically using mapping services.
+
+The total price may include base charge and per-mile rate.
+
+5. Waiting Time
+
+Waiting time may be charged if the driver is required to wait at collection or delivery.
+
+Additional waiting charges may be added if waiting exceeds the free period.
+
+6. Multi-Drop Deliveries
+
+Additional stops may increase the delivery price.
+
+Each extra drop may include additional distance and stop charges.
+
+7. Return Trips
+
+Return deliveries may be charged separately depending on route and distance.
+
+8. Restricted Zones
+
+Deliveries to congestion zones, restricted areas, or toll roads may include additional charges.
+
+9. Out of Hours
+
+Deliveries outside normal hours, weekends, or bank holidays may include extra charges.
+
+10. Final Price
+
+The final price is based on the information provided at booking.
+
+Run Courier reserves the right to adjust price if job details change.
+
+11. Acceptance
+
+By placing a booking, the customer agrees to this Pricing & Service Policy.
+
+--------------------------------------------------
+
+BOOKING PAGE CHANGE
+
+On the booking / quote page, add small text under price:
+
+See Pricing & Service Policy
+
+Link to:
+
+/pricing-policy
+
+Do not show price breakdown.
+Do not show surcharge list.
+Do not change calculator.
+
+ADMIN PANEL
+
+No change required.
+
+DESIGN RULES
+
+Keep current Run Courier design.
+Keep blue theme.
+Keep mobile responsive.
+Do not remove any existing feature.
+
+RESULT
+
+The website must have:
+
+✔ new policy page
+✔ footer link
+✔ small link under price
+✔ no change to pricing UI
+✔ no change to booking flow
+✔ no change to totals

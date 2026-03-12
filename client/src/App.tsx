@@ -45,6 +45,7 @@ const Contact = lazy(() => import("@/pages/Contact"));
 const Track = lazy(() => import("@/pages/Track"));
 const Terms = lazy(() => import("@/pages/Terms"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
+const PricingPolicy = lazy(() => import("@/pages/PricingPolicy"));
 const AdminSignup = lazy(() => import("@/pages/AdminSignup"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
@@ -114,6 +115,7 @@ function Router() {
         <Route path="/track" component={Track} />
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />
+        <Route path="/pricing-policy" component={PricingPolicy} />
         <Route path="/support" component={Support} />
         
         <Route path="/login">
