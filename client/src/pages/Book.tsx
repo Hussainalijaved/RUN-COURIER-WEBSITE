@@ -1056,14 +1056,11 @@ export default function Book() {
                           <div className="bg-primary/10 rounded-lg p-4 text-center">
                             {isEligibleForNewCustomerDiscount ? (
                               <>
-                                <p className="text-sm line-through text-muted-foreground">
-                                  £{quote.totalPrice.toFixed(2)}
-                                </p>
                                 <p className="text-2xl font-bold text-primary" data-testid="text-final-price">
                                   £{finalPrice.toFixed(2)}
                                 </p>
                                 <p className="text-xs text-green-600 font-medium mt-1" data-testid="text-discount-label">
-                                  New customer discount (20% off first 3 bookings)
+                                  New customer discount applied (20% off first 3 bookings)
                                 </p>
                               </>
                             ) : (
@@ -1443,23 +1440,15 @@ export default function Book() {
                     <Separator className="my-4" />
                     {quote && (
                       <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Subtotal</span>
-                          <span>£{quote.totalPrice.toFixed(2)}</span>
-                        </div>
                         {isEligibleForNewCustomerDiscount && (
-                          <div className="flex justify-between text-green-600" data-testid="order-discount-line">
-                            <span>New customer discount (20% off)</span>
-                            <span>-£{discountAmount.toFixed(2)}</span>
-                          </div>
+                          <>
+                            <div className="flex justify-between text-green-600" data-testid="order-discount-line">
+                              <span>New customer discount (20% off)</span>
+                              <span>-£{discountAmount.toFixed(2)}</span>
+                            </div>
+                            <Separator className="my-2" />
+                          </>
                         )}
-                        {serviceTypeAdj.amount > 0 && (
-                          <div className="flex justify-between text-muted-foreground" data-testid="order-service-type-line">
-                            <span>{SERVICE_TYPE_CONFIG[bookingServiceType].label} surcharge (+{serviceTypeAdj.percent}%)</span>
-                            <span>+£{serviceTypeAdj.amount.toFixed(2)}</span>
-                          </div>
-                        )}
-                        <Separator className="my-2" />
                         <div className="flex justify-between font-bold text-lg text-primary" data-testid="order-total">
                           <span>Total to Pay</span>
                           <span>£{finalPrice.toFixed(2)}</span>

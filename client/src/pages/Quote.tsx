@@ -786,11 +786,6 @@ export default function Quote() {
                             £{finalQuotePrice.toFixed(2)}
                           </div>
                           <p className="text-muted-foreground text-sm mt-1">Total delivery cost</p>
-                          {serviceTypeAdjustment && serviceTypeAdjustment.amount > 0 && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              incl. {SERVICE_TYPE_CONFIG[selectedServiceType].label} surcharge (£{serviceTypeAdjustment.amount.toFixed(2)})
-                            </p>
-                          )}
                           <p className="mt-2">
                             <a href="/pricing-policy" className="text-xs text-primary underline underline-offset-2 hover:opacity-80">
                               See Pricing &amp; Service Policy
@@ -812,16 +807,6 @@ export default function Quote() {
                                 : `${estimatedTime} mins`}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Base fare</span>
-                            <span className="font-medium">£{quote.totalPrice.toFixed(2)}</span>
-                          </div>
-                          {serviceTypeAdjustment && serviceTypeAdjustment.amount > 0 && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">{SERVICE_TYPE_CONFIG[selectedServiceType].label} surcharge</span>
-                              <span className="font-medium">+£{serviceTypeAdjustment.amount.toFixed(2)}</span>
-                            </div>
-                          )}
                           <Separator />
                           <div className="flex justify-between font-semibold">
                             <span>Total</span>
