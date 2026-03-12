@@ -2486,7 +2486,7 @@ export async function registerRoutes(
         // Set the Supabase auth.uid driver_id for RLS compatibility
         if (supabaseDriverId) {
           supabaseUpdateData.driver_id = supabaseDriverId;
-          supabaseUpdateData.status = finalJob.status === 'assigned' ? 'pending' : finalJob.status;
+          supabaseUpdateData.status = finalJob.status || 'pending';
         }
         
         // Add geocoded coordinates
@@ -2578,20 +2578,106 @@ export async function registerRoutes(
       customerId: job.customerId,
       createdAt: job.createdAt,
     });
-    // If job is created with a driver already assigned, notify the driver
-    if (job.driverId) {
+    // If job is created with a driver already assigned, do full assignment flow
+    if (supabaseDriverId && finalJob.driverId) {
+      // 1. Re-fetch the job so we have fresh geocoded coordinates
+      const freshCreatedJob = await storage.getJob(finalJob.id) || finalJob;
+
+      // 2. Create a job_assignment record so the driver app can see the job
+      try {
+        const existingAssignments = await storage.getJobAssignments({ jobId: finalJob.id, driverId: supabaseDriverId });
+        if (!existingAssignments || existingAssignments.length === 0) {
+          const dispatcherId = req.body.dispatcherId || null;
+          await storage.createJobAssignment({
+            jobId: finalJob.id,
+            driverId: supabaseDriverId,
+            assignedBy: dispatcherId,
+            driverPrice: finalJob.driverPrice || '0',
+            status: 'sent',
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          });
+          console.log(`[Jobs] Created job_assignment for new job ${finalJob.id} → driver ${supabaseDriverId}`);
+        }
+      } catch (assignErr) {
+        console.error('[Jobs] Failed to create job_assignment on job creation:', assignErr);
+      }
+
+      // 3. Broadcast WebSocket event using the correct Supabase driver ID
       broadcastJobAssigned({
-        id: job.id,
-        trackingNumber: job.trackingNumber,
-        jobNumber: job.jobNumber,
-        status: job.status,
-        driverId: job.driverId,
-        pickupAddress: job.pickupAddress,
-        deliveryAddress: job.deliveryAddress,
-        vehicleType: job.vehicleType,
-        driverPrice: job.driverPrice,
+        id: freshCreatedJob.id,
+        trackingNumber: freshCreatedJob.trackingNumber,
+        jobNumber: freshCreatedJob.jobNumber,
+        status: freshCreatedJob.status,
+        driverId: supabaseDriverId,
+        pickupAddress: freshCreatedJob.pickupAddress,
+        pickupPostcode: freshCreatedJob.pickupPostcode,
+        pickupLatitude: freshCreatedJob.pickupLatitude,
+        pickupLongitude: freshCreatedJob.pickupLongitude,
+        deliveryAddress: freshCreatedJob.deliveryAddress,
+        deliveryPostcode: freshCreatedJob.deliveryPostcode,
+        deliveryLatitude: freshCreatedJob.deliveryLatitude,
+        deliveryLongitude: freshCreatedJob.deliveryLongitude,
+        vehicleType: freshCreatedJob.vehicleType,
+        driverPrice: freshCreatedJob.driverPrice,
       });
-      console.log(`[Jobs] New job ${job.id} created and assigned to driver ${job.driverId}`);
+
+      // 4. Send push notification to driver's mobile device
+      (async () => {
+        let multiDropStops: any[] | undefined;
+        if (freshCreatedJob.isMultiDrop) {
+          try {
+            const { supabaseAdmin: mdClient } = await import('./supabaseAdmin');
+            if (mdClient) {
+              const { data: stops } = await mdClient
+                .from('multi_drop_stops')
+                .select('stop_order, address, postcode, recipient_name, recipient_phone, instructions, latitude, longitude')
+                .eq('job_id', freshCreatedJob.id)
+                .order('stop_order', { ascending: true });
+              if (stops && stops.length > 0) {
+                multiDropStops = stops.map(s => ({
+                  stopOrder: s.stop_order,
+                  address: s.address,
+                  postcode: s.postcode,
+                  recipientName: s.recipient_name,
+                  recipientPhone: s.recipient_phone,
+                  instructions: s.instructions,
+                  latitude: s.latitude,
+                  longitude: s.longitude,
+                }));
+              }
+            }
+          } catch (err: any) {
+            console.error('[Jobs] Failed to fetch multi-drop stops for push on creation:', err.message);
+          }
+        }
+        const result = await sendJobOfferNotification(supabaseDriverId!, {
+          jobId: freshCreatedJob.id,
+          trackingNumber: freshCreatedJob.trackingNumber,
+          jobNumber: freshCreatedJob.jobNumber,
+          pickupAddress: freshCreatedJob.pickupAddress,
+          pickupPostcode: freshCreatedJob.pickupPostcode,
+          pickupLatitude: freshCreatedJob.pickupLatitude,
+          pickupLongitude: freshCreatedJob.pickupLongitude,
+          deliveryAddress: freshCreatedJob.deliveryAddress,
+          deliveryPostcode: freshCreatedJob.deliveryPostcode,
+          deliveryLatitude: freshCreatedJob.deliveryLatitude,
+          deliveryLongitude: freshCreatedJob.deliveryLongitude,
+          recipientName: freshCreatedJob.recipientName,
+          recipientPhone: freshCreatedJob.recipientPhone,
+          distance: freshCreatedJob.distance,
+          driverPrice: freshCreatedJob.driverPrice || '0',
+          vehicleType: freshCreatedJob.vehicleType,
+          isMultiDrop: freshCreatedJob.isMultiDrop || false,
+          multiDropStops,
+        });
+        if (result.success) {
+          console.log(`[Jobs] Push notification sent to ${result.sentCount} device(s) for driver ${supabaseDriverId} on job creation`);
+        } else {
+          console.log(`[Jobs] Push notification failed for driver ${supabaseDriverId} on job creation`);
+        }
+      })().catch(err => console.error('[Jobs] Failed to send push notification on job creation:', err));
+
+      console.log(`[Jobs] New job ${finalJob.id} created and fully assigned to driver ${supabaseDriverId}`);
     }
     // Send admin notification - include multiDropStops from request for email details
     const customerEmail = req.body.customerEmail || (job as any).customerEmail;
