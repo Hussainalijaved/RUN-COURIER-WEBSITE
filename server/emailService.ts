@@ -1999,6 +1999,10 @@ export async function sendBusinessQuoteEmail(
       totalDuration: number;
     };
     notes?: string;
+    serviceType?: string;
+    serviceTypePercent?: number;
+    serviceTypeAmount?: number;
+    finalTotal?: number;
   }
 ): Promise<boolean> {
   const vehicleNames: Record<string, string> = {
@@ -2088,9 +2092,35 @@ export async function sendBusinessQuoteEmail(
       </div>
     </div>
     
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e0e0e0;">
+      <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Pricing Summary</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Base Quote</td>
+          <td style="padding: 6px 0; text-align: right; color: #333;">&pound;${data.quote.breakdown.totalPrice.toFixed(2)}</td>
+        </tr>
+        ${data.serviceType && data.serviceType !== 'flexible' ? `
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Service Level</td>
+          <td style="padding: 6px 0; text-align: right; color: #333;">${{ flexible: 'Flexible', standard: 'Standard', urgent: 'Urgent', dedicated: 'Dedicated / Direct' }[data.serviceType] || data.serviceType}${data.serviceTypePercent && data.serviceTypePercent > 0 ? ` (+${data.serviceTypePercent}%)` : ''}</td>
+        </tr>
+        ${data.serviceTypeAmount && data.serviceTypeAmount > 0 ? `
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Service Level Surcharge</td>
+          <td style="padding: 6px 0; text-align: right; color: #333;">+&pound;${data.serviceTypeAmount.toFixed(2)}</td>
+        </tr>
+        ` : ''}
+        ` : `
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Service Level</td>
+          <td style="padding: 6px 0; text-align: right; color: #333;">Flexible</td>
+        </tr>
+        `}
+      </table>
+    </div>
     <div style="background-color: #007BFF; color: white; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">
       <p style="font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">TOTAL QUOTE</p>
-      <p style="font-size: 36px; font-weight: bold; margin: 0;">&pound;${data.quote.breakdown.totalPrice.toFixed(2)}</p>
+      <p style="font-size: 36px; font-weight: bold; margin: 0;">&pound;${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}</p>
     </div>
     
     ${data.notes ? `
@@ -2144,7 +2174,10 @@ Estimated Duration: ${data.quote.totalDuration} mins
 Vehicle Type: ${vehicleNames[data.vehicleType] || data.vehicleType}
 Number of Drops: ${data.drops.length}
 
-TOTAL QUOTE: £${data.quote.breakdown.totalPrice.toFixed(2)}
+Base Quote: £${data.quote.breakdown.totalPrice.toFixed(2)}
+Service Level: ${{ flexible: 'Flexible', standard: 'Standard', urgent: 'Urgent', dedicated: 'Dedicated / Direct' }[data.serviceType || 'flexible'] || data.serviceType || 'Flexible'}${data.serviceTypePercent && data.serviceTypePercent > 0 ? ` (+${data.serviceTypePercent}%)` : ''}
+${data.serviceTypeAmount && data.serviceTypeAmount > 0 ? `Service Level Surcharge: +£${data.serviceTypeAmount.toFixed(2)}\n` : ''}
+TOTAL QUOTE: £${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}
 
 ${data.notes ? `NOTES: ${data.notes}` : ''}
 

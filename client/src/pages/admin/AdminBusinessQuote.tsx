@@ -28,7 +28,7 @@ import {
   Building,
 } from 'lucide-react';
 import { geocodePostcode, calculateDistance } from '@/lib/maps';
-import { calculateQuote, formatPrice, isCentralLondon, type QuoteBreakdown } from '@/lib/pricing';
+import { calculateQuote, formatPrice, isCentralLondon, type QuoteBreakdown, SERVICE_TYPE_CONFIG, applyServiceTypeAdjustment, type ServiceType } from '@/lib/pricing';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { RouteMapPreview } from '@/components/RouteMapPreview';
 import { Route } from 'lucide-react';
@@ -66,7 +66,11 @@ export default function AdminBusinessQuote() {
   const [pickupTime, setPickupTime] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
   const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
-  
+  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>('flexible');
+
+  const serviceTypeAdj = quoteResult ? applyServiceTypeAdjustment(quoteResult.breakdown.totalPrice, selectedServiceType) : null;
+  const finalQuoteTotal = serviceTypeAdj ? serviceTypeAdj.total : (quoteResult?.breakdown.totalPrice || 0);
+
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -320,6 +324,10 @@ export default function AdminBusinessQuote() {
           weight: parseFloat(weight),
           quote: quoteResult,
           notes,
+          serviceType: selectedServiceType,
+          serviceTypePercent: serviceTypeAdj?.percent ?? 0,
+          serviceTypeAmount: serviceTypeAdj?.amount ?? 0,
+          finalTotal: finalQuoteTotal,
         }),
       });
 
@@ -632,9 +640,46 @@ export default function AdminBusinessQuote() {
                           <span>Yes</span>
                         </div>
                       )}
-                      <div className="flex justify-between font-bold text-lg border-t pt-2">
+                    </div>
+
+                    {/* Service Level Selector */}
+                    <div className="border-t pt-4 space-y-2">
+                      <p className="text-sm font-medium">Service Level</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(Object.entries(SERVICE_TYPE_CONFIG) as [ServiceType, typeof SERVICE_TYPE_CONFIG[ServiceType]][]).map(([key, cfg]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            data-testid={`button-service-type-${key}`}
+                            onClick={() => setSelectedServiceType(key)}
+                            className={`rounded-md border p-2.5 text-left transition-colors ${
+                              selectedServiceType === key
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-background hover-elevate'
+                            }`}
+                          >
+                            <div className="text-xs font-semibold">{cfg.label}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{cfg.percent === 0 ? 'No surcharge' : `+${cfg.percent}%`}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{SERVICE_TYPE_CONFIG[selectedServiceType].description}</p>
+                    </div>
+
+                    <div className="border-t pt-4 space-y-1">
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Base Quote</span>
+                        <span>{formatPrice(quoteResult.breakdown.totalPrice)}</span>
+                      </div>
+                      {serviceTypeAdj && serviceTypeAdj.amount > 0 && (
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>{SERVICE_TYPE_CONFIG[selectedServiceType].label} surcharge (+{serviceTypeAdj.percent}%)</span>
+                          <span>+{formatPrice(serviceTypeAdj.amount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold text-lg pt-1">
                         <span>Total</span>
-                        <span className="text-primary">{formatPrice(quoteResult.breakdown.totalPrice)}</span>
+                        <span className="text-primary">{formatPrice(finalQuoteTotal)}</span>
                       </div>
                     </div>
 
