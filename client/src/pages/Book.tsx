@@ -709,12 +709,13 @@ export default function Book() {
                               <Calendar className="h-4 w-4 text-primary" />
                               Pickup Date & Time
                             </Label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <FormField
                                 control={form.control}
                                 name="pickupDate"
                                 render={({ field }) => (
                                   <FormItem>
+                                    <FormLabel className="text-sm">Date</FormLabel>
                                     <FormControl>
                                       <Input
                                         type="date"
@@ -732,6 +733,7 @@ export default function Book() {
                                 name="pickupTime"
                                 render={({ field }) => (
                                   <FormItem>
+                                    <FormLabel className="text-sm">Time</FormLabel>
                                     <FormControl>
                                       <Input
                                         type="time"
