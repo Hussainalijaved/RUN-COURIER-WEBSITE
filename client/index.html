@@ -16,50 +16,31 @@
     <title>Run Courier - Same Day Delivery UK</title>
 
     <script>
-      // Patch WebSocket to silently swallow Vite HMR fallback connections to invalid URLs.
-      // This MUST run before ANY other script so Vite's @vite/client uses the patched constructor.
+      // Wrap WebSocket constructor to silently swallow Vite HMR fallback URL errors in Replit.
+      // Vite falls back to wss://localhost:undefined/ which throws a SyntaxError — this prevents
+      // that error from reaching the runtime error overlay and causing page reloads.
       (function() {
         var OrigWS = window.WebSocket;
-        function PatchedWS(url, protocols) {
-          // Vite falls back to wss://localhost:undefined/ when HMR host is unknown in Replit.
-          // Silently fail by returning a dummy inert WebSocket-like object instead of throwing.
-          if (typeof url === 'string' && url.indexOf('localhost:undefined') !== -1) {
-            // Return an inert object that looks like a WebSocket but never connects
-            var dummy = Object.create(OrigWS.prototype);
-            dummy.readyState = 3; // CLOSED
-            dummy.url = url;
-            dummy.protocol = '';
-            dummy.bufferedAmount = 0;
-            dummy.extensions = '';
-            dummy.binaryType = 'blob';
-            dummy.send = function() {};
-            dummy.close = function() {};
-            dummy.addEventListener = function() {};
-            dummy.removeEventListener = function() {};
-            dummy.dispatchEvent = function() { return false; };
-            dummy.onopen = null;
-            dummy.onerror = null;
-            dummy.onclose = null;
-            dummy.onmessage = null;
-            // Dispatch close event asynchronously so Vite thinks connection was refused
-            setTimeout(function() {
-              if (typeof dummy.onclose === 'function') {
-                dummy.onclose({ code: 1006, reason: '', wasClean: false });
-              }
-            }, 0);
-            return dummy;
+        window.WebSocket = function(url, protocols) {
+          try {
+            var ws = protocols !== undefined ? new OrigWS(url, protocols) : new OrigWS(url);
+            return ws;
+          } catch(e) {
+            // Return a plain inert object so Vite's HMR code doesn't null-crash.
+            // This silently absorbs the invalid-URL fallback without triggering error overlays.
+            var noop = function(){};
+            return {
+              readyState: 3,
+              send: noop, close: noop,
+              addEventListener: noop, removeEventListener: noop, dispatchEvent: noop
+            };
           }
-          if (protocols !== undefined) {
-            return new OrigWS(url, protocols);
-          }
-          return new OrigWS(url);
-        }
-        PatchedWS.prototype = OrigWS.prototype;
-        PatchedWS.CONNECTING = 0;
-        PatchedWS.OPEN = 1;
-        PatchedWS.CLOSING = 2;
-        PatchedWS.CLOSED = 3;
-        window.WebSocket = PatchedWS;
+        };
+        window.WebSocket.prototype = OrigWS.prototype;
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
       })();
     </script>
     
