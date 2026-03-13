@@ -1,7 +1,10 @@
-const CACHE_NAME = 'runcourier-static-v1';
+const CACHE_NAME = 'runcourier-static-v2';
 const STATIC_ASSETS = [
   '/run-favicon.png',
   '/run-loader.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/manifest.json',
 ];
 
 self.addEventListener('install', (event) => {
