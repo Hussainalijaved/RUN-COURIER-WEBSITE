@@ -2532,6 +2532,15 @@ export async function registerRoutes(
         
         // Ensure job_number is set
         supabaseUpdateData.job_number = jobNumber;
+
+        // Tag office_city if created by a supervisor
+        try {
+          const creatorEmail = await getSupervisorEmailFromReq(req);
+          if (creatorEmail) {
+            const supCity = await getSupervisorCityByEmail(creatorEmail);
+            if (supCity) supabaseUpdateData.office_city = supCity;
+          }
+        } catch {}
         
         const { error: updateError } = await supabaseAdmin
           .from('jobs')
@@ -12604,8 +12613,9 @@ export async function registerRoutes(
 
   // POST /api/supervisors/register — supervisor creates account from invite
   app.post('/api/supervisors/register', asyncHandler(async (req, res) => {
-    const { token, password, fullName, phone } = req.body;
+    const { token, password, fullName, phone, city } = req.body;
     if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+    if (!city) return res.status(400).json({ error: 'City is required' });
     const result = await getPgPool().query(
       'SELECT id, email, full_name, status, invite_token_expires_at FROM supervisors WHERE invite_token = $1 LIMIT 1',
       [token]
@@ -12621,7 +12631,7 @@ export async function registerRoutes(
       email: sup.email,
       password,
       email_confirm: true,
-      user_metadata: { role: 'supervisor', fullName: fullName || sup.full_name, phone: phone || '' },
+      user_metadata: { role: 'supervisor', fullName: fullName || sup.full_name, phone: phone || '', city: city || '' },
     });
     if (authError) {
       if (authError.message.includes('already')) {
@@ -12631,8 +12641,8 @@ export async function registerRoutes(
     }
     // Update supervisors table
     await getPgPool().query(
-      'UPDATE supervisors SET auth_user_id = $1, full_name = $2, phone = $3, status = $4, invite_token = NULL, activated_at = NOW(), updated_at = NOW() WHERE id = $5',
-      [authData.user.id, fullName || sup.full_name, phone || null, 'pending_approval', sup.id]
+      'UPDATE supervisors SET auth_user_id = $1, full_name = $2, phone = $3, city = $4, status = $5, invite_token = NULL, activated_at = NOW(), updated_at = NOW() WHERE id = $6',
+      [authData.user.id, fullName || sup.full_name, phone || null, city, 'pending_approval', sup.id]
     );
     res.json({ success: true, message: 'Account created successfully. Your account is pending admin approval.' });
   }));
@@ -12645,7 +12655,7 @@ export async function registerRoutes(
     const authUser = await verifyAccessToken(token);
     if (!authUser?.email) return res.status(401).json({ error: 'Invalid token' });
     const result = await getPgPool().query(
-      'SELECT id, status, full_name FROM supervisors WHERE email = $1 LIMIT 1',
+      'SELECT id, status, full_name, city FROM supervisors WHERE email = $1 LIMIT 1',
       [authUser.email.toLowerCase()]
     );
     if (result.rows.length === 0) return res.status(403).json({ error: 'Not a supervisor account' });
@@ -12653,15 +12663,115 @@ export async function registerRoutes(
     if (sup.status !== 'active') {
       return res.status(403).json({ error: 'Your account is pending admin approval.', status: sup.status });
     }
-    res.json({ verified: true, status: sup.status, name: sup.full_name });
+    res.json({ verified: true, status: sup.status, name: sup.full_name, city: sup.city });
   }));
 
   // GET /api/supervisors — admin list all supervisors
   app.get('/api/supervisors', requireAdminAccessStrict, asyncHandler(async (req, res) => {
     const result = await getPgPool().query(
-      'SELECT id, email, full_name, phone, status, invited_at, activated_at, invited_by, notes, created_at FROM supervisors ORDER BY created_at DESC'
+      'SELECT id, email, full_name, phone, city, status, invited_at, activated_at, invited_by, notes, created_at FROM supervisors ORDER BY created_at DESC'
     );
     res.json(result.rows);
+  }));
+
+  // Helper: get supervisor city by email
+  async function getSupervisorCityByEmail(email: string): Promise<string | null> {
+    try {
+      const r = await getPgPool().query('SELECT city FROM supervisors WHERE email = $1 LIMIT 1', [email.toLowerCase()]);
+      return r.rows[0]?.city || null;
+    } catch { return null; }
+  }
+
+  // Helper: extract supervisor email from Bearer token (returns null if admin or invalid)
+  async function getSupervisorEmailFromReq(req: Request): Promise<string | null> {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return null;
+    const token = authHeader.slice(7);
+    const authUser = await verifyAccessToken(token);
+    if (!authUser?.email) return null;
+    const isAdmin = await isAdminByEmail(authUser.email);
+    if (isAdmin) return null; // admins get no filter
+    return authUser.email;
+  }
+
+  // GET /api/supervisor/jobs — filtered by supervisor's office city
+  app.get('/api/supervisor/jobs', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
+    const supEmail = await getSupervisorEmailFromReq(req);
+    const city = supEmail ? await getSupervisorCityByEmail(supEmail) : null;
+    let query: string;
+    let params: any[];
+    if (city) {
+      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, customer_email, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
+               FROM jobs WHERE office_city = $1 ORDER BY created_at DESC LIMIT 300`;
+      params = [city];
+    } else {
+      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, customer_email, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
+               FROM jobs ORDER BY created_at DESC LIMIT 300`;
+      params = [];
+    }
+    const result = await getPgPool().query(query, params);
+    // Camelcase the keys
+    const jobs = result.rows.map((r: any) => ({
+      id: r.id, trackingNumber: r.tracking_number, status: r.status,
+      pickupAddress: r.pickup_address, deliveryAddress: r.delivery_address,
+      customerName: r.customer_name, customerEmail: r.customer_email,
+      vehicleType: r.vehicle_type, totalPrice: r.total_price,
+      createdAt: r.created_at, isMultiDrop: r.is_multi_drop,
+      officeCity: r.office_city, driverId: r.driver_id, serviceType: r.service_type,
+    }));
+    res.json(jobs);
+  }));
+
+  // GET /api/supervisor/history — completed jobs filtered by supervisor's office city
+  app.get('/api/supervisor/history', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
+    const supEmail = await getSupervisorEmailFromReq(req);
+    const city = supEmail ? await getSupervisorCityByEmail(supEmail) : null;
+    let query: string;
+    let params: any[];
+    if (city) {
+      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, vehicle_type, total_price, created_at, is_multi_drop, office_city
+               FROM jobs WHERE office_city = $1 AND status IN ('delivered','cancelled','failed') ORDER BY created_at DESC LIMIT 500`;
+      params = [city];
+    } else {
+      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, vehicle_type, total_price, created_at, is_multi_drop, office_city
+               FROM jobs WHERE status IN ('delivered','cancelled','failed') ORDER BY created_at DESC LIMIT 500`;
+      params = [];
+    }
+    const result = await getPgPool().query(query, params);
+    const jobs = result.rows.map((r: any) => ({
+      id: r.id, trackingNumber: r.tracking_number, status: r.status,
+      pickupAddress: r.pickup_address, deliveryAddress: r.delivery_address,
+      customerName: r.customer_name, vehicleType: r.vehicle_type,
+      totalPrice: r.total_price, createdAt: r.created_at, isMultiDrop: r.is_multi_drop,
+      officeCity: r.office_city,
+    }));
+    res.json(jobs);
+  }));
+
+  // GET /api/supervisor/invoices — invoices for jobs in supervisor's office city
+  app.get('/api/supervisor/invoices', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
+    const supEmail = await getSupervisorEmailFromReq(req);
+    const city = supEmail ? await getSupervisorCityByEmail(supEmail) : null;
+    let query: string;
+    let params: any[];
+    if (city) {
+      query = `SELECT i.* FROM invoices i
+               LEFT JOIN jobs j ON j.id::text = i.job_id::text
+               WHERE j.office_city = $1 OR i.office_city = $1
+               ORDER BY i.created_at DESC LIMIT 300`;
+      params = [city];
+    } else {
+      query = `SELECT * FROM invoices ORDER BY created_at DESC LIMIT 300`;
+      params = [];
+    }
+    try {
+      const result = await getPgPool().query(query, params);
+      res.json(result.rows);
+    } catch {
+      // invoices table may not have job_id or office_city yet — fallback to unfiltered
+      const fallback = await getPgPool().query(`SELECT * FROM invoices ORDER BY created_at DESC LIMIT 300`);
+      res.json(fallback.rows);
+    }
   }));
 
   // PATCH /api/supervisors/:id/status — admin update supervisor status
@@ -12691,13 +12801,16 @@ export async function registerRoutes(
     res.json({ success: true });
   }));
 
-  // GET /api/supervisor/stats — supervisor dashboard stats
+  // GET /api/supervisor/stats — supervisor dashboard stats (filtered by city for supervisors)
   app.get('/api/supervisor/stats', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
     try {
-      const [jobsResult, driversResult, customersResult] = await Promise.all([
-        getPgPool().query("SELECT status, COUNT(*) as count FROM jobs GROUP BY status"),
+      const supEmail = await getSupervisorEmailFromReq(req);
+      const city = supEmail ? await getSupervisorCityByEmail(supEmail) : null;
+      const [jobsResult, driversResult] = await Promise.all([
+        city
+          ? getPgPool().query("SELECT status, COUNT(*) as count FROM jobs WHERE office_city = $1 GROUP BY status", [city])
+          : getPgPool().query("SELECT status, COUNT(*) as count FROM jobs GROUP BY status"),
         getPgPool().query("SELECT COUNT(*) as count FROM drivers WHERE is_verified = true AND is_active = true"),
-        getPgPool().query("SELECT COUNT(*) as count FROM users WHERE role = 'customer'"),
       ]);
       const jobCounts: Record<string, number> = {};
       for (const row of jobsResult.rows) {
@@ -12711,10 +12824,10 @@ export async function registerRoutes(
         activeJobs,
         completedJobs: jobCounts['delivered'] || 0,
         activeDrivers: parseInt(driversResult.rows[0]?.count || '0'),
-        totalCustomers: parseInt(customersResult.rows[0]?.count || '0'),
+        officeCity: city || null,
       });
     } catch (e: any) {
-      res.json({ totalJobs: 0, pendingJobs: 0, activeJobs: 0, completedJobs: 0, activeDrivers: 0, totalCustomers: 0 });
+      res.json({ totalJobs: 0, pendingJobs: 0, activeJobs: 0, completedJobs: 0, activeDrivers: 0, officeCity: null });
     }
   }));
 

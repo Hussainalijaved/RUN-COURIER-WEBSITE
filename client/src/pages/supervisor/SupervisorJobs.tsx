@@ -39,8 +39,7 @@ export default function SupervisorJobs() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: jobs = [], isLoading, refetch, isFetching } = useQuery<any[]>({
-    queryKey: ['/api/jobs', 'supervisor'],
-    queryFn: () => fetch('/api/jobs?limit=200').then(r => r.json()),
+    queryKey: ['/api/supervisor/jobs'],
     refetchInterval: 30000,
   });
 

@@ -26,8 +26,7 @@ export default function SupervisorDashboard() {
   });
 
   const { data: recentJobs } = useQuery<any[]>({
-    queryKey: ['/api/jobs', 'supervisor-recent'],
-    queryFn: () => fetch('/api/jobs?limit=5').then(r => r.json()),
+    queryKey: ['/api/supervisor/jobs'],
     refetchInterval: 30000,
   });
 
@@ -37,7 +36,6 @@ export default function SupervisorDashboard() {
     { label: 'Active', value: stats?.activeJobs ?? '—', icon: AlertCircle, color: 'text-orange-600' },
     { label: 'Completed', value: stats?.completedJobs ?? '—', icon: CheckCircle, color: 'text-green-600' },
     { label: 'Active Drivers', value: stats?.activeDrivers ?? '—', icon: Users, color: 'text-purple-600' },
-    { label: 'Customers', value: stats?.totalCustomers ?? '—', icon: Users, color: 'text-indigo-600' },
   ];
 
   const statusColors: Record<string, string> = {
@@ -55,7 +53,9 @@ export default function SupervisorDashboard() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Supervisor Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Overview of current operations</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {stats?.officeCity ? `Office: ${stats.officeCity}` : 'Overview of current operations'}
+            </p>
           </div>
           <div className="flex gap-2">
             <Button onClick={() => setLocation('/supervisor/jobs/create')} data-testid="button-create-job">
@@ -69,7 +69,7 @@ export default function SupervisorDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {statCards.map((card) => (
             <Card key={card.label}>
               <CardContent className="p-4 flex flex-col gap-2">

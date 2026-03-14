@@ -468,6 +468,10 @@ async function runBackgroundTasks() {
       await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_email ON supervisors(email)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_status ON supervisors(status)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_invite_token ON supervisors(invite_token)`);
+      // Add city column if missing (idempotent)
+      await db.execute(sql`ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS city TEXT`);
+      // Add office_city to jobs if missing
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS office_city TEXT`);
       await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
       console.log("[MIGRATION] Supervisors table created/verified successfully");
     } catch (e: any) {

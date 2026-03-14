@@ -18,13 +18,10 @@ export default function SupervisorHistory() {
   const [vehicleFilter, setVehicleFilter] = useState('all');
 
   const { data: allJobs = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/jobs', 'history'],
-    queryFn: () => fetch('/api/jobs?limit=500').then(r => r.json()),
+    queryKey: ['/api/supervisor/history'],
   });
 
-  const completedJobs = (allJobs as any[]).filter((j: any) =>
-    ['delivered', 'cancelled', 'failed'].includes(j.status)
-  );
+  const completedJobs = allJobs as any[];
 
   const filtered = completedJobs.filter((job: any) => {
     const q = search.toLowerCase();

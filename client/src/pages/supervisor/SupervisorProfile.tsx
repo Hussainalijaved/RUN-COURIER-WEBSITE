@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,11 +10,16 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Briefcase, Mail, User, Lock, Save, Loader2 } from 'lucide-react';
+import { Briefcase, Mail, User, Lock, Save, Loader2, MapPin } from 'lucide-react';
 
 export default function SupervisorProfile() {
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const { data: supervisorInfo } = useQuery<{ name: string; city?: string }>({
+    queryKey: ['/api/supervisor/verify'],
+    retry: false,
+  });
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -111,6 +117,17 @@ export default function SupervisorProfile() {
                   readOnly
                   className="bg-muted/40 cursor-not-allowed"
                   data-testid="input-role"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-wide">
+                  <MapPin className="h-3.5 w-3.5" /> Office City
+                </Label>
+                <Input
+                  value={supervisorInfo?.city || '—'}
+                  readOnly
+                  className="bg-muted/40 cursor-not-allowed"
+                  data-testid="input-city"
                 />
               </div>
             </div>

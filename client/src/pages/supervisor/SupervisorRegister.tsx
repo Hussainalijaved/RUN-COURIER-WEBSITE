@@ -3,10 +3,20 @@ import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import logoImage from '@assets/run_courier_logo.jpeg';
+
+const UK_CITIES = [
+  'London', 'Birmingham', 'Manchester', 'Leeds', 'Glasgow', 'Sheffield', 'Bradford',
+  'Liverpool', 'Edinburgh', 'Bristol', 'Leicester', 'Cardiff', 'Coventry', 'Nottingham',
+  'Newcastle upon Tyne', 'Sunderland', 'Brighton', 'Hull', 'Plymouth', 'Stoke-on-Trent',
+  'Wolverhampton', 'Derby', 'Swansea', 'Southampton', 'Salford', 'Aberdeen', 'Westminster',
+  'Portsmouth', 'York', 'Peterborough', 'Dundee', 'Lancaster', 'Oxford', 'Newport',
+  'Preston', 'St Albans', 'Norwich', 'Chester', 'Cambridge', 'Exeter', 'Other',
+];
 
 export default function SupervisorRegister() {
   const [, setLocation] = useLocation();
@@ -22,6 +32,7 @@ export default function SupervisorRegister() {
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,12 +72,16 @@ export default function SupervisorRegister() {
       setError('Password must be at least 8 characters.');
       return;
     }
+    if (!city) {
+      setError('Please select your office city.');
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch('/api/supervisors/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password, fullName, phone }),
+        body: JSON.stringify({ token, password, fullName, phone, city }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -160,6 +175,19 @@ export default function SupervisorRegister() {
                     disabled={loading}
                     data-testid="input-phone"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">Office City</Label>
+                  <Select value={city} onValueChange={setCity} disabled={loading}>
+                    <SelectTrigger id="city" data-testid="select-city">
+                      <SelectValue placeholder="Select your office city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UK_CITIES.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>

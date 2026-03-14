@@ -50,6 +50,7 @@ interface Supervisor {
   email: string;
   full_name: string;
   phone?: string;
+  city?: string;
   status: string;
   invited_at: string;
   activated_at?: string;
@@ -242,6 +243,7 @@ export default function AdminSupervisors() {
                       <p className="text-sm font-medium text-foreground">{sup.full_name || '(No name yet)'}</p>
                       <p className="text-xs text-muted-foreground">{sup.email}</p>
                       {sup.phone && <p className="text-xs text-muted-foreground">{sup.phone}</p>}
+                      {sup.city && <p className="text-xs text-muted-foreground">Office: {sup.city}</p>}
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Invited {new Date(sup.invited_at).toLocaleDateString('en-GB')}
                         {sup.invited_by ? ` by ${sup.invited_by}` : ''}

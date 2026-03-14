@@ -19,8 +19,7 @@ export default function SupervisorInvoices() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: invoices = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/invoices'],
-    queryFn: () => fetch('/api/invoices').then(r => r.json()),
+    queryKey: ['/api/supervisor/invoices'],
   });
 
   const filtered = (invoices as any[]).filter((inv: any) => {
