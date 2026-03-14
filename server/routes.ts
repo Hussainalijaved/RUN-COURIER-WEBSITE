@@ -12902,7 +12902,7 @@ export async function registerRoutes(
       driverId: r.driver_id,
       serviceType: r.service_type,
     }));
-    res.json(jobs);
+    res.json(assignStableJobNumbers(jobs));
   }));
 
   // GET /api/supervisor/history — all completed jobs (no city filter)
@@ -12934,7 +12934,7 @@ export async function registerRoutes(
       driverName: r.driver_name,
       driverCode: r.driver_code,
     }));
-    res.json(jobs);
+    res.json(assignStableJobNumbers(jobs));
   }));
 
   // PUT /api/supervisor/profile — update supervisor's own name and phone
