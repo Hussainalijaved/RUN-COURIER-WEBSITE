@@ -24,16 +24,8 @@ const sections = [
         text: 'Flexible delivery is the most economical option. Jobs may be scheduled within available routes.',
       },
       {
-        title: 'Standard Same-Day',
-        text: 'Standard same-day delivery is the default service and will be dispatched as soon as possible.',
-      },
-      {
         title: 'Urgent Priority',
         text: 'Urgent delivery is prioritised and assigned to the nearest available driver.',
-      },
-      {
-        title: 'Dedicated / Direct Delivery',
-        text: 'Dedicated delivery means the driver will go directly from collection to delivery without additional stops.',
       },
     ],
     footer: 'Different service types may affect the final delivery price.',

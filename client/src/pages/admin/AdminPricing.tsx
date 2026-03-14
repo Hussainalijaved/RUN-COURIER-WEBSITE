@@ -13,9 +13,7 @@ import type { PricingSettings, Vehicle, VehicleType } from '@shared/schema';
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
   flexible: 'Flexible',
-  standard: 'Standard',
   urgent: 'Urgent',
-  dedicated: 'Dedicated / Direct',
 };
 
 export default function AdminPricing() {
@@ -23,9 +21,7 @@ export default function AdminPricing() {
   const [config, setConfig] = useState<PricingConfig>(defaultPricingConfig);
   const [serviceTypePricing, setServiceTypePricing] = useState<Record<string, number>>({
     flexible: 0,
-    standard: 10,
     urgent: 25,
-    dedicated: 40,
   });
 
   // Fetch pricing settings from API
@@ -95,9 +91,7 @@ export default function AdminPricing() {
         const stp = pricingSettings.serviceTypePricing as Record<string, number>;
         setServiceTypePricing({
           flexible: stp.flexible ?? 0,
-          standard: stp.standard ?? 10,
           urgent: stp.urgent ?? 25,
-          dedicated: stp.dedicated ?? 40,
         });
       }
     }
@@ -438,7 +432,7 @@ export default function AdminPricing() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {(['flexible', 'standard', 'urgent', 'dedicated'] as const).map((key) => (
+              {(['flexible', 'urgent'] as const).map((key) => (
                 <div key={key} className="space-y-2">
                   <Label className="text-sm font-medium">{SERVICE_TYPE_LABELS[key]}</Label>
                   <div className="flex items-center gap-2">

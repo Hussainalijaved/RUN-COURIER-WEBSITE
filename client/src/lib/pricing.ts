@@ -1,20 +1,18 @@
 import type { VehicleType, PricingSettings, Vehicle } from "@shared/schema";
 import { congestionZonePostcodes } from "./congestionZonePostcodes";
 
-export type ServiceType = 'flexible' | 'standard' | 'urgent' | 'dedicated';
+export type ServiceType = 'flexible' | 'urgent';
 
 export const SERVICE_TYPE_CONFIG: Record<ServiceType, { label: string; percent: number; description: string }> = {
-  flexible:  { label: 'Flexible',         percent: 0,  description: 'Best value, flexible timing' },
-  standard:  { label: 'Standard',         percent: 10, description: 'Reliable same-day delivery' },
-  urgent:    { label: 'Urgent',           percent: 25, description: 'Priority same-day delivery' },
-  dedicated: { label: 'Dedicated / Direct', percent: 40, description: 'Exclusive dedicated courier' },
+  flexible: { label: 'Flexible', percent: 0,  description: 'Best value, flexible timing' },
+  urgent:   { label: 'Urgent',   percent: 25, description: 'Priority same-day delivery' },
 };
 
 export function applyServiceTypeAdjustment(
   baseTotal: number,
   serviceType: ServiceType
 ): { total: number; percent: number; amount: number } {
-  const config = SERVICE_TYPE_CONFIG[serviceType] ?? SERVICE_TYPE_CONFIG.standard;
+  const config = SERVICE_TYPE_CONFIG[serviceType] ?? SERVICE_TYPE_CONFIG.flexible;
   const amount = Math.round(baseTotal * (config.percent / 100) * 100) / 100;
   const total = Math.round((baseTotal + amount) * 100) / 100;
   return { total, percent: config.percent, amount };

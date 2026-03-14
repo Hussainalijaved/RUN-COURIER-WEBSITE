@@ -117,9 +117,7 @@ export const pricingSettings = pgTable("pricing_settings", {
   }),
   serviceTypePricing: jsonb("service_type_pricing").$type<Record<string, number>>().default({
     "flexible": 0,
-    "standard": 10,
     "urgent": 25,
-    "dedicated": 40
   }),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -169,8 +167,8 @@ export const jobs = pgTable("jobs", {
   returnTripCharge: decimal("return_trip_charge", { precision: 10, scale: 2 }).default("0"),
   centralLondonCharge: decimal("central_london_charge", { precision: 10, scale: 2 }).default("0"),
   waitingTimeCharge: decimal("waiting_time_charge", { precision: 10, scale: 2 }).default("0"),
-  serviceType: text("service_type").default("standard"),
-  serviceTypePercent: decimal("service_type_percent", { precision: 5, scale: 2 }).default("10"),
+  serviceType: text("service_type").default("flexible"),
+  serviceTypePercent: decimal("service_type_percent", { precision: 5, scale: 2 }).default("0"),
   serviceTypeAmount: decimal("service_type_amount", { precision: 10, scale: 2 }).default("0"),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
   driverPrice: decimal("driver_price", { precision: 10, scale: 2 }),

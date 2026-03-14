@@ -221,9 +221,7 @@ export async function sendQuoteNotification(data: {
 
   const serviceLevelNames: Record<string, string> = {
     flexible: 'Flexible',
-    standard: 'Standard',
     urgent: 'Urgent',
-    dedicated: 'Dedicated / Direct',
   };
   const serviceLevelDisplay = data.serviceType ? serviceLevelNames[data.serviceType] || data.serviceType : 'Flexible';
   const serviceLevelPercent = data.serviceTypePercent ?? 0;
@@ -597,7 +595,7 @@ export async function sendNewJobNotification(jobId: string, jobDetails: any): Pr
         ${jobDetails.serviceType && jobDetails.serviceType !== 'flexible' ? `
         <tr>
           <td style="padding: 8px 0; color: #333;"><strong>Service Level:</strong></td>
-          <td style="padding: 8px 0; color: #333;">${{ flexible: 'Flexible', standard: 'Standard', urgent: 'Urgent', dedicated: 'Dedicated / Direct' }[jobDetails.serviceType as string] || jobDetails.serviceType}${jobDetails.serviceTypePercent > 0 ? ` (+${jobDetails.serviceTypePercent}%)` : ''}</td>
+          <td style="padding: 8px 0; color: #333;">${{ flexible: 'Flexible', urgent: 'Urgent' }[jobDetails.serviceType as string] || jobDetails.serviceType}${jobDetails.serviceTypePercent > 0 ? ` (+${jobDetails.serviceTypePercent}%)` : ''}</td>
         </tr>
         ${parseFloat(jobDetails.serviceTypeAmount || 0) > 0 ? `
         <tr>
@@ -2093,7 +2091,7 @@ export async function sendBusinessQuoteEmail(
     </div>
     
     <div style="background-color: #007BFF; color: white; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">
-      ${data.serviceType && data.serviceType !== 'flexible' ? `<p style="font-size: 13px; margin: 0 0 6px 0; opacity: 0.85;">Service Level: ${{ flexible: 'Flexible', standard: 'Standard', urgent: 'Urgent', dedicated: 'Dedicated / Direct' }[data.serviceType] || data.serviceType}</p>` : ''}
+      ${data.serviceType && data.serviceType !== 'flexible' ? `<p style="font-size: 13px; margin: 0 0 6px 0; opacity: 0.85;">Service Level: ${{ flexible: 'Flexible', urgent: 'Urgent' }[data.serviceType] || data.serviceType}</p>` : ''}
       <p style="font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">TOTAL QUOTE</p>
       <p style="font-size: 36px; font-weight: bold; margin: 0;">&pound;${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}</p>
     </div>
@@ -2149,7 +2147,7 @@ Estimated Duration: ${data.quote.totalDuration} mins
 Vehicle Type: ${vehicleNames[data.vehicleType] || data.vehicleType}
 Number of Drops: ${data.drops.length}
 
-${data.serviceType && data.serviceType !== 'flexible' ? `Service Level: ${{ flexible: 'Flexible', standard: 'Standard', urgent: 'Urgent', dedicated: 'Dedicated / Direct' }[data.serviceType] || data.serviceType}\n` : ''}TOTAL QUOTE: £${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}
+${data.serviceType && data.serviceType !== 'flexible' ? `Service Level: ${{ flexible: 'Flexible', urgent: 'Urgent' }[data.serviceType] || data.serviceType}\n` : ''}TOTAL QUOTE: £${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}
 
 ${data.notes ? `NOTES: ${data.notes}` : ''}
 

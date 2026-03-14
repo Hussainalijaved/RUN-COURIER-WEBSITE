@@ -8047,10 +8047,10 @@ export async function registerRoutes(
     const description = `Run Courier Delivery - ${vehicleName} - ${bookingData.pickupPostcode} to ${bookingData.deliveryPostcode}`;
 
     // Apply service type adjustment server-side
-    const serviceType = (bookingData.serviceType || 'standard') as string;
+    const serviceType = (bookingData.serviceType || 'flexible') as string;
     const storedPricingSettings = await storage.getPricingSettings();
-    const serviceTypePercents: Record<string, number> = (storedPricingSettings.serviceTypePricing as Record<string, number>) || { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
-    const serviceTypePercent = serviceTypePercents[serviceType] ?? 10;
+    const serviceTypePercents: Record<string, number> = (storedPricingSettings.serviceTypePricing as Record<string, number>) || { flexible: 0, urgent: 25 };
+    const serviceTypePercent = serviceTypePercents[serviceType] ?? 0;
     const baseTotal = bookingData.totalPrice;
     const serviceTypeAmount = Math.round(baseTotal * (serviceTypePercent / 100) * 100) / 100;
     const finalTotal = Math.round((baseTotal + serviceTypeAmount) * 100) / 100;
@@ -8153,8 +8153,8 @@ export async function registerRoutes(
       returnTripCharge: metadata.returnTripCharge || '0',
       centralLondonCharge: metadata.centralLondonCharge || '0',
       waitingTimeCharge: metadata.waitingTimeCharge || '0',
-      serviceType: metadata.serviceType || 'standard',
-      serviceTypePercent: String(metadata.serviceTypePercent || '10'),
+      serviceType: metadata.serviceType || 'flexible',
+      serviceTypePercent: String(metadata.serviceTypePercent || '0'),
       serviceTypeAmount: String(metadata.serviceTypeAmount || '0'),
       totalPrice: String(totalPrice),
       distance: metadata.distance || '0',
@@ -8348,10 +8348,10 @@ export async function registerRoutes(
     const jobNumber = await generateJobNumber();
 
     // Apply service type adjustment for pay-later bookings
-    const plServiceType = bookingData.serviceType || 'standard';
+    const plServiceType = bookingData.serviceType || 'flexible';
     const plPricingSettings = await storage.getPricingSettings();
-    const plServiceTypePercents: Record<string, number> = (plPricingSettings.serviceTypePricing as Record<string, number>) || { flexible: 0, standard: 10, urgent: 25, dedicated: 40 };
-    const plServiceTypePercent = plServiceTypePercents[plServiceType] ?? 10;
+    const plServiceTypePercents: Record<string, number> = (plPricingSettings.serviceTypePricing as Record<string, number>) || { flexible: 0, urgent: 25 };
+    const plServiceTypePercent = plServiceTypePercents[plServiceType] ?? 0;
     const plBaseTotal = bookingData.totalPrice;
     const plServiceTypeAmount = Math.round(plBaseTotal * (plServiceTypePercent / 100) * 100) / 100;
     const plFinalTotal = Math.round((plBaseTotal + plServiceTypeAmount) * 100) / 100;
@@ -8380,7 +8380,7 @@ export async function registerRoutes(
       returnTripCharge: String(bookingData.returnTripCharge || 0),
       centralLondonCharge: String(bookingData.centralLondonCharge || 0),
       waitingTimeCharge: String(bookingData.waitingTimeCharge || 0),
-      serviceType: (bookingData.serviceType || 'standard'),
+      serviceType: (bookingData.serviceType || 'flexible'),
       serviceTypePercent: String(plServiceTypePercent),
       serviceTypeAmount: String(plServiceTypeAmount),
       totalPrice: String(plFinalTotal),
