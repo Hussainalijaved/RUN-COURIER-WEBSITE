@@ -12739,7 +12739,7 @@ export async function registerRoutes(
       pickup_address, delivery_address, pickup_postcode, delivery_postcode,
       pickup_contact_name, vehicle_type, total_price, driver_price,
       payment_status, created_at, scheduled_pickup_time, is_multi_drop,
-      office_city, driver_id, service_type, customer_type`;
+      office_city, driver_id, service_type`;
 
     if (city) {
       // All active jobs (any city) + completed jobs only for this supervisor's city
@@ -12779,7 +12779,6 @@ export async function registerRoutes(
       officeCity: r.office_city,
       driverId: r.driver_id,
       serviceType: r.service_type,
-      customerType: r.customer_type,
     }));
     res.json(jobs);
   }));
