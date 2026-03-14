@@ -12567,8 +12567,13 @@ export async function registerRoutes(
         [normalizedEmail, fullName || '', 'pending', token, expiresAt, invitedBy, notes || null]
       );
     }
-    const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+    // Use APP_URL if set (production), otherwise derive from the request host so dev testing works
+    const reqHost = (req.headers['x-forwarded-host'] as string) || req.headers.host || '';
+    const reqProto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+    const isLocalhost = reqHost.includes('localhost') || reqHost.includes('127.0.0.1');
+    const baseUrl = process.env.APP_URL && !isLocalhost ? process.env.APP_URL : `${reqProto}://${reqHost}`;
     const inviteUrl = `${baseUrl}/supervisor/register?token=${token}`;
+    console.log(`[Supervisor] Invite URL for ${normalizedEmail}: ${inviteUrl} (host: ${reqHost})`);
     try {
       const { sendSupervisorInviteEmail } = await import('./emailService');
       await sendSupervisorInviteEmail(normalizedEmail, {

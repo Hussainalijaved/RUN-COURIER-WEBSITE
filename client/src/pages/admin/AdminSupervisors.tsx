@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UserPlus, Search, RefreshCw, Trash2, CheckCircle, XCircle, AlertCircle, MoreHorizontal } from 'lucide-react';
+import { UserPlus, Search, RefreshCw, Trash2, CheckCircle, XCircle, AlertCircle, MoreHorizontal, Copy, Link } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,10 +83,19 @@ export default function AdminSupervisors() {
   const [inviteName, setInviteName] = useState('');
   const [inviteNotes, setInviteNotes] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const { data: supervisors = [], isLoading, refetch, isFetching } = useQuery<Supervisor[]>({
     queryKey: ['/api/supervisors'],
   });
+
+  const copyLink = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
 
   const inviteMutation = useMutation({
     mutationFn: async (data: { email: string; fullName: string; notes: string; fromDialog?: boolean }) => {
@@ -97,6 +106,7 @@ export default function AdminSupervisors() {
       queryClient.invalidateQueries({ queryKey: ['/api/supervisors'] });
       if (data.fromDialog) {
         setInviteSuccess(data.message || 'Invitation sent successfully.');
+        setInviteLink(data.inviteUrl || '');
         setInviteEmail('');
         setInviteName('');
         setInviteNotes('');
@@ -305,7 +315,7 @@ export default function AdminSupervisors() {
           </CardContent>
         </Card>
 
-        <Dialog open={showInviteDialog} onOpenChange={(open) => { setShowInviteDialog(open); if (!open) setInviteSuccess(''); }}>
+        <Dialog open={showInviteDialog} onOpenChange={(open) => { setShowInviteDialog(open); if (!open) { setInviteSuccess(''); setInviteLink(''); setLinkCopied(false); } }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Invite a Supervisor</DialogTitle>
@@ -314,11 +324,34 @@ export default function AdminSupervisors() {
               </DialogDescription>
             </DialogHeader>
             {inviteSuccess ? (
-              <div className="py-4">
+              <div className="py-2 space-y-4">
                 <Alert>
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-700">{inviteSuccess}</AlertDescription>
                 </Alert>
+                {inviteLink && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+                      <Link className="h-3.5 w-3.5" />
+                      Registration link — share this if the email doesn't arrive:
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs bg-muted rounded-md px-3 py-2 break-all font-mono text-foreground">
+                        {inviteLink}
+                      </code>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => copyLink(inviteLink)}
+                        data-testid="button-copy-invite-link"
+                        title="Copy link"
+                      >
+                        {linkCopied ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">This link expires in 7 days.</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4 py-2">
