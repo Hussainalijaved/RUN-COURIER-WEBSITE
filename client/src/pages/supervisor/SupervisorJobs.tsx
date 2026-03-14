@@ -273,11 +273,11 @@ export default function SupervisorJobs() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Manage Driver</DialogTitle>
-            <DialogDescription>
-              Job #{manageJob?.trackingNumber || manageJob?.id?.slice(0, 8)} —{' '}
-              <Badge className={`text-xs ${STATUS_COLORS[manageJob?.status] || ''}`}>
+            <DialogDescription className="flex items-center gap-2 flex-wrap">
+              <span>Job #{manageJob?.trackingNumber || manageJob?.id?.slice(0, 8)}</span>
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[manageJob?.status] || ''}`}>
                 {STATUS_LABELS[manageJob?.status] || manageJob?.status}
-              </Badge>
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -365,15 +365,15 @@ export default function SupervisorJobs() {
                         ) : (
                           activeDrivers.map((d: any) => (
                             <SelectItem key={d.id} value={d.id}>
-                              <div className="flex items-center gap-2">
+                              <span className="flex items-center gap-2">
                                 {d.driverCode && (
                                   <span className="font-mono font-bold text-blue-600">{d.driverCode}</span>
                                 )}
                                 <span>{d.fullName || d.driverCode || 'Unknown'}</span>
                                 {d.isAvailable && (
-                                  <Badge variant="secondary" className="text-xs">Online</Badge>
+                                  <span className="inline-flex items-center rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-semibold">Online</span>
                                 )}
-                              </div>
+                              </span>
                             </SelectItem>
                           ))
                         )}
@@ -429,15 +429,15 @@ export default function SupervisorJobs() {
                           .filter((d: any) => d.id !== manageJob?.driverId)
                           .map((d: any) => (
                             <SelectItem key={d.id} value={d.id}>
-                              <div className="flex items-center gap-2">
+                              <span className="flex items-center gap-2">
                                 {d.driverCode && (
                                   <span className="font-mono font-bold text-blue-600">{d.driverCode}</span>
                                 )}
                                 <span>{d.fullName || d.driverCode || 'Unknown'}</span>
                                 {d.isAvailable && (
-                                  <Badge variant="secondary" className="text-xs">Online</Badge>
+                                  <span className="inline-flex items-center rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-semibold">Online</span>
                                 )}
-                              </div>
+                              </span>
                             </SelectItem>
                           ))}
                       </SelectContent>
