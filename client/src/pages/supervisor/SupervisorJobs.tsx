@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Separator } from '@/components/ui/separator';
-import { Package, Plus, Search, RefreshCw, UserX, UserCheck, Loader2, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Search, RefreshCw, UserX, UserCheck, Loader2, AlertTriangle, ChevronsUpDown, Check } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -41,6 +43,82 @@ const STATUS_LABELS: Record<string, string> = {
 
 const MANAGEABLE_STATUSES = ['pending', 'assigned', 'offered', 'accepted', 'on_the_way_pickup', 'collected', 'on_the_way_delivery'];
 
+interface DriverComboboxProps {
+  drivers: any[];
+  value: string;
+  onSelect: (id: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  testId?: string;
+}
+
+function DriverCombobox({ drivers, value, onSelect, open, onOpenChange, testId }: DriverComboboxProps) {
+  const selected = drivers.find((d) => d.id === value);
+  const selectedLabel = selected
+    ? `${selected.driverCode ? selected.driverCode + ' · ' : ''}${selected.fullName || selected.driverCode || 'Unknown'}`
+    : null;
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          data-testid={testId}
+        >
+          {selectedLabel ? (
+            <span className="flex items-center gap-2 truncate">
+              {selected?.driverCode && (
+                <span className="font-mono font-bold text-blue-600 shrink-0">{selected.driverCode}</span>
+              )}
+              <span className="truncate">{selected?.fullName || selected?.driverCode || 'Unknown'}</span>
+              {selected?.isAvailable && (
+                <span className="inline-flex items-center rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-semibold shrink-0">Online</span>
+              )}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Search driver…</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[320px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search by name or driver ID…" />
+          <CommandList>
+            <CommandEmpty>No drivers found.</CommandEmpty>
+            <CommandGroup>
+              {drivers.length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">No active drivers available</div>
+              ) : (
+                drivers.map((d) => (
+                  <CommandItem
+                    key={d.id}
+                    value={`${d.driverCode || ''} ${d.fullName || ''}`}
+                    onSelect={() => onSelect(d.id)}
+                    className="flex items-center gap-2"
+                  >
+                    <Check className={`h-4 w-4 shrink-0 ${value === d.id ? 'opacity-100' : 'opacity-0'}`} />
+                    {d.driverCode && (
+                      <span className="font-mono font-bold text-blue-600 shrink-0">{d.driverCode}</span>
+                    )}
+                    <span className="flex-1 truncate">{d.fullName || d.driverCode || 'Unknown'}</span>
+                    {d.isAvailable && (
+                      <span className="inline-flex items-center rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-semibold shrink-0">Online</span>
+                    )}
+                  </CommandItem>
+                ))
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function SupervisorJobs() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -54,6 +132,7 @@ export default function SupervisorJobs() {
   const [newDriverId, setNewDriverId] = useState('');
   const [newDriverPrice, setNewDriverPrice] = useState('');
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [driverComboOpen, setDriverComboOpen] = useState(false);
 
   const { data: jobs = [], isLoading, refetch, isFetching } = useQuery<any[]>({
     queryKey: ['/api/supervisor/jobs'],
@@ -354,31 +433,15 @@ export default function SupervisorJobs() {
                   </p>
 
                   <div className="space-y-2">
-                    <Label htmlFor="driver-select">Driver</Label>
-                    <Select value={newDriverId} onValueChange={setNewDriverId}>
-                      <SelectTrigger id="driver-select" data-testid="select-driver">
-                        <SelectValue placeholder="Select a driver…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeDrivers.length === 0 ? (
-                          <SelectItem value="_none" disabled>No active drivers available</SelectItem>
-                        ) : (
-                          activeDrivers.map((d: any) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              <span className="flex items-center gap-2">
-                                {d.driverCode && (
-                                  <span className="font-mono font-bold text-blue-600">{d.driverCode}</span>
-                                )}
-                                <span>{d.fullName || d.driverCode || 'Unknown'}</span>
-                                {d.isAvailable && (
-                                  <span className="inline-flex items-center rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-semibold">Online</span>
-                                )}
-                              </span>
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <Label>Driver</Label>
+                    <DriverCombobox
+                      drivers={activeDrivers}
+                      value={newDriverId}
+                      onSelect={(id) => { setNewDriverId(id); setDriverComboOpen(false); }}
+                      open={driverComboOpen}
+                      onOpenChange={setDriverComboOpen}
+                      testId="select-driver"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -419,29 +482,15 @@ export default function SupervisorJobs() {
                   </p>
 
                   <div className="space-y-2">
-                    <Label htmlFor="driver-select-reassign">New Driver</Label>
-                    <Select value={newDriverId} onValueChange={setNewDriverId}>
-                      <SelectTrigger id="driver-select-reassign" data-testid="select-driver-reassign">
-                        <SelectValue placeholder="Select a driver…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeDrivers
-                          .filter((d: any) => d.id !== manageJob?.driverId)
-                          .map((d: any) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              <span className="flex items-center gap-2">
-                                {d.driverCode && (
-                                  <span className="font-mono font-bold text-blue-600">{d.driverCode}</span>
-                                )}
-                                <span>{d.fullName || d.driverCode || 'Unknown'}</span>
-                                {d.isAvailable && (
-                                  <span className="inline-flex items-center rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-semibold">Online</span>
-                                )}
-                              </span>
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>New Driver</Label>
+                    <DriverCombobox
+                      drivers={activeDrivers.filter((d: any) => d.id !== manageJob?.driverId)}
+                      value={newDriverId}
+                      onSelect={(id) => { setNewDriverId(id); setDriverComboOpen(false); }}
+                      open={driverComboOpen}
+                      onOpenChange={setDriverComboOpen}
+                      testId="select-driver-reassign"
+                    />
                   </div>
 
                   <div className="space-y-2">
