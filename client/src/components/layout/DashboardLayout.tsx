@@ -49,6 +49,7 @@ import {
   FileSignature,
   Megaphone,
   SlidersHorizontal,
+  Search,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -122,6 +123,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/supervisor/customers', label: 'Customers', icon: Users },
     { href: '/supervisor/invoices', label: 'Invoices', icon: Receipt },
     { href: '/supervisor/history', label: 'Job History', icon: Clock },
+    { href: '/supervisor/track', label: 'Track Order', icon: Search },
   ],
 };
 

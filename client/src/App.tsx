@@ -462,6 +462,16 @@ function Router() {
             <SupervisorHistory />
           </ProtectedRoute>
         </Route>
+        <Route path="/supervisor/track/:trackingNumber">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <Track />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/track">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <Track />
+          </ProtectedRoute>
+        </Route>
         <Route path="/supervisor/profile">
           <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
             <SupervisorProfile />
