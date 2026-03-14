@@ -55,6 +55,7 @@ import {
   RefreshCw,
   CheckCircle,
   Undo2,
+  Trash2,
   Building2,
   User,
   Check,
@@ -325,6 +326,8 @@ export default function SupervisorJobs() {
   const [customerName, setCustomerName] = useState('');
   const [uploadingPod, setUploadingPod] = useState(false);
   const [deletingPodUrl, setDeletingPodUrl] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const podFileInputRef = useRef<HTMLInputElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const [loadingTooLong, setLoadingTooLong] = useState(false);
@@ -464,6 +467,21 @@ export default function SupervisorJobs() {
     },
     onError: (error: any) => {
       toast({ title: 'Failed to unassign driver', description: error?.message || 'Please try again', variant: 'destructive' });
+    },
+  });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest('DELETE', `/api/jobs/${jobId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      toast({ title: 'Job deleted', description: 'The job has been permanently removed.' });
+      setDeleteDialogOpen(false);
+      setJobToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to delete job', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 
@@ -929,6 +947,14 @@ export default function SupervisorJobs() {
                                 Withdraw from Driver
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuItem
+                              onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}
+                              className="text-destructive focus:text-destructive"
+                              data-testid={`menu-delete-${job.id}`}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Job
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -1351,6 +1377,49 @@ export default function SupervisorJobs() {
               <Button onClick={handlePrintLabel} className="gap-2" disabled={loadingStops} data-testid="button-print-label">
                 <Printer className="h-4 w-4" />
                 Print {jobForLabel?.isMultiDrop && multiDropStops.length > 0 ? `${multiDropStops.length + 1} Labels` : 'Label'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Job Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={(open) => { if (!open) { setDeleteDialogOpen(false); setJobToDelete(null); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                Delete Job
+              </DialogTitle>
+              <DialogDescription>
+                <span>
+                  This will permanently delete job{' '}
+                  <strong>{(jobToDelete as any)?.jobNumber || jobToDelete?.trackingNumber}</strong>.
+                  This action cannot be undone.
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            {jobToDelete && (
+              <div className="rounded-md bg-muted px-4 py-3 text-sm space-y-1">
+                <p><span className="text-muted-foreground">From:</span> {jobToDelete.pickupAddress}</p>
+                <p><span className="text-muted-foreground">To:</span> {jobToDelete.deliveryAddress}</p>
+                <p><span className="text-muted-foreground">Status:</span> {jobToDelete.status}</p>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setJobToDelete(null); }}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => jobToDelete && deleteJobMutation.mutate(jobToDelete.id)}
+                disabled={deleteJobMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteJobMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</>
+                ) : (
+                  <><Trash2 className="mr-2 h-4 w-4" />Delete Job</>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
