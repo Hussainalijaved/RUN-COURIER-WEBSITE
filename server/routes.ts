@@ -12722,23 +12722,32 @@ export async function registerRoutes(
     return authUser.email;
   }
 
-  // GET /api/supervisor/jobs — filtered by supervisor's office city
+  // GET /api/supervisor/jobs — active jobs (all, no city filter) + completed jobs for supervisor's city
   app.get('/api/supervisor/jobs', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
     const supEmail = await getSupervisorEmailFromReq(req);
     const city = supEmail ? await getSupervisorCityByEmail(supEmail) : null;
+
+    const ACTIVE_STATUSES = ['pending', 'assigned', 'accepted', 'offered', 'on_the_way_pickup', 'collected', 'on_the_way_delivery'];
+
     let query: string;
     let params: any[];
+
     if (city) {
+      // All active jobs (any city) + completed jobs only for this supervisor's city
       query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, customer_email, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
-               FROM jobs WHERE office_city = $1 ORDER BY created_at DESC LIMIT 300`;
-      params = [city];
+               FROM jobs
+               WHERE status = ANY($1::text[])
+                  OR (status NOT IN ('pending','assigned','accepted','offered','on_the_way_pickup','collected','on_the_way_delivery') AND office_city = $2)
+               ORDER BY created_at DESC LIMIT 300`;
+      params = [ACTIVE_STATUSES, city];
     } else {
+      // Admin — all jobs
       query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, customer_email, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
                FROM jobs ORDER BY created_at DESC LIMIT 300`;
       params = [];
     }
+
     const result = await getPgPool().query(query, params);
-    // Camelcase the keys
     const jobs = result.rows.map((r: any) => ({
       id: r.id, trackingNumber: r.tracking_number, status: r.status,
       pickupAddress: r.pickup_address, deliveryAddress: r.delivery_address,
@@ -12829,28 +12838,37 @@ export async function registerRoutes(
     res.json({ success: true });
   }));
 
-  // GET /api/supervisor/stats — supervisor dashboard stats (filtered by city for supervisors)
+  // GET /api/supervisor/stats — supervisor dashboard stats
+  // Active job counts = ALL jobs (no city filter); completed = city-filtered for supervisors
   app.get('/api/supervisor/stats', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
     try {
       const supEmail = await getSupervisorEmailFromReq(req);
       const city = supEmail ? await getSupervisorCityByEmail(supEmail) : null;
-      const [jobsResult, driversResult] = await Promise.all([
+
+      const ACTIVE_STATUSES = ['pending', 'assigned', 'accepted', 'offered', 'on_the_way_pickup', 'collected', 'on_the_way_delivery'];
+
+      const [activeResult, completedResult, driversResult] = await Promise.all([
+        // All active jobs regardless of city
+        getPgPool().query("SELECT status, COUNT(*) as count FROM jobs WHERE status = ANY($1::text[]) GROUP BY status", [ACTIVE_STATUSES]),
+        // Completed jobs filtered by city (or all for admin)
         city
-          ? getPgPool().query("SELECT status, COUNT(*) as count FROM jobs WHERE office_city = $1 GROUP BY status", [city])
-          : getPgPool().query("SELECT status, COUNT(*) as count FROM jobs GROUP BY status"),
+          ? getPgPool().query("SELECT COUNT(*) as count FROM jobs WHERE status = 'delivered' AND office_city = $1", [city])
+          : getPgPool().query("SELECT COUNT(*) as count FROM jobs WHERE status = 'delivered'"),
         getPgPool().query("SELECT COUNT(*) as count FROM drivers WHERE is_verified = true AND is_active = true"),
       ]);
-      const jobCounts: Record<string, number> = {};
-      for (const row of jobsResult.rows) {
-        jobCounts[row.status] = parseInt(row.count);
+
+      const activeCounts: Record<string, number> = {};
+      for (const row of activeResult.rows) {
+        activeCounts[row.status] = parseInt(row.count);
       }
-      const totalJobs = Object.values(jobCounts).reduce((a, b) => a + b, 0);
-      const activeJobs = (jobCounts['assigned'] || 0) + (jobCounts['accepted'] || 0) + (jobCounts['on_the_way_pickup'] || 0) + (jobCounts['collected'] || 0) + (jobCounts['on_the_way_delivery'] || 0);
+      const totalActive = Object.values(activeCounts).reduce((a, b) => a + b, 0);
+      const inProgress = (activeCounts['assigned'] || 0) + (activeCounts['accepted'] || 0) + (activeCounts['on_the_way_pickup'] || 0) + (activeCounts['collected'] || 0) + (activeCounts['on_the_way_delivery'] || 0);
+
       res.json({
-        totalJobs,
-        pendingJobs: jobCounts['pending'] || 0,
-        activeJobs,
-        completedJobs: jobCounts['delivered'] || 0,
+        totalJobs: totalActive,
+        pendingJobs: activeCounts['pending'] || 0,
+        activeJobs: inProgress,
+        completedJobs: parseInt(completedResult.rows[0]?.count || '0'),
         activeDrivers: parseInt(driversResult.rows[0]?.count || '0'),
         officeCity: city || null,
       });
