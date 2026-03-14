@@ -368,6 +368,14 @@ function enforceAdminAccess(req: Request, res: Response): boolean {
   return true;
 }
 
+function enforceAdminOrSupervisorAccess(req: Request, res: Response): boolean {
+  if (!(req as any).isAdmin && !(req as any).isSupervisor) {
+    res.status(403).json({ error: 'Admin or supervisor access required', code: 'NOT_AUTHORIZED' });
+    return false;
+  }
+  return true;
+}
+
 // Server-side pricing configuration - SINGLE SOURCE OF TRUTH
 // This must match the client-side config in client/src/lib/pricing.ts
 const PRICING_CONFIG = {
@@ -10591,8 +10599,7 @@ export async function registerRoutes(
 
   // Send invoice to customer email
   app.post("/api/invoices/:id/send", asyncHandler(async (req, res) => {
-    // ADMIN REQUIRED: Sending invoices is an admin-only operation
-    if (!enforceAdminAccess(req, res)) return;
+    if (!enforceAdminOrSupervisorAccess(req, res)) return;
     
     const { sendInvoiceToCustomer } = await import("./emailService");
     
@@ -10629,8 +10636,7 @@ export async function registerRoutes(
 
   // Resend invoice email to customer
   app.post("/api/invoices/:id/resend", asyncHandler(async (req, res) => {
-    // ADMIN REQUIRED: Resending invoices is an admin-only operation
-    if (!enforceAdminAccess(req, res)) return;
+    if (!enforceAdminOrSupervisorAccess(req, res)) return;
     
     const { sendInvoiceToCustomerWithPaymentLink } = await import("./emailService");
     
@@ -10710,8 +10716,7 @@ export async function registerRoutes(
   // Bulk send invoices by email
   app.post("/api/invoices/bulk-send", asyncHandler(async (req, res) => {
     console.log('[Bulk Send] Starting bulk send request');
-    // ADMIN REQUIRED: Bulk sending invoices is an admin-only operation
-    if (!enforceAdminAccess(req, res)) return;
+    if (!enforceAdminOrSupervisorAccess(req, res)) return;
     
     const { invoiceIds, overrideEmail } = req.body;
     console.log('[Bulk Send] Invoice IDs:', invoiceIds, 'Override email:', overrideEmail);
