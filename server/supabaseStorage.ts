@@ -1208,7 +1208,8 @@ export class SupabaseStorage implements IStorage {
 
   async deleteJob(id: string): Promise<void> {
     const supabase = this.checkSupabase();
-    await supabase.from('jobs').delete().eq('id', id);
+    const { error } = await supabase.from('jobs').delete().eq('id', id);
+    if (error) throw new Error(`Failed to delete job: ${error.message}`);
   }
 
   async getDocument(id: string): Promise<Document | undefined> {

@@ -474,7 +474,10 @@ export default function SupervisorJobs() {
     mutationFn: async (jobId: string) => {
       return apiRequest('DELETE', `/api/jobs/${jobId}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, jobId) => {
+      queryClient.setQueryData<Job[]>(['/api/supervisor/jobs'], (old) =>
+        old ? old.filter((j) => String(j.id) !== String(jobId)) : []
+      );
       queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
       toast({ title: 'Job deleted', description: 'The job has been permanently removed.' });
       setDeleteDialogOpen(false);
