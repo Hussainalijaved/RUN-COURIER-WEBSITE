@@ -1,0 +1,126 @@
+IMPORTANT:
+The final supervisor system must be added to the main website codebase, but do NOT build or test risky changes directly on the live production website.
+
+Workflow required:
+1. First create a full duplicate/staging copy of the current main website project.
+2. Build and test all new supervisor features in the staging copy first.
+3. Keep the live website fully untouched during development.
+4. After all testing is complete and approved, merge the exact working changes into the main website codebase carefully.
+5. Do not deploy unfinished work to production.
+6. Do not break or redesign any existing working feature.
+
+The current main website and system already include:
+- booking / get quote
+- postcode autocomplete
+- job system
+- map tracking
+- invoice system
+- driver app sync
+- admin panel
+- Supabase backend
+
+We only want to ADD a new Supervisor system to the existing main website.
+
+Requirements:
+
+1. Role system
+- main_admin
+- supervisor
+- driver
+- customer
+
+Main admin keeps full control.
+Supervisor has limited office operations access only.
+
+2. Supervisor invitation and approval
+Main admin must be able to invite a supervisor by secure link.
+Supervisor completes registration from the invite link.
+Supervisor account status must start as pending.
+Main admin can approve, activate, suspend, deactivate, or delete supervisor.
+Only active supervisors can log in.
+
+3. Separate supervisor panel
+Create a separate Supervisor dashboard and routes.
+Supervisor must not see Main Admin pages or menus.
+
+Supervisor pages:
+- Dashboard
+- Live Map
+- Jobs
+- Create Job
+- Assigned Jobs
+- Drivers (approved only)
+- Invoices
+- Customers
+- Job History
+
+Supervisor must not access:
+- driver approval
+- driver document upload/compliance
+- global settings
+- pricing settings
+- staff management
+- main admin pages
+
+4. Same design and same booking logic
+Any Supervisor “Create Job” flow must use the same design, same UI style, same booking fields, same postcode autocomplete, same quote logic, same pickup/dropoff structure, and same pricing flow already used on the main website.
+
+Do not create a different booking form.
+Reuse the existing booking/get quote logic and styling.
+
+5. Supervisor permissions
+Supervisor can:
+- view approved drivers
+- see driver online/offline status
+- see driver live location on map
+- create jobs
+- edit job details before dispatch
+- manually adjust final price for an individual job
+- assign job
+- withdraw job
+- reassign job
+- view invoices and payment status
+
+Supervisor cannot:
+- approve drivers
+- reject drivers
+- upload/edit driver documents
+- manage compliance
+- change global pricing settings
+- change company-wide system settings
+- manage staff accounts
+
+6. Main admin remains unchanged
+Do not redesign or break the current main admin panel.
+Only add a new Supervisors section where Main Admin can:
+- invite supervisor
+- view pending supervisors
+- approve
+- activate
+- suspend
+- deactivate
+- delete
+- view supervisor activity
+
+7. Database safety
+We are using the existing Supabase project.
+Only make minimal safe, backward-compatible changes such as adding tables/columns/roles/status fields if required.
+Do NOT delete, rename, or break existing tables, columns, auth logic, booking logic, invoice logic, or driver app sync.
+
+8. Security
+Enforce permissions in frontend and backend.
+Supervisor must not be able to access Main Admin pages by direct URL.
+
+9. Non-negotiable rule
+Do not break:
+- main website
+- booking
+- get quote
+- postcode autocomplete
+- admin panel
+- map
+- invoice system
+- driver app sync
+- Supabase integration
+
+Build in staging first, test fully, then merge safely into the main website.
