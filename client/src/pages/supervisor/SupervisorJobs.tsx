@@ -293,14 +293,17 @@ export default function SupervisorJobs() {
                 <div className="space-y-3">
                   <p className="text-sm font-medium text-foreground">Current Driver</p>
                   <div className="flex items-center justify-between gap-3 rounded-md border p-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex items-center gap-2">
+                      {currentDriver?.driverCode && (
+                        <span className="font-mono font-bold text-blue-600 shrink-0">{currentDriver.driverCode}</span>
+                      )}
                       <p className="text-sm font-medium truncate">
                         {currentDriver
-                          ? `${currentDriver.firstName || ''} ${currentDriver.lastName || ''}`.trim() || currentDriver.driverCode
+                          ? currentDriver.fullName || currentDriver.driverCode || 'Unknown'
                           : manageJob?.driverId?.slice(0, 8) + '…'}
                       </p>
-                      {currentDriver?.driverCode && (
-                        <p className="text-xs text-muted-foreground">{currentDriver.driverCode}</p>
+                      {currentDriver?.isAvailable && (
+                        <Badge variant="secondary" className="text-xs shrink-0">Online</Badge>
                       )}
                     </div>
                     {!confirmWithdraw ? (
@@ -362,7 +365,15 @@ export default function SupervisorJobs() {
                         ) : (
                           activeDrivers.map((d: any) => (
                             <SelectItem key={d.id} value={d.id}>
-                              {`${d.firstName || ''} ${d.lastName || ''}`.trim() || d.driverCode} {d.driverCode ? `(${d.driverCode})` : ''}
+                              <div className="flex items-center gap-2">
+                                {d.driverCode && (
+                                  <span className="font-mono font-bold text-blue-600">{d.driverCode}</span>
+                                )}
+                                <span>{d.fullName || d.driverCode || 'Unknown'}</span>
+                                {d.isAvailable && (
+                                  <Badge variant="secondary" className="text-xs">Online</Badge>
+                                )}
+                              </div>
                             </SelectItem>
                           ))
                         )}
@@ -418,7 +429,15 @@ export default function SupervisorJobs() {
                           .filter((d: any) => d.id !== manageJob?.driverId)
                           .map((d: any) => (
                             <SelectItem key={d.id} value={d.id}>
-                              {`${d.firstName || ''} ${d.lastName || ''}`.trim() || d.driverCode} {d.driverCode ? `(${d.driverCode})` : ''}
+                              <div className="flex items-center gap-2">
+                                {d.driverCode && (
+                                  <span className="font-mono font-bold text-blue-600">{d.driverCode}</span>
+                                )}
+                                <span>{d.fullName || d.driverCode || 'Unknown'}</span>
+                                {d.isAvailable && (
+                                  <Badge variant="secondary" className="text-xs">Online</Badge>
+                                )}
+                              </div>
                             </SelectItem>
                           ))}
                       </SelectContent>
