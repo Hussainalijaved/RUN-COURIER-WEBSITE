@@ -12683,7 +12683,7 @@ export async function registerRoutes(
     const authUser = await verifyAccessToken(token);
     if (!authUser?.email) return res.status(401).json({ error: 'Invalid token' });
     const result = await getPgPool().query(
-      'SELECT id, status, full_name, city FROM supervisors WHERE email = $1 LIMIT 1',
+      'SELECT id, status, full_name, city, phone FROM supervisors WHERE email = $1 LIMIT 1',
       [authUser.email.toLowerCase()]
     );
     if (result.rows.length === 0) return res.status(403).json({ error: 'Not a supervisor account' });
@@ -12691,7 +12691,7 @@ export async function registerRoutes(
     if (sup.status !== 'active') {
       return res.status(403).json({ error: 'Your account is pending admin approval.', status: sup.status });
     }
-    res.json({ verified: true, status: sup.status, name: sup.full_name, city: sup.city });
+    res.json({ verified: true, status: sup.status, name: sup.full_name, city: sup.city, phone: sup.phone });
   }));
 
   // GET /api/supervisors — admin list all supervisors
@@ -12759,22 +12759,12 @@ export async function registerRoutes(
     res.json(jobs);
   }));
 
-  // GET /api/supervisor/history — completed jobs filtered by supervisor's office city
+  // GET /api/supervisor/history — all completed jobs (no city filter)
   app.get('/api/supervisor/history', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
-    const supEmail = await getSupervisorEmailFromReq(req);
-    const city = supEmail ? await getSupervisorCityByEmail(supEmail) : null;
-    let query: string;
-    let params: any[];
-    if (city) {
-      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, vehicle_type, total_price, created_at, is_multi_drop, office_city
-               FROM jobs WHERE office_city = $1 AND status IN ('delivered','cancelled','failed') ORDER BY created_at DESC LIMIT 500`;
-      params = [city];
-    } else {
-      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, vehicle_type, total_price, created_at, is_multi_drop, office_city
-               FROM jobs WHERE status IN ('delivered','cancelled','failed') ORDER BY created_at DESC LIMIT 500`;
-      params = [];
-    }
-    const result = await getPgPool().query(query, params);
+    const result = await getPgPool().query(
+      `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, vehicle_type, total_price, created_at, is_multi_drop, office_city
+       FROM jobs WHERE status IN ('delivered','cancelled','failed') ORDER BY created_at DESC LIMIT 500`
+    );
     const jobs = result.rows.map((r: any) => ({
       id: r.id, trackingNumber: r.tracking_number, status: r.status,
       pickupAddress: r.pickup_address, deliveryAddress: r.delivery_address,
@@ -12783,6 +12773,24 @@ export async function registerRoutes(
       officeCity: r.office_city,
     }));
     res.json(jobs);
+  }));
+
+  // PUT /api/supervisor/profile — update supervisor's own name and phone
+  app.put('/api/supervisor/profile', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+    const token = authHeader.slice(7);
+    const authUser = await verifyAccessToken(token);
+    if (!authUser?.email) return res.status(401).json({ error: 'Invalid token' });
+    const { fullName, phone } = req.body;
+    if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
+      return res.status(400).json({ error: 'Full name is required' });
+    }
+    await getPgPool().query(
+      'UPDATE supervisors SET full_name = $1, phone = $2 WHERE email = $3',
+      [fullName.trim(), (phone || '').trim() || null, authUser.email.toLowerCase()]
+    );
+    res.json({ success: true });
   }));
 
   // GET /api/supervisor/invoices — invoices for jobs in supervisor's office city

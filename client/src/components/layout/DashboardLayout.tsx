@@ -116,6 +116,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/supervisor', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/supervisor/jobs', label: 'Jobs', icon: Package },
     { href: '/supervisor/jobs/create', label: 'Create Job', icon: CheckCircle },
+    { href: '/supervisor/quote', label: 'Get Quote', icon: Calculator },
     { href: '/supervisor/map', label: 'Live Map', icon: MapPin },
     { href: '/supervisor/drivers', label: 'Drivers', icon: Users },
     { href: '/supervisor/customers', label: 'Customers', icon: Users },

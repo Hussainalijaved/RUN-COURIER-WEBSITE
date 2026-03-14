@@ -452,6 +452,11 @@ function Router() {
             <SupervisorInvoices />
           </ProtectedRoute>
         </Route>
+        <Route path="/supervisor/quote">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <Quote />
+          </ProtectedRoute>
+        </Route>
         <Route path="/supervisor/history">
           <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
             <SupervisorHistory />
