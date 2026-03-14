@@ -20,54 +20,45 @@ const VEHICLE_LABELS: Record<string, string> = {
 export default function SupervisorDrivers() {
   const [search, setSearch] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [availabilityFilter, setAvailabilityFilter] = useState('all');
 
-  const { data: drivers = [], isLoading } = useQuery<any[]>({
+  const { data: allDrivers = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/supabase-drivers'],
     queryFn: () => fetch('/api/supabase-drivers').then(r => r.json()),
     refetchInterval: 30000,
   });
 
-  const filtered = (drivers as any[]).filter((driver: any) => {
+  const approvedDrivers = (allDrivers as any[]).filter(
+    (d: any) => d.is_verified === true && d.is_active !== false
+  );
+
+  const filtered = approvedDrivers.filter((driver: any) => {
     const q = search.toLowerCase();
-    const matchesSearch = !q || (
+    const matchesSearch =
+      !q ||
       (driver.full_name || '').toLowerCase().includes(q) ||
       (driver.email || '').toLowerCase().includes(q) ||
       (driver.driver_code || '').toLowerCase().includes(q) ||
-      (driver.phone || '').toLowerCase().includes(q)
-    );
+      (driver.phone || '').toLowerCase().includes(q);
     const matchesVehicle = vehicleFilter === 'all' || driver.vehicle_type === vehicleFilter;
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'verified' && driver.is_verified && driver.is_active !== false) ||
-      (statusFilter === 'pending' && !driver.is_verified) ||
-      (statusFilter === 'inactive' && driver.is_active === false);
-    return matchesSearch && matchesVehicle && matchesStatus;
+    const matchesAvailability =
+      availabilityFilter === 'all' ||
+      (availabilityFilter === 'available' && driver.is_available) ||
+      (availabilityFilter === 'unavailable' && !driver.is_available);
+    return matchesSearch && matchesVehicle && matchesAvailability;
   });
 
   const initials = (name: string) =>
     name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '?';
-
-  const getStatusBadge = (driver: any) => {
-    if (driver.is_active === false) {
-      return <Badge variant="secondary" className="text-xs">Inactive</Badge>;
-    }
-    if (!driver.is_verified) {
-      return <Badge variant="outline" className="text-xs text-yellow-700 border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400">Pending</Badge>;
-    }
-    return (
-      <Badge className={`text-xs ${driver.is_available ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
-        {driver.is_available ? 'Available' : 'Unavailable'}
-      </Badge>
-    );
-  };
 
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Drivers</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtered.length} driver{filtered.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {filtered.length} approved driver{filtered.length !== 1 ? 's' : ''}
+          </p>
         </div>
 
         <Card>
@@ -94,22 +85,21 @@ export default function SupervisorDrivers() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="Status" />
+              <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-availability-filter">
+                  <SelectValue placeholder="Availability" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Drivers</SelectItem>
-                  <SelectItem value="verified">Active & Verified</SelectItem>
-                  <SelectItem value="pending">Pending Approval</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="unavailable">Unavailable</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="space-y-0">
+              <div>
                 {[...Array(5)].map((_, i) => (
                   <div key={i} className="flex items-center gap-4 px-6 py-4 border-t animate-pulse">
                     <div className="h-10 w-10 bg-muted rounded-full" />
@@ -128,20 +118,31 @@ export default function SupervisorDrivers() {
             ) : (
               <div className="divide-y">
                 {filtered.map((driver: any) => (
-                  <div key={driver.id} className="flex flex-wrap items-center gap-4 px-6 py-4" data-testid={`row-driver-${driver.id}`}>
+                  <div
+                    key={driver.id}
+                    className="flex flex-wrap items-center gap-4 px-6 py-4"
+                    data-testid={`row-driver-${driver.id}`}
+                  >
                     <Avatar className="h-10 w-10 shrink-0">
-                      <AvatarFallback className="text-sm font-medium">{initials(driver.full_name || '')}</AvatarFallback>
+                      <AvatarFallback className="text-sm font-medium">
+                        {initials(driver.full_name || '')}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-[150px]">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-foreground">{driver.full_name || 'Unknown'}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {driver.full_name || 'Unknown'}
+                        </p>
                         {driver.driver_code && (
-                          <Badge variant="outline" className="text-xs font-mono">{driver.driver_code}</Badge>
+                          <Badge variant="outline" className="text-xs font-mono">
+                            {driver.driver_code}
+                          </Badge>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{driver.email}</p>
-                      {driver.phone && <p className="text-xs text-muted-foreground">{driver.phone}</p>}
-                      {driver.postcode && <p className="text-xs text-muted-foreground">{driver.postcode}</p>}
+                      {driver.phone && (
+                        <p className="text-xs text-muted-foreground">{driver.phone}</p>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                       {driver.vehicle_type && (
@@ -149,7 +150,15 @@ export default function SupervisorDrivers() {
                           {VEHICLE_LABELS[driver.vehicle_type] || driver.vehicle_type}
                         </Badge>
                       )}
-                      {getStatusBadge(driver)}
+                      <Badge
+                        className={`text-xs ${
+                          driver.is_available
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {driver.is_available ? 'Available' : 'Unavailable'}
+                      </Badge>
                     </div>
                   </div>
                 ))}
