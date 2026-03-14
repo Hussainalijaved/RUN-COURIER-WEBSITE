@@ -12762,15 +12762,31 @@ export async function registerRoutes(
   // GET /api/supervisor/history — all completed jobs (no city filter)
   app.get('/api/supervisor/history', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
     const result = await getPgPool().query(
-      `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, vehicle_type, total_price, created_at, is_multi_drop, office_city
-       FROM jobs WHERE status IN ('delivered','cancelled','failed') ORDER BY created_at DESC LIMIT 500`
+      `SELECT j.id, j.tracking_number, j.job_number, j.status, j.pickup_address, j.delivery_address,
+              j.customer_name, j.vehicle_type, j.total_price, j.driver_price, j.created_at,
+              j.is_multi_drop, j.office_city, j.driver_id,
+              d.full_name AS driver_name, d.driver_code
+       FROM jobs j
+       LEFT JOIN drivers d ON d.id = j.driver_id
+       WHERE j.status IN ('delivered','cancelled','failed')
+       ORDER BY j.created_at DESC LIMIT 500`
     );
     const jobs = result.rows.map((r: any) => ({
-      id: r.id, trackingNumber: r.tracking_number, status: r.status,
-      pickupAddress: r.pickup_address, deliveryAddress: r.delivery_address,
-      customerName: r.customer_name, vehicleType: r.vehicle_type,
-      totalPrice: r.total_price, createdAt: r.created_at, isMultiDrop: r.is_multi_drop,
+      id: r.id,
+      trackingNumber: r.tracking_number,
+      jobNumber: r.job_number,
+      status: r.status,
+      pickupAddress: r.pickup_address,
+      deliveryAddress: r.delivery_address,
+      customerName: r.customer_name,
+      vehicleType: r.vehicle_type,
+      totalPrice: r.total_price,
+      driverPrice: r.driver_price,
+      createdAt: r.created_at,
+      isMultiDrop: r.is_multi_drop,
       officeCity: r.office_city,
+      driverName: r.driver_name,
+      driverCode: r.driver_code,
     }));
     res.json(jobs);
   }));
