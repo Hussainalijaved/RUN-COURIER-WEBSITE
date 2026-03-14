@@ -77,7 +77,7 @@ import { sendJobOfferNotification, sendJobWithdrawalNotification } from "./pushN
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
 import { cache, CACHE_TTL } from "./cache";
 
-const adminTokenCache = new Map<string, { user: { id: string; email: string; user_metadata?: any }; isAdmin: boolean; expiry: number }>();
+const adminTokenCache = new Map<string, { user: { id: string; email: string; user_metadata?: any }; isAdmin: boolean; isSupervisor?: boolean; expiry: number }>();
 
 function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: number; user_metadata?: any } | null {
   try {
@@ -181,6 +181,99 @@ async function requireAdminAccessStrict(req: Request, res: Response, next: NextF
     next();
   } catch (error) {
     console.error('[Admin Access] Error verifying admin status:', error);
+    res.status(500).json({ error: 'Authentication error', code: 'AUTH_ERROR' });
+  }
+}
+
+/**
+ * Strict middleware that allows both admins AND active supervisors
+ * Used for routes that supervisors and admins share (payment links, invoices, etc.)
+ */
+async function requireAdminOrSupervisorStrict(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authentication required', code: 'NO_TOKEN' });
+    return;
+  }
+  try {
+    const token = authHeader.slice(7);
+    const tokenHash = token.slice(-16);
+
+    const cached = adminTokenCache.get(tokenHash);
+    if (cached && Date.now() < cached.expiry) {
+      if (!cached.isAdmin && !cached.isSupervisor) {
+        res.status(403).json({ error: 'Admin or supervisor access required', code: 'NOT_AUTHORIZED' });
+        return;
+      }
+      (req as any).isAdmin = cached.isAdmin;
+      (req as any).isSupervisor = cached.isSupervisor;
+      (req as any).adminUser = {
+        id: cached.user.id,
+        email: cached.user.email,
+        role: cached.isAdmin ? 'admin' : 'supervisor',
+        fullName: cached.user.user_metadata?.fullName || cached.user.user_metadata?.full_name,
+      };
+      next();
+      return;
+    }
+
+    const payload = decodeJwtPayload(token);
+    if (payload?.exp && payload.exp * 1000 < Date.now()) {
+      res.status(401).json({ error: 'Token expired', code: 'INVALID_TOKEN' });
+      return;
+    }
+
+    let authUser: { id: string; email: string; user_metadata?: any } | null = null;
+    let jwtExp = payload?.exp ? payload.exp * 1000 : 0;
+
+    if (supabaseAdmin) {
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && user) authUser = user;
+    }
+    if (!authUser && payload?.email && payload?.sub) {
+      authUser = { id: payload.sub, email: payload.email, user_metadata: payload.user_metadata || {} };
+    }
+    if (!authUser) {
+      res.status(401).json({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' });
+      return;
+    }
+
+    const emailIsAdmin = await isAdminByEmail(authUser.email || '');
+    let emailIsSupervisor = false;
+    if (!emailIsAdmin) {
+      try {
+        const supResult = await getPgPool().query(
+          "SELECT status FROM supervisors WHERE email = $1 LIMIT 1",
+          [(authUser.email || '').toLowerCase()]
+        );
+        emailIsSupervisor = supResult.rows.length > 0 && supResult.rows[0].status === 'active';
+      } catch { emailIsSupervisor = false; }
+    }
+
+    const cacheExpiry = Math.min(jwtExp || Date.now() + 300000, Date.now() + 300000);
+    adminTokenCache.set(tokenHash, {
+      user: authUser,
+      isAdmin: emailIsAdmin,
+      isSupervisor: emailIsSupervisor,
+      expiry: cacheExpiry,
+    });
+
+    if (!emailIsAdmin && !emailIsSupervisor) {
+      res.status(403).json({ error: 'Admin or supervisor access required', code: 'NOT_AUTHORIZED' });
+      return;
+    }
+
+    (req as any).isAdmin = emailIsAdmin;
+    (req as any).isSupervisor = emailIsSupervisor;
+    (req as any).adminUser = {
+      id: authUser.id,
+      email: authUser.email || '',
+      role: emailIsAdmin ? 'admin' : 'supervisor',
+      fullName: authUser.user_metadata?.fullName || authUser.user_metadata?.full_name,
+    };
+    next();
+  } catch (error) {
+    console.error('[AdminOrSupervisor Access] Error:', error);
     res.status(500).json({ error: 'Authentication error', code: 'AUTH_ERROR' });
   }
 }
@@ -769,9 +862,10 @@ export async function registerRoutes(
 
   app.use(compression());
 
-  // Apply STRICT admin access middleware to all admin-only routes
-  // These routes will REJECT requests without valid admin credentials
-  app.use('/api/admin', requireAdminAccessStrict);
+  // Apply access middleware to admin/supervisor shared routes
+  // /api/admin/* — supervisors and admins both need access (payment links, pricing, etc.)
+  app.use('/api/admin', requireAdminOrSupervisorStrict);
+  // Strictly admin-only management routes
   app.use('/api/contract-templates', requireAdminAccessStrict);
   app.use('/api/driver-contracts', requireAdminAccessStrict);
   app.use('/api/notice-templates', requireAdminAccessStrict);
@@ -780,9 +874,10 @@ export async function registerRoutes(
   app.use('/api/drivers/:id/reactivate', requireAdminAccessStrict);
   app.use('/api/documents/:id/review', requireAdminAccessStrict);
   app.use('/api/documents/:id', (req, res, next) => { if (req.method === 'DELETE') return requireAdminAccessStrict(req, res, next); next(); });
-  app.use('/api/invoices/:id/send', requireAdminAccessStrict);
-  app.use('/api/invoices/:id/resend', requireAdminAccessStrict);
-  app.use('/api/invoices/bulk-send', requireAdminAccessStrict);
+  // Invoices — supervisors can send/resend invoices
+  app.use('/api/invoices/:id/send', requireAdminOrSupervisorStrict);
+  app.use('/api/invoices/:id/resend', requireAdminOrSupervisorStrict);
+  app.use('/api/invoices/bulk-send', requireAdminOrSupervisorStrict);
   // Protect DELETE invoice route (must be registered before the route)
   app.delete('/api/invoices/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
     const invoiceId = req.params.id;
