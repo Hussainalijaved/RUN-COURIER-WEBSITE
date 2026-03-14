@@ -82,6 +82,7 @@ const AdminPricing = lazy(() => import("@/pages/admin/AdminPricing"));
 const AdminContracts = lazy(() => import("@/pages/admin/AdminContracts"));
 const AdminNotices = lazy(() => import("@/pages/admin/AdminNotices"));
 const AdminSupervisors = lazy(() => import("@/pages/admin/AdminSupervisors"));
+const AdminProfile = lazy(() => import("@/pages/admin/AdminProfile"));
 
 const SupervisorLogin = lazy(() => import("@/pages/supervisor/SupervisorLogin"));
 const SupervisorRegister = lazy(() => import("@/pages/supervisor/SupervisorRegister"));
@@ -93,6 +94,7 @@ const SupervisorDrivers = lazy(() => import("@/pages/supervisor/SupervisorDriver
 const SupervisorCustomers = lazy(() => import("@/pages/supervisor/SupervisorCustomers"));
 const SupervisorInvoices = lazy(() => import("@/pages/supervisor/SupervisorInvoices"));
 const SupervisorHistory = lazy(() => import("@/pages/supervisor/SupervisorHistory"));
+const SupervisorProfile = lazy(() => import("@/pages/supervisor/SupervisorProfile"));
 const ContractSign = lazy(() => import("@/pages/ContractSign"));
 
 const CustomerDashboard = lazy(() => import("@/pages/customer/CustomerDashboard"));
@@ -279,6 +281,11 @@ function Router() {
             <AdminSupervisors />
           </ProtectedRoute>
         </Route>
+        <Route path="/admin/profile">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminProfile />
+          </ProtectedRoute>
+        </Route>
 
         <Route path="/customer">
           <ProtectedRoute allowedRoles={['customer']}>
@@ -448,6 +455,11 @@ function Router() {
         <Route path="/supervisor/history">
           <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
             <SupervisorHistory />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/profile">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorProfile />
           </ProtectedRoute>
         </Route>
         <Route path="/supervisor">

@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback } from 'react';
+import { type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ import {
   Receipt,
   FileSignature,
   Megaphone,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -77,6 +78,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/notices', label: 'Driver Notices', icon: Megaphone },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/supervisors', label: 'Supervisors', icon: Users },
+    { href: '/admin/pricing', label: 'Settings', icon: SlidersHorizontal },
   ],
   driver: [
     { href: '/driver', label: 'Dashboard', icon: LayoutDashboard },
@@ -126,11 +128,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, signOut } = useAuth();
 
-  const handleNavClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    e.preventDefault();
-    setLocation(href);
-  }, [setLocation]);
-
   if (!user) {
     return <div className="p-8">Loading...</div>;
   }
@@ -172,14 +169,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   {navItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
+                        asChild
                         isActive={location === item.href}
                         tooltip={item.label}
-                        onClick={(e) => handleNavClick(e as any, item.href)}
-                        className="cursor-pointer"
                         data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
                       >
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.label}</span>
+                        <a
+                          href={item.href}
+                          onClick={(e) => { e.preventDefault(); setLocation(item.href); }}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </a>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
