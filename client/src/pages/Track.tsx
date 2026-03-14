@@ -31,9 +31,27 @@ const statusSteps: { status: JobStatus; label: string; icon: any }[] = [
   { status: 'delivered', label: 'Delivered', icon: CheckCircle },
 ];
 
+// Maps every possible job status to the correct position in the customer timeline.
+// Statuses must only ever move forward — this function ensures the UI reflects
+// the furthest milestone reached, never resetting to an earlier step.
+const STATUS_TO_STEP_INDEX: Partial<Record<JobStatus | string, number>> = {
+  pending: 0,
+  assigned: 1,
+  offered: 1,     // offered = assigned from customer perspective
+  accepted: 1,    // driver accepted but not yet en-route — still "Driver Assigned"
+  on_the_way_pickup: 2,
+  arrived_pickup: 3,
+  collected: 4,
+  picked_up: 4,   // legacy mobile alias for collected
+  on_the_way_delivery: 5,
+  on_the_way: 5,  // legacy mobile alias for on_the_way_delivery
+  delivered: 6,
+};
+
 const getStatusIndex = (status: JobStatus): number => {
-  const index = statusSteps.findIndex((s) => s.status === status);
-  return index >= 0 ? index : 0;
+  const idx = STATUS_TO_STEP_INDEX[status as string];
+  // If status is unknown keep at 0 (Order Placed) — never go negative
+  return idx !== undefined ? idx : 0;
 };
 
 const getStatusColor = (status: JobStatus): string => {
@@ -41,14 +59,44 @@ const getStatusColor = (status: JobStatus): string => {
     case 'delivered':
       return 'bg-green-500';
     case 'cancelled':
+    case 'failed':
       return 'bg-red-500';
     case 'on_the_way_delivery':
+    case 'on_the_way':
     case 'on_the_way_pickup':
       return 'bg-blue-500';
+    case 'assigned':
+    case 'offered':
+    case 'accepted':
+      return 'bg-indigo-500';
+    case 'collected':
+    case 'picked_up':
+    case 'arrived_pickup':
+      return 'bg-purple-500';
     default:
       return 'bg-yellow-500';
   }
 };
+
+// Human-readable label for every possible status — used in the badge.
+const STATUS_LABEL: Partial<Record<string, string>> = {
+  pending: 'Order Placed',
+  assigned: 'Driver Assigned',
+  offered: 'Driver Assigned',
+  accepted: 'Driver Assigned',
+  on_the_way_pickup: 'En Route to Pickup',
+  arrived_pickup: 'Arrived at Pickup',
+  collected: 'Parcel Collected',
+  picked_up: 'Parcel Collected',
+  on_the_way_delivery: 'Out for Delivery',
+  on_the_way: 'Out for Delivery',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  failed: 'Failed',
+};
+
+const getStatusLabel = (status: string): string =>
+  STATUS_LABEL[status] ?? status;
 
 interface MockJob {
   id: string;
@@ -261,7 +309,7 @@ export default function Track() {
                       )}
                     </div>
                     <Badge className={`${getStatusColor(job.status)} text-white`}>
-                      {statusSteps.find((s) => s.status === job.status)?.label || job.status}
+                      {getStatusLabel(job.status)}
                     </Badge>
                   </div>
                 </CardHeader>

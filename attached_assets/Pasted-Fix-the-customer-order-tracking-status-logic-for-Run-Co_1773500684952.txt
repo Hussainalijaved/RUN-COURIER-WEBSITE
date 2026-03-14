@@ -1,0 +1,51 @@
+Fix the customer order tracking status logic for Run Courier.
+
+Current issue:
+The tracking timeline is updating incorrectly.
+When the driver clicks "Start to Pickup", the customer should see "En Route to Pickup", NOT "Arrived at Pickup".
+After pickup is completed, the system should continue forward to delivery statuses only, and must never repeat or reset previous pickup statuses.
+
+Required correct customer tracking flow:
+1. Order Placed
+2. Driver Assigned
+3. En Route to Pickup
+4. Arrived at Pickup
+5. Parcel Collected
+6. Out for Delivery
+7. Delivered
+
+Required driver action to customer status mapping:
+- When admin creates order => Order Placed
+- When driver is assigned => Driver Assigned
+- When driver clicks "Start to Pickup" => En Route to Pickup
+- When driver clicks "Arrived at Pickup" => Arrived at Pickup
+- When driver confirms pickup / parcel collected => Parcel Collected
+- When driver clicks "Start Delivery" or leaves pickup with parcel => Out for Delivery
+- When driver marks completed with POD/signature/photo/OTP => Delivered
+
+Important rules:
+- Statuses must move forward only
+- Never repeat previous statuses
+- Never reset timeline back to pickup statuses after parcel is collected
+- Once a status is completed, keep it completed
+- The timeline UI must highlight completed steps and current active step correctly
+- Customer tracking must always reflect the latest real driver stage
+- Prevent duplicate status updates from being inserted
+- If the same button is clicked twice, do not create duplicate tracking events
+- Add backend validation so status progression is monotonic only:
+  order_placed -> driver_assigned -> en_route_pickup -> arrived_pickup -> parcel_collected -> out_for_delivery -> delivered
+
+Implementation requirements:
+- Audit all frontend button actions and backend status mapping
+- Check whether "Start to Pickup" is incorrectly mapped to "arrived_pickup"
+- Check whether pickup confirmation is re-triggering earlier statuses
+- Ensure only one current status exists at a time
+- Use a single source of truth in the database for current status
+- Keep a status history log if needed, but do not use duplicated history records to render the main timeline incorrectly
+- Update both website and mobile app to use the same status enum values
+- Make sure customer tracking page reads the correct latest status from backend
+- Test every step end-to-end:
+  assign driver -> start to pickup -> arrive pickup -> collect parcel -> start delivery -> delivered
+
+Expected result:
+The customer timeline must progress smoothly from pickup stages to delivery stages without repeating or jumping to the wrong step.

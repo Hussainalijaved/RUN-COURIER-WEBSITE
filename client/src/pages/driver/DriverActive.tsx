@@ -40,11 +40,11 @@ const getStatusLabel = (status: JobStatus) => {
 const getNextActionLabel = (status: JobStatus) => {
   const actions: Record<string, string> = {
     assigned: 'Accept Job',
-    accepted: 'Start Journey',
+    accepted: 'Start to Pickup',
     on_the_way_pickup: 'Arrived at Pickup',
-    arrived_pickup: 'Collected Parcel',
-    collected: 'En Route to Delivery',
-    on_the_way_delivery: 'Mark Delivered',
+    arrived_pickup: 'Parcel Collected',
+    collected: 'Start Delivery',
+    on_the_way_delivery: 'Mark as Delivered',
   };
   return actions[status] || 'Complete';
 };

@@ -2882,12 +2882,49 @@ export async function registerRoutes(
     res.json(ensureJobNumber(job));
   }));
 
+  // Canonical forward-only status order for driver tracking progression.
+  // Any update that would move status BACKWARD is rejected; identical status
+  // updates are treated as no-ops (idempotent) to prevent duplicates.
+  const JOB_STATUS_ORDER: string[] = [
+    'pending',
+    'assigned',
+    'offered',
+    'accepted',
+    'on_the_way_pickup',
+    'arrived_pickup',
+    'collected',
+    'on_the_way_delivery',
+    'delivered',
+  ];
+
   app.patch("/api/jobs/:id/status", asyncHandler(async (req, res) => {
     const { status, rejectionReason, cancellationReason } = req.body;
     const previousJob = await storage.getJob(req.params.id);
     
     if (!previousJob) {
       return res.status(404).json({ error: "Job not found" });
+    }
+    
+    // Monotonic status progression — statuses must only move forward.
+    // Cancellation is always allowed. Same-status updates are idempotent.
+    if (status !== 'cancelled' && status !== 'failed') {
+      const prevIdx = JOB_STATUS_ORDER.indexOf(previousJob.status);
+      const nextIdx = JOB_STATUS_ORDER.indexOf(status);
+      if (prevIdx !== -1 && nextIdx !== -1) {
+        if (nextIdx < prevIdx) {
+          console.warn(`[Status] Rejected backward progression: ${previousJob.status} → ${status} for job ${req.params.id}`);
+          return res.status(400).json({
+            error: `Cannot move job status backward from '${previousJob.status}' to '${status}'`,
+            code: 'STATUS_REGRESSION',
+            currentStatus: previousJob.status,
+          });
+        }
+        if (nextIdx === prevIdx) {
+          // Idempotent — same status, return current job without re-processing
+          console.log(`[Status] Duplicate status update ignored: ${status} for job ${req.params.id}`);
+          return res.json(ensureJobNumber(previousJob));
+        }
+      }
     }
     
     // Require POD (photo or signature) before marking as delivered
