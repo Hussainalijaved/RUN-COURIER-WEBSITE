@@ -12504,6 +12504,215 @@ export async function registerRoutes(
     res.status(204).end();
   }));
 
+  // ============================================================
+  // SUPERVISOR ROUTES
+  // ============================================================
+  async function isSupervisorActive(email: string): Promise<boolean> {
+    try {
+      const result = await getPgPool().query(
+        "SELECT status FROM supervisors WHERE email = $1 LIMIT 1",
+        [email.toLowerCase()]
+      );
+      return result.rows.length > 0 && result.rows[0].status === 'active';
+    } catch {
+      return false;
+    }
+  }
+
+  async function requireSupervisorOrAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const token = authHeader.slice(7);
+    const authUser = await verifyAccessToken(token);
+    if (!authUser?.email) {
+      res.status(401).json({ error: 'Invalid token' });
+      return;
+    }
+    const isAdmin = await isAdminByEmail(authUser.email);
+    if (isAdmin) { next(); return; }
+    const isSup = await isSupervisorActive(authUser.email);
+    if (isSup) { next(); return; }
+    res.status(403).json({ error: 'Access denied' });
+  }
+
+  // POST /api/supervisors/invite — admin invites a supervisor
+  app.post('/api/supervisors/invite', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { email, fullName, notes } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    const normalizedEmail = email.toLowerCase().trim();
+    const { randomBytes } = await import('crypto');
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const invitedBy = req.headers['x-admin-name'] as string || 'Admin';
+    // Check if supervisor already exists
+    const existing = await getPgPool().query(
+      'SELECT id, status FROM supervisors WHERE email = $1 LIMIT 1',
+      [normalizedEmail]
+    );
+    if (existing.rows.length > 0 && existing.rows[0].status === 'active') {
+      return res.status(400).json({ error: 'A supervisor with this email already exists and is active' });
+    }
+    if (existing.rows.length > 0) {
+      // Re-invite: update token
+      await getPgPool().query(
+        'UPDATE supervisors SET invite_token = $1, invite_token_expires_at = $2, full_name = COALESCE($3, full_name), status = $4, notes = COALESCE($5, notes), updated_at = NOW() WHERE email = $6',
+        [token, expiresAt, fullName || null, 'pending', notes || null, normalizedEmail]
+      );
+    } else {
+      await getPgPool().query(
+        'INSERT INTO supervisors (email, full_name, status, invite_token, invite_token_expires_at, invited_by, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [normalizedEmail, fullName || '', 'pending', token, expiresAt, invitedBy, notes || null]
+      );
+    }
+    const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+    const inviteUrl = `${baseUrl}/supervisor/register?token=${token}`;
+    try {
+      const { sendSupervisorInviteEmail } = await import('./emailService');
+      await sendSupervisorInviteEmail(normalizedEmail, {
+        supervisorName: fullName,
+        inviteUrl,
+        invitedBy,
+        expiresAt,
+      });
+    } catch (emailErr: any) {
+      console.warn('[Supervisor] Failed to send invite email:', emailErr?.message);
+    }
+    res.json({ success: true, message: `Invitation sent to ${normalizedEmail}`, inviteUrl });
+  }));
+
+  // GET /api/supervisors/invite/validate/:token
+  app.get('/api/supervisors/invite/validate/:token', asyncHandler(async (req, res) => {
+    const { token } = req.params;
+    const result = await getPgPool().query(
+      'SELECT id, email, full_name, status, invite_token_expires_at FROM supervisors WHERE invite_token = $1 LIMIT 1',
+      [token]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Invalid or expired invitation link' });
+    const sup = result.rows[0];
+    if (sup.status === 'active') return res.status(400).json({ error: 'This invitation has already been used' });
+    if (new Date(sup.invite_token_expires_at) < new Date()) return res.status(400).json({ error: 'This invitation link has expired. Please request a new one from your admin.' });
+    res.json({ valid: true, email: sup.email, fullName: sup.full_name });
+  }));
+
+  // POST /api/supervisors/register — supervisor creates account from invite
+  app.post('/api/supervisors/register', asyncHandler(async (req, res) => {
+    const { token, password, fullName, phone } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+    const result = await getPgPool().query(
+      'SELECT id, email, full_name, status, invite_token_expires_at FROM supervisors WHERE invite_token = $1 LIMIT 1',
+      [token]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Invalid invitation link' });
+    const sup = result.rows[0];
+    if (sup.status === 'active') return res.status(400).json({ error: 'This invitation has already been used' });
+    if (new Date(sup.invite_token_expires_at) < new Date()) return res.status(400).json({ error: 'This invitation has expired' });
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Server error' });
+    // Create Supabase Auth user
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: sup.email,
+      password,
+      email_confirm: true,
+      user_metadata: { role: 'supervisor', fullName: fullName || sup.full_name, phone: phone || '' },
+    });
+    if (authError) {
+      if (authError.message.includes('already')) {
+        return res.status(400).json({ error: 'An account with this email already exists. Try logging in.' });
+      }
+      return res.status(400).json({ error: authError.message });
+    }
+    // Update supervisors table
+    await getPgPool().query(
+      'UPDATE supervisors SET auth_user_id = $1, full_name = $2, phone = $3, status = $4, invite_token = NULL, activated_at = NOW(), updated_at = NOW() WHERE id = $5',
+      [authData.user.id, fullName || sup.full_name, phone || null, 'pending_approval', sup.id]
+    );
+    res.json({ success: true, message: 'Account created successfully. Your account is pending admin approval.' });
+  }));
+
+  // GET /api/supervisor/verify — check supervisor status after login
+  app.get('/api/supervisor/verify', asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+    const token = authHeader.slice(7);
+    const authUser = await verifyAccessToken(token);
+    if (!authUser?.email) return res.status(401).json({ error: 'Invalid token' });
+    const result = await getPgPool().query(
+      'SELECT id, status, full_name FROM supervisors WHERE email = $1 LIMIT 1',
+      [authUser.email.toLowerCase()]
+    );
+    if (result.rows.length === 0) return res.status(403).json({ error: 'Not a supervisor account' });
+    const sup = result.rows[0];
+    if (sup.status !== 'active') {
+      return res.status(403).json({ error: 'Your account is pending admin approval.', status: sup.status });
+    }
+    res.json({ verified: true, status: sup.status, name: sup.full_name });
+  }));
+
+  // GET /api/supervisors — admin list all supervisors
+  app.get('/api/supervisors', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const result = await getPgPool().query(
+      'SELECT id, email, full_name, phone, status, invited_at, activated_at, invited_by, notes, created_at FROM supervisors ORDER BY created_at DESC'
+    );
+    res.json(result.rows);
+  }));
+
+  // PATCH /api/supervisors/:id/status — admin update supervisor status
+  app.patch('/api/supervisors/:id/status', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    const allowed = ['active', 'suspended', 'deactivated', 'pending_approval'];
+    if (!allowed.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+    const result = await getPgPool().query(
+      'UPDATE supervisors SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Supervisor not found' });
+    res.json(result.rows[0]);
+  }));
+
+  // DELETE /api/supervisors/:id — admin delete supervisor
+  app.delete('/api/supervisors/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const supResult = await getPgPool().query('SELECT auth_user_id FROM supervisors WHERE id = $1', [id]);
+    if (supResult.rows.length === 0) return res.status(404).json({ error: 'Supervisor not found' });
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (supabaseAdmin && supResult.rows[0].auth_user_id) {
+      await supabaseAdmin.auth.admin.deleteUser(supResult.rows[0].auth_user_id).catch(() => {});
+    }
+    await getPgPool().query('DELETE FROM supervisors WHERE id = $1', [id]);
+    res.json({ success: true });
+  }));
+
+  // GET /api/supervisor/stats — supervisor dashboard stats
+  app.get('/api/supervisor/stats', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
+    try {
+      const [jobsResult, driversResult, customersResult] = await Promise.all([
+        getPgPool().query("SELECT status, COUNT(*) as count FROM jobs GROUP BY status"),
+        getPgPool().query("SELECT COUNT(*) as count FROM drivers WHERE is_verified = true AND is_active = true"),
+        getPgPool().query("SELECT COUNT(*) as count FROM users WHERE role = 'customer'"),
+      ]);
+      const jobCounts: Record<string, number> = {};
+      for (const row of jobsResult.rows) {
+        jobCounts[row.status] = parseInt(row.count);
+      }
+      const totalJobs = Object.values(jobCounts).reduce((a, b) => a + b, 0);
+      const activeJobs = (jobCounts['assigned'] || 0) + (jobCounts['accepted'] || 0) + (jobCounts['on_the_way_pickup'] || 0) + (jobCounts['collected'] || 0) + (jobCounts['on_the_way_delivery'] || 0);
+      res.json({
+        totalJobs,
+        pendingJobs: jobCounts['pending'] || 0,
+        activeJobs,
+        completedJobs: jobCounts['delivered'] || 0,
+        activeDrivers: parseInt(driversResult.rows[0]?.count || '0'),
+        totalCustomers: parseInt(customersResult.rows[0]?.count || '0'),
+      });
+    } catch (e: any) {
+      res.json({ totalJobs: 0, pendingJobs: 0, activeJobs: 0, completedJobs: 0, activeDrivers: 0, totalCustomers: 0 });
+    }
+  }));
+
   registerMobileRoutes(app);
 
   // Payment Links Routes

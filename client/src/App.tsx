@@ -81,6 +81,18 @@ const AdminInvoices = lazy(() => import("@/pages/admin/AdminInvoices"));
 const AdminPricing = lazy(() => import("@/pages/admin/AdminPricing"));
 const AdminContracts = lazy(() => import("@/pages/admin/AdminContracts"));
 const AdminNotices = lazy(() => import("@/pages/admin/AdminNotices"));
+const AdminSupervisors = lazy(() => import("@/pages/admin/AdminSupervisors"));
+
+const SupervisorLogin = lazy(() => import("@/pages/supervisor/SupervisorLogin"));
+const SupervisorRegister = lazy(() => import("@/pages/supervisor/SupervisorRegister"));
+const SupervisorDashboard = lazy(() => import("@/pages/supervisor/SupervisorDashboard"));
+const SupervisorJobs = lazy(() => import("@/pages/supervisor/SupervisorJobs"));
+const SupervisorCreateJob = lazy(() => import("@/pages/supervisor/SupervisorCreateJob"));
+const SupervisorMap = lazy(() => import("@/pages/supervisor/SupervisorMap"));
+const SupervisorDrivers = lazy(() => import("@/pages/supervisor/SupervisorDrivers"));
+const SupervisorCustomers = lazy(() => import("@/pages/supervisor/SupervisorCustomers"));
+const SupervisorInvoices = lazy(() => import("@/pages/supervisor/SupervisorInvoices"));
+const SupervisorHistory = lazy(() => import("@/pages/supervisor/SupervisorHistory"));
 const ContractSign = lazy(() => import("@/pages/ContractSign"));
 
 const CustomerDashboard = lazy(() => import("@/pages/customer/CustomerDashboard"));
@@ -262,6 +274,11 @@ function Router() {
             <AdminNotices />
           </ProtectedRoute>
         </Route>
+        <Route path="/admin/supervisors">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminSupervisors />
+          </ProtectedRoute>
+        </Route>
 
         <Route path="/customer">
           <ProtectedRoute allowedRoles={['customer']}>
@@ -389,6 +406,53 @@ function Router() {
         <Route path="/vendor/api">
           <ProtectedRoute allowedRoles={['vendor']}>
             <VendorDashboard />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/supervisor/login">
+          <SupervisorLogin />
+        </Route>
+        <Route path="/supervisor/register">
+          <SupervisorRegister />
+        </Route>
+        <Route path="/supervisor/jobs/create">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorCreateJob />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/jobs">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorJobs />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/map">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorMap />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/drivers">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorDrivers />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/customers">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorCustomers />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/invoices">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorInvoices />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/history">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorHistory />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <SupervisorDashboard />
           </ProtectedRoute>
         </Route>
 

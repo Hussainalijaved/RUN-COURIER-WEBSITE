@@ -76,6 +76,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/contracts', label: 'Contracts', icon: FileSignature },
     { href: '/admin/notices', label: 'Driver Notices', icon: Megaphone },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+    { href: '/admin/supervisors', label: 'Supervisors', icon: Users },
   ],
   driver: [
     { href: '/driver', label: 'Dashboard', icon: LayoutDashboard },
@@ -108,6 +109,16 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/vendor/upload', label: 'Bulk Upload', icon: Upload },
     { href: '/vendor/scheduled', label: 'Scheduled', icon: Calendar },
     { href: '/vendor/api', label: 'API Keys', icon: Key },
+  ],
+  supervisor: [
+    { href: '/supervisor', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/supervisor/jobs', label: 'Jobs', icon: Package },
+    { href: '/supervisor/jobs/create', label: 'Create Job', icon: CheckCircle },
+    { href: '/supervisor/map', label: 'Live Map', icon: MapPin },
+    { href: '/supervisor/drivers', label: 'Drivers', icon: Users },
+    { href: '/supervisor/customers', label: 'Customers', icon: Users },
+    { href: '/supervisor/invoices', label: 'Invoices', icon: Receipt },
+    { href: '/supervisor/history', label: 'Job History', icon: Clock },
   ],
 };
 

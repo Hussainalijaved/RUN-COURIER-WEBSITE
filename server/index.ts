@@ -445,6 +445,38 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS supervisors (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          auth_user_id UUID UNIQUE,
+          email TEXT NOT NULL UNIQUE,
+          full_name TEXT NOT NULL DEFAULT '',
+          phone TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          invite_token TEXT UNIQUE,
+          invite_token_expires_at TIMESTAMPTZ,
+          invited_by TEXT,
+          invited_at TIMESTAMPTZ DEFAULT NOW(),
+          activated_at TIMESTAMPTZ,
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_email ON supervisors(email)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_status ON supervisors(status)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_invite_token ON supervisors(invite_token)`);
+      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
+      console.log("[MIGRATION] Supervisors table created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Supervisors table migration error:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
       const { hydrateLocationCache } = await import('./realtime');
       await hydrateLocationCache();
       console.log("[BACKGROUND] Cache hydrated");

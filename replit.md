@@ -89,6 +89,9 @@ Admins can create contract templates with placeholder variables, send contracts 
 ### Driver Notice / Broadcast System
 Admins can create notice templates, send notices to all active approved drivers or selected drivers, and track viewing/acknowledgement status. Notices can optionally require driver acknowledgement and trigger email notifications.
 
+### Supervisor System
+A dedicated operations supervisor role with a separate login portal at `/supervisor/login`. Supervisors are invited by admins via email (invite link with 7-day expiry), self-register at `/supervisor/register?token=...`, and must be approved by an admin before gaining access. The `supervisors` table (auto-migrated on startup) tracks invite status, activation, and notes. Admin manages supervisors at `/admin/supervisors` (invite, approve/reject, suspend, delete). Active supervisors access a full operations dashboard including: Dashboard with live stats, Jobs list, Create Job (same UI/logic as admin), Live Map, Drivers, Customers, Invoices, and Job History. The `UserRole` type includes `'supervisor'`, DashboardLayout/ProtectedRoute/dashboardRoutes all handle the supervisor role, and the `/api/supervisor/*` and `/api/supervisors/*` backend routes manage all supervisor operations. Supervisor status flow: `pending` (invited, not yet registered) → `pending_approval` (registered, awaiting admin approval) → `active` (approved) → `suspended` / `deactivated`.
+
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.

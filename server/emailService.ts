@@ -2732,3 +2732,40 @@ export async function sendContractSigningEmail(
 
   return sendEmailNotification(driverEmail, `Contract Ready for Signing - ${data.contractTitle} - Run Courier`, htmlContent, textContent);
 }
+
+export async function sendSupervisorInviteEmail(supervisorEmail: string, data: {
+  supervisorName?: string;
+  inviteUrl: string;
+  invitedBy: string;
+  expiresAt: Date;
+}): Promise<boolean> {
+  const content = `
+    <h2 style="color: #1a1a1a; margin-bottom: 8px;">You've Been Invited as a Supervisor</h2>
+    <p style="color: #555; font-size: 15px; line-height: 1.6;">
+      Hi${data.supervisorName ? ` ${data.supervisorName}` : ''},<br><br>
+      ${data.invitedBy} has invited you to join <strong>Run Courier</strong> as a Supervisor.
+      As a supervisor, you will be able to manage jobs, view driver activity, and oversee daily operations.
+    </p>
+    <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 24px 0;">
+      <p style="margin: 0; color: #555; font-size: 14px;">
+        <strong>Invitation expires:</strong> ${data.expiresAt.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+      </p>
+    </div>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.inviteUrl}" style="display: inline-block; background-color: #007BFF; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+        Accept Invitation &amp; Create Account
+      </a>
+    </div>
+    <p style="color: #888; font-size: 13px; line-height: 1.6;">
+      If you did not expect this invitation or believe this was sent in error, please ignore this email.
+      For questions, contact us at sales@runcourier.co.uk
+    </p>
+    <p style="color: #aaa; font-size: 12px;">
+      Or copy this link into your browser:<br>
+      <a href="${data.inviteUrl}" style="color: #007BFF; word-break: break-all;">${data.inviteUrl}</a>
+    </p>
+  `;
+  const htmlContent = wrapEmailContent(content, 'Supervisor Invitation');
+  const textContent = `You've Been Invited as a Supervisor\n\nHi${data.supervisorName ? ` ${data.supervisorName}` : ''},\n\n${data.invitedBy} has invited you to join Run Courier as a Supervisor.\n\nAccept your invitation at: ${data.inviteUrl}\n\nThis invitation expires on ${data.expiresAt.toLocaleDateString('en-GB')}.\n\nQuestions? Contact sales@runcourier.co.uk`;
+  return sendEmailNotification(supervisorEmail, 'You\'ve Been Invited as a Supervisor - Run Courier', htmlContent, textContent);
+}

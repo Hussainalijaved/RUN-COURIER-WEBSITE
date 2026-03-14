@@ -2,7 +2,7 @@ import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb, se
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export type UserRole = "admin" | "driver" | "customer" | "dispatcher" | "vendor";
+export type UserRole = "admin" | "driver" | "customer" | "dispatcher" | "vendor" | "supervisor";
 export type UserType = "individual" | "business";
 export type CustomerType = "individual" | "business";
 // CRITICAL: Job status values must match Supabase and mobile app

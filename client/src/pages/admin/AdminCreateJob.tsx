@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,6 +115,7 @@ type CreateJobInput = z.infer<typeof createJobSchema>;
 
 export default function AdminCreateJob() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [distance, setDistance] = useState<number>(0);
@@ -472,7 +474,7 @@ export default function AdminCreateJob() {
         description: `Job ${data.trackingNumber} has been created successfully.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      navigate('/admin/jobs');
+      navigate(user?.role === 'supervisor' ? '/supervisor/jobs' : '/admin/jobs');
     },
     onError: (error: any) => {
       toast({
