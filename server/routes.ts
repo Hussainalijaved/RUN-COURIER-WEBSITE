@@ -3752,7 +3752,19 @@ export async function registerRoutes(
   }));
 
   app.delete("/api/jobs/:id", asyncHandler(async (req, res) => {
-    await storage.deleteJob(req.params.id);
+    const jobId = req.params.id;
+    try {
+      await storage.deleteJob(jobId);
+    } catch (e: any) {
+      // Supabase REST API may reject non-integer IDs for bigint columns.
+      // Fall back to raw SQL with text cast which handles both integer and
+      // legacy string-format job IDs.
+      if (e.message && e.message.includes('invalid input syntax for type bigint')) {
+        await getPgPool().query('DELETE FROM jobs WHERE id::text = $1', [jobId]);
+      } else {
+        throw e;
+      }
+    }
     res.status(204).send();
   }));
 
