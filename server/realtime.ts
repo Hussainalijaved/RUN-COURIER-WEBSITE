@@ -342,15 +342,20 @@ async function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string)
   
   let authorizedRole: string;
   
-  if (dbUser && dbUser.role) {
+  // Supervisors are stored in the `supervisors` table, not `users` table.
+  // Their JWT role is 'supervisor' — always trust the JWT for supervisors.
+  if (verifiedUser.role === 'supervisor') {
+    authorizedRole = 'supervisor';
+    log(`WebSocket auth: Supervisor ${verifiedUser.id} authenticated via JWT role`, 'realtime');
+  } else if (dbUser && dbUser.role) {
     authorizedRole = dbUser.role;
     log(`WebSocket auth: User ${verifiedUser.id} found in database with role: ${authorizedRole}`, 'realtime');
   } else {
     if (verifiedUser.role === 'driver') {
       authorizedRole = 'driver';
       log(`WebSocket auth: Driver ${verifiedUser.id} not in users table, will validate driver profile`, 'realtime');
-    } else if (['admin', 'dispatcher', 'supervisor'].includes(verifiedUser.role)) {
-      log(`WebSocket auth: Admin/dispatcher/supervisor user ${verifiedUser.id} authenticated via Supabase token`, 'realtime');
+    } else if (['admin', 'dispatcher'].includes(verifiedUser.role)) {
+      log(`WebSocket auth: Admin/dispatcher user ${verifiedUser.id} authenticated via Supabase token`, 'realtime');
       authorizedRole = verifiedUser.role;
     } else {
       log(`WebSocket auth failed: User ${verifiedUser.id} not in database and metadata role (${verifiedUser.role}) is not allowed`, 'realtime');

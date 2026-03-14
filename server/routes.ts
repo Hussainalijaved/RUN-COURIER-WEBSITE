@@ -12387,6 +12387,7 @@ export async function registerRoutes(
   app.patch("/api/jobs/:id/unassign", asyncHandler(async (req, res) => {
     const { adminUserId, reason } = req.body;
     const jobId = req.params.id;
+    console.log(`[Job Unassign] Request — jobId: ${jobId}, adminUserId: ${adminUserId}, reason: ${reason}`);
     
     if (!adminUserId) {
       return res.status(400).json({ error: "adminUserId is required" });
@@ -12394,10 +12395,12 @@ export async function registerRoutes(
 
     const job = await storage.getJob(jobId);
     if (!job) {
+      console.log(`[Job Unassign] Job ${jobId} not found`);
       return res.status(404).json({ error: "Job not found" });
     }
 
     if (!job.driverId) {
+      console.log(`[Job Unassign] Job ${jobId} has no driver assigned`);
       return res.status(400).json({ error: "Job has no driver assigned" });
     }
 
