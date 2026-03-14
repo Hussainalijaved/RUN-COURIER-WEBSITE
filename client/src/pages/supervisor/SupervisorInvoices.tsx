@@ -114,11 +114,6 @@ export default function SupervisorInvoices() {
     return isNaN(n) ? '—' : `£${n.toFixed(2)}`;
   };
 
-  const totalAmount = filtered.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-  const paidAmount = filtered
-    .filter((inv) => inv.status === 'paid')
-    .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-
   const resendMutation = useMutation({
     mutationFn: async ({ invoice, overrideEmail }: { invoice: any; overrideEmail?: string }) => {
       const response = await apiRequest('POST', `/api/invoices/${invoice.id}/resend`,
@@ -197,29 +192,6 @@ export default function SupervisorInvoices() {
           <p className="text-sm text-muted-foreground mt-1">
             {filtered.length} invoice{filtered.length !== 1 ? 's' : ''}
           </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Invoiced</p>
-              <p className="text-xl font-bold text-foreground mt-1">{formatAmount(totalAmount)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Paid</p>
-              <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">{formatAmount(paidAmount)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Outstanding</p>
-              <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                {formatAmount(totalAmount - paidAmount)}
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         <Card>
