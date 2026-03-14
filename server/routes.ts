@@ -12734,7 +12734,7 @@ export async function registerRoutes(
 
     if (city) {
       // All active jobs (any city) + completed jobs only for this supervisor's city
-      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, customer_email, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
+      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, pickup_contact_name, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
                FROM jobs
                WHERE status = ANY($1::text[])
                   OR (status NOT IN ('pending','assigned','accepted','offered','on_the_way_pickup','collected','on_the_way_delivery') AND office_city = $2)
@@ -12742,7 +12742,7 @@ export async function registerRoutes(
       params = [ACTIVE_STATUSES, city];
     } else {
       // Admin — all jobs
-      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, customer_name, customer_email, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
+      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, pickup_contact_name, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
                FROM jobs ORDER BY created_at DESC LIMIT 300`;
       params = [];
     }
@@ -12751,7 +12751,7 @@ export async function registerRoutes(
     const jobs = result.rows.map((r: any) => ({
       id: r.id, trackingNumber: r.tracking_number, status: r.status,
       pickupAddress: r.pickup_address, deliveryAddress: r.delivery_address,
-      customerName: r.customer_name, customerEmail: r.customer_email,
+      customerName: r.pickup_contact_name, customerEmail: null,
       vehicleType: r.vehicle_type, totalPrice: r.total_price,
       createdAt: r.created_at, isMultiDrop: r.is_multi_drop,
       officeCity: r.office_city, driverId: r.driver_id, serviceType: r.service_type,
@@ -12763,7 +12763,7 @@ export async function registerRoutes(
   app.get('/api/supervisor/history', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
     const result = await getPgPool().query(
       `SELECT j.id, j.tracking_number, j.job_number, j.status, j.pickup_address, j.delivery_address,
-              j.customer_name, j.vehicle_type, j.total_price, j.driver_price, j.created_at,
+              j.pickup_contact_name, j.vehicle_type, j.total_price, j.driver_price, j.created_at,
               j.is_multi_drop, j.office_city, j.driver_id,
               d.full_name AS driver_name, d.driver_code
        FROM jobs j
@@ -12778,7 +12778,7 @@ export async function registerRoutes(
       status: r.status,
       pickupAddress: r.pickup_address,
       deliveryAddress: r.delivery_address,
-      customerName: r.customer_name,
+      customerName: r.pickup_contact_name,
       vehicleType: r.vehicle_type,
       totalPrice: r.total_price,
       driverPrice: r.driver_price,
