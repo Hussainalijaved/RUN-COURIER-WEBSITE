@@ -3232,7 +3232,24 @@ export async function registerRoutes(
     // This must happen BEFORE driver fetches the job
     await storage.updateJob(req.params.id, { driverPrice: finalDriverPrice });
     console.log(`[Jobs] Updated job ${job.id} with driver_price: £${finalDriverPrice}`);
-    
+
+    // Tag office_city if assigned by a supervisor and job not already tagged
+    try {
+      const assignerEmail = await getSupervisorEmailFromReq(req);
+      if (assignerEmail) {
+        const supCity = await getSupervisorCityByEmail(assignerEmail);
+        if (supCity && !previousJob?.officeCity) {
+          await getPgPool().query(
+            'UPDATE jobs SET office_city = $1 WHERE id = $2',
+            [supCity, req.params.id]
+          );
+          console.log(`[Jobs] Tagged job ${req.params.id} with office_city=${supCity} (assigned by supervisor ${assignerEmail})`);
+        }
+      }
+    } catch (tagErr) {
+      console.warn('[Jobs] Failed to tag office_city on assignment:', tagErr);
+    }
+
     // Auto-geocode job coordinates if missing (for mobile app map preview)
     if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude) ||
         job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
@@ -11943,6 +11960,17 @@ export async function registerRoutes(
         driverId: driverId,
         driverPrice: driverPrice
       });
+
+      // Tag office_city if assigned by a supervisor and job not already tagged
+      try {
+        const assignerEmail = await getSupervisorEmailFromReq(req);
+        if (assignerEmail) {
+          const supCity = await getSupervisorCityByEmail(assignerEmail);
+          if (supCity && !job.officeCity) {
+            await getPgPool().query('UPDATE jobs SET office_city = $1 WHERE id = $2', [supCity, jobId]);
+          }
+        }
+      } catch {}
 
       assignments.push(assignment);
     }
