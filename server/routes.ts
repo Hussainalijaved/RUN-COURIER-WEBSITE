@@ -2153,11 +2153,13 @@ export async function registerRoutes(
 
     console.log(`[Stop Deliver] Stop ${stopId} delivered for job ${jobId} by ${isAdmin ? 'admin' : 'driver'}`);
 
-    // Check if ALL stops for this job are now delivered
+    // Fetch ALL stops with full details ordered by stop_order so the app always
+    // has the authoritative sequence — prevents client-side reordering bugs.
     const { data: allStops, error: allStopsError } = await supAdmin
       .from('multi_drop_stops')
-      .select('id, status, pod_photo_url, pod_recipient_name')
-      .eq('job_id', jobId);
+      .select('id, job_id, stop_order, address, postcode, latitude, longitude, recipient_name, recipient_phone, instructions, status, delivered_at, pod_photo_url, pod_recipient_name')
+      .eq('job_id', jobId)
+      .order('stop_order', { ascending: true });
 
     if (allStopsError) {
       console.error('[Stop Deliver] Failed to fetch all stops:', allStopsError);
@@ -2178,7 +2180,28 @@ export async function registerRoutes(
       });
     }
 
-    const allDelivered = allStops && allStops.length > 0 && allStops.every(s => s.status === 'delivered');
+    // Map all stops to camelCase for the response
+    const mappedAllStops = (allStops || []).map((s: any) => ({
+      id: s.id,
+      jobId: s.job_id,
+      stopOrder: s.stop_order,
+      address: s.address,
+      postcode: s.postcode,
+      latitude: s.latitude,
+      longitude: s.longitude,
+      recipientName: s.recipient_name,
+      recipientPhone: s.recipient_phone,
+      instructions: s.instructions,
+      status: s.status,
+      deliveredAt: s.delivered_at,
+      podRecipientName: s.pod_recipient_name,
+      podPhotoUrl: s.pod_photo_url,
+    }));
+
+    // Remaining stops in original stop_order sequence — never re-sorted
+    const remainingStops = mappedAllStops.filter(s => s.status !== 'delivered');
+
+    const allDelivered = allStops && allStops.length > 0 && allStops.every((s: any) => s.status === 'delivered');
 
     if (allDelivered) {
       console.log(`[Stop Deliver] All ${allStops.length} stops delivered for job ${jobId} - auto-completing job`);
@@ -2259,6 +2282,9 @@ export async function registerRoutes(
         },
         jobCompleted: true,
         message: `All ${allStops.length} stops delivered. Job auto-completed.`,
+        allStops: mappedAllStops,
+        remainingStops: [],
+        remainingStopsCount: 0,
       });
     }
 
@@ -2275,7 +2301,13 @@ export async function registerRoutes(
         podPhotoUrl: updatedStop.pod_photo_url,
       },
       jobCompleted: false,
-      remainingStops: allStops ? allStops.filter(s => s.status !== 'delivered').length : undefined,
+      // Full ordered list of all stops (delivered + pending) sorted by stop_order.
+      // The app must use this to drive navigation — never re-sort client-side.
+      allStops: mappedAllStops,
+      // Pending stops only, already in stop_order sequence ready for navigation.
+      remainingStops,
+      remainingStopsCount: remainingStops.length,
+      nextStop: remainingStops[0] ?? null,
     });
   }));
 
