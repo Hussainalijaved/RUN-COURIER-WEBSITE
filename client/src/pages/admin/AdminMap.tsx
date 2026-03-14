@@ -219,10 +219,12 @@ export default function AdminMap() {
     
     if (hasValidBounds) {
       map.fitBounds(bounds, 50);
-      // Don't zoom in too far if there's only one driver
+      // Clamp zoom: never below 11 (region level) and never above 14 (street level)
       const listener = google.maps.event.addListener(map, 'idle', () => {
-        if (map.getZoom() && map.getZoom()! > 14) {
-          map.setZoom(14);
+        const z = map.getZoom();
+        if (z !== undefined) {
+          if (z > 14) map.setZoom(14);
+          else if (z < 11) map.setZoom(11);
         }
         google.maps.event.removeListener(listener);
       });
