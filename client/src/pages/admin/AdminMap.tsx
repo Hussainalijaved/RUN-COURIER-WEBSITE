@@ -66,7 +66,6 @@ export default function AdminMap() {
   const [assigningJobId, setAssigningJobId] = useState<string | null>(null);
   const [selectedDriverForAssign, setSelectedDriverForAssign] = useState<string>('');
   const [driverPriceForAssign, setDriverPriceForAssign] = useState<string>('');
-  const [hasInitialFit, setHasInitialFit] = useState(false);
   const [driverSearchQuery, setDriverSearchQuery] = useState('');
   const { toast } = useToast();
 
@@ -536,12 +535,7 @@ export default function AdminMap() {
       }
     });
     
-    // Automatically fit all drivers on first load
-    if (!hasInitialFit && activeDrivers.length > 0 && driverMarkersRef.current.size > 0) {
-      fitAllDrivers();
-      setHasInitialFit(true);
-    }
-  }, [activeDrivers, mapLoaded, jobs, realtimeLocations, getDriverLocation, hasInitialFit, fitAllDrivers]);
+  }, [activeDrivers, mapLoaded, jobs, realtimeLocations, getDriverLocation, fitAllDrivers]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;

@@ -132,9 +132,11 @@ if (IS_PROD) {
       setupRealtimeServer(httpServer);
       console.log("[BOOT] Realtime done");
       
-      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
         const message = err.message || "Internal Server Error";
+        if (status >= 500) console.error(`[ERROR] ${req.method} ${req.path} → ${status}: ${message}`, err.stack || '');
+        else console.warn(`[WARN] ${req.method} ${req.path} → ${status}: ${message}`);
         res.status(status).json({ message });
       });
       
@@ -228,9 +230,11 @@ if (IS_PROD) {
       setupRealtimeServer(httpServer);
       console.log("[BOOT] Realtime done");
 
-      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
         const message = err.message || "Internal Server Error";
+        if (status >= 500) console.error(`[ERROR] ${req.method} ${req.path} → ${status}: ${message}`, err.stack || '');
+        else console.warn(`[WARN] ${req.method} ${req.path} → ${status}: ${message}`);
         res.status(status).json({ message });
       });
 

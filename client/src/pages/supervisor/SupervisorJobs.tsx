@@ -436,7 +436,7 @@ export default function SupervisorJobs() {
 
   const assignDriverMutation = useMutation({
     mutationFn: async ({ jobId, driverId, driverPrice }: { jobId: string; driverId: string; driverPrice: string }) => {
-      const res = await apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId, driverPrice, assignedBy: user?.id });
+      const res = await apiRequest('PATCH', `/api/jobs/${jobId}/assign`, { driverId, driverPrice, dispatcherId: user?.id || null });
       return res.json();
     },
     onSuccess: () => {
@@ -454,7 +454,7 @@ export default function SupervisorJobs() {
 
   const withdrawAssignmentMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const res = await apiRequest('PATCH', `/api/jobs/${jobId}/unassign`, { adminUserId: user?.id, reason: 'Withdrawn by supervisor' });
+      const res = await apiRequest('PATCH', `/api/jobs/${jobId}/unassign`, { adminUserId: user?.id || 'supervisor', reason: 'Withdrawn by supervisor' });
       return res.json();
     },
     onSuccess: () => {
