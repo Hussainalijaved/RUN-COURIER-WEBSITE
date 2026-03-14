@@ -349,8 +349,8 @@ async function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string)
     if (verifiedUser.role === 'driver') {
       authorizedRole = 'driver';
       log(`WebSocket auth: Driver ${verifiedUser.id} not in users table, will validate driver profile`, 'realtime');
-    } else if (['admin', 'dispatcher'].includes(verifiedUser.role)) {
-      log(`WebSocket auth: Admin/dispatcher user ${verifiedUser.id} authenticated via Supabase token`, 'realtime');
+    } else if (['admin', 'dispatcher', 'supervisor'].includes(verifiedUser.role)) {
+      log(`WebSocket auth: Admin/dispatcher/supervisor user ${verifiedUser.id} authenticated via Supabase token`, 'realtime');
       authorizedRole = verifiedUser.role;
     } else {
       log(`WebSocket auth failed: User ${verifiedUser.id} not in database and metadata role (${verifiedUser.role}) is not allowed`, 'realtime');
@@ -397,7 +397,7 @@ async function handleAuth(ws: WebSocket, message: AuthMessage, clientId: string)
     broadcastDriverAvailability(driverId, true).catch(err => {
       log(`Error broadcasting driver availability on connect: ${err}`, 'realtime');
     });
-  } else if (['admin', 'dispatcher'].includes(authorizedRole)) {
+  } else if (['admin', 'dispatcher', 'supervisor'].includes(authorizedRole)) {
     observerConnections.set(clientId, client);
     log(`Observer ${authorizedRole}:${verifiedUser.email} authenticated via database role`, 'realtime');
   } else {
@@ -471,8 +471,8 @@ async function handleLocationUpdate(client: AuthenticatedClient, message: Locati
 }
 
 function handleSubscribe(client: AuthenticatedClient): void {
-  if (!['admin', 'dispatcher'].includes(client.user.role)) {
-    sendMessage(client.ws, { type: 'error', payload: { message: 'Only admins and dispatchers can subscribe', code: 'UNAUTHORIZED' } });
+  if (!['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
+    sendMessage(client.ws, { type: 'error', payload: { message: 'Only admins, dispatchers and supervisors can subscribe', code: 'UNAUTHORIZED' } });
     return;
   }
 
@@ -528,7 +528,7 @@ export function broadcastJobUpdate(job: {
     const sub = client.jobSubscription;
     if (!sub) return;
     
-    const isAdmin = ['admin', 'dispatcher'].includes(client.user.role);
+    const isAdmin = ['admin', 'dispatcher', 'supervisor'].includes(client.user.role);
     const matchesCustomer = sub.customerId && sub.customerId === job.customerId;
     const matchesJob = sub.jobId && sub.jobId === job.id;
     const matchesTracking = sub.trackingNumber && sub.trackingNumber === job.trackingNumber;
@@ -542,7 +542,7 @@ export function broadcastJobUpdate(job: {
   });
   
   observerConnections.forEach((client) => {
-    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
       sendMessage(client.ws, message);
       sentCount++;
     }
@@ -570,7 +570,7 @@ export function broadcastJobCreated(job: {
   };
 
   observerConnections.forEach((client) => {
-    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
       sendMessage(client.ws, message);
     }
   });
@@ -580,7 +580,7 @@ export function broadcastJobCreated(job: {
     const sub = client.jobSubscription;
     if (!sub) return;
     
-    const isAdmin = ['admin', 'dispatcher'].includes(client.user.role);
+    const isAdmin = ['admin', 'dispatcher', 'supervisor'].includes(client.user.role);
     const matchesCustomer = sub.customerId && sub.customerId === job.customerId;
     
     if (isAdmin || matchesCustomer) {
@@ -666,7 +666,7 @@ export function broadcastJobAssigned(job: {
 
   // Send to admins/dispatchers for monitoring
   observerConnections.forEach((client) => {
-    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
       sendMessage(client.ws, message);
       sentCount++;
     }
@@ -751,7 +751,7 @@ export function broadcastJobWithdrawn(job: {
 
   // Also send to admins/dispatchers for monitoring
   observerConnections.forEach((client) => {
-    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
       sendMessage(client.ws, message);
       sentCount++;
     }
@@ -784,7 +784,7 @@ export function broadcastDocumentPending(document: {
 
   // Send only to admins/dispatchers
   observerConnections.forEach((client) => {
-    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
       sendMessage(client.ws, message);
       sentCount++;
     }
@@ -792,7 +792,7 @@ export function broadcastDocumentPending(document: {
 
   // Also send to job subscribers who are admins
   jobSubscribers.forEach((client) => {
-    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
       sendMessage(client.ws, message);
       sentCount++;
     }
@@ -823,7 +823,7 @@ export function broadcastProfileUpdate(driverId: string, profileData: Record<str
 
   // Also send to admins/dispatchers for monitoring
   observerConnections.forEach((client) => {
-    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher'].includes(client.user.role)) {
+    if (client.ws.readyState === WebSocket.OPEN && ['admin', 'dispatcher', 'supervisor'].includes(client.user.role)) {
       sendMessage(client.ws, message);
       sentCount++;
     }

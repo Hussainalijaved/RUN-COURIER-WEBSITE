@@ -290,7 +290,7 @@ export default function AdminMap() {
     const center = getMapCenter();
     const newMap = new google.maps.Map(mapRef.current, {
       center,
-      zoom: 14,
+      zoom: 15,
       styles: [
         { featureType: 'poi', stylers: [{ visibility: 'off' }] },
         { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
