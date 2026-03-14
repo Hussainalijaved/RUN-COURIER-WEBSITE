@@ -851,7 +851,7 @@ export default function SupervisorJobs() {
                             </DropdownMenuItem>
                             {!job.driverId && job.status === 'pending' && (
                               <DropdownMenuItem
-                                onClick={() => { setJobToAssign(job); setAssignDialogOpen(true); }}
+                                onClick={() => { setJobToAssign(job); setAssignDriverPrice(''); setAssignDialogOpen(true); }}
                                 data-testid={`menu-assign-${job.id}`}
                               >
                                 <UserPlus className="mr-2 h-4 w-4" />
@@ -860,7 +860,7 @@ export default function SupervisorJobs() {
                             )}
                             {job.driverId && job.status !== 'delivered' && job.status !== 'cancelled' && (
                               <DropdownMenuItem
-                                onClick={() => { setJobToAssign(job); setAssignDialogOpen(true); }}
+                                onClick={() => { setJobToAssign(job); setAssignDriverPrice(job.driverPrice?.toString() || ''); setAssignDialogOpen(true); }}
                                 data-testid={`menu-reassign-${job.id}`}
                               >
                                 <UserPlus className="mr-2 h-4 w-4" />
@@ -1230,11 +1230,17 @@ export default function SupervisorJobs() {
             </DialogHeader>
             {jobToAssign && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded-md">
+                <div className={`grid gap-4 p-3 bg-muted/50 rounded-md ${jobToAssign.driverPrice ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <div>
                     <p className="text-xs text-muted-foreground">Customer Price</p>
                     <p className="font-semibold">{formatPrice(jobToAssign.totalPrice)}</p>
                   </div>
+                  {jobToAssign.driverPrice && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Current Driver Pay</p>
+                      <p className="font-semibold text-green-600">{formatPrice(jobToAssign.driverPrice)}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs text-muted-foreground">Route</p>
                     <p className="font-mono text-sm">{jobToAssign.pickupPostcode} → {jobToAssign.deliveryPostcode}</p>
