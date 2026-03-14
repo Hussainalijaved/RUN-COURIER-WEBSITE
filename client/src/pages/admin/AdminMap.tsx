@@ -219,12 +219,12 @@ export default function AdminMap() {
     
     if (hasValidBounds) {
       map.fitBounds(bounds, 50);
-      // Clamp zoom: never below 11 (region level) and never above 14 (street level)
+      // Clamp zoom: never below 12 (Greater London view) and never above 14 (street level)
       const listener = google.maps.event.addListener(map, 'idle', () => {
         const z = map.getZoom();
         if (z !== undefined) {
           if (z > 14) map.setZoom(14);
-          else if (z < 11) map.setZoom(11);
+          else if (z < 12) map.setZoom(12);
         }
         google.maps.event.removeListener(listener);
       });
@@ -292,7 +292,7 @@ export default function AdminMap() {
     const center = getMapCenter();
     const newMap = new google.maps.Map(mapRef.current, {
       center,
-      zoom: 15,
+      zoom: 12,
       styles: [
         { featureType: 'poi', stylers: [{ visibility: 'off' }] },
         { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
