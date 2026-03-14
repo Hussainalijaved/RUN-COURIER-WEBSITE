@@ -2731,7 +2731,17 @@ export async function registerRoutes(
       try {
         const existingAssignments = await storage.getJobAssignments({ jobId: finalJob.id, driverId: supabaseDriverId });
         if (!existingAssignments || existingAssignments.length === 0) {
-          const dispatcherId = req.body.dispatcherId || null;
+          // Resolve who is creating this assignment — prefer explicit dispatcherId,
+          // fall back to the authenticated user's sub from the JWT token
+          let dispatcherId = req.body.dispatcherId || null;
+          if (!dispatcherId) {
+            const authHeader = req.headers.authorization;
+            const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+            if (token) {
+              const payload = decodeJwtPayload(token);
+              dispatcherId = payload?.sub || null;
+            }
+          }
           await storage.createJobAssignment({
             jobId: finalJob.id,
             driverId: supabaseDriverId,

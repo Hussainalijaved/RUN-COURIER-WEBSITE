@@ -474,6 +474,7 @@ export default function AdminCreateJob() {
         description: `Job ${data.trackingNumber} has been created successfully.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
       navigate(user?.role === 'supervisor' ? '/supervisor/jobs' : '/admin/jobs');
     },
     onError: (error: any) => {
