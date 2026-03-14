@@ -414,13 +414,14 @@ export default function SupervisorJobs() {
   };
 
   const filteredJobs = useMemo(() => jobs?.filter((job) => {
-    const matchesSearch =
-      ((job as any).jobNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.trackingNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.pickupPostcode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.deliveryPostcode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (job.pickupContactName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (job.recipientName || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q ||
+      ((job as any).jobNumber || '').toLowerCase().includes(q) ||
+      (job.trackingNumber || '').toLowerCase().includes(q) ||
+      (job.pickupPostcode || '').toLowerCase().includes(q) ||
+      (job.deliveryPostcode || '').toLowerCase().includes(q) ||
+      (job.pickupContactName || '').toLowerCase().includes(q) ||
+      ((job as any).recipientName || '').toLowerCase().includes(q);
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesCustomerType = customerTypeFilter === 'all' || (job as any).customerType === customerTypeFilter;
     return matchesSearch && matchesStatus && matchesCustomerType;

@@ -12735,29 +12735,51 @@ export async function registerRoutes(
     let query: string;
     let params: any[];
 
+    const SELECT_COLS = `id, tracking_number, job_number, status,
+      pickup_address, delivery_address, pickup_postcode, delivery_postcode,
+      pickup_contact_name, vehicle_type, total_price, driver_price,
+      payment_status, created_at, scheduled_pickup_time, is_multi_drop,
+      office_city, driver_id, service_type, customer_type`;
+
     if (city) {
       // All active jobs (any city) + completed jobs only for this supervisor's city
-      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, pickup_contact_name, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
+      query = `SELECT ${SELECT_COLS}
                FROM jobs
                WHERE status = ANY($1::text[])
                   OR (status NOT IN ('pending','assigned','accepted','offered','on_the_way_pickup','collected','on_the_way_delivery') AND office_city = $2)
                ORDER BY created_at DESC LIMIT 300`;
       params = [ACTIVE_STATUSES, city];
     } else {
-      // Admin — all jobs
-      query = `SELECT id, tracking_number, status, pickup_address, delivery_address, pickup_contact_name, vehicle_type, total_price, driver_price, created_at, is_multi_drop, office_city, driver_id, service_type
+      // Admin / no-city supervisor — all jobs
+      query = `SELECT ${SELECT_COLS}
                FROM jobs ORDER BY created_at DESC LIMIT 300`;
       params = [];
     }
 
     const result = await getPgPool().query(query, params);
     const jobs = result.rows.map((r: any) => ({
-      id: r.id, trackingNumber: r.tracking_number, status: r.status,
-      pickupAddress: r.pickup_address, deliveryAddress: r.delivery_address,
-      customerName: r.pickup_contact_name, customerEmail: null,
-      vehicleType: r.vehicle_type, totalPrice: r.total_price,
-      createdAt: r.created_at, isMultiDrop: r.is_multi_drop,
-      officeCity: r.office_city, driverId: r.driver_id, serviceType: r.service_type,
+      id: r.id,
+      trackingNumber: r.tracking_number,
+      jobNumber: r.job_number,
+      status: r.status,
+      pickupAddress: r.pickup_address,
+      deliveryAddress: r.delivery_address,
+      pickupPostcode: r.pickup_postcode || '',
+      deliveryPostcode: r.delivery_postcode || '',
+      pickupContactName: r.pickup_contact_name,
+      customerName: r.pickup_contact_name,
+      customerEmail: null,
+      vehicleType: r.vehicle_type,
+      totalPrice: r.total_price,
+      driverPrice: r.driver_price,
+      paymentStatus: r.payment_status,
+      createdAt: r.created_at,
+      scheduledPickupTime: r.scheduled_pickup_time,
+      isMultiDrop: r.is_multi_drop,
+      officeCity: r.office_city,
+      driverId: r.driver_id,
+      serviceType: r.service_type,
+      customerType: r.customer_type,
     }));
     res.json(jobs);
   }));
