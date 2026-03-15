@@ -2500,7 +2500,7 @@ export async function registerRoutes(
     res.json({ success: true, podPhotoUrl: signedUrl, storagePath, stopId });
   }));
 
-  app.post("/api/jobs", asyncHandler(async (req, res) => {
+  app.post("/api/jobs", requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     console.log('[Jobs] POST /api/jobs - Creating new job with driverId:', req.body.driverId);
     
     // Generate tracking number first

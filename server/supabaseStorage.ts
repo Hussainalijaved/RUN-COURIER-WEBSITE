@@ -1035,21 +1035,50 @@ export class SupabaseStorage implements IStorage {
       .single();
     
     if (error) {
-      if (error.message?.includes('customer_email') && (dbJob as any).customer_email) {
+      // Strip unknown columns and retry — handles columns that may not yet exist in the live DB
+      const savedEmail = (dbJob as any).customer_email;
+      let needsRetry = false;
+      if (error.message?.includes('customer_email') && savedEmail) {
         console.warn('[SupabaseStorage] customer_email column not found, retrying without it');
         delete (dbJob as any).customer_email;
+        needsRetry = true;
+      }
+      if (error.message?.includes('customer_type')) {
+        console.warn('[SupabaseStorage] customer_type column not found, retrying without it');
+        delete (dbJob as any).customer_type;
+        needsRetry = true;
+      }
+      if (needsRetry) {
         const { data: retryData, error: retryError } = await supabase
           .from('jobs')
           .insert(dbJob)
           .select()
           .single();
         if (retryError) {
-          console.error('[SupabaseStorage] Error creating job (retry):', retryError);
-          throw retryError;
+          // One more pass — strip both problematic columns
+          if (retryError.message?.includes('customer_type')) {
+            delete (dbJob as any).customer_type;
+          }
+          if (retryError.message?.includes('customer_email')) {
+            delete (dbJob as any).customer_email;
+          }
+          const { data: finalData, error: finalError } = await supabase
+            .from('jobs')
+            .insert(dbJob)
+            .select()
+            .single();
+          if (finalError) {
+            console.error('[SupabaseStorage] Error creating job (final retry):', finalError);
+            throw finalError;
+          }
+          console.log(`[SupabaseStorage] Created job ${finalData.id} with tracking ${insertJob.trackingNumber}`);
+          const result2 = mapDbToJob(finalData);
+          if (savedEmail) (result2 as any).customerEmail = savedEmail;
+          return result2;
         }
         console.log(`[SupabaseStorage] Created job ${retryData.id} with tracking ${insertJob.trackingNumber}`);
         const result = mapDbToJob(retryData);
-        (result as any).customerEmail = (insertJob as any).customerEmail;
+        if (savedEmail) (result as any).customerEmail = savedEmail;
         return result;
       }
       console.error('[SupabaseStorage] Error creating job:', error);
