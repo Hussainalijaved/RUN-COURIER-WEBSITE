@@ -287,7 +287,7 @@ export async function sendJobOfferNotification(
       screen: "JobOffers",
     },
     priority: "high",
-    channelId: "job-offers",
+    channelId: "job-alerts",
   }));
 
   const tickets = await sendExpoPushNotifications(messages);
@@ -326,7 +326,7 @@ export async function sendJobWithdrawalNotification(
       screen: "JobOffers",
     },
     priority: "high",
-    channelId: "job-offers",
+    channelId: "job-alerts",
   }));
 
   const tickets = await sendExpoPushNotifications(messages);
@@ -372,7 +372,7 @@ export async function sendJobStatusNotification(
       status: jobDetails.status,
     },
     priority: "normal",
-    channelId: "job-updates",
+    channelId: "job-alerts",
   }));
 
   const tickets = await sendExpoPushNotifications(messages);

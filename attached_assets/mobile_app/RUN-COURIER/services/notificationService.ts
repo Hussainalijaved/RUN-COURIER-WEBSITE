@@ -22,6 +22,15 @@ export type NotificationData = {
   body?: string;
 };
 
+const getApiUrl = (): string => {
+  return (
+    Constants.expoConfig?.extra?.apiUrl ||
+    (Constants as any).manifest?.extra?.apiUrl ||
+    process.env.EXPO_PUBLIC_API_URL ||
+    ''
+  );
+};
+
 class NotificationService {
   private expoPushToken: string | null = null;
   private notificationListener: Notifications.EventSubscription | null = null;
@@ -102,27 +111,49 @@ class NotificationService {
     }
   }
 
-  async saveTokenToDatabase(driverId: string): Promise<boolean> {
+  async saveTokenToDatabase(_driverId: string): Promise<boolean> {
     if (!this.expoPushToken) {
       console.log('No push token available');
       return false;
     }
 
     try {
-      const { error } = await supabase
-        .from('drivers')
-        .update({ 
-          push_token: this.expoPushToken,
-          push_token_updated_at: new Date().toISOString()
-        })
-        .eq('id', driverId);
-
-      if (error) {
-        console.error('Failed to save push token:', error);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.log('No auth session available for push token registration');
         return false;
       }
 
-      console.log('Push token saved successfully');
+      const apiUrl = getApiUrl();
+      if (!apiUrl) {
+        console.log('No API URL configured for push token registration');
+        return false;
+      }
+
+      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      const appVersion = Constants.expoConfig?.version || undefined;
+
+      const response = await fetch(`${apiUrl}/api/mobile/v1/driver/push-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          pushToken: this.expoPushToken,
+          platform,
+          appVersion,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => 'unknown error');
+        console.error('Failed to register push token via API:', response.status, errorBody);
+        return false;
+      }
+
+      const result = await response.json();
+      console.log('Push token registered successfully via API:', result.deviceId);
       return true;
     } catch (error) {
       console.error('Error saving push token:', error);
@@ -130,15 +161,34 @@ class NotificationService {
     }
   }
 
-  async removeTokenFromDatabase(driverId: string): Promise<void> {
+  async removeTokenFromDatabase(_driverId: string): Promise<void> {
+    if (!this.expoPushToken) {
+      return;
+    }
+
     try {
-      await supabase
-        .from('drivers')
-        .update({ 
-          push_token: null,
-          push_token_updated_at: new Date().toISOString()
-        })
-        .eq('id', driverId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        return;
+      }
+
+      const apiUrl = getApiUrl();
+      if (!apiUrl) {
+        return;
+      }
+
+      await fetch(`${apiUrl}/api/mobile/v1/driver/push-token`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          pushToken: this.expoPushToken,
+        }),
+      });
+
+      console.log('Push token unregistered');
     } catch (error) {
       console.error('Error removing push token:', error);
     }
@@ -153,22 +203,24 @@ class NotificationService {
     }
     if (this.responseListener) {
       this.responseListener.remove();
+      this.responseListener = null;
     }
 
     this.notificationListener = Notifications.addNotificationReceivedListener(
       (notification) => {
-        console.log('Notification received:', notification);
+        console.log('[Push] Notification received:', notification.request.content.title);
         onNotificationReceived?.(notification);
       }
     );
 
-    this.responseListener = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        console.log('Notification response:', response);
-        const data = response.notification.request.content.data as NotificationData;
-        onNotificationResponse?.(response);
-      }
-    );
+    if (onNotificationResponse) {
+      this.responseListener = Notifications.addNotificationResponseReceivedListener(
+        (response) => {
+          console.log('[Push] Notification tapped:', response.notification.request.content.data);
+          onNotificationResponse(response);
+        }
+      );
+    }
   }
 
   removeListeners(): void {

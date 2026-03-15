@@ -1,0 +1,77 @@
+Fix the driver mobile app push notification system so drivers receive a real push notification with sound, vibration, and banner alert even when the app is closed, in the background, or the phone is locked.
+
+Current problem:
+- Notification / sound only works when the app is open
+- When a new job is assigned, the driver does not get a proper phone-style alert if the app is closed
+- I want it to behave like a normal mobile notification such as SMS / WhatsApp: banner, sound, vibration, and tap to open the job screen
+
+Project stack:
+- Mobile app built with Expo / React Native
+- Backend uses Supabase
+- Jobs are assigned from admin side and stored in Supabase
+- The app currently reacts only when open, which means it is using local/in-app logic instead of proper remote push notification flow
+
+Required solution:
+1. Implement full remote push notifications using expo-notifications
+2. Register each driver device for push notifications and request permission properly on login/app start
+3. Generate and save the Expo push token for each logged-in driver in Supabase
+4. Store/update the token in the driver profile table so each driver can have the correct active device token
+5. When admin assigns a job to a driver, trigger a Supabase Edge Function to send a push notification to that driver’s Expo push token
+6. Notification must work when app is:
+   - open
+   - in background
+   - fully closed
+   - phone locked
+7. Add Android notification channel with high importance, sound, vibration, and visible banner
+8. Ensure foreground notifications also show properly by setting the notification handler:
+   - shouldShowBanner: true
+   - shouldShowList: true
+   - shouldPlaySound: true
+   - shouldSetBadge: true
+9. When the driver taps the notification, open the correct screen directly:
+   - Job Details screen
+   - with the correct job ID passed in notification data
+10. Do not create duplicate notifications for the same job assignment
+11. Only send notification for newly assigned jobs, not for every status update unless explicitly configured
+12. Add error handling and logs for:
+   - permission denied
+   - missing Expo push token
+   - failed push send
+   - invalid token
+13. Make sure this works with development build / production build, not Expo Go only
+14. Keep all data in Supabase and do not break existing login, job assignment, or tracking logic
+
+Implementation details required:
+- Install and configure expo-notifications correctly
+- Set up permission request flow for iOS and Android
+- Set up Android notification channel, for example:
+  - name: Job Alerts
+  - importance: max/high
+  - vibration enabled
+  - sound enabled
+- Add push token registration service in the app
+- Save token in Supabase after login and refresh if token changes
+- Create/update Supabase Edge Function to send push notification through Expo Push API
+- Trigger the Edge Function when a job is assigned to a driver
+- Include notification payload like:
+  - title: New Job Assigned
+  - body: You have received a new delivery job
+  - data: { jobId, type: "job_assigned" }
+  - sound: default
+  - priority: high
+  - channelId: job-alerts
+- Add listeners for:
+  - notification received
+  - notification tapped
+- Route the driver to the correct job details page when the notification is opened
+
+Important:
+- Do not use only local notifications
+- Do not depend only on realtime subscriptions for alerts
+- Realtime can update app data, but push notifications must be used for closed/background app alerts
+- Do not break the existing Supabase sync between website and mobile app
+- Keep code clean and production-ready
+- If any native config is required, update app config properly
+- If testing requires development build, prepare the app for that
+
+Please do all code changes needed in the mobile app and Supabase Edge Function, and explain exactly what was changed.

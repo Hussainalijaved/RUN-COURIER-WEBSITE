@@ -144,15 +144,11 @@ const initializeDriverNotifications = async (driverId: string) => {
       console.log('Push token obtained:', token.substring(0, 20) + '...');
       await notificationService.saveTokenToDatabase(driverId);
       
-      // Set up notification listeners
+      // Only set up the received listener here — tap/response navigation
+      // is handled globally in App.tsx via addNotificationResponseReceivedListener
       notificationService.setupNotificationListeners(
         (notification) => {
-          console.log('Received notification:', notification.request.content.title);
-        },
-        (response) => {
-          const data = response.notification.request.content.data;
-          console.log('User responded to notification:', data);
-          // Handle notification tap - navigate to job if applicable
+          console.log('[Push] Notification received in foreground:', notification.request.content.title);
         }
       );
     } else {

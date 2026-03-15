@@ -8,6 +8,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { navigationRef } from '@/lib/navigationRef';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PendingJobsProvider } from '@/context/PendingJobsContext';
@@ -190,6 +192,20 @@ function AppContent() {
     }, 500);
   }, []);
 
+  useEffect(() => {
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        handleNotificationNavigation(response.notification.request.content.data);
+      }
+    });
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleNotificationNavigation(response.notification.request.content.data);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   if (isChecking) {
     return (
       <View style={styles.loadingContainer}>
@@ -210,12 +226,23 @@ function AppContent() {
   return (
     <AuthProvider>
       <PendingJobsProvider>
-        <NavigationContainer linking={linking}>
+        <NavigationContainer ref={navigationRef} linking={linking}>
           <RootNavigator />
         </NavigationContainer>
       </PendingJobsProvider>
     </AuthProvider>
   );
+}
+
+function handleNotificationNavigation(data: any) {
+  if (!data) return;
+  try {
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('HomeTab' as never);
+    }
+  } catch (err) {
+    console.warn('[Notification] Navigation failed:', err);
+  }
 }
 
 function ConditionalKeyboardProvider({ children }: { children: React.ReactNode }) {

@@ -204,7 +204,7 @@ serve(async (req) => {
             screen: "JobOffers",
           },
           priority: "high",
-          channelId: "job-offers",
+          channelId: "job-alerts",
         }));
 
         const validMessages = messages.filter((m: any) => 
