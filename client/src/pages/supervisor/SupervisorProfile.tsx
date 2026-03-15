@@ -65,13 +65,14 @@ export default function SupervisorProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editCity, setEditCity] = useState('');
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { fullName: string; phone: string }) => {
+    mutationFn: async (data: { fullName: string; phone: string; city: string }) => {
       return apiRequest('PUT', '/api/supervisor/profile', data);
     },
     onSuccess: () => {
@@ -87,6 +88,7 @@ export default function SupervisorProfile() {
   const startEditing = () => {
     setEditName(supervisorInfo?.name || user?.fullName || '');
     setEditPhone(supervisorInfo?.phone || '');
+    setEditCity(supervisorInfo?.city || '');
     setIsEditing(true);
   };
 
@@ -96,7 +98,7 @@ export default function SupervisorProfile() {
       toast({ title: 'Error', description: 'Full name cannot be empty.', variant: 'destructive' });
       return;
     }
-    updateProfileMutation.mutate({ fullName: editName.trim(), phone: editPhone.trim() });
+    updateProfileMutation.mutate({ fullName: editName.trim(), phone: editPhone.trim(), city: editCity.trim() });
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -226,7 +228,7 @@ export default function SupervisorProfile() {
                   <User className="h-5 w-5 text-muted-foreground" />
                   Account Information
                 </CardTitle>
-                <CardDescription className="mt-1">Update your name and phone number.</CardDescription>
+                <CardDescription className="mt-1">Update your name, phone number and office city.</CardDescription>
               </div>
               {!isEditing && (
                 <Button variant="outline" size="sm" onClick={startEditing} data-testid="button-edit-profile">
@@ -261,6 +263,18 @@ export default function SupervisorProfile() {
                     onChange={(e) => setEditPhone(e.target.value)}
                     placeholder="e.g. 07700 900000"
                     data-testid="input-edit-phone"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-city" className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-wide">
+                    <MapPin className="h-3.5 w-3.5" /> Office City
+                  </Label>
+                  <Input
+                    id="edit-city"
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    placeholder="e.g. London"
+                    data-testid="input-edit-city"
                   />
                 </div>
                 <div className="space-y-1.5">

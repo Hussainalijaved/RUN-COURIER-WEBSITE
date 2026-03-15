@@ -13090,20 +13090,20 @@ export async function registerRoutes(
     res.json(assignStableJobNumbers(jobs));
   }));
 
-  // PUT /api/supervisor/profile — update supervisor's own name and phone
+  // PUT /api/supervisor/profile — update supervisor's own name, phone and city
   app.put('/api/supervisor/profile', requireSupervisorOrAdmin, asyncHandler(async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
     const token = authHeader.slice(7);
     const authUser = await verifyAccessToken(token);
     if (!authUser?.email) return res.status(401).json({ error: 'Invalid token' });
-    const { fullName, phone } = req.body;
+    const { fullName, phone, city } = req.body;
     if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
       return res.status(400).json({ error: 'Full name is required' });
     }
     await getPgPool().query(
-      'UPDATE supervisors SET full_name = $1, phone = $2 WHERE email = $3',
-      [fullName.trim(), (phone || '').trim() || null, authUser.email.toLowerCase()]
+      'UPDATE supervisors SET full_name = $1, phone = $2, city = $3 WHERE email = $4',
+      [fullName.trim(), (phone || '').trim() || null, (city || '').trim() || null, authUser.email.toLowerCase()]
     );
     res.json({ success: true });
   }));
