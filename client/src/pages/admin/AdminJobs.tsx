@@ -457,6 +457,7 @@ export default function AdminJobs() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>('all');
   const [officeFilter, setOfficeFilter] = useState<string>('all');
+  const [createdByFilter, setCreatedByFilter] = useState<string>('all');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [jobToAssign, setJobToAssign] = useState<Job | null>(null);
@@ -1164,7 +1165,14 @@ export default function AdminJobs() {
       : officeFilter === 'none'
         ? !job.officeCity
         : job.officeCity === officeFilter;
-    return matchesSearch && matchesStatus && matchesCustomerType && matchesOffice;
+    const matchesCreatedBy = createdByFilter === 'all'
+      ? true
+      : createdByFilter === 'admin'
+        ? ((job as any).createdBy?.toLowerCase().startsWith('admin:') || (!(job as any).createdBy && !job.officeCity))
+        : createdByFilter === 'supervisor'
+          ? (job as any).createdBy?.toLowerCase().startsWith('supervisor:')
+          : true;
+    return matchesSearch && matchesStatus && matchesCustomerType && matchesOffice && matchesCreatedBy;
   }) || [];
 
   const getDriverName = (driverId: string | null) => {
@@ -1606,6 +1614,17 @@ export default function AdminJobs() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                <SelectTrigger className="w-[160px]" data-testid="select-created-by-filter">
+                  <User className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="admin">Admin Created</SelectItem>
+                  <SelectItem value="supervisor">Supervisor Created</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
                   <Filter className="mr-2 h-4 w-4" />
@@ -1716,14 +1735,21 @@ export default function AdminJobs() {
                       <TableCell className="capitalize">{job.vehicleType?.replace('_', ' ')}</TableCell>
                       <TableCell>{getDriverName(job.driverId)}</TableCell>
                       <TableCell>
-                        {job.officeCity ? (
-                          <Badge variant="outline" className="gap-1 text-xs whitespace-nowrap" data-testid={`badge-office-${job.id}`}>
-                            <Building2 className="h-3 w-3" />
-                            {job.officeCity}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {job.officeCity ? (
+                            <Badge variant="outline" className="gap-1 text-xs whitespace-nowrap" data-testid={`badge-office-${job.id}`}>
+                              <Building2 className="h-3 w-3" />
+                              {job.officeCity}
+                            </Badge>
+                          ) : null}
+                          {(job as any).createdBy ? (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
+                              {(job as any).createdBy}
+                            </span>
+                          ) : !job.officeCity ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 flex-wrap">
