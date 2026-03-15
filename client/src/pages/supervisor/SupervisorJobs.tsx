@@ -77,6 +77,7 @@ import { MultiDropShippingLabels } from '@/components/MultiDropShippingLabels';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { ErrorState } from '@/components/ErrorState';
+import { useJobUpdates } from '@/hooks/useJobUpdates';
 import type { Job, Driver, JobStatus } from '@shared/schema';
 
 interface SupabaseDriver {
@@ -333,7 +334,7 @@ export default function SupervisorJobs() {
   const [loadingTooLong, setLoadingTooLong] = useState(false);
 
   const { data: jobs, isLoading: jobsLoading, isError: jobsError, refetch: refetchJobs } = useQuery<Job[]>({
-    queryKey: ['/api/supervisor/jobs'],
+    queryKey: ['/api/jobs'],
     refetchInterval: 30000,
     retry: 2,
     retryDelay: 1000,
@@ -348,6 +349,16 @@ export default function SupervisorJobs() {
     }
     return () => clearTimeout(timer);
   }, [jobsLoading]);
+
+  useJobUpdates({
+    enabled: true,
+    onJobUpdate: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+    },
+    onJobCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+    },
+  });
 
   const { data: drivers } = useQuery<Driver[]>({ queryKey: ['/api/drivers'] });
   const { data: supabaseDrivers, isError: supabaseDriversError } = useQuery<SupabaseDriver[]>({
@@ -444,7 +455,7 @@ export default function SupervisorJobs() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Assignment sent to driver', description: 'The driver will receive a notification to accept or decline.' });
       setAssignDialogOpen(false);
       setJobToAssign(null);
@@ -462,7 +473,7 @@ export default function SupervisorJobs() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Driver unassigned', description: 'The job is now available for reassignment.' });
     },
     onError: (error: any) => {
@@ -475,10 +486,10 @@ export default function SupervisorJobs() {
       return apiRequest('DELETE', `/api/jobs/${jobId}`);
     },
     onSuccess: (_, jobId) => {
-      queryClient.setQueryData<Job[]>(['/api/supervisor/jobs'], (old) =>
+      queryClient.setQueryData<Job[]>(['/api/jobs'], (old) =>
         old ? old.filter((j) => String(j.id) !== String(jobId)) : []
       );
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Job deleted', description: 'The job has been permanently removed.' });
       setDeleteDialogOpen(false);
       setJobToDelete(null);
@@ -493,7 +504,7 @@ export default function SupervisorJobs() {
       return apiRequest('PATCH', `/api/jobs/${jobId}/payment-status`, { paymentStatus });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: variables.paymentStatus === 'paid' ? 'Invoice marked as paid' : 'Invoice marked as unpaid' });
     },
     onError: () => { toast({ title: 'Failed to update invoice status', variant: 'destructive' }); },
@@ -504,7 +515,7 @@ export default function SupervisorJobs() {
       return apiRequest('PATCH', `/api/jobs/${jobId}/driver-visibility`, { hidden, adminId: user?.id });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: variables.hidden ? 'Job hidden from driver' : 'Job visible to driver' });
     },
     onError: () => { toast({ title: 'Failed to update job visibility', variant: 'destructive' }); },
@@ -515,7 +526,7 @@ export default function SupervisorJobs() {
       return apiRequest('POST', '/api/admin/payment-links', { jobId, customerEmail: custEmail, customerName: custName });
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       setEmailDialogOpen(false);
       setEmailDialogJobId('');
       setCustomerEmail('');
@@ -539,7 +550,7 @@ export default function SupervisorJobs() {
       return apiRequest('POST', `/api/admin/payment-links/${activeLink.id}/resend`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Payment link resent!' });
     },
     onError: (error: any) => {
@@ -586,7 +597,7 @@ export default function SupervisorJobs() {
       if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Upload failed'); }
       const result = await response.json();
       toast({ title: 'POD uploaded successfully' });
-      queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       if (selectedJob?.id === jobId) {
         setSelectedJob({ ...selectedJob, podPhotoUrl: result.podPhotoUrl, podPhotos: result.podPhotos });
       }
@@ -1276,7 +1287,7 @@ export default function SupervisorJobs() {
                                       if (resp.ok) {
                                         const result = await resp.json();
                                         setSelectedJob({ ...selectedJob, podPhotoUrl: result.podPhotoUrl, podPhotos: result.podPhotos });
-                                        queryClient.invalidateQueries({ queryKey: ['/api/supervisor/jobs'] });
+                                        queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
                                         toast({ title: 'Photo removed' });
                                       } else {
                                         toast({ title: 'Error', description: 'Failed to remove photo', variant: 'destructive' });
