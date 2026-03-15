@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { View, StyleSheet, Pressable, Modal, RefreshControl, Alert, Text, Platform, ActivityIndicator, TouchableOpacity, Switch, Dimensions } from 'react-native';
+import { View, StyleSheet, Pressable, Modal, RefreshControl, Alert, Text, Platform, ActivityIndicator, TouchableOpacity, Switch, Dimensions, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '@/components/ThemedText';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
@@ -521,6 +521,29 @@ export function JobOffersScreen({ navigation }: any) {
     }
   }, [fetchAssignedJobs]);
 
+  // Re-fetch with sound when app comes to foreground (phone unlocked / app resumed)
+  // This catches jobs assigned while the phone was sleeping / WebSocket was dropped
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active' && !isInitialLoadRef.current) {
+        console.log('[JobOffers] App came to foreground - checking for new jobs');
+        fetchAssignedJobsRef.current(true);
+      }
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, []);
+
+  // Re-fetch with sound when driver navigates back to this tab
+  useFocusEffect(
+    useCallback(() => {
+      if (!isInitialLoadRef.current) {
+        console.log('[JobOffers] Screen focused - checking for new jobs');
+        fetchAssignedJobsRef.current(true);
+      }
+    }, [])
+  );
+
   const fetchAssignedJobsSilent = useCallback(async () => {
     if (!driverId || allDriverIds.length === 0) return;
     try {
@@ -686,7 +709,7 @@ export function JobOffersScreen({ navigation }: any) {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchAssignedJobs(false);
+    fetchAssignedJobs(true);
   }, [fetchAssignedJobs]);
 
   // IMPORTANT: tracking_number should ALWAYS come from the database (set by website/admin)
