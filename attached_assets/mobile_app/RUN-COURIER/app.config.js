@@ -4,7 +4,7 @@ export default {
   expo: {
     name: "RUN COURIER",
     slug: "run-courier",
-    version: "1.6.7",
+    version: "2.70.75",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "runcourier",
@@ -13,7 +13,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.runcourier.driver",
-      buildNumber: "1",
+      buildNumber: "60",
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           "Run Courier needs your location to track deliveries and provide navigation to pickup and delivery addresses.",
