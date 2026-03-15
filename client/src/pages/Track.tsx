@@ -374,6 +374,10 @@ export default function Track() {
                       <p className="text-sm text-muted-foreground">To</p>
                       <p className="font-medium">{job.deliveryAddress}</p>
                     </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Booked Vehicle</p>
+                      <p className="font-medium capitalize">{job.vehicleType}</p>
+                    </div>
                   </CardContent>
                 </Card>
 
