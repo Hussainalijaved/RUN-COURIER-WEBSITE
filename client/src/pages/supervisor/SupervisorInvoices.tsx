@@ -18,6 +18,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -42,6 +43,9 @@ import {
   RotateCcw,
   Download,
   Loader2,
+  Eye,
+  Printer,
+  Mail,
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -79,6 +83,9 @@ export default function SupervisorInvoices() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  const [viewInvoice, setViewInvoice] = useState<any | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sendDialogInvoice, setSendDialogInvoice] = useState<any | null>(null);
   const [sendEmail, setSendEmail] = useState('');
@@ -114,6 +121,22 @@ export default function SupervisorInvoices() {
     return isNaN(n) ? '—' : `£${n.toFixed(2)}`;
   };
 
+  const formatPrice = (val: any) => {
+    const n = Number(val);
+    return isNaN(n) ? '£0.00' : `£${n.toFixed(2)}`;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const cfg = STATUS_CONFIG[status] || STATUS_CONFIG['pending'];
+    const Icon = cfg.icon;
+    return (
+      <Badge className={`text-xs gap-1 ${cfg.className}`}>
+        <Icon className="h-3 w-3" />
+        {cfg.label}
+      </Badge>
+    );
+  };
+
   const resendMutation = useMutation({
     mutationFn: async ({ invoice, overrideEmail }: { invoice: any; overrideEmail?: string }) => {
       const response = await apiRequest('POST', `/api/invoices/${invoice.id}/resend`,
@@ -141,15 +164,180 @@ export default function SupervisorInvoices() {
     onSuccess: (_: any, variables: any) => {
       toast({ title: variables.status === 'paid' ? 'Invoice marked as paid' : 'Invoice marked as unpaid' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      if (viewInvoice?.id === variables.invoiceId) {
+        setViewInvoice((prev: any) => prev ? { ...prev, status: variables.status } : prev);
+      }
     },
     onError: (error: any) => {
       toast({ title: 'Failed to update invoice', description: error?.message || 'Please try again', variant: 'destructive' });
     },
   });
 
-  const formatPrice = (val: any) => {
-    const n = Number(val);
-    return isNaN(n) ? '£0.00' : `£${n.toFixed(2)}`;
+  const printInvoice = (invoice: any) => {
+    const jobDetails = invoice.job_details ? JSON.parse(invoice.job_details) : [];
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Please allow popups to print', variant: 'destructive' });
+      return;
+    }
+
+    const statusClass = invoice.status === 'paid' ? 'status-paid' : invoice.status === 'overdue' ? 'status-overdue' : 'status-pending';
+    const logoUrl = `${window.location.origin}/run-loader.png`;
+
+    const jobsTableHtml = jobDetails.length > 0 ? `
+      <table>
+        <thead>
+          <tr>
+            <th>Job No.</th>
+            <th>Date</th>
+            <th>Description</th>
+            <th style="text-align:right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${jobDetails.map((job: any) => {
+            const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
+            const desc = isMultiDrop ? `
+              <div style="font-weight:600;color:#111;margin-bottom:4px;">Same-Day Delivery &mdash; ${job.multiDropStops.length} drop-offs</div>
+              <div style="color:#555;font-size:11px;margin-bottom:2px;">Collected from: ${job.pickupAddress || 'N/A'}</div>
+              ${job.multiDropStops.map((stop: any, i: number) => `
+                <div style="font-size:11px;padding-left:10px;border-left:2px solid rgba(0,123,255,0.4);margin:2px 0;color:#444;">
+                  Stop ${stop.stopOrder || (i + 1)}: ${stop.address || stop.postcode}${stop.recipientName ? ` &mdash; ${stop.recipientName}` : ''}
+                </div>
+              `).join('')}
+            ` : `
+              <div style="font-weight:600;color:#111;margin-bottom:2px;">Same-Day Delivery</div>
+              <div style="font-size:11px;color:#555;">${job.pickupAddress || 'N/A'} &rarr; ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
+            `;
+            return `<tr style="vertical-align:top;">
+              <td style="font-family:monospace;font-size:11px;">${job.jobNumber || job.trackingNumber || 'N/A'}</td>
+              <td>${job.scheduledDate || 'N/A'}</td>
+              <td>${desc}</td>
+              <td style="text-align:right;font-weight:600;">£${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    ` : '';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${invoice.invoice_number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #007BFF; }
+          .company-header { display: flex; align-items: flex-start; gap: 15px; }
+          .company-logo { width: 56px; height: 56px; object-fit: contain; }
+          .company-name { font-size: 24px; font-weight: bold; color: #007BFF; margin-bottom: 4px; }
+          .company-details { font-size: 11px; color: #555; line-height: 1.6; }
+          .invoice-right { text-align: right; }
+          .invoice-label { font-size: 12px; color: #007BFF; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+          .invoice-number { font-size: 18px; font-weight: bold; color: #111; margin-top: 6px; }
+          .status { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          .status-paid { background: #d4edda; color: #155724; }
+          .status-pending { background: #fff3cd; color: #856404; }
+          .status-overdue { background: #f8d7da; color: #721c24; }
+          .addresses { display: flex; justify-content: space-between; margin: 24px 0; }
+          .address-block { width: 45%; }
+          .address-block h3 { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 8px; }
+          .address-block p { margin: 3px 0; font-size: 12px; }
+          .meta { background: #f8f9fa; padding: 14px 16px; margin: 16px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+          .meta-item { text-align: center; }
+          .meta-item label { font-size: 9px; color: #888; text-transform: uppercase; display: block; margin-bottom: 4px; }
+          .meta-item span { font-size: 12px; font-weight: bold; color: #111; }
+          table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+          th { background: #007BFF; color: white; padding: 10px 12px; text-align: left; font-size: 10px; text-transform: uppercase; }
+          td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 12px; vertical-align: top; }
+          .totals-wrap { display: flex; justify-content: flex-end; margin-top: 8px; }
+          .totals { width: 260px; }
+          .totals-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #eee; }
+          .totals-row.grand { border-top: 2px solid #333; border-bottom: none; font-size: 16px; font-weight: bold; padding-top: 12px; }
+          .totals-row.grand span:last-child { color: #007BFF; }
+          .notes { background: #fff8e1; border-left: 3px solid #ffc107; padding: 12px 16px; margin: 16px 0; font-size: 12px; }
+          .payment-section { margin-top: 28px; padding-top: 20px; border-top: 2px solid #eee; }
+          .payment-box { background: #f0f7ff; padding: 16px 20px; margin-top: 10px; }
+          .payment-box h4 { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #333; margin: 0 0 14px 0; letter-spacing: 0.5px; }
+          .payment-row { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid #dce8f5; font-size: 12px; }
+          .payment-row:last-of-type { border-bottom: none; }
+          .payment-row label { color: #666; width: 140px; flex-shrink: 0; }
+          .payment-row span { font-weight: 600; color: #111; font-family: monospace; font-size: 12px; }
+          .payment-ref { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #b0cce8; font-size: 11px; color: #555; }
+          .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #999; line-height: 1.8; }
+          @media print {
+            body { padding: 0; margin: 0; }
+            @page { margin: 12mm 10mm; size: A4; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-header">
+            <img src="${logoUrl}" alt="Run Courier" class="company-logo" />
+            <div>
+              <div class="company-name">RUN COURIER</div>
+              <div class="company-details">Same Day Delivery</div>
+            </div>
+          </div>
+          <div class="invoice-right">
+            <div class="invoice-label">Invoice</div>
+            <div class="invoice-number">${invoice.invoice_number}</div>
+            <div class="status ${statusClass}">${(invoice.status || '').toUpperCase()}</div>
+          </div>
+        </div>
+        <div class="addresses">
+          <div class="address-block">
+            <h3>From</h3>
+            <p style="font-weight:bold;">Run Courier</p>
+            <p>112 Bridgwater Road</p>
+            <p>Ruislip, HA4 6LW</p>
+            <p>London, United Kingdom</p>
+            <p>info@runcourier.co.uk</p>
+          </div>
+          <div class="address-block">
+            <h3>Bill To</h3>
+            <p style="font-weight:bold;">${invoice.company_name || invoice.customer_name}</p>
+            ${invoice.company_name ? `<p>${invoice.customer_name}</p>` : ''}
+            ${invoice.business_address ? `<p>${invoice.business_address}</p>` : ''}
+            <p>${invoice.customer_email || ''}</p>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="meta-item"><label>Invoice Date</label><span>${formatDate(invoice.created_at)}</span></div>
+          <div class="meta-item"><label>Due Date</label><span style="color:${invoice.status === 'overdue' ? '#c0392b' : '#111'};">${formatDate(invoice.due_date)}</span></div>
+          <div class="meta-item"><label>Period Start</label><span>${formatDate(invoice.period_start)}</span></div>
+          <div class="meta-item"><label>Period End</label><span>${formatDate(invoice.period_end)}</span></div>
+        </div>
+        ${jobsTableHtml}
+        ${jobDetails.length === 0 ? `<div style="text-align:center;padding:24px;color:#888;border:1px solid #eee;margin:16px 0;font-size:13px;">No job details attached to this invoice</div>` : ''}
+        ${invoice.notes ? `<div class="notes"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
+        <div class="totals-wrap">
+          <div class="totals">
+            <div class="totals-row"><span>Subtotal</span><span>${formatPrice(invoice.subtotal ?? invoice.total)}</span></div>
+            <div class="totals-row"><span>VAT</span><span>${formatPrice(invoice.vat ?? 0)}</span></div>
+            <div class="totals-row grand"><span>Total Due</span><span>${formatPrice(invoice.total)}</span></div>
+          </div>
+        </div>
+        <div class="payment-section">
+          <div class="payment-box">
+            <h4>Bank Transfer Details</h4>
+            <div class="payment-row"><label>Account Name</label><span>RUN COURIER</span></div>
+            <div class="payment-row"><label>Sort Code</label><span>30-99-50</span></div>
+            <div class="payment-row"><label>Account Number</label><span>36113363</span></div>
+            <p class="payment-ref">Please use invoice number <strong>${invoice.invoice_number}</strong> as your payment reference.</p>
+          </div>
+        </div>
+        <div class="footer">
+          Run Courier | info@runcourier.co.uk | www.runcourier.co.uk<br>
+          112 Bridgwater Road, Ruislip, HA4 6LW, London, United Kingdom<br>
+          Thank you for your business
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   const downloadPdf = async (inv: any) => {
@@ -166,7 +354,6 @@ export default function SupervisorInvoices() {
         if (y + needed > 280) { doc.addPage(); y = margin; }
       };
 
-      // Header
       doc.setFontSize(20);
       doc.setTextColor(0, 123, 255);
       doc.setFont('helvetica', 'bold');
@@ -190,14 +377,12 @@ export default function SupervisorInvoices() {
       doc.text(statusLabel, pageWidth - margin, y + 21, { align: 'right' });
       y += 30;
 
-      // Divider
       doc.setDrawColor(0, 123, 255);
       doc.setLineWidth(0.8);
       doc.line(margin, y, pageWidth - margin, y);
       doc.setLineWidth(0.2);
       y += 8;
 
-      // Bill To + Invoice Details
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       doc.setFont('helvetica', 'bold');
@@ -250,7 +435,6 @@ export default function SupervisorInvoices() {
       doc.text(`${formatDate(inv.period_start)} - ${formatDate(inv.period_end)}`, detailX, detailY);
       y = Math.max(y, detailY) + 10;
 
-      // Job table
       if (jobDetails.length > 0) {
         checkPageBreak(20);
         doc.setFillColor(248, 249, 250);
@@ -318,7 +502,6 @@ export default function SupervisorInvoices() {
         }
       }
 
-      // Notes
       if (inv.notes) {
         checkPageBreak(20);
         y += 5;
@@ -334,7 +517,6 @@ export default function SupervisorInvoices() {
         y += 14 + noteLines.length * 4;
       }
 
-      // Totals
       checkPageBreak(35);
       y += 5;
       doc.setFillColor(248, 249, 250);
@@ -356,7 +538,6 @@ export default function SupervisorInvoices() {
       doc.text(formatPrice(inv.total), pageWidth - margin - 5, y + 25, { align: 'right' });
       y += 38;
 
-      // Bank details
       checkPageBreak(35);
       doc.setFillColor(232, 244, 253);
       doc.roundedRect(margin, y, contentWidth, 28, 2, 2, 'F');
@@ -373,7 +554,6 @@ export default function SupervisorInvoices() {
       doc.text(`Reference: ${inv.invoice_number || inv.id}`, margin + 80, y + 18);
       y += 35;
 
-      // Footer
       doc.setFontSize(8);
       doc.setTextColor(120, 120, 120);
       doc.setFont('helvetica', 'normal');
@@ -474,11 +654,14 @@ export default function SupervisorInvoices() {
                   </TableHeader>
                   <TableBody>
                     {filtered.map((inv: any) => {
-                      const cfg = STATUS_CONFIG[inv.status] || STATUS_CONFIG['pending'];
-                      const Icon = cfg.icon;
                       const isPaid = inv.status === 'paid';
                       return (
-                        <TableRow key={inv.id} data-testid={`row-invoice-${inv.id}`}>
+                        <TableRow
+                          key={inv.id}
+                          className="cursor-pointer"
+                          onClick={() => { setViewInvoice(inv); setViewDialogOpen(true); }}
+                          data-testid={`row-invoice-${inv.id}`}
+                        >
                           <TableCell>
                             <p className="text-sm font-medium text-foreground">
                               {inv.invoice_number || `INV-${inv.id?.slice(0, 8)}`}
@@ -518,12 +701,9 @@ export default function SupervisorInvoices() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge className={`text-xs gap-1 ${cfg.className}`}>
-                              <Icon className="h-3 w-3" />
-                              {cfg.label}
-                            </Badge>
+                            {getStatusBadge(inv.status)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" data-testid={`menu-invoice-${inv.id}`}>
@@ -532,11 +712,19 @@ export default function SupervisorInvoices() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={() => openSendDialog(inv)}
-                                  data-testid={`menu-send-invoice-${inv.id}`}
+                                  onClick={() => { setViewInvoice(inv); setViewDialogOpen(true); }}
+                                  data-testid={`menu-view-invoice-${inv.id}`}
                                 >
-                                  <Send className="mr-2 h-4 w-4" />
-                                  Send Invoice
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Invoice
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => printInvoice(inv)}
+                                  data-testid={`menu-print-invoice-${inv.id}`}
+                                >
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Print
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => downloadPdf(inv)}
@@ -545,6 +733,15 @@ export default function SupervisorInvoices() {
                                   <Download className="mr-2 h-4 w-4" />
                                   Download PDF
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => openSendDialog(inv)}
+                                  data-testid={`menu-send-invoice-${inv.id}`}
+                                >
+                                  <Send className="mr-2 h-4 w-4" />
+                                  Send Invoice
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 {!isPaid ? (
                                   <DropdownMenuItem
                                     onClick={() => markPaidMutation.mutate({ invoiceId: inv.id, status: 'paid' })}
@@ -578,6 +775,169 @@ export default function SupervisorInvoices() {
         </Card>
       </div>
 
+      {/* View Invoice Dialog */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Invoice Details</DialogTitle>
+            <DialogDescription>
+              {viewInvoice?.invoice_number}
+            </DialogDescription>
+          </DialogHeader>
+          {viewInvoice && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Bill To</h4>
+                  <p className="font-medium">{viewInvoice.customer_name}</p>
+                  {viewInvoice.company_name && <p className="text-sm">{viewInvoice.company_name}</p>}
+                  {viewInvoice.business_address && (
+                    <p className="text-sm text-muted-foreground">{viewInvoice.business_address}</p>
+                  )}
+                  <p className="text-sm text-muted-foreground">{viewInvoice.customer_email}</p>
+                </div>
+                <div className="text-right">
+                  <div className="mb-2">
+                    <span className="text-sm text-muted-foreground">Status: </span>
+                    {getStatusBadge(viewInvoice.status)}
+                  </div>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Created:</span> {formatDate(viewInvoice.created_at)}
+                  </p>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Due:</span> {formatDate(viewInvoice.due_date)}
+                  </p>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Period:</span>{' '}
+                    {formatDate(viewInvoice.period_start)} - {formatDate(viewInvoice.period_end)}
+                  </p>
+                </div>
+              </div>
+
+              {viewInvoice.job_details && JSON.parse(viewInvoice.job_details).length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Jobs Included</h4>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Job No.</TableHead>
+                          <TableHead>Route Details</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => {
+                          const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
+                          return (
+                            <TableRow key={idx} className="align-top">
+                              <TableCell className="font-mono text-sm">
+                                {job.jobNumber || job.trackingNumber || 'N/A'}
+                              </TableCell>
+                              <TableCell className="text-sm max-w-[300px] break-words">
+                                {isMultiDrop ? (
+                                  <div>
+                                    <div className="font-medium mb-1">
+                                      Same-Day Delivery &mdash; {job.multiDropStops.length} drop-offs
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mb-1">
+                                      Collected from: {job.pickupAddress || 'N/A'}
+                                    </div>
+                                    {job.multiDropStops.map((stop: any, stopIdx: number) => (
+                                      <div
+                                        key={stopIdx}
+                                        className="text-xs text-muted-foreground pl-3 py-0.5 border-l-2 border-primary/30"
+                                      >
+                                        Stop {stop.stopOrder || stopIdx + 1}: {stop.address || stop.postcode}
+                                        {stop.recipientName && (
+                                          <span className="ml-1">&mdash; {stop.recipientName}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="font-medium mb-0.5">Same-Day Delivery</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {job.pickupAddress || 'N/A'} &rarr;{' '}
+                                      {job.deliveryAddress || job.recipientName || 'N/A'}
+                                    </div>
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatPrice(job.price)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {viewInvoice.notes && (
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Notes</h4>
+                  <p className="text-sm p-3 bg-muted rounded-md">{viewInvoice.notes}</p>
+                </div>
+              )}
+
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>{formatPrice(viewInvoice.subtotal ?? viewInvoice.total)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">VAT</span>
+                  <span>{formatPrice(viewInvoice.vat ?? 0)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span>{formatPrice(viewInvoice.total)}</span>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                <h4 className="font-medium mb-2">Bank Transfer Details</h4>
+                <div className="text-sm space-y-1">
+                  <p><span className="text-muted-foreground">Account Name:</span> RUN COURIER</p>
+                  <p><span className="text-muted-foreground">Sort Code:</span> 30-99-50</p>
+                  <p><span className="text-muted-foreground">Account Number:</span> 36113363</p>
+                  <p><span className="text-muted-foreground">Reference:</span> {viewInvoice.invoice_number}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => viewInvoice && downloadPdf(viewInvoice)} data-testid="button-download-pdf">
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
+            <Button variant="outline" onClick={() => viewInvoice && printInvoice(viewInvoice)} data-testid="button-print-invoice">
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+            <Button variant="outline" onClick={() => { if (viewInvoice) { openSendDialog(viewInvoice); setViewDialogOpen(false); } }} data-testid="button-send-invoice">
+              <Mail className="h-4 w-4 mr-2" />
+              Send Email
+            </Button>
+            {viewInvoice?.status !== 'paid' && (
+              <Button
+                onClick={() => viewInvoice && markPaidMutation.mutate({ invoiceId: viewInvoice.id, status: 'paid' })}
+                disabled={markPaidMutation.isPending}
+                data-testid="button-mark-paid"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Mark Paid
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Invoice Dialog */}
       <Dialog open={sendDialogOpen} onOpenChange={(open) => { if (!open) { setSendDialogOpen(false); setSendDialogInvoice(null); setSendEmail(''); } }}>
         <DialogContent>
           <DialogHeader>
