@@ -10163,7 +10163,83 @@ export async function registerRoutes(
     } catch (e) {
       console.error('[Invoices] Error enriching stops:', e);
     }
-    
+
+    // Fill in job_details for invoices that have job_ids but no job_details stored
+    // (happens for card-payment invoices created at booking time)
+    try {
+      const needsEnrichment = allInvoices.filter((inv: any) => !inv.job_details && inv.job_ids && inv.job_ids.length > 0);
+      if (needsEnrichment.length > 0) {
+        const allMissingIds = needsEnrichment.flatMap((inv: any) => inv.job_ids);
+        const { data: missingJobs } = await supabaseAdmin
+          .from('jobs')
+          .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+          .in('id', allMissingIds);
+
+        const multiDropIds = (missingJobs || []).filter((j: any) => j.is_multi_drop).map((j: any) => j.id);
+        let freshStopsMap: Record<string, any[]> = {};
+        if (multiDropIds.length > 0) {
+          const { data: freshStops } = await supabaseAdmin
+            .from('multi_drop_stops')
+            .select('job_id, stop_order, postcode, address, recipient_name, recipient_phone, instructions')
+            .in('job_id', multiDropIds)
+            .order('stop_order', { ascending: true });
+          for (const stop of freshStops || []) {
+            if (!freshStopsMap[stop.job_id]) freshStopsMap[stop.job_id] = [];
+            freshStopsMap[stop.job_id].push({
+              stopOrder: stop.stop_order,
+              postcode: stop.postcode,
+              address: stop.address,
+              recipientName: stop.recipient_name,
+              recipientPhone: stop.recipient_phone,
+              instructions: stop.instructions,
+            });
+          }
+        }
+
+        const jobMap: Record<string, any> = {};
+        for (const j of missingJobs || []) {
+          let stops = freshStopsMap[j.id] || [];
+          if (j.is_multi_drop && j.delivery_address) {
+            const normalized = j.delivery_address.trim().toLowerCase();
+            if (!stops.some((s: any) => s.address && s.address.trim().toLowerCase() === normalized)) {
+              stops = [...stops, {
+                stopOrder: stops.length + 1,
+                postcode: '',
+                address: j.delivery_address,
+                recipientName: j.recipient_name || '',
+                recipientPhone: '',
+                instructions: '',
+              }];
+            }
+          }
+          jobMap[j.id] = {
+            jobNumber: j.tracking_number || String(j.id),
+            trackingNumber: j.tracking_number || 'N/A',
+            pickupAddress: j.pickup_address || 'N/A',
+            deliveryAddress: j.delivery_address || 'N/A',
+            recipientName: j.recipient_name || '',
+            scheduledDate: j.scheduled_pickup_time
+              ? new Date(j.scheduled_pickup_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              : 'N/A',
+            vehicleType: j.vehicle_type || 'car',
+            price: parseFloat(j.total_price) || 0,
+            isMultiDrop: j.is_multi_drop || false,
+            multiDropStops: stops,
+          };
+        }
+
+        for (const inv of needsEnrichment) {
+          const details = (inv.job_ids as string[]).map((jid: string) => jobMap[jid]).filter(Boolean);
+          if (details.length > 0) {
+            inv.job_details = JSON.stringify(details);
+          }
+        }
+        console.log(`[Invoices] Enriched ${needsEnrichment.length} invoices with live job details`);
+      }
+    } catch (e) {
+      console.error('[Invoices] Error enriching missing job_details:', e);
+    }
+
     console.log('[Invoices] Total invoices:', allInvoices.length);
     res.json(allInvoices);
   }));
@@ -10691,14 +10767,53 @@ export async function registerRoutes(
       paymentUrl = `${appUrl}/invoice-pay/${storedToken}`;
     }
     
-    // Parse job details from stored JSON
-    const storedJobDetails = invoice.job_details;
-    const jobDetails = storedJobDetails 
-      ? (typeof storedJobDetails === 'string' 
-          ? JSON.parse(storedJobDetails) 
-          : storedJobDetails)
-      : [];
-    
+    // Parse job details from stored JSON; if missing, build from job_ids live
+    let jobDetails: any[] = [];
+    if (invoice.job_details) {
+      jobDetails = typeof invoice.job_details === 'string'
+        ? JSON.parse(invoice.job_details)
+        : invoice.job_details;
+    } else if (invoice.job_ids && invoice.job_ids.length > 0) {
+      const { data: liveJobs } = await supabaseAdmin!
+        .from('jobs')
+        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+        .in('id', invoice.job_ids);
+      const mdIds = (liveJobs || []).filter((j: any) => j.is_multi_drop).map((j: any) => j.id);
+      const stopsMap: Record<string, any[]> = {};
+      if (mdIds.length > 0) {
+        const { data: liveStops } = await supabaseAdmin!
+          .from('multi_drop_stops')
+          .select('job_id, stop_order, postcode, address, recipient_name, recipient_phone, instructions')
+          .in('job_id', mdIds)
+          .order('stop_order', { ascending: true });
+        for (const s of liveStops || []) {
+          if (!stopsMap[s.job_id]) stopsMap[s.job_id] = [];
+          stopsMap[s.job_id].push({ stopOrder: s.stop_order, postcode: s.postcode, address: s.address, recipientName: s.recipient_name, recipientPhone: s.recipient_phone, instructions: s.instructions });
+        }
+      }
+      jobDetails = (liveJobs || []).map((j: any) => {
+        let stops = stopsMap[j.id] || [];
+        if (j.is_multi_drop && j.delivery_address) {
+          const n = j.delivery_address.trim().toLowerCase();
+          if (!stops.some((s: any) => s.address && s.address.trim().toLowerCase() === n)) {
+            stops = [...stops, { stopOrder: stops.length + 1, postcode: '', address: j.delivery_address, recipientName: j.recipient_name || '', recipientPhone: '', instructions: '' }];
+          }
+        }
+        return {
+          jobNumber: j.tracking_number || String(j.id),
+          trackingNumber: j.tracking_number || 'N/A',
+          pickupAddress: j.pickup_address || 'N/A',
+          deliveryAddress: j.delivery_address || 'N/A',
+          recipientName: j.recipient_name || '',
+          scheduledDate: j.scheduled_pickup_time ? new Date(j.scheduled_pickup_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+          vehicleType: j.vehicle_type || 'car',
+          price: parseFloat(j.total_price) || 0,
+          isMultiDrop: j.is_multi_drop || false,
+          multiDropStops: stops,
+        };
+      });
+    }
+
     // Convert amount to number (invoice_payment_tokens uses 'amount' column)
     const rawAmount = invoice.amount ?? 0;
     const totalAmount = typeof rawAmount === 'string' 
@@ -10812,14 +10927,42 @@ export async function registerRoutes(
           paymentUrl = `${appUrl}/invoice-pay/${storedToken}`;
         }
         
-        // Parse job details from stored JSON
-        const storedJobDetails = invoice.job_details;
-        const jobDetails = storedJobDetails 
-          ? (typeof storedJobDetails === 'string' 
-              ? JSON.parse(storedJobDetails) 
-              : storedJobDetails)
-          : [];
-        
+        // Parse job details from stored JSON; if missing, build live from job_ids
+        let jobDetails: any[] = [];
+        if (invoice.job_details) {
+          jobDetails = typeof invoice.job_details === 'string' ? JSON.parse(invoice.job_details) : invoice.job_details;
+        } else if (invoice.job_ids && invoice.job_ids.length > 0) {
+          const { data: liveJobs2 } = await supabaseAdmin
+            .from('jobs')
+            .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+            .in('id', invoice.job_ids);
+          const mdIds2 = (liveJobs2 || []).filter((j: any) => j.is_multi_drop).map((j: any) => j.id);
+          const stopsMap2: Record<string, any[]> = {};
+          if (mdIds2.length > 0) {
+            const { data: liveStops2 } = await supabaseAdmin
+              .from('multi_drop_stops')
+              .select('job_id, stop_order, postcode, address, recipient_name')
+              .in('job_id', mdIds2)
+              .order('stop_order', { ascending: true });
+            for (const s of liveStops2 || []) {
+              if (!stopsMap2[s.job_id]) stopsMap2[s.job_id] = [];
+              stopsMap2[s.job_id].push({ stopOrder: s.stop_order, postcode: s.postcode, address: s.address, recipientName: s.recipient_name });
+            }
+          }
+          jobDetails = (liveJobs2 || []).map((j: any) => ({
+            jobNumber: j.tracking_number || String(j.id),
+            trackingNumber: j.tracking_number || 'N/A',
+            pickupAddress: j.pickup_address || 'N/A',
+            deliveryAddress: j.delivery_address || 'N/A',
+            recipientName: j.recipient_name || '',
+            scheduledDate: j.scheduled_pickup_time ? new Date(j.scheduled_pickup_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+            vehicleType: j.vehicle_type || 'car',
+            price: parseFloat(j.total_price) || 0,
+            isMultiDrop: j.is_multi_drop || false,
+            multiDropStops: stopsMap2[j.id] || [],
+          }));
+        }
+
         // invoice_payment_tokens uses 'amount' column, not 'total'
         const rawAmount = invoice.amount ?? invoice.total ?? 0;
         const totalAmount = typeof rawAmount === 'string' 
