@@ -1796,16 +1796,18 @@ export async function registerRoutes(
       // Get driver info if assigned
       let driverName = null;
       let driverPhone = null;
+      let driverVehicleType = null;
       if (job.driver_id) {
         const { data: driver } = await supabaseAdmin
           .from('drivers')
-          .select('full_name, phone')
+          .select('full_name, phone, vehicle_type')
           .eq('id', job.driver_id)
           .single();
         
         if (driver) {
           driverName = driver.full_name;
           driverPhone = driver.phone;
+          driverVehicleType = (driver as any).vehicle_type || null;
         }
       }
       
@@ -1825,6 +1827,7 @@ export async function registerRoutes(
         createdAt: job.created_at,
         driverName,
         driverPhone,
+        driverVehicleType,
         podPhotoUrl: (job as any).pod_photo_url || null,
         podPhotos: (job as any).pod_photos || [],
         podSignatureUrl: (job as any).pod_signature_url || null,

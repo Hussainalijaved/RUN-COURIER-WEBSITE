@@ -107,6 +107,7 @@ interface MockJob {
   deliveryAddress: string;
   driverName?: string;
   driverPhone?: string;
+  driverVehicleType?: string;
   vehicleType: string;
   estimatedDelivery?: string;
   createdAt: string;
@@ -162,6 +163,9 @@ export default function Track() {
           deliveryAddress: `${data.deliveryAddress}, ${data.deliveryPostcode}`,
           driverName: data.driverName || undefined,
           driverPhone: data.driverPhone || undefined,
+          driverVehicleType: data.driverVehicleType
+            ? data.driverVehicleType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+            : undefined,
           vehicleType: data.vehicleType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Standard',
           estimatedDelivery: data.estimatedDeliveryTime ? new Date(data.estimatedDeliveryTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined,
           createdAt: data.createdAt,
@@ -387,15 +391,13 @@ export default function Track() {
                         <p className="font-medium">{job.driverName}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Vehicle</p>
-                        <p className="font-medium">{job.vehicleType}</p>
+                        <p className="text-sm text-muted-foreground">Vehicle Type</p>
+                        <p className="font-medium capitalize">{job.driverVehicleType || job.vehicleType}</p>
                       </div>
-                      {job.driverPhone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span>{job.driverPhone}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{job.driverPhone || '—'}</span>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
