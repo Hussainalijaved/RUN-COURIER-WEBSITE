@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { useCallback, useRef, useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
-import { useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 let globalSoundEnabled = true;
 let globalRepeatIntervalId: NodeJS.Timeout | null = null;
@@ -55,6 +55,13 @@ export function useSoundAlarm() {
   const repeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    if (Platform.OS !== 'web') {
+      setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        staysActiveInBackground: true,
+      }).catch(e => console.log('[SoundAlarm] Failed to set audio mode:', e));
+    }
     return () => {
       if (repeatIntervalRef.current) {
         clearInterval(repeatIntervalRef.current);

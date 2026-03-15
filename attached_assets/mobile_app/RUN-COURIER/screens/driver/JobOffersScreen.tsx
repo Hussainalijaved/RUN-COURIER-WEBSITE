@@ -54,6 +54,10 @@ export function JobOffersScreen({ navigation }: any) {
   const { user, driver } = useAuth();
   const { refreshPendingJobs } = usePendingJobs();
   const { startRepeatingAlarm, stopRepeatingAlarm } = useSoundAlarm();
+  const startAlarmRef = useRef(startRepeatingAlarm);
+  const stopAlarmRef = useRef(stopRepeatingAlarm);
+  useEffect(() => { startAlarmRef.current = startRepeatingAlarm; }, [startRepeatingAlarm]);
+  useEffect(() => { stopAlarmRef.current = stopRepeatingAlarm; }, [stopRepeatingAlarm]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -476,6 +480,7 @@ export function JobOffersScreen({ navigation }: any) {
         const newestJob = newJobs[0];
         if (newestJob) {
           AlarmService.start(String(newestJob.id));
+          startAlarmRef.current();
         }
         
         if (alarmVerifyIntervalRef.current) clearInterval(alarmVerifyIntervalRef.current);
@@ -485,6 +490,7 @@ export function JobOffersScreen({ navigation }: any) {
         }, 3000);
       } else if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
         AlarmService.stop('jobs reduced or empty');
+        stopAlarmRef.current();
         if (alarmVerifyIntervalRef.current) {
           clearInterval(alarmVerifyIntervalRef.current);
           alarmVerifyIntervalRef.current = null;
@@ -536,6 +542,7 @@ export function JobOffersScreen({ navigation }: any) {
       if (newJobs.length < previousJobCountRef.current || newJobs.length === 0) {
         console.log('[JobOffers] Jobs withdrawn/removed - STOPPING ALARM');
         AlarmService.stop('silent fetch: jobs reduced or empty');
+        stopAlarmRef.current();
         if (alarmVerifyIntervalRef.current) {
           clearInterval(alarmVerifyIntervalRef.current);
           alarmVerifyIntervalRef.current = null;
@@ -571,6 +578,7 @@ export function JobOffersScreen({ navigation }: any) {
         
         if (eventType === 'DELETE') {
           AlarmService.stopIfJob(jobId, 'job deleted');
+          stopAlarmRef.current();
           knownJobIds.delete(jobId);
           fetchAssignedJobsRef.current(false);
           return;
@@ -583,6 +591,7 @@ export function JobOffersScreen({ navigation }: any) {
           if (wasKnown && !isNowMyJob) {
             console.log(`[JobOffers] Job ${jobId} no longer assigned to me - stopping alarm`);
             AlarmService.stopIfJob(jobId, 'driver_id no longer matches');
+            stopAlarmRef.current();
             knownJobIds.delete(jobId);
             fetchAssignedJobsRef.current(false);
             return;
@@ -591,6 +600,7 @@ export function JobOffersScreen({ navigation }: any) {
           if (wasKnown && STOP_STATUSES.includes(newStatus)) {
             console.log(`[JobOffers] Job ${jobId} status=${newStatus} - stopping alarm`);
             AlarmService.stopIfJob(jobId, `status changed to ${newStatus}`);
+            stopAlarmRef.current();
             knownJobIds.delete(jobId);
             fetchAssignedJobsRef.current(false);
             return;
@@ -624,6 +634,7 @@ export function JobOffersScreen({ navigation }: any) {
           console.log(`[JobOffers] Assignment withdrawn/cancelled for job ${assignmentJobId} - stopping alarm`);
           AlarmService.stopIfJob(assignmentJobId, `assignment ${assignmentStatus}`);
           AlarmService.stop(`assignment ${assignmentStatus} for job ${assignmentJobId}`);
+          stopAlarmRef.current();
           knownJobIds.delete(assignmentJobId);
           fetchAssignedJobsRef.current(false);
         }
@@ -634,6 +645,7 @@ export function JobOffersScreen({ navigation }: any) {
       supabase.removeChannel(jobsChannel);
       supabase.removeChannel(assignmentsChannel);
       AlarmService.stop('component unmount');
+      stopAlarmRef.current();
       if (alarmVerifyIntervalRef.current) {
         clearInterval(alarmVerifyIntervalRef.current);
         alarmVerifyIntervalRef.current = null;
