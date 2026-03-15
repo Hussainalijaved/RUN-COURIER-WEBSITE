@@ -636,10 +636,103 @@ export default function SupervisorJobs() {
       return clone.outerHTML;
     };
     const labelContent = await convertImagesToBase64(labelRef.current);
+
     const printWindow = window.open('', '_blank');
-    if (!printWindow) { toast({ title: 'Please allow popups to print labels', variant: 'destructive' }); return; }
+    if (!printWindow) {
+      toast({ title: 'Please allow popups to print labels', variant: 'destructive' });
+      return;
+    }
+
     const isMultiLabel = jobForLabel?.isMultiDrop && multiDropStops.length > 0;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Shipping Label - ${jobForLabel?.trackingNumber}</title><style>@page{size:4in 6in;margin:0;}*,*::before,*::after{box-sizing:border-box;}html,body{width:4in;margin:0!important;padding:0!important;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:white;color:black;${isMultiLabel?'':'height:6in;max-height:6in;overflow:hidden!important;'}}@media print{@page{size:4in 6in;margin:0;}html,body{width:4in!important;margin:0!important;padding:0!important;${isMultiLabel?'':'height:6in!important;max-height:6in!important;overflow:hidden!important;'}}.label-page{width:4in!important;height:6in!important;max-height:6in!important;margin:0!important;page-break-after:always!important;break-after:page!important;overflow:hidden!important;}}img{display:block;max-width:100%;}svg{display:inline-block;vertical-align:middle;}</style></head><body>${labelContent}<script>window.onload=function(){setTimeout(function(){window.print();window.close();},100);};</script></body></html>`);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Shipping Label - ${jobForLabel?.trackingNumber}</title>
+          <style>
+            @page {
+              size: 4in 6in;
+              margin: 0;
+            }
+            *, *::before, *::after {
+              box-sizing: border-box;
+            }
+            html, body {
+              width: 4in;
+              margin: 0 !important;
+              padding: 0 !important;
+              font-family: Arial, sans-serif;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+              background: white;
+              color: black;
+              ${isMultiLabel ? '' : 'height: 6in; max-height: 6in; overflow: hidden !important;'}
+            }
+            @media print {
+              @page { size: 4in 6in; margin: 0; }
+              html, body {
+                width: 4in !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                ${isMultiLabel ? '' : 'height: 6in !important; max-height: 6in !important; overflow: hidden !important;'}
+              }
+              .label-page {
+                width: 4in !important;
+                height: 6in !important;
+                max-height: 6in !important;
+                margin: 0 !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: hidden !important;
+              }
+              .label-page:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+              }
+              body > div > div {
+                width: 4in !important;
+                height: 6in !important;
+                max-height: 6in !important;
+                margin: 0 !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: hidden !important;
+              }
+              body > div > div:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+              }
+            }
+            img {
+              display: block;
+              max-width: 100%;
+            }
+            svg {
+              display: inline-block;
+              vertical-align: middle;
+            }
+          </style>
+        </head>
+        <body>
+          ${labelContent}
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 100);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+
     printWindow.document.close();
   };
 
@@ -1352,7 +1445,7 @@ export default function SupervisorJobs() {
               <DialogDescription>
                 {jobForLabel?.isMultiDrop && multiDropStops.length > 0
                   ? `${multiDropStops.length + 1} labels for multi-drop job ${jobForLabel?.trackingNumber}`
-                  : `4" x 6" Shipping Label for ${jobForLabel?.trackingNumber}`}
+                  : `4" x 6" Professional Shipping Label for ${jobForLabel?.trackingNumber}`}
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-auto" style={{ maxHeight: '55vh' }}>
