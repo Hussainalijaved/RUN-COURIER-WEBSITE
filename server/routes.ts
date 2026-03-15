@@ -12808,7 +12808,7 @@ export async function registerRoutes(
     const authUser = await verifyAccessToken(token);
     if (!authUser?.email) return res.status(401).json({ error: 'Invalid token' });
     const result = await getPgPool().query(
-      'SELECT id, status, full_name, city, phone FROM supervisors WHERE email = $1 LIMIT 1',
+      'SELECT id, status, full_name, city, phone, notes, invited_at, activated_at, created_at FROM supervisors WHERE email = $1 LIMIT 1',
       [authUser.email.toLowerCase()]
     );
     if (result.rows.length === 0) return res.status(403).json({ error: 'Not a supervisor account' });
@@ -12816,7 +12816,17 @@ export async function registerRoutes(
     if (sup.status !== 'active') {
       return res.status(403).json({ error: 'Your account is pending admin approval.', status: sup.status });
     }
-    res.json({ verified: true, status: sup.status, name: sup.full_name, city: sup.city, phone: sup.phone });
+    res.json({
+      verified: true,
+      status: sup.status,
+      name: sup.full_name,
+      city: sup.city,
+      phone: sup.phone,
+      notes: sup.notes,
+      invited_at: sup.invited_at,
+      activated_at: sup.activated_at,
+      created_at: sup.created_at,
+    });
   }));
 
   // GET /api/supervisors — admin list all supervisors
@@ -12979,6 +12989,25 @@ export async function registerRoutes(
       const fallback = await getPgPool().query(`SELECT * FROM invoices ORDER BY created_at DESC LIMIT 300`);
       res.json(fallback.rows);
     }
+  }));
+
+  // PUT /api/supervisors/:id — admin edit supervisor profile details
+  app.put('/api/supervisors/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { full_name, phone, city, notes } = req.body;
+    const result = await getPgPool().query(
+      `UPDATE supervisors
+       SET full_name = COALESCE($1, full_name),
+           phone = COALESCE($2, phone),
+           city = COALESCE($3, city),
+           notes = $4,
+           updated_at = NOW()
+       WHERE id = $5
+       RETURNING id, email, full_name, phone, city, status, invited_at, activated_at, invited_by, notes, created_at`,
+      [full_name || null, phone || null, city || null, notes ?? null, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Supervisor not found' });
+    res.json(result.rows[0]);
   }));
 
   // PATCH /api/supervisors/:id/status — admin update supervisor status

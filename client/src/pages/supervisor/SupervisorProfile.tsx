@@ -5,20 +5,59 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { apiRequest } from '@/lib/queryClient';
-import { Briefcase, Mail, User, Lock, Save, Loader2, MapPin, Phone, Pencil, X } from 'lucide-react';
+import {
+  Briefcase, Mail, User, Lock, Save, Loader2, MapPin, Phone,
+  Pencil, X, Calendar, FileText, CheckCircle2, AlertCircle, Clock,
+  ShieldCheck,
+} from 'lucide-react';
+
+interface SupervisorInfo {
+  name: string;
+  city?: string;
+  phone?: string;
+  status?: string;
+  notes?: string;
+  invited_at?: string;
+  activated_at?: string;
+  created_at?: string;
+}
+
+const STATUS_CONFIG: Record<string, { label: string; className: string; icon: any }> = {
+  active: {
+    label: 'Active',
+    className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    icon: CheckCircle2,
+  },
+  suspended: {
+    label: 'Suspended',
+    className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+    icon: AlertCircle,
+  },
+  pending_approval: {
+    label: 'Pending Approval',
+    className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    icon: Clock,
+  },
+  deactivated: {
+    label: 'Deactivated',
+    className: 'bg-muted text-muted-foreground',
+    icon: AlertCircle,
+  },
+};
 
 export default function SupervisorProfile() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: supervisorInfo } = useQuery<{ name: string; city?: string; phone?: string }>({
+  const { data: supervisorInfo, isLoading } = useQuery<SupervisorInfo>({
     queryKey: ['/api/supervisor/verify'],
     retry: false,
   });
@@ -84,21 +123,101 @@ export default function SupervisorProfile() {
     }
   };
 
+  const formatDate = (d?: string) =>
+    d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
   const displayName = supervisorInfo?.name || user?.fullName || '';
-  const initials = displayName
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase() || 'S';
+  const initials = displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) || 'S';
+  const status = supervisorInfo?.status || 'active';
+  const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG['active'];
+  const StatusIcon = statusCfg.icon;
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-2xl mx-auto p-6 space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-40 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Profile Settings</h1>
           <p className="text-muted-foreground mt-1">Manage your supervisor account details.</p>
         </div>
 
+        {/* Account Summary Card */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16 ring-2 ring-primary/20 shrink-0">
+                <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                  <p className="text-lg font-semibold truncate">{displayName || '(No name)'}</p>
+                  <Badge className={`text-xs gap-1 ${statusCfg.className}`}>
+                    <StatusIcon className="h-3 w-3" />
+                    {statusCfg.label}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  Operations Supervisor
+                </p>
+              </div>
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <Phone className="h-3 w-3" /> Phone
+                </p>
+                <p className="font-medium">{supervisorInfo?.phone || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <MapPin className="h-3 w-3" /> Office City
+                </p>
+                <p className="font-medium">{supervisorInfo?.city || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <Calendar className="h-3 w-3" /> Invited
+                </p>
+                <p className="font-medium">{formatDate(supervisorInfo?.invited_at)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <Calendar className="h-3 w-3" /> Activated
+                </p>
+                <p className="font-medium">{formatDate(supervisorInfo?.activated_at)}</p>
+              </div>
+            </div>
+
+            {supervisorInfo?.notes && (
+              <div className="mt-4 bg-muted/50 rounded-md p-3">
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                  <FileText className="h-3 w-3" /> Note from Admin
+                </p>
+                <p className="text-sm">{supervisorInfo.notes}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Edit Profile Card */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -107,7 +226,7 @@ export default function SupervisorProfile() {
                   <User className="h-5 w-5 text-muted-foreground" />
                   Account Information
                 </CardTitle>
-                <CardDescription className="mt-1">Your supervisor account details.</CardDescription>
+                <CardDescription className="mt-1">Update your name and phone number.</CardDescription>
               </div>
               {!isEditing && (
                 <Button variant="outline" size="sm" onClick={startEditing} data-testid="button-edit-profile">
@@ -116,21 +235,7 @@ export default function SupervisorProfile() {
               )}
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 ring-2 ring-primary/20">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-lg font-semibold">{displayName}</p>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
-              </div>
-            </div>
-
-            <Separator />
-
+          <CardContent className="space-y-4">
             {isEditing ? (
               <form onSubmit={handleSaveProfile} className="grid gap-4">
                 <div className="space-y-1.5">
@@ -200,9 +305,10 @@ export default function SupervisorProfile() {
                     <Phone className="h-3.5 w-3.5" /> Phone Number
                   </Label>
                   <Input
-                    value={supervisorInfo?.phone || '—'}
+                    value={supervisorInfo?.phone || ''}
                     readOnly
                     className="bg-muted/40 cursor-not-allowed"
+                    placeholder="Not set"
                     data-testid="input-phone"
                   />
                 </div>
@@ -233,9 +339,10 @@ export default function SupervisorProfile() {
                     <MapPin className="h-3.5 w-3.5" /> Office City
                   </Label>
                   <Input
-                    value={supervisorInfo?.city || '—'}
+                    value={supervisorInfo?.city || ''}
                     readOnly
                     className="bg-muted/40 cursor-not-allowed"
+                    placeholder="Not set"
                     data-testid="input-city"
                   />
                 </div>
@@ -244,6 +351,7 @@ export default function SupervisorProfile() {
           </CardContent>
         </Card>
 
+        {/* Change Password Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
