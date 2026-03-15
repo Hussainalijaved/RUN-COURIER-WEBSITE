@@ -147,22 +147,240 @@ export default function SupervisorInvoices() {
     },
   });
 
+  const formatPrice = (val: any) => {
+    const n = Number(val);
+    return isNaN(n) ? '£0.00' : `£${n.toFixed(2)}`;
+  };
+
   const downloadPdf = async (inv: any) => {
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const jobDetails = inv.job_details ? JSON.parse(inv.job_details) : [];
+      const pageWidth = 210;
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const checkPageBreak = (needed: number) => {
+        if (y + needed > 280) { doc.addPage(); y = margin; }
+      };
+
+      // Header
       doc.setFontSize(20);
-      doc.text('INVOICE', 105, 20, { align: 'center' });
+      doc.setTextColor(0, 123, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RUN COURIER', margin, y + 7);
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Same Day Delivery', margin, y + 14);
+      doc.setFontSize(22);
+      doc.setTextColor(17, 17, 17);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INVOICE', pageWidth - margin, y + 7, { align: 'right' });
       doc.setFontSize(11);
-      doc.text(`Invoice No: ${inv.invoice_number || inv.id}`, 20, 40);
-      doc.text(`Customer: ${inv.customer_name || inv.company_name || '—'}`, 20, 48);
-      doc.text(`Email: ${inv.customer_email || '—'}`, 20, 56);
-      doc.text(`Date: ${formatDate(inv.created_at)}`, 20, 64);
-      if (inv.due_date) doc.text(`Due: ${formatDate(inv.due_date)}`, 20, 72);
-      doc.text(`Total: ${formatAmount(inv.total)}`, 20, 82);
-      doc.text(`Status: ${inv.status?.toUpperCase() || '—'}`, 20, 90);
+      doc.setTextColor(51, 51, 51);
+      doc.text(inv.invoice_number || inv.id, pageWidth - margin, y + 14, { align: 'right' });
+      const statusLabel = (inv.status || '').toUpperCase();
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      const statusColor: [number, number, number] = inv.status === 'paid' ? [21, 87, 36] : inv.status === 'overdue' ? [114, 28, 36] : [133, 100, 4];
+      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      doc.text(statusLabel, pageWidth - margin, y + 21, { align: 'right' });
+      y += 30;
+
+      // Divider
+      doc.setDrawColor(0, 123, 255);
+      doc.setLineWidth(0.8);
+      doc.line(margin, y, pageWidth - margin, y);
+      doc.setLineWidth(0.2);
+      y += 8;
+
+      // Bill To + Invoice Details
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont('helvetica', 'bold');
+      doc.text('BILL TO', margin, y);
+      doc.text('INVOICE DETAILS', pageWidth / 2 + 10, y);
+      y += 6;
+      doc.setFontSize(11);
+      doc.setTextColor(17, 17, 17);
+      doc.setFont('helvetica', 'bold');
+      doc.text(inv.customer_name || '', margin, y);
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      if (inv.company_name) { doc.text(inv.company_name, margin, y); y += 5; }
+      if (inv.business_address) {
+        const addrLines = doc.splitTextToSize(inv.business_address, contentWidth / 2 - 5);
+        doc.text(addrLines, margin, y);
+        y += addrLines.length * 4.5;
+      }
+      doc.setTextColor(80, 80, 80);
+      doc.text(inv.customer_email || '', margin, y);
+
+      let detailY = y - (inv.company_name ? 10 : 5) - (inv.business_address ? 5 : 0);
+      const detailX = pageWidth / 2 + 10;
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Invoice Date', detailX, detailY);
+      detailY += 4;
+      doc.setFontSize(10);
+      doc.setTextColor(17, 17, 17);
+      doc.text(formatDate(inv.created_at), detailX, detailY);
+      detailY += 7;
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Due Date', detailX, detailY);
+      detailY += 4;
+      doc.setFontSize(10);
+      doc.setTextColor(200, 50, 50);
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatDate(inv.due_date), detailX, detailY);
+      detailY += 7;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Period', detailX, detailY);
+      detailY += 4;
+      doc.setFontSize(10);
+      doc.setTextColor(17, 17, 17);
+      doc.text(`${formatDate(inv.period_start)} - ${formatDate(inv.period_end)}`, detailX, detailY);
+      y = Math.max(y, detailY) + 10;
+
+      // Job table
+      if (jobDetails.length > 0) {
+        checkPageBreak(20);
+        doc.setFillColor(248, 249, 250);
+        doc.rect(margin, y, contentWidth, 8, 'F');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(51, 51, 51);
+        doc.text('Job No.', margin + 2, y + 5.5);
+        doc.text('Route Details', margin + 35, y + 5.5);
+        doc.text('Date', margin + 130, y + 5.5);
+        doc.text('Amount', pageWidth - margin - 2, y + 5.5, { align: 'right' });
+        y += 10;
+        doc.setFont('helvetica', 'normal');
+        for (const job of jobDetails) {
+          const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
+          const rowHeight = isMultiDrop ? 12 + job.multiDropStops.length * 5 : 14;
+          checkPageBreak(rowHeight + 5);
+          doc.setFontSize(9);
+          doc.setTextColor(17, 17, 17);
+          doc.setFont('helvetica', 'normal');
+          doc.text(String(job.jobNumber || job.trackingNumber || 'N/A'), margin + 2, y + 4);
+          if (isMultiDrop) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text(`Same-Day Delivery \u2014 ${job.multiDropStops.length} drop-offs`, margin + 35, y + 4);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(80, 80, 80);
+            doc.text(`Collected from: ${job.pickupAddress || 'N/A'}`, margin + 35, y + 9);
+            let stopY = y + 14;
+            for (let si = 0; si < job.multiDropStops.length; si++) {
+              const stop = job.multiDropStops[si];
+              checkPageBreak(6);
+              doc.setDrawColor(0, 123, 255);
+              doc.setLineWidth(0.5);
+              doc.line(margin + 37, stopY - 3, margin + 37, stopY + 1);
+              doc.setTextColor(51, 51, 51);
+              doc.setFontSize(8);
+              const stopText = `Stop ${stop.stopOrder || si + 1}: ${stop.address || stop.postcode}${stop.recipientName ? ` \u2014 ${stop.recipientName}` : ''}`;
+              const stopLines = doc.splitTextToSize(stopText, 85);
+              doc.text(stopLines, margin + 39, stopY);
+              stopY += stopLines.length * 4;
+            }
+            y = Math.max(y + rowHeight, stopY);
+          } else {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text('Same-Day Delivery', margin + 35, y + 4);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(80, 80, 80);
+            const routeText = `${job.pickupAddress || 'N/A'} \u2192 ${job.deliveryAddress || job.recipientName || 'N/A'}`;
+            const routeLines = doc.splitTextToSize(routeText, 90);
+            doc.text(routeLines, margin + 35, y + 9);
+            y += 6 + routeLines.length * 4;
+          }
+          doc.setFontSize(9);
+          doc.setTextColor(17, 17, 17);
+          doc.text(job.scheduledDate || 'N/A', margin + 130, y - (isMultiDrop ? rowHeight - 4 : 6) + 4);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`\u00A3${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}`, pageWidth - margin - 2, y - (isMultiDrop ? rowHeight - 4 : 6) + 4, { align: 'right' });
+          doc.setDrawColor(230, 230, 230);
+          doc.line(margin, y + 2, pageWidth - margin, y + 2);
+          y += 5;
+        }
+      }
+
+      // Notes
+      if (inv.notes) {
+        checkPageBreak(20);
+        y += 5;
+        doc.setFillColor(255, 243, 205);
+        const noteLines = doc.splitTextToSize(inv.notes, contentWidth - 10);
+        doc.roundedRect(margin, y, contentWidth, 10 + noteLines.length * 4, 2, 2, 'F');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(17, 17, 17);
+        doc.text('Notes:', margin + 5, y + 6);
+        doc.setFont('helvetica', 'normal');
+        doc.text(noteLines, margin + 5, y + 11);
+        y += 14 + noteLines.length * 4;
+      }
+
+      // Totals
+      checkPageBreak(35);
+      y += 5;
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'F');
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Subtotal:', pageWidth - margin - 50, y + 8);
+      doc.setTextColor(17, 17, 17);
+      doc.text(formatPrice(inv.subtotal ?? inv.total), pageWidth - margin - 5, y + 8, { align: 'right' });
+      doc.setTextColor(80, 80, 80);
+      doc.text('VAT:', pageWidth - margin - 50, y + 15);
+      doc.setTextColor(17, 17, 17);
+      doc.text(formatPrice(inv.vat ?? 0), pageWidth - margin - 5, y + 15, { align: 'right' });
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 123, 255);
+      doc.text('Total:', pageWidth - margin - 50, y + 25);
+      doc.text(formatPrice(inv.total), pageWidth - margin - 5, y + 25, { align: 'right' });
+      y += 38;
+
+      // Bank details
+      checkPageBreak(35);
+      doc.setFillColor(232, 244, 253);
+      doc.roundedRect(margin, y, contentWidth, 28, 2, 2, 'F');
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(17, 17, 17);
+      doc.text('Bank Transfer Details', margin + 5, y + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 51, 51);
+      doc.text('Account Name: RUN COURIER', margin + 5, y + 13);
+      doc.text('Sort Code: 30-99-50', margin + 5, y + 18);
+      doc.text('Account Number: 36113363', margin + 80, y + 13);
+      doc.text(`Reference: ${inv.invoice_number || inv.id}`, margin + 80, y + 18);
+      y += 35;
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Run Courier | 112 Bridgwater Road, Ruislip, HA4 6LW, London | info@runcourier.co.uk | runcourier.co.uk', pageWidth / 2, 290, { align: 'center' });
+
       doc.save(`${inv.invoice_number || 'invoice'}.pdf`);
-      toast({ title: 'PDF downloaded' });
+      toast({ title: 'PDF downloaded', description: `${inv.invoice_number || 'invoice'}.pdf saved` });
     } catch {
       toast({ title: 'Failed to download PDF', variant: 'destructive' });
     }
