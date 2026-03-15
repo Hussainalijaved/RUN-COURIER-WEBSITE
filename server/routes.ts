@@ -2639,12 +2639,28 @@ export async function registerRoutes(
         // Ensure job_number is set
         supabaseUpdateData.job_number = jobNumber;
 
-        // Tag office_city if created by a supervisor
+        // Tag office_city and created_by if created by a supervisor; tag created_by for admins too
         try {
+          const adminUser = (req as any).adminUser;
           const creatorEmail = await getSupervisorEmailFromReq(req);
           if (creatorEmail) {
+            // Supervisor created the job — look up their full name
             const supCity = await getSupervisorCityByEmail(creatorEmail);
             if (supCity) supabaseUpdateData.office_city = supCity;
+            try {
+              const supRow = await getPgPool().query(
+                'SELECT full_name FROM supervisors WHERE email = $1 LIMIT 1',
+                [creatorEmail.toLowerCase()]
+              );
+              const supName = supRow.rows[0]?.full_name || creatorEmail;
+              supabaseUpdateData.created_by = `Supervisor: ${supName}`;
+            } catch {
+              supabaseUpdateData.created_by = `Supervisor: ${creatorEmail}`;
+            }
+          } else if (adminUser?.email) {
+            // Admin created the job
+            const adminName = adminUser.fullName || adminUser.email;
+            supabaseUpdateData.created_by = `Admin: ${adminName}`;
           }
         } catch {}
         

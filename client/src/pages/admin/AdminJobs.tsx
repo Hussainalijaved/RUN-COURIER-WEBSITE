@@ -2165,6 +2165,12 @@ export default function AdminJobs() {
                       Office: {selectedJob.officeCity}
                     </Badge>
                   )}
+                  {selectedJob.createdBy && (
+                    <Badge variant="outline" className="gap-1">
+                      <User className="h-3 w-3" />
+                      {selectedJob.createdBy}
+                    </Badge>
+                  )}
                   {selectedJob.isCentralLondon && (
                     <Badge variant="outline">Central London</Badge>
                   )}
