@@ -190,6 +190,7 @@ export const jobs = pgTable("jobs", {
   driverHidden: boolean("driver_hidden").default(false),
   driverHiddenAt: timestamp("driver_hidden_at"),
   driverHiddenBy: varchar("driver_hidden_by", { length: 36 }),
+  officeCity: text("office_city"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

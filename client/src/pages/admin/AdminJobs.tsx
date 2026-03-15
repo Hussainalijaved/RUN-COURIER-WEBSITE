@@ -456,6 +456,7 @@ export default function AdminJobs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>('all');
+  const [officeFilter, setOfficeFilter] = useState<string>('all');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [jobToAssign, setJobToAssign] = useState<Job | null>(null);
@@ -1143,6 +1144,13 @@ export default function AdminJobs() {
     updateJobMutation.mutate({ jobId: jobToEdit.id, updates });
   };
 
+  const officeCities = useMemo(() => {
+    const cities = (jobs || [])
+      .map((j) => j.officeCity)
+      .filter((c): c is string => !!c);
+    return Array.from(new Set(cities)).sort();
+  }, [jobs]);
+
   const filteredJobs = jobs?.filter((job) => {
     const matchesSearch =
       ((job as any).jobNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1151,7 +1159,12 @@ export default function AdminJobs() {
       job.deliveryPostcode.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesCustomerType = customerTypeFilter === 'all' || (job as any).customerType === customerTypeFilter;
-    return matchesSearch && matchesStatus && matchesCustomerType;
+    const matchesOffice = officeFilter === 'all'
+      ? true
+      : officeFilter === 'none'
+        ? !job.officeCity
+        : job.officeCity === officeFilter;
+    return matchesSearch && matchesStatus && matchesCustomerType && matchesOffice;
   }) || [];
 
   const getDriverName = (driverId: string | null) => {
@@ -1580,6 +1593,19 @@ export default function AdminJobs() {
                   <SelectItem value="business">Business</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={officeFilter} onValueChange={setOfficeFilter}>
+                <SelectTrigger className="w-[160px]" data-testid="select-office-filter">
+                  <Building2 className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Office" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Offices</SelectItem>
+                  <SelectItem value="none">No Office</SelectItem>
+                  {officeCities.map((city) => (
+                    <SelectItem key={city} value={city}>{city}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
                   <Filter className="mr-2 h-4 w-4" />
@@ -1638,6 +1664,7 @@ export default function AdminJobs() {
                     <TableHead>Route</TableHead>
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Driver</TableHead>
+                    <TableHead>Office</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Pickup Time</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -1688,6 +1715,16 @@ export default function AdminJobs() {
                       </TableCell>
                       <TableCell className="capitalize">{job.vehicleType?.replace('_', ' ')}</TableCell>
                       <TableCell>{getDriverName(job.driverId)}</TableCell>
+                      <TableCell>
+                        {job.officeCity ? (
+                          <Badge variant="outline" className="gap-1 text-xs whitespace-nowrap" data-testid={`badge-office-${job.id}`}>
+                            <Building2 className="h-3 w-3" />
+                            {job.officeCity}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {getStatusBadge(job.status)}
@@ -2121,6 +2158,12 @@ export default function AdminJobs() {
                   {getStatusBadge(selectedJob.status)}
                   {selectedJob.driverId && (
                     <Badge variant="outline">Driver: {getDriverName(selectedJob.driverId)}</Badge>
+                  )}
+                  {selectedJob.officeCity && (
+                    <Badge variant="outline" className="gap-1">
+                      <Building2 className="h-3 w-3" />
+                      Office: {selectedJob.officeCity}
+                    </Badge>
                   )}
                   {selectedJob.isCentralLondon && (
                     <Badge variant="outline">Central London</Badge>

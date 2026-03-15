@@ -164,6 +164,7 @@ function mapDbToJob(dbJob: any): Job {
     driverHiddenAt: dbJob.driver_hidden_at ? new Date(dbJob.driver_hidden_at) : null,
     driverHiddenBy: dbJob.driver_hidden_by,
     customerEmail: dbJob.customer_email || null,
+    officeCity: dbJob.office_city || null,
     createdAt: dbJob.created_at ? new Date(dbJob.created_at) : new Date(),
     updatedAt: dbJob.updated_at ? new Date(dbJob.updated_at) : null,
   };
