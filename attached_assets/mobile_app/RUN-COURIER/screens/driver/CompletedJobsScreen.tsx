@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '@/components/ThemedText';
 import { Card } from '@/components/Card';
 import { ScreenScrollView } from '@/components/ScreenScrollView';
@@ -9,6 +10,9 @@ import { useTheme } from '@/hooks/useTheme';
 import { Feather } from '@expo/vector-icons';
 import { supabase, Job } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const POLL_INTERVAL_MS = 30 * 1000;
 
 export function CompletedJobsScreen() {
   const { theme } = useTheme();
@@ -24,16 +28,22 @@ export function CompletedJobsScreen() {
   const driverId = driverRecordId || authUserId;
   const allDriverIds = [...new Set([driverRecordId, authUserId].filter(Boolean))] as string[];
 
+  const fetchCompletedJobsRef = useRef<() => Promise<void>>();
+
   const fetchCompletedJobs = useCallback(async () => {
     if (!driverId || allDriverIds.length === 0) return;
 
     try {
+      const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
+
       // SECURITY: Query driver_jobs_view instead of jobs table to hide customer pricing
+      // Only show jobs completed in the last 7 days
       const { data, error } = await supabase
         .from('driver_jobs_view')
         .select('*')
         .in('driver_id', allDriverIds)
         .in('status', ['delivered', 'failed'])
+        .gte('updated_at', sevenDaysAgo)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -53,8 +63,23 @@ export function CompletedJobsScreen() {
   }, [driverId, allDriverIds.join(',')]);
 
   useEffect(() => {
+    fetchCompletedJobsRef.current = fetchCompletedJobs;
+  }, [fetchCompletedJobs]);
+
+  useEffect(() => {
     fetchCompletedJobs();
   }, [fetchCompletedJobs]);
+
+  // Auto-refresh when the screen gains focus and poll every 30 seconds while focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchCompletedJobsRef.current?.();
+      const interval = setInterval(() => {
+        fetchCompletedJobsRef.current?.();
+      }, POLL_INTERVAL_MS);
+      return () => clearInterval(interval);
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -103,13 +128,13 @@ export function CompletedJobsScreen() {
             <View style={[styles.earningsIcon, { backgroundColor: theme.success + '15' }]}>
               <Feather name="trending-up" size={24} color={theme.success} />
             </View>
-            <ThemedText type="caption" color="secondary">Total Earnings</ThemedText>
+            <ThemedText type="caption" color="secondary">Earnings — Last 7 Days</ThemedText>
           </View>
           <ThemedText type="largeTitle" style={{ color: theme.success, marginBottom: Spacing.xs }}>
             £{totalEarnings.toFixed(2)}
           </ThemedText>
           <ThemedText type="caption" color="secondary">
-            {jobs.filter(j => j.status === 'delivered').length} delivered, {jobs.filter(j => j.status === 'failed').length} failed
+            {jobs.filter(j => j.status === 'delivered').length} delivered, {jobs.filter(j => j.status === 'failed').length} failed · last 7 days
           </ThemedText>
         </Card>
         
@@ -120,7 +145,7 @@ export function CompletedJobsScreen() {
             </View>
             <ThemedText type="h3" style={styles.emptyTitle}>No Completed Jobs</ThemedText>
             <ThemedText type="subhead" color="secondary" style={styles.emptySubtext}>
-              Complete deliveries to see them here
+              No deliveries completed in the last 7 days
             </ThemedText>
           </View>
         ) : (

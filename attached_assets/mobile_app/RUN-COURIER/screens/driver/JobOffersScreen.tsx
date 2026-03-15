@@ -535,12 +535,20 @@ export function JobOffersScreen({ navigation }: any) {
   }, []);
 
   // Re-fetch with sound when driver navigates back to this tab
+  // Also poll every 30 seconds while focused as fallback when realtime drops
   useFocusEffect(
     useCallback(() => {
       if (!isInitialLoadRef.current) {
         console.log('[JobOffers] Screen focused - checking for new jobs');
         fetchAssignedJobsRef.current(true);
       }
+      const pollInterval = setInterval(() => {
+        if (!isInitialLoadRef.current) {
+          console.log('[JobOffers] Poll tick - silent check for new jobs');
+          fetchAssignedJobsRef.current(true);
+        }
+      }, 30000);
+      return () => clearInterval(pollInterval);
     }, [])
   );
 
