@@ -910,7 +910,7 @@ export async function registerRoutes(
     console.log('[Invoices] Invoice deleted successfully:', invoiceId);
     res.json({ success: true, message: "Invoice deleted successfully" });
   }));
-  app.use('/api/job-assignments', requireAdminAccessStrict);
+  app.use('/api/job-assignments', requireAdminOrSupervisorStrict);
 
   app.get("/api/health", (req, res) => {
     const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
@@ -2071,7 +2071,7 @@ export async function registerRoutes(
       }
       next();
     });
-  }, requireAdminAccessStrict, asyncHandler(async (req, res) => {
+  }, requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { jobId, stopId } = req.params;
     
     const job = await storage.getJob(jobId);
@@ -2173,7 +2173,7 @@ export async function registerRoutes(
   }));
 
   // Delete POD photo for a specific multi-drop stop
-  app.delete("/api/jobs/:jobId/stops/:stopId/pod", requireAdminAccessStrict, asyncHandler(async (req, res) => {
+  app.delete("/api/jobs/:jobId/stops/:stopId/pod", requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { jobId, stopId } = req.params;
     
     const { supabaseAdmin: supAdmin } = await import('./supabaseAdmin');
@@ -3588,7 +3588,7 @@ export async function registerRoutes(
       }
       next();
     });
-  }, requireAdminAccessStrict, asyncHandler(async (req, res) => {
+  }, requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const jobId = req.params.id;
     
     const job = await storage.getJob(jobId);
@@ -3687,8 +3687,8 @@ export async function registerRoutes(
     });
   }));
 
-  // Admin DELETE a POD photo from a job
-  app.delete("/api/jobs/:id/pod/photo", requireAdminAccessStrict, asyncHandler(async (req, res) => {
+  // Admin/Supervisor DELETE a POD photo from a job
+  app.delete("/api/jobs/:id/pod/photo", requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const jobId = req.params.id;
     const { photoUrl } = req.body;
     
