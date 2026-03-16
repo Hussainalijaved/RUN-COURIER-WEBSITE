@@ -1895,23 +1895,34 @@ export async function registerRoutes(
     return res.json(ensureJobNumber(stripCustomerPricing(await resolveSingleJobPodUrls(job))));
   }));
 
-  // Get multi-drop stops for a job (admin only - contains POD and recipient data)
+  // Get multi-drop stops for a job (admin/supervisor - contains POD and recipient data)
   app.get("/api/jobs/:id/stops", asyncHandler(async (req, res) => {
     const jobId = req.params.id;
     
-    // SECURITY: Require admin access for POD and recipient data
-    let isAdmin = false;
+    // SECURITY: Require admin or supervisor access for POD and recipient data
+    let isAdminOrSupervisor = false;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       const { data: { user: authUser } } = await supabaseAdmin?.auth.getUser(token) || { data: { user: null } };
       if (authUser?.email) {
-        isAdmin = await isAdminByEmail(authUser.email);
+        const adminCheck = await isAdminByEmail(authUser.email);
+        if (adminCheck) {
+          isAdminOrSupervisor = true;
+        } else {
+          try {
+            const supResult = await getPgPool().query(
+              "SELECT status FROM supervisors WHERE email = $1 LIMIT 1",
+              [authUser.email.toLowerCase()]
+            );
+            isAdminOrSupervisor = supResult.rows.length > 0 && supResult.rows[0].status === 'active';
+          } catch { isAdminOrSupervisor = false; }
+        }
       }
     }
     
-    if (!isAdmin) {
-      return res.status(403).json({ error: "Admin access required", code: "NOT_ADMIN" });
+    if (!isAdminOrSupervisor) {
+      return res.status(403).json({ error: "Admin or supervisor access required", code: "NOT_AUTHORIZED" });
     }
     
     // First verify the job exists
