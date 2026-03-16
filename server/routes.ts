@@ -1986,23 +1986,10 @@ export async function registerRoutes(
     const { jobId, stopId } = req.params;
     const { status } = req.body;
     
-    // SECURITY: Require admin access
-    let isAdmin = false;
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      const { data: { user: authUser } } = await supabaseAdmin?.auth.getUser(token) || { data: { user: null } };
-      if (authUser?.email) {
-        isAdmin = await isAdminByEmail(authUser.email);
-      }
-    }
+    if (!enforceAdminOrSupervisorAccess(req, res)) return;
     
-    if (!isAdmin) {
-      return res.status(403).json({ error: "Admin access required", code: "NOT_ADMIN" });
-    }
-    
-    if (!status || !['pending', 'delivered'].includes(status)) {
-      return res.status(400).json({ error: "Invalid status. Must be 'pending' or 'delivered'" });
+    if (!status || !['pending', 'delivered', 'failed'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be 'pending', 'delivered', or 'failed'" });
     }
     
     if (!supabaseAdmin) {

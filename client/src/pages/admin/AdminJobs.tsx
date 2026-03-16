@@ -323,33 +323,55 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
                   <Badge variant="outline" className="text-xs">Stop {stop.stopOrder}</Badge>
                   {stop.status === 'delivered' ? (
                     <Badge className="bg-green-500 text-white text-xs">Delivered</Badge>
+                  ) : stop.status === 'failed' ? (
+                    <Badge className="bg-red-600 text-white text-xs">Failed</Badge>
                   ) : (
                     <Badge variant="secondary" className="text-xs">Pending</Badge>
                   )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={updatingStopId === stop.id}
-                    onClick={() => updateStopStatusMutation.mutate({
-                      stopId: stop.id,
-                      status: stop.status === 'delivered' ? 'pending' : 'delivered'
-                    })}
-                    data-testid={`button-toggle-stop-${stop.stopOrder}`}
-                  >
-                    {updatingStopId === stop.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : stop.status === 'delivered' ? (
-                      <>
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Mark Pending
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Mark Delivered
-                      </>
-                    )}
-                  </Button>
+                  {updatingStopId === stop.id ? (
+                    <Button size="sm" variant="outline" disabled>
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      Updating…
+                    </Button>
+                  ) : (
+                    <>
+                      {stop.status !== 'delivered' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-green-500 text-green-600 hover:bg-green-50"
+                          onClick={() => updateStopStatusMutation.mutate({ stopId: stop.id, status: 'delivered' })}
+                          data-testid={`button-delivered-stop-${stop.stopOrder}`}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Mark Delivered
+                        </Button>
+                      )}
+                      {stop.status !== 'failed' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-500 text-red-600 hover:bg-red-50"
+                          onClick={() => updateStopStatusMutation.mutate({ stopId: stop.id, status: 'failed' })}
+                          data-testid={`button-failed-stop-${stop.stopOrder}`}
+                        >
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          Mark Failed
+                        </Button>
+                      )}
+                      {(stop.status === 'delivered' || stop.status === 'failed') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateStopStatusMutation.mutate({ stopId: stop.id, status: 'pending' })}
+                          data-testid={`button-pending-stop-${stop.stopOrder}`}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Reset to Pending
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
                 <p className="text-sm font-medium">{stop.address}</p>
                 <p className="text-sm font-mono text-muted-foreground">{stop.postcode}</p>
@@ -673,6 +695,19 @@ export default function AdminJobs() {
     },
     onError: () => {
       toast({ title: 'Failed to cancel job', variant: 'destructive' });
+    },
+  });
+
+  const markJobFailedMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/status`, { status: 'failed' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: 'Job marked as failed', description: 'The job status has been set to failed.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update job status', description: error?.message || 'Please try again.', variant: 'destructive' });
     },
   });
 
@@ -1887,6 +1922,17 @@ export default function AdminJobs() {
                                   Mark Invoice Unpaid
                                 </DropdownMenuItem>
                               )
+                            )}
+                            {job.status !== 'failed' && job.status !== 'cancelled' && job.status !== 'delivered' && (
+                              <DropdownMenuItem 
+                                className="text-orange-600"
+                                onClick={() => markJobFailedMutation.mutate(job.id)}
+                                disabled={markJobFailedMutation.isPending}
+                                data-testid={`menu-fail-${job.id}`}
+                              >
+                                <AlertCircle className="mr-2 h-4 w-4" />
+                                Mark as Failed
+                              </DropdownMenuItem>
                             )}
                             {job.status !== 'delivered' && job.status !== 'cancelled' && (
                               <DropdownMenuItem 
