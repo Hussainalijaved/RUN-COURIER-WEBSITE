@@ -1595,7 +1595,7 @@ export async function registerRoutes(
       cache.set(jobsCacheKey, resolvedJobs, CACHE_TTL.JOBS_LIST);
     }
     
-    let isAdmin = false;
+    let isAdminOrSupervisor = false;
     let isCustomerViewingOwn = false;
     let authenticatedUserId: string | null = null;
     
@@ -1604,15 +1604,27 @@ export async function registerRoutes(
       const token = authHeader.slice(7);
       const { verifyAccessToken } = await import("./supabaseAdmin");
       const user = await verifyAccessToken(token);
-      isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
       authenticatedUserId = user?.id || null;
+      
+      if (user?.role === 'admin' || user?.role === 'dispatcher') {
+        isAdminOrSupervisor = true;
+      } else if (user?.email) {
+        // Check supervisor table
+        try {
+          const supResult = await getPgPool().query(
+            "SELECT status FROM supervisors WHERE email = $1 LIMIT 1",
+            [user.email.toLowerCase()]
+          );
+          isAdminOrSupervisor = supResult.rows.length > 0 && supResult.rows[0].status === 'active';
+        } catch { isAdminOrSupervisor = false; }
+      }
       
       if ((user?.role === 'customer' || user?.role === 'business') && customerId && authenticatedUserId === customerId) {
         isCustomerViewingOwn = true;
       }
     }
     
-    if (isAdmin || isCustomerViewingOwn) {
+    if (isAdminOrSupervisor || isCustomerViewingOwn) {
       return res.json(resolvedJobs);
     }
     
@@ -1873,21 +1885,31 @@ export async function registerRoutes(
     }
     
     // SECURITY: Check if user can see pricing
-    let isAdmin = false;
+    let isAdminOrSupervisor = false;
     let isOwner = false;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       const { verifyAccessToken } = await import("./supabaseAdmin");
       const user = await verifyAccessToken(token);
-      isAdmin = user?.role === 'admin' || user?.role === 'dispatcher';
+      if (user?.role === 'admin' || user?.role === 'dispatcher') {
+        isAdminOrSupervisor = true;
+      } else if (user?.email) {
+        try {
+          const supResult = await getPgPool().query(
+            "SELECT status FROM supervisors WHERE email = $1 LIMIT 1",
+            [user.email.toLowerCase()]
+          );
+          isAdminOrSupervisor = supResult.rows.length > 0 && supResult.rows[0].status === 'active';
+        } catch { isAdminOrSupervisor = false; }
+      }
       // Customer or Business viewing their own job
       if ((user?.role === 'customer' || user?.role === 'business') && user?.id === job.customerId) {
         isOwner = true;
       }
     }
     
-    if (isAdmin || isOwner) {
+    if (isAdminOrSupervisor || isOwner) {
       return res.json(ensureJobNumber(await resolveSingleJobPodUrls(job)));
     }
     
