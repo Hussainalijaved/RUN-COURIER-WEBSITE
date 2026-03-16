@@ -1986,8 +1986,32 @@ export async function registerRoutes(
     const { jobId, stopId } = req.params;
     const { status } = req.body;
     
-    if (!enforceAdminOrSupervisorAccess(req, res)) return;
-    
+    // Verify token and allow admin OR active supervisor
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const token = authHeader.slice(7);
+    const { verifyAccessToken } = await import('./supabaseAdmin');
+    const authUser = await verifyAccessToken(token);
+    if (!authUser?.email) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    const userIsAdmin = await isAdminByEmail(authUser.email);
+    let userIsSupervisor = false;
+    if (!userIsAdmin) {
+      try {
+        const supResult = await getPgPool().query(
+          "SELECT status FROM supervisors WHERE email = $1 LIMIT 1",
+          [authUser.email.toLowerCase()]
+        );
+        userIsSupervisor = supResult.rows.length > 0 && supResult.rows[0].status === 'active';
+      } catch { userIsSupervisor = false; }
+    }
+    if (!userIsAdmin && !userIsSupervisor) {
+      return res.status(403).json({ error: 'Admin or supervisor access required' });
+    }
+
     if (!status || !['pending', 'delivered', 'failed'].includes(status)) {
       return res.status(400).json({ error: "Invalid status. Must be 'pending', 'delivered', or 'failed'" });
     }
