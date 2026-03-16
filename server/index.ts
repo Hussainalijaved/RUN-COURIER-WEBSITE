@@ -487,6 +487,32 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        host: process.env.PGHOST,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false },
+        max: 2,
+      });
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS job_admin_notes (
+          job_id TEXT NOT NULL PRIMARY KEY,
+          notes TEXT,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.end();
+      console.log("[MIGRATION] job_admin_notes table created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] job_admin_notes migration error:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
       const { hydrateLocationCache } = await import('./realtime');
       await hydrateLocationCache();
       console.log("[BACKGROUND] Cache hydrated");

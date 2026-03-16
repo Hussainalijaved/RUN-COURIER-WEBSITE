@@ -532,9 +532,16 @@ export default function AdminJobs() {
   const [cancellationReason, setCancellationReason] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
 
+  const { data: notesData } = useQuery<{ adminNotes: string | null }>({
+    queryKey: ['/api/jobs', selectedJob?.id, 'admin-notes'],
+    enabled: !!selectedJob?.id,
+    staleTime: 0,
+  });
+  const savedNotes = notesData?.adminNotes ?? '';
+
   useEffect(() => {
-    setNotesDraft((selectedJob as any)?.adminNotes || '');
-  }, [(selectedJob as any)?.id]);
+    setNotesDraft(savedNotes);
+  }, [selectedJob?.id, savedNotes]);
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
@@ -721,9 +728,8 @@ export default function AdminJobs() {
       const res = await apiRequest('PATCH', `/api/jobs/${jobId}/admin-notes`, { notes });
       return res.json();
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      if (selectedJob) setSelectedJob({ ...selectedJob, ...(data.adminNotes !== undefined ? { adminNotes: data.adminNotes } as any : {}) });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs', variables.jobId, 'admin-notes'] });
       toast({ title: 'Notes saved' });
     },
     onError: () => {
@@ -2473,7 +2479,7 @@ export default function AdminJobs() {
                       <Button
                         size="sm"
                         onClick={() => selectedJob && saveNotesMutation.mutate({ jobId: selectedJob.id, notes: notesDraft })}
-                        disabled={saveNotesMutation.isPending || notesDraft === ((selectedJob as any)?.adminNotes || '')}
+                        disabled={saveNotesMutation.isPending || notesDraft === savedNotes}
                         data-testid="button-save-notes"
                       >
                         {saveNotesMutation.isPending ? (

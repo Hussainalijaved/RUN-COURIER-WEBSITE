@@ -3258,15 +3258,26 @@ export async function registerRoutes(
   }));
 
   // Admin/supervisor notes for a job
+  app.get("/api/jobs/:id/admin-notes", requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const pool = getPgPool();
+    const result = await pool.query('SELECT notes FROM job_admin_notes WHERE job_id = $1', [req.params.id]);
+    const adminNotes = result.rows[0]?.notes ?? null;
+    res.json({ adminNotes });
+  }));
+
   app.patch("/api/jobs/:id/admin-notes", requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { notes } = req.body;
     if (notes !== undefined && typeof notes !== 'string') {
       return res.status(400).json({ error: "Notes must be a string" });
     }
-    const updatedJob = await storage.updateJob(req.params.id, { adminNotes: notes ?? null });
-    if (!updatedJob) return res.status(404).json({ error: "Job not found" });
+    const pool = getPgPool();
+    await pool.query(
+      `INSERT INTO job_admin_notes (job_id, notes, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (job_id) DO UPDATE SET notes = $2, updated_at = NOW()`,
+      [req.params.id, notes ?? null]
+    );
     console.log(`[Jobs] Admin notes updated for job ${req.params.id}`);
-    res.json({ success: true, adminNotes: updatedJob.adminNotes });
+    res.json({ success: true, adminNotes: notes ?? null });
   }));
 
   app.patch("/api/jobs/:id/payment-status", asyncHandler(async (req, res) => {
