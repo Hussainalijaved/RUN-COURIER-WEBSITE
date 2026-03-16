@@ -166,6 +166,7 @@ function mapDbToJob(dbJob: any): Job {
     customerEmail: dbJob.customer_email || null,
     officeCity: dbJob.office_city || null,
     createdBy: dbJob.created_by || null,
+    adminNotes: dbJob.admin_notes || null,
     createdAt: dbJob.created_at ? new Date(dbJob.created_at) : new Date(),
     updatedAt: dbJob.updated_at ? new Date(dbJob.updated_at) : null,
   };
@@ -1111,6 +1112,7 @@ export class SupabaseStorage implements IStorage {
     if (data.driverHidden !== undefined) dbData.driver_hidden = data.driverHidden;
     if (data.driverHiddenAt !== undefined) dbData.driver_hidden_at = data.driverHiddenAt;
     if (data.driverHiddenBy !== undefined) dbData.driver_hidden_by = data.driverHiddenBy;
+    if (data.adminNotes !== undefined) dbData.admin_notes = data.adminNotes;
     if (data.pickupLatitude !== undefined) dbData.pickup_latitude = data.pickupLatitude;
     if (data.pickupLongitude !== undefined) dbData.pickup_longitude = data.pickupLongitude;
     if (data.deliveryLatitude !== undefined) dbData.delivery_latitude = data.deliveryLatitude;

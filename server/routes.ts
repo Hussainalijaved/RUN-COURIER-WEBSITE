@@ -3224,6 +3224,18 @@ export async function registerRoutes(
     res.json(ensureJobNumber(updatedJob));
   }));
 
+  // Admin/supervisor notes for a job
+  app.patch("/api/jobs/:id/admin-notes", requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { notes } = req.body;
+    if (notes !== undefined && typeof notes !== 'string') {
+      return res.status(400).json({ error: "Notes must be a string" });
+    }
+    const updatedJob = await storage.updateJob(req.params.id, { adminNotes: notes ?? null });
+    if (!updatedJob) return res.status(404).json({ error: "Job not found" });
+    console.log(`[Jobs] Admin notes updated for job ${req.params.id}`);
+    res.json({ success: true, adminNotes: updatedJob.adminNotes });
+  }));
+
   app.patch("/api/jobs/:id/payment-status", asyncHandler(async (req, res) => {
     const { paymentStatus } = req.body;
     const job = await storage.getJob(req.params.id);

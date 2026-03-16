@@ -530,6 +530,11 @@ export default function AdminJobs() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [jobToCancel, setJobToCancel] = useState<Job | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
+  const [notesDraft, setNotesDraft] = useState('');
+
+  useEffect(() => {
+    setNotesDraft((selectedJob as any)?.adminNotes || '');
+  }, [(selectedJob as any)?.id]);
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
   const { toast } = useToast();
@@ -708,6 +713,21 @@ export default function AdminJobs() {
     },
     onError: (error: any) => {
       toast({ title: 'Failed to update job status', description: error?.message || 'Please try again.', variant: 'destructive' });
+    },
+  });
+
+  const saveNotesMutation = useMutation({
+    mutationFn: async ({ jobId, notes }: { jobId: string; notes: string }) => {
+      const res = await apiRequest('PATCH', `/api/jobs/${jobId}/admin-notes`, { notes });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      if (selectedJob) setSelectedJob({ ...selectedJob, ...(data.adminNotes !== undefined ? { adminNotes: data.adminNotes } as any : {}) });
+      toast({ title: 'Notes saved' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to save notes', variant: 'destructive' });
     },
   });
 
@@ -2431,6 +2451,39 @@ export default function AdminJobs() {
                       </>
                     );
                   })()}
+                </div>
+
+                {/* Admin Notes Section */}
+                <div className="border-t pt-4 mt-2">
+                  <h4 className="font-semibold flex items-center gap-2 mb-3">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Internal Notes
+                  </h4>
+                  <div className="space-y-2">
+                    <Textarea
+                      placeholder="Add internal notes for this job (visible to admins and supervisors only)..."
+                      value={notesDraft}
+                      onChange={(e) => setNotesDraft(e.target.value)}
+                      rows={4}
+                      className="resize-none text-sm"
+                      data-testid="textarea-admin-notes"
+                    />
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Only visible to admins and supervisors</p>
+                      <Button
+                        size="sm"
+                        onClick={() => selectedJob && saveNotesMutation.mutate({ jobId: selectedJob.id, notes: notesDraft })}
+                        disabled={saveNotesMutation.isPending || notesDraft === ((selectedJob as any)?.adminNotes || '')}
+                        data-testid="button-save-notes"
+                      >
+                        {saveNotesMutation.isPending ? (
+                          <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Saving...</>
+                        ) : (
+                          <><Save className="h-3 w-3 mr-1" />Save Notes</>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

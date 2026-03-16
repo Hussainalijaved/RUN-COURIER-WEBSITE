@@ -442,6 +442,7 @@ async function runBackgroundTasks() {
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_amount DECIMAL(10,2) DEFAULT 0`);
       await db.execute(sql`ALTER TABLE pricing_settings ADD COLUMN IF NOT EXISTS service_type_pricing JSONB DEFAULT '{"flexible":0,"urgent":25}'::jsonb`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS admin_notes TEXT`);
       console.log("[MIGRATION] Service type columns created/verified successfully");
     } catch (e: any) {
       console.warn("[MIGRATION] Service type columns migration error:", e?.message);
