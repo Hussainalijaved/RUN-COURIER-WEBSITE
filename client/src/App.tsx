@@ -8,6 +8,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { BookingProvider } from "@/context/BookingContext";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 import { Loader2 } from "lucide-react";
+import { FloatingButtons } from "@/components/FloatingButtons";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -497,6 +498,7 @@ function App() {
           <BookingProvider>
             <ScrollToTop />
             <Toaster />
+            <FloatingButtons />
             <Router />
           </BookingProvider>
         </AuthProvider>
