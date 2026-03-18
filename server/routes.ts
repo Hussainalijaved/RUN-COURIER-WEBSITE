@@ -4659,7 +4659,69 @@ export async function registerRoutes(
         console.error("[Drivers] Document migration error (non-critical):", docMigrationErr.message);
       }
     }
-    
+
+    // ── Auto-emails on approval ──────────────────────────────────────────────
+    if (isVerified === true && driver.email) {
+      // Email 1: Approval confirmation
+      try {
+        const { sendDriverApprovalEmailExisting } = await import('./emailService');
+        const sent = await sendDriverApprovalEmailExisting(
+          driver.email,
+          driver.fullName || 'Driver',
+          driver.driverCode || driver.id
+        );
+        if (sent) {
+          console.log(`[Drivers] Approval confirmation email sent to ${driver.email}`);
+        } else {
+          console.error(`[Drivers] Failed to send approval confirmation email to ${driver.email}`);
+        }
+      } catch (emailErr: any) {
+        console.error('[Drivers] Error sending approval confirmation email:', emailErr.message);
+      }
+
+      // Email 2: Contract signing — use first available template automatically
+      try {
+        const templates = await storage.getContractTemplates();
+        if (templates && templates.length > 0) {
+          const template = templates[0];
+          const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+          const driverCode = driver.driverCode || driver.id;
+          const contractContent = template.content
+            .replace(/\{\{driver_name\}\}/g, driver.fullName || 'Driver')
+            .replace(/\{\{driver_code\}\}/g, driverCode)
+            .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }))
+            .replace(/\{\{driver_email\}\}/g, driver.email || '')
+            .replace(/\{\{driver_phone\}\}/g, driver.phone || '')
+            .replace(/\{\{vehicle_type\}\}/g, driver.vehicleType || '');
+
+          await storage.createDriverContract({
+            templateId: template.id,
+            driverId: driver.id,
+            driverName: driver.fullName || 'Driver',
+            driverEmail: driver.email || undefined,
+            contractContent,
+            token,
+            status: 'sent',
+            sentAt: new Date().toISOString(),
+          });
+
+          const { sendContractSigningEmail } = await import('./emailService');
+          const signingUrl = `https://runcourier.co.uk/contracts/sign/${token}`;
+          await sendContractSigningEmail(driver.email, {
+            driverName: driver.fullName || 'Driver',
+            contractTitle: template.title,
+            signingUrl,
+          });
+          console.log(`[Drivers] Contract signing email sent to ${driver.email} (template: ${template.title})`);
+        } else {
+          console.log('[Drivers] No contract templates found — skipping auto contract email');
+        }
+      } catch (contractErr: any) {
+        console.error('[Drivers] Error sending auto contract email:', contractErr.message);
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     res.json(driver);
   }));
 
