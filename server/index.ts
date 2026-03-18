@@ -504,6 +504,8 @@ async function runBackgroundTasks() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
+      await pool.query(`ALTER TABLE job_admin_notes ADD COLUMN IF NOT EXISTS office_city TEXT`);
+      await pool.query(`ALTER TABLE job_admin_notes ADD COLUMN IF NOT EXISTS created_by TEXT`);
       await pool.end();
       console.log("[MIGRATION] job_admin_notes table created/verified successfully");
     } catch (e: any) {

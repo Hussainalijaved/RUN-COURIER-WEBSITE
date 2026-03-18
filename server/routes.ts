@@ -57,6 +57,22 @@ function getPgPool(): Pool {
   return pgPool;
 }
 
+async function upsertJobMetadata(jobId: string, officeCity?: string | null, createdBy?: string | null): Promise<void> {
+  try {
+    await getPgPool().query(
+      `INSERT INTO job_admin_notes (job_id, office_city, created_by, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (job_id) DO UPDATE SET
+         office_city = CASE WHEN $2 IS NOT NULL THEN $2 ELSE job_admin_notes.office_city END,
+         created_by = CASE WHEN $3 IS NOT NULL THEN $3 ELSE job_admin_notes.created_by END,
+         updated_at = NOW()`,
+      [jobId, officeCity ?? null, createdBy ?? null]
+    );
+  } catch (err: any) {
+    console.warn('[Jobs] Failed to upsert job metadata:', err.message);
+  }
+}
+
 async function setMustChangePassword(userId: string, value: boolean): Promise<void> {
   try {
     await getPgPool().query('UPDATE drivers SET must_change_password = $1 WHERE id = $2', [value, userId]);
@@ -1591,6 +1607,27 @@ export async function registerRoutes(
           }
         }
       }
+
+      // Merge office_city and created_by from job_admin_notes (PGHOST) into jobs
+      try {
+        const jobIds = resolvedJobs.map((j: any) => j.id).filter(Boolean);
+        if (jobIds.length > 0) {
+          const metaResult = await getPgPool().query(
+            'SELECT job_id, office_city, created_by FROM job_admin_notes WHERE job_id = ANY($1::text[])',
+            [jobIds]
+          );
+          const metaMap = new Map<string, any>(metaResult.rows.map((r: any) => [r.job_id, r]));
+          for (const job of resolvedJobs) {
+            const meta = metaMap.get((job as any).id);
+            if (meta) {
+              if (meta.office_city) (job as any).officeCity = meta.office_city;
+              if (meta.created_by) (job as any).createdBy = meta.created_by;
+            }
+          }
+        }
+      } catch (metaErr: any) {
+        console.warn('[API Jobs] Failed to merge metadata:', metaErr.message);
+      }
       
       cache.set(jobsCacheKey, resolvedJobs, CACHE_TTL.JOBS_LIST);
     }
@@ -1883,6 +1920,19 @@ export async function registerRoutes(
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
+
+    // Merge office_city and created_by from job_admin_notes (PGHOST)
+    try {
+      const metaResult = await getPgPool().query(
+        'SELECT office_city, created_by FROM job_admin_notes WHERE job_id = $1',
+        [req.params.id]
+      );
+      if (metaResult.rows.length > 0) {
+        const meta = metaResult.rows[0];
+        if (meta.office_city) (job as any).officeCity = meta.office_city;
+        if (meta.created_by) (job as any).createdBy = meta.created_by;
+      }
+    } catch {}
     
     // SECURITY: Check if user can see pricing
     let isAdminOrSupervisor = false;
@@ -2683,28 +2733,24 @@ export async function registerRoutes(
         // Ensure job_number is set
         supabaseUpdateData.job_number = jobNumber;
 
-        // Tag office_city and created_by if created by a supervisor; tag created_by for admins too
+        // Tag office_city and created_by in job_admin_notes (PGHOST) — Supabase jobs table lacks these columns
         try {
           const adminUser = (req as any).adminUser;
           const creatorEmail = await getSupervisorEmailFromReq(req);
           if (creatorEmail) {
-            // Supervisor created the job — look up their full name
             const supCity = await getSupervisorCityByEmail(creatorEmail);
-            if (supCity) supabaseUpdateData.office_city = supCity;
+            let supName = creatorEmail;
             try {
               const supRow = await getPgPool().query(
                 'SELECT full_name FROM supervisors WHERE email = $1 LIMIT 1',
                 [creatorEmail.toLowerCase()]
               );
-              const supName = supRow.rows[0]?.full_name || creatorEmail;
-              supabaseUpdateData.created_by = `Supervisor: ${supName}`;
-            } catch {
-              supabaseUpdateData.created_by = `Supervisor: ${creatorEmail}`;
-            }
+              supName = supRow.rows[0]?.full_name || creatorEmail;
+            } catch {}
+            await upsertJobMetadata(finalJob.id.toString(), supCity || null, `Supervisor: ${supName}`);
           } else if (adminUser?.email) {
-            // Admin created the job
             const adminName = adminUser.fullName || adminUser.email;
-            supabaseUpdateData.created_by = `Admin: ${adminName}`;
+            await upsertJobMetadata(finalJob.id.toString(), null, `Admin: ${adminName}`);
           }
         } catch {}
         
@@ -3438,10 +3484,7 @@ export async function registerRoutes(
       if (assignerEmail) {
         const supCity = await getSupervisorCityByEmail(assignerEmail);
         if (supCity && !previousJob?.officeCity) {
-          await getPgPool().query(
-            'UPDATE jobs SET office_city = $1 WHERE id = $2',
-            [supCity, req.params.id]
-          );
+          await upsertJobMetadata(req.params.id, supCity, null);
           console.log(`[Jobs] Tagged job ${req.params.id} with office_city=${supCity} (assigned by supervisor ${assignerEmail})`);
         }
       }
@@ -12318,7 +12361,7 @@ export async function registerRoutes(
         if (assignerEmail) {
           const supCity = await getSupervisorCityByEmail(assignerEmail);
           if (supCity && !job.officeCity) {
-            await getPgPool().query('UPDATE jobs SET office_city = $1 WHERE id = $2', [supCity, jobId]);
+            await upsertJobMetadata(jobId, supCity, null);
           }
         }
       } catch {}
