@@ -515,7 +515,6 @@ export default function SupervisorJobHistory() {
 
   const { data: jobs, isLoading: jobsLoading, isError: jobsError, refetch: refetchJobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
-    refetchInterval: 30000, // Poll every 30 seconds for new jobs
     retry: 2,
     retryDelay: 1000,
   });

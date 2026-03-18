@@ -100,10 +100,10 @@ export const cache = new MemoryCache();
 
 // Cache TTL constants (in milliseconds)
 export const CACHE_TTL = {
-  DRIVERS_LIST: 2000,      // 2 seconds - drivers list for live map, needs near real-time
-  JOBS_LIST: 5000,         // 5 seconds - jobs cache for reduced database load
-  DRIVER_DETAIL: 5000,     // 5 seconds - individual driver detail
-  JOB_DETAIL: 3000,        // 3 seconds - individual job detail
-  STATS: 10000,            // 10 seconds - dashboard stats
-  PRICING: 60000,          // 1 minute - pricing config rarely changes
+  DRIVERS_LIST: 20000,     // 20 seconds - WebSocket handles real-time location, list can be stale longer
+  JOBS_LIST: 30000,        // 30 seconds - WebSocket pushes job updates in real-time
+  DRIVER_DETAIL: 30000,    // 30 seconds - individual driver detail
+  JOB_DETAIL: 30000,       // 30 seconds - individual job detail
+  STATS: 60000,            // 60 seconds - dashboard stats
+  PRICING: 300000,         // 5 minutes - pricing config rarely changes
 } as const;

@@ -535,7 +535,7 @@ export default function AdminJobs() {
   const { data: notesData } = useQuery<{ adminNotes: string | null }>({
     queryKey: ['/api/jobs', selectedJob?.id, 'admin-notes'],
     enabled: !!selectedJob?.id,
-    staleTime: 0,
+    staleTime: 30000,
   });
   const savedNotes = notesData?.adminNotes ?? '';
 
@@ -550,7 +550,6 @@ export default function AdminJobs() {
 
   const { data: jobs, isLoading: jobsLoading, isError: jobsError, refetch: refetchJobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
-    refetchInterval: 30000, // Poll every 30 seconds for new jobs
     retry: 2,
     retryDelay: 1000,
   });

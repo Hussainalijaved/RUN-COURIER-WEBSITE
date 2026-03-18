@@ -82,12 +82,12 @@ export default function AdminMap() {
 
   const { data: drivers, isLoading: driversLoading, refetch: refetchDrivers } = useQuery<Driver[]>({
     queryKey: ['/api/drivers'],
-    refetchInterval: 15000,
+    staleTime: 30000,
   });
 
   const { data: jobs, refetch: refetchJobs } = useQuery<Job[]>({
     queryKey: ['/api/jobs'],
-    refetchInterval: 30000,
+    staleTime: 30000,
   });
 
   const assignJobMutation = useMutation({

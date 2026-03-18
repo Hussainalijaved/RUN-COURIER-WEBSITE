@@ -22,12 +22,12 @@ export default function SupervisorDashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['/api/supervisor/stats'],
     queryFn: () => fetchWithAuth('/api/supervisor/stats'),
-    refetchInterval: 30000,
+    staleTime: 60000,
   });
 
   const { data: recentJobs } = useQuery<any[]>({
     queryKey: ['/api/supervisor/jobs'],
-    refetchInterval: 30000,
+    staleTime: 60000,
   });
 
   const statCards = [

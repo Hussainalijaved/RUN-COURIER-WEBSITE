@@ -927,7 +927,7 @@ async function runBackgroundTasks() {
     } catch (e: any) {
       console.warn("[BACKGROUND] Document reconciliation error:", e?.message);
     }
-  }, 20000);
+  }, 120000);
 
   setTimeout(async () => {
     try {

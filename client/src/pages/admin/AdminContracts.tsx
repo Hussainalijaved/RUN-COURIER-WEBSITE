@@ -79,7 +79,7 @@ export default function AdminContracts() {
 
   const { data: contracts = [], isLoading: contractsLoading } = useQuery<any[]>({
     queryKey: ['/api/driver-contracts'],
-    refetchInterval: 15000,
+    staleTime: 120000,
   });
 
   const { data: drivers = [] } = useQuery<any[]>({
