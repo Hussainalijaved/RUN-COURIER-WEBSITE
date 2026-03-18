@@ -2733,12 +2733,14 @@ export async function registerRoutes(
         // Ensure job_number is set
         supabaseUpdateData.job_number = jobNumber;
 
-        // Tag office_city and created_by in job_admin_notes (PGHOST) — Supabase jobs table lacks these columns
+        // Tag office_city and created_by — stored in PGHOST job_admin_notes AND Supabase (if columns exist)
         try {
           const adminUser = (req as any).adminUser;
           const creatorEmail = await getSupervisorEmailFromReq(req);
+          let metaOfficeCity: string | null = null;
+          let metaCreatedBy: string | null = null;
           if (creatorEmail) {
-            const supCity = await getSupervisorCityByEmail(creatorEmail);
+            metaOfficeCity = await getSupervisorCityByEmail(creatorEmail);
             let supName = creatorEmail;
             try {
               const supRow = await getPgPool().query(
@@ -2747,10 +2749,19 @@ export async function registerRoutes(
               );
               supName = supRow.rows[0]?.full_name || creatorEmail;
             } catch {}
-            await upsertJobMetadata(finalJob.id.toString(), supCity || null, `Supervisor: ${supName}`);
+            metaCreatedBy = `Supervisor: ${supName}`;
           } else if (adminUser?.email) {
-            const adminName = adminUser.fullName || adminUser.email;
-            await upsertJobMetadata(finalJob.id.toString(), null, `Admin: ${adminName}`);
+            metaCreatedBy = `Admin: ${adminUser.fullName || adminUser.email}`;
+          }
+          if (metaOfficeCity || metaCreatedBy) {
+            await upsertJobMetadata(finalJob.id.toString(), metaOfficeCity, metaCreatedBy);
+            // Also write directly to Supabase (safe — ignored if columns don't exist yet)
+            try {
+              const supaMeta: Record<string, string> = {};
+              if (metaOfficeCity) supaMeta.office_city = metaOfficeCity;
+              if (metaCreatedBy) supaMeta.created_by = metaCreatedBy;
+              await supabaseAdmin.from('jobs').update(supaMeta).eq('id', finalJob.id.toString());
+            } catch {}
           }
         } catch {}
         
@@ -3485,6 +3496,9 @@ export async function registerRoutes(
         const supCity = await getSupervisorCityByEmail(assignerEmail);
         if (supCity && !previousJob?.officeCity) {
           await upsertJobMetadata(req.params.id, supCity, null);
+          try {
+            await supabaseAdmin.from('jobs').update({ office_city: supCity }).eq('id', req.params.id);
+          } catch {}
           console.log(`[Jobs] Tagged job ${req.params.id} with office_city=${supCity} (assigned by supervisor ${assignerEmail})`);
         }
       }
@@ -12362,6 +12376,9 @@ export async function registerRoutes(
           const supCity = await getSupervisorCityByEmail(assignerEmail);
           if (supCity && !job.officeCity) {
             await upsertJobMetadata(jobId, supCity, null);
+            try {
+              await supabaseAdmin.from('jobs').update({ office_city: supCity }).eq('id', jobId);
+            } catch {}
           }
         }
       } catch {}

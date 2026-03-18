@@ -513,6 +513,47 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Backfill job_admin_notes from Supabase (runs once; safe if columns don't exist in Supabase yet)
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      const { data } = await (supabaseAdmin as any)
+        .from('jobs')
+        .select('id, office_city, created_by')
+        .or('office_city.not.is.null,created_by.not.is.null');
+      if (!data || data.length === 0) return;
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        host: process.env.PGHOST,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false },
+        max: 2,
+      });
+      let count = 0;
+      for (const job of data) {
+        if (!job.office_city && !job.created_by) continue;
+        try {
+          await pool.query(
+            `INSERT INTO job_admin_notes (job_id, office_city, created_by, updated_at)
+             VALUES ($1, $2, $3, NOW())
+             ON CONFLICT (job_id) DO UPDATE SET
+               office_city = CASE WHEN $2 IS NOT NULL THEN $2 ELSE job_admin_notes.office_city END,
+               created_by = CASE WHEN $3 IS NOT NULL THEN $3 ELSE job_admin_notes.created_by END,
+               updated_at = NOW()`,
+            [job.id, job.office_city || null, job.created_by || null]
+          );
+          count++;
+        } catch {}
+      }
+      await pool.end();
+      if (count > 0) console.log(`[MIGRATION] Backfilled ${count} jobs with office_city/created_by from Supabase`);
+    } catch {}
+  })();
+
   (async () => {
     try {
       const { hydrateLocationCache } = await import('./realtime');
