@@ -2733,37 +2733,53 @@ export async function registerRoutes(
         // Ensure job_number is set
         supabaseUpdateData.job_number = jobNumber;
 
-        // Tag office_city and created_by — stored in PGHOST job_admin_notes AND Supabase (if columns exist)
-        try {
+        // Tag office_city and created_by using flags already set by auth middleware (no extra network calls)
+        {
           const adminUser = (req as any).adminUser;
-          const creatorEmail = await getSupervisorEmailFromReq(req);
+          const isSupervisor = (req as any).isSupervisor === true;
           let metaOfficeCity: string | null = null;
           let metaCreatedBy: string | null = null;
-          if (creatorEmail) {
-            metaOfficeCity = await getSupervisorCityByEmail(creatorEmail);
-            let supName = creatorEmail;
+
+          if (isSupervisor && adminUser?.email) {
+            // Supervisor path — look up their city and name from supervisors table
             try {
-              const supRow = await getPgPool().query(
-                'SELECT full_name FROM supervisors WHERE email = $1 LIMIT 1',
-                [creatorEmail.toLowerCase()]
-              );
-              supName = supRow.rows[0]?.full_name || creatorEmail;
-            } catch {}
-            metaCreatedBy = `Supervisor: ${supName}`;
+              metaOfficeCity = await getSupervisorCityByEmail(adminUser.email);
+              let supName = adminUser.fullName || adminUser.email;
+              try {
+                const supRow = await getPgPool().query(
+                  'SELECT full_name FROM supervisors WHERE email = $1 LIMIT 1',
+                  [adminUser.email.toLowerCase()]
+                );
+                supName = supRow.rows[0]?.full_name || supName;
+              } catch {}
+              metaCreatedBy = `Supervisor: ${supName}`;
+            } catch (err: any) {
+              console.warn('[Jobs] Could not fetch supervisor city/name:', err.message);
+              metaCreatedBy = `Supervisor: ${adminUser.fullName || adminUser.email}`;
+            }
           } else if (adminUser?.email) {
+            // Admin path — no city, just record who created it
             metaCreatedBy = `Admin: ${adminUser.fullName || adminUser.email}`;
           }
-          if (metaOfficeCity || metaCreatedBy) {
-            await upsertJobMetadata(finalJob.id.toString(), metaOfficeCity, metaCreatedBy);
-            // Also write directly to Supabase (safe — ignored if columns don't exist yet)
+
+          if (metaCreatedBy) {
+            try {
+              await upsertJobMetadata(finalJob.id.toString(), metaOfficeCity, metaCreatedBy);
+              console.log(`[Jobs] Tagged job ${finalJob.id} createdBy="${metaCreatedBy}" officeCity="${metaOfficeCity}"`);
+            } catch (err: any) {
+              console.warn('[Jobs] Failed to write job metadata to PGHOST:', err.message);
+            }
+            // Also write to Supabase (safe — ignored silently if columns don't exist yet)
             try {
               const supaMeta: Record<string, string> = {};
               if (metaOfficeCity) supaMeta.office_city = metaOfficeCity;
               if (metaCreatedBy) supaMeta.created_by = metaCreatedBy;
-              await supabaseAdmin.from('jobs').update(supaMeta).eq('id', finalJob.id.toString());
+              if (Object.keys(supaMeta).length > 0) {
+                await supabaseAdmin.from('jobs').update(supaMeta).eq('id', finalJob.id.toString());
+              }
             } catch {}
           }
-        } catch {}
+        }
         
         const { error: updateError } = await supabaseAdmin
           .from('jobs')
