@@ -76,6 +76,44 @@ const ZONE_COLORS = [
   '#6366F1', // indigo
 ];
 
+// Generate a large SVG drop-pin marker with postcode label
+function makePinSvg(color: string, label: string): string {
+  const w = 64;
+  const h = 80;
+  const r = 28; // circle radius
+  const cx = w / 2;
+  const cy = r + 4;
+  // tip of the pin
+  const tipY = h - 2;
+  // lighter version for gradient highlight
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <defs>
+        <radialGradient id="g" cx="38%" cy="35%" r="60%">
+          <stop offset="0%" stop-color="white" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="shadow" x="-20%" y="-10%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000055"/>
+        </filter>
+      </defs>
+      <!-- pin body -->
+      <g filter="url(#shadow)">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#g)"/>
+        <!-- pin stem -->
+        <path d="M${cx - 8} ${cy + r - 6} Q${cx} ${tipY} ${cx + 8} ${cy + r - 6}" fill="${color}"/>
+        <!-- white inner ring -->
+        <circle cx="${cx}" cy="${cy}" r="${r - 8}" fill="white" opacity="0.25"/>
+      </g>
+      <!-- label -->
+      <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-family="monospace,sans-serif"
+            font-size="${label.length > 4 ? '11' : '13'}" font-weight="bold" fill="white"
+            letter-spacing="0.5">${label}</text>
+    </svg>`.trim();
+  return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+}
+
 // Approximate circle radius based on outcode length (postcode district vs sector)
 function getZoneRadius(postcode: string): number {
   const parts = postcode.trim().split(' ');
@@ -196,18 +234,9 @@ export default function PostcodeMap() {
           map,
           title: info.postcode,
           icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: color,
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-          },
-          label: {
-            text: info.outcode,
-            color: '#ffffff',
-            fontSize: '10px',
-            fontWeight: 'bold',
+            url: makePinSvg(color, info.outcode),
+            scaledSize: new google.maps.Size(64, 80),
+            anchor: new google.maps.Point(32, 78),
           },
           zIndex: 100,
         });
