@@ -14804,5 +14804,67 @@ export async function registerRoutes(
     });
   }));
 
+  // ─── CONTACTS (admin + supervisor) ───────────────────────────────────────
+  // Migrate contacts table on first use
+  try {
+    await getPgPool().query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id BIGSERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT NOT NULL,
+        company_name TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('[MIGRATION] contacts table created/verified successfully');
+  } catch (e) {
+    console.warn('[MIGRATION] contacts table migration failed:', e);
+  }
+
+  app.get('/api/contacts', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const result = await getPgPool().query(
+      'SELECT * FROM contacts ORDER BY name ASC'
+    );
+    res.json(result.rows);
+  }));
+
+  app.post('/api/contacts', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { name, phone, email, company_name, notes } = req.body;
+    if (!name || !phone || !email) {
+      return res.status(400).json({ error: 'name, phone and email are required' });
+    }
+    const result = await getPgPool().query(
+      `INSERT INTO contacts (name, phone, email, company_name, notes)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [name.trim(), phone.trim(), email.trim(), company_name?.trim() || null, notes?.trim() || null]
+    );
+    res.status(201).json(result.rows[0]);
+  }));
+
+  app.put('/api/contacts/:id', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { name, phone, email, company_name, notes } = req.body;
+    if (!name || !phone || !email) {
+      return res.status(400).json({ error: 'name, phone and email are required' });
+    }
+    const result = await getPgPool().query(
+      `UPDATE contacts SET name=$1, phone=$2, email=$3, company_name=$4, notes=$5, updated_at=NOW()
+       WHERE id=$6 RETURNING *`,
+      [name.trim(), phone.trim(), email.trim(), company_name?.trim() || null, notes?.trim() || null, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Contact not found' });
+    res.json(result.rows[0]);
+  }));
+
+  app.delete('/api/contacts/:id', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    await getPgPool().query('DELETE FROM contacts WHERE id=$1', [id]);
+    res.json({ success: true });
+  }));
+
   return httpServer;
 }

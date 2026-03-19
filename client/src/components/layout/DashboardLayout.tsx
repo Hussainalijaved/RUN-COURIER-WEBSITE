@@ -50,6 +50,7 @@ import {
   Megaphone,
   SlidersHorizontal,
   Search,
+  BookUser,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -77,6 +78,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
     { href: '/admin/contracts', label: 'Contracts', icon: FileSignature },
     { href: '/admin/notices', label: 'Driver Notices', icon: Megaphone },
+    { href: '/admin/contacts', label: 'Contacts', icon: BookUser },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/supervisors', label: 'Supervisors', icon: Users },
     { href: '/admin/pricing', label: 'Settings', icon: SlidersHorizontal },
@@ -122,6 +124,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/supervisor/drivers', label: 'Drivers', icon: Users },
     { href: '/supervisor/customers', label: 'Customers', icon: Users },
     { href: '/supervisor/invoices', label: 'Invoices', icon: Receipt },
+    { href: '/supervisor/contacts', label: 'Contacts', icon: BookUser },
     { href: '/supervisor/track', label: 'Track Order', icon: Search },
   ],
 };

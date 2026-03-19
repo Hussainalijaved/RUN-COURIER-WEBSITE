@@ -84,6 +84,7 @@ const AdminContracts = lazy(() => import("@/pages/admin/AdminContracts"));
 const AdminNotices = lazy(() => import("@/pages/admin/AdminNotices"));
 const AdminSupervisors = lazy(() => import("@/pages/admin/AdminSupervisors"));
 const AdminProfile = lazy(() => import("@/pages/admin/AdminProfile"));
+const AdminContacts = lazy(() => import("@/pages/admin/AdminContacts"));
 
 const SupervisorLogin = lazy(() => import("@/pages/supervisor/SupervisorLogin"));
 const SupervisorRegister = lazy(() => import("@/pages/supervisor/SupervisorRegister"));
@@ -282,6 +283,11 @@ function Router() {
             <AdminSupervisors />
           </ProtectedRoute>
         </Route>
+        <Route path="/admin/contacts">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminContacts />
+          </ProtectedRoute>
+        </Route>
         <Route path="/admin/profile">
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminProfile />
@@ -451,6 +457,11 @@ function Router() {
         <Route path="/supervisor/invoices">
           <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
             <SupervisorInvoices />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/contacts">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <AdminContacts />
           </ProtectedRoute>
         </Route>
         <Route path="/supervisor/quote">
