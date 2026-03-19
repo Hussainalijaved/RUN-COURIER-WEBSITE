@@ -93,7 +93,7 @@ function getZoneRadius(postcode: string): number {
 export default function PostcodeMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const { isLoaded, loadError } = useGoogleMaps();
+  const { isReady, error: loadError } = useGoogleMaps();
 
   const [searchValue, setSearchValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -107,7 +107,7 @@ export default function PostcodeMap() {
 
   // Initialise the Google Map
   useEffect(() => {
-    if (!isLoaded || !mapRef.current || mapInstanceRef.current) return;
+    if (!isReady || !mapRef.current || mapInstanceRef.current) return;
     try {
       const map = new google.maps.Map(mapRef.current, {
         center: { lat: 54.5, lng: -3.0 },
@@ -441,7 +441,7 @@ export default function PostcodeMap() {
 
         {/* Map */}
         <div className="flex-1 relative">
-          {!isLoaded && (
+          {!isReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -452,7 +452,7 @@ export default function PostcodeMap() {
           <div ref={mapRef} className="w-full h-full" data-testid="postcode-map-container" />
 
           {/* Map overlay hint */}
-          {isLoaded && pinnedPostcodes.length === 0 && (
+          {isReady && pinnedPostcodes.length === 0 && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur-sm border border-border rounded-lg px-4 py-2 shadow-md pointer-events-none">
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <Info className="h-4 w-4 flex-shrink-0" />
