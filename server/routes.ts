@@ -10394,7 +10394,10 @@ export async function registerRoutes(
         // Also enrich if job_details is stored as an empty array (e.g. "[]")
         try {
           const parsed = typeof inv.job_details === 'string' ? JSON.parse(inv.job_details) : inv.job_details;
-          return !Array.isArray(parsed) || parsed.length === 0;
+          if (!Array.isArray(parsed) || parsed.length === 0) return true;
+          // Re-enrich if any job entry is missing the version flag (_v: 2)
+          // This upgrades old enrichments that stored total_price (incl. waiting) as the price
+          return parsed.some((job: any) => !job._v || job._v < 2);
         } catch { return true; }
       });
       if (needsEnrichment.length > 0) {
@@ -10455,11 +10458,12 @@ export async function registerRoutes(
               ? new Date(j.scheduled_pickup_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
               : 'N/A',
             vehicleType: j.vehicle_type || 'car',
-            price: parseFloat(j.total_price) || 0,
+            price: Math.max(0, (parseFloat(j.total_price) || 0) - (parseFloat((j as any).waiting_time_charge) || 0)),
             isMultiDrop: j.is_multi_drop || false,
             multiDropStops: stops,
             waitingTimeMinutes: 0,
             waitingTimeCharge: parseFloat((j as any).waiting_time_charge) || 0,
+            _v: 2,
           };
           // Store under both integer and string key for robust lookup
           jobMap[String(j.id)] = entry;
@@ -10872,11 +10876,12 @@ export async function registerRoutes(
             recipientName: job.recipient_name,
             scheduledDate: formatShortDate(job.scheduled_pickup_time),
             vehicleType: job.vehicle_type || 'car',
-            price: parseFloat(job.total_price) || 0,
+            price: Math.max(0, (parseFloat(job.total_price) || 0) - (parseFloat((job as any).waiting_time_charge) || 0)),
             isMultiDrop: job.is_multi_drop || false,
             multiDropStops: stops,
             waitingTimeMinutes: wtMinutesMap[Number(job.id)] || 0,
             waitingTimeCharge: parseFloat((job as any).waiting_time_charge) || 0,
+            _v: 2,
           };
         });
       }
@@ -11042,7 +11047,7 @@ export async function registerRoutes(
     } else if (invoice.job_ids && invoice.job_ids.length > 0) {
       const { data: liveJobs } = await supabaseAdmin!
         .from('jobs')
-        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
         .in('id', invoice.job_ids);
       const mdIds = (liveJobs || []).filter((j: any) => j.is_multi_drop).map((j: any) => j.id);
       const stopsMap: Record<string, any[]> = {};
@@ -11073,9 +11078,11 @@ export async function registerRoutes(
           recipientName: j.recipient_name || '',
           scheduledDate: j.scheduled_pickup_time ? new Date(j.scheduled_pickup_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
           vehicleType: j.vehicle_type || 'car',
-          price: parseFloat(j.total_price) || 0,
+          price: Math.max(0, (parseFloat(j.total_price) || 0) - (parseFloat((j as any).waiting_time_charge) || 0)),
           isMultiDrop: j.is_multi_drop || false,
           multiDropStops: stops,
+          waitingTimeCharge: parseFloat((j as any).waiting_time_charge) || 0,
+          waitingTimeMinutes: 0,
         };
       });
     }
@@ -11200,7 +11207,7 @@ export async function registerRoutes(
         } else if (invoice.job_ids && invoice.job_ids.length > 0) {
           const { data: liveJobs2 } = await supabaseAdmin
             .from('jobs')
-            .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+            .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
             .in('id', invoice.job_ids);
           const mdIds2 = (liveJobs2 || []).filter((j: any) => j.is_multi_drop).map((j: any) => j.id);
           const stopsMap2: Record<string, any[]> = {};
@@ -11223,9 +11230,11 @@ export async function registerRoutes(
             recipientName: j.recipient_name || '',
             scheduledDate: j.scheduled_pickup_time ? new Date(j.scheduled_pickup_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
             vehicleType: j.vehicle_type || 'car',
-            price: parseFloat(j.total_price) || 0,
+            price: Math.max(0, (parseFloat(j.total_price) || 0) - (parseFloat((j as any).waiting_time_charge) || 0)),
             isMultiDrop: j.is_multi_drop || false,
             multiDropStops: stopsMap2[j.id] || [],
+            waitingTimeCharge: parseFloat((j as any).waiting_time_charge) || 0,
+            waitingTimeMinutes: 0,
           }));
         }
 
