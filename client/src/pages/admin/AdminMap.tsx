@@ -20,6 +20,9 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { Driver, Job } from '@shared/schema';
 
+// GPS older than 24 hours should not be shown — fall back to postcode
+const GPS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 interface MultiDropStop {
   id: string;
   jobId: string;
@@ -182,9 +185,6 @@ export default function AdminMap() {
   const pendingJobs = jobs?.filter(j => j.status === 'pending') || [];
   const activeJobs = jobs?.filter(j => !['delivered', 'cancelled', 'failed', 'pending'].includes(j.status)) || [];
   const allActiveBookings = jobs?.filter(j => !completedStatuses.includes(j.status)) || [];
-
-  // GPS older than 24 hours should not be shown as a location — fall back to postcode
-  const GPS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
   const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number; source: 'gps' | 'postcode' | null } => {
     const now = Date.now();
