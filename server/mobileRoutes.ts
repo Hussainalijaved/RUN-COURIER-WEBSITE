@@ -1675,12 +1675,17 @@ export function registerMobileRoutes(app: Express): void {
             updated_at
           `;
         
-        // Query jobs directly assigned to driver (include ALL jobs, filter hidden later in JS)
+        // 7-day cutoff for completed jobs — computed once, applied at query level
+        const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        // Query jobs directly assigned to driver.
+        // DB-level filter: show job if status is NOT completed, OR if it was updated within 7 days.
         console.log(`[Mobile Jobs] Querying jobs with driver_id IN [${allDriverIds.join(', ')}]`);
         const { data: directJobs, error: directError } = await supabaseAdmin
           .from('jobs')
           .select(driverSafeSelect)
           .in('driver_id', allDriverIds)
+          .or(`status.not.in.(delivered,cancelled,failed),updated_at.gte.${sevenDaysAgoIso}`)
           .order('created_at', { ascending: false });
         
         if (directError) {
@@ -1695,7 +1700,8 @@ export function registerMobileRoutes(app: Express): void {
           const { data: assignedJobs, error: assignedError } = await supabaseAdmin
             .from('jobs')
             .select(driverSafeSelect)
-            .in('id', assignmentJobIds.map(id => parseInt(id) || id));
+            .in('id', assignmentJobIds.map(id => parseInt(id) || id))
+            .or(`status.not.in.(delivered,cancelled,failed),updated_at.gte.${sevenDaysAgoIso}`);
           
           if (assignedError) {
             console.log("[Mobile Jobs] Supabase assigned jobs query error:", assignedError.message);
@@ -1719,16 +1725,14 @@ export function registerMobileRoutes(app: Express): void {
           supabaseJobs = supabaseJobs.filter(j => j.driver_hidden !== true);
           console.log(`[Mobile Jobs] Filtered ${beforeHiddenFilter - supabaseJobs.length} hidden jobs, ${supabaseJobs.length} remaining`);
 
-          // AUTO-WITHDRAW: Remove completed jobs older than 7 days from the mobile app view.
-          // Active and pending jobs are never removed by age — only delivered/cancelled/failed.
-          const COMPLETED_JOB_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-          const sevenDaysAgo = new Date(Date.now() - COMPLETED_JOB_MAX_AGE_MS).toISOString();
+          // AUTO-WITHDRAW: JS safety net — belt-and-braces after the DB-level filter above.
+          // Removes completed jobs older than 7 days in case any slipped through.
           const completedJobStatuses = ['delivered', 'cancelled', 'failed'];
           const beforeAgeFilter = supabaseJobs.length;
           supabaseJobs = supabaseJobs.filter(j => {
-            if (!completedJobStatuses.includes(j.status)) return true; // keep all active/pending
+            if (!completedJobStatuses.includes(j.status)) return true;
             const jobDate = j.updated_at || j.created_at;
-            return jobDate && jobDate > sevenDaysAgo;
+            return jobDate && jobDate > sevenDaysAgoIso;
           });
           if (beforeAgeFilter - supabaseJobs.length > 0) {
             console.log(`[Mobile Jobs] Auto-withdrew ${beforeAgeFilter - supabaseJobs.length} completed jobs older than 7 days, ${supabaseJobs.length} remaining`);
