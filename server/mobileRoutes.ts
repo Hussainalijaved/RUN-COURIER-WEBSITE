@@ -1499,6 +1499,8 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
+      console.log(`[GPS Update] ${driver.driverCode || driver.id}: lat=${lat.toFixed(5)}, lng=${lng.toFixed(5)}, speed=${speed||'n/a'}, accuracy=${accuracy||'n/a'}`);
+
       const updatedDriver = await storage.updateDriverLocation(
         driver.id, 
         lat.toFixed(7), 

@@ -918,6 +918,8 @@ export async function hydrateLocationCache(): Promise<void> {
           // Skip drivers whose GPS hasn't been updated within the staleness window.
           // This prevents stale 3-day-old coordinates from appearing on the live map.
           if (locationTs > 0 && locationTs < cutoff) {
+            const ageHours = Math.round((Date.now() - locationTs) / 3600000);
+            log(`Skipping stale GPS for ${driver.driverCode || driver.id} (last update ${ageHours}h ago)`, 'realtime');
             skipped++;
             // Remove from cache in case it was previously hydrated
             locationCache.delete(driver.id);

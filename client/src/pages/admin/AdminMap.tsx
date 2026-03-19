@@ -165,9 +165,9 @@ export default function AdminMap() {
       const lat = parseFloat(d.currentLatitude);
       const lng = parseFloat(d.currentLongitude);
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-        // Must be within the 24h window
         const ts = d.lastLocationUpdate ? new Date(d.lastLocationUpdate as any).getTime() : 0;
-        return ts > (Date.now() - GPS_MAX_AGE_MS);
+        // Accept if timestamp unknown (null) OR known to be within 24h window
+        return ts === 0 || ts > (Date.now() - GPS_MAX_AGE_MS);
       }
     }
     return false;
@@ -199,8 +199,9 @@ export default function AdminMap() {
         const ts = driver.lastLocationUpdate
           ? new Date(driver.lastLocationUpdate as any).getTime()
           : 0;
-        // Only accept if timestamp exists and is within the 24h window
-        if (ts > gpsCutoff) {
+        // Accept if: timestamp is unknown (null → 0) OR it is within the 24h window.
+        // Only reject if we positively know the timestamp is stale.
+        if (ts === 0 || ts > gpsCutoff) {
           dbLat = parsedLat;
           dbLng = parsedLng;
           dbTimestamp = ts;
@@ -208,9 +209,9 @@ export default function AdminMap() {
       }
     }
 
-    // WebSocket cache entry — also subject to 24h cutoff
+    // WebSocket cache entry — apply 24h cutoff only when timestamp is known
     const realtimeLoc = realtimeLocations.get(driver.id);
-    const freshRealtimeLoc = realtimeLoc && realtimeLoc.timestamp > gpsCutoff ? realtimeLoc : undefined;
+    const freshRealtimeLoc = realtimeLoc && (realtimeLoc.timestamp === 0 || realtimeLoc.timestamp > gpsCutoff) ? realtimeLoc : undefined;
 
     if (freshRealtimeLoc) {
       // Prefer whichever source is more recent
@@ -1216,11 +1217,20 @@ export default function AdminMap() {
                     })()}
                     {(() => {
                       const loc = getDriverLocation(selectedDriver);
+                      if (!loc.source) {
+                        // No GPS coordinates and no postcode — we have nothing to show
+                        return (
+                          <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 p-2 rounded-md">
+                            <AlertCircle className="h-3 w-3 inline mr-1" />
+                            No GPS data has ever been received from this driver's device. Ask them to check that location permission is enabled for the app on their phone.
+                          </div>
+                        );
+                      }
                       if (loc.source === 'postcode') {
                         return (
                           <div className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
                             <AlertCircle className="h-3 w-3 inline mr-1" />
-                            This driver has no live GPS. Location shown is based on their postcode. Ask them to open the app for real-time tracking.
+                            No GPS data received yet. Location shown is based on their postcode. Driver needs to enable location permission in the app.
                           </div>
                         );
                       }
@@ -1231,7 +1241,7 @@ export default function AdminMap() {
                         return (
                           <div className="text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 p-2 rounded-md">
                             <Clock className="h-3 w-3 inline mr-1" />
-                            Last GPS update was {timeStr} ago. Location may not be current.
+                            Last GPS update was {timeStr} ago. Driver may have closed the app or moved out of coverage.
                           </div>
                         );
                       }
