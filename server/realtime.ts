@@ -897,10 +897,15 @@ function sendMessage(ws: WebSocket, message: OutgoingMessage): void {
   }
 }
 
+// Only cache GPS locations updated within this window. Older entries are too stale to show.
+const LOCATION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 export async function hydrateLocationCache(): Promise<void> {
   try {
     const drivers = await storage.getDrivers();
     let count = 0;
+    let skipped = 0;
+    const cutoff = Date.now() - LOCATION_CACHE_MAX_AGE_MS;
     
     for (const driver of drivers) {
       if (driver.currentLatitude && driver.currentLongitude) {
@@ -908,11 +913,22 @@ export async function hydrateLocationCache(): Promise<void> {
         const lng = parseFloat(driver.currentLongitude);
         
         if (!isNaN(lat) && !isNaN(lng)) {
+          const locationTs = driver.lastLocationUpdate?.getTime() || 0;
+
+          // Skip drivers whose GPS hasn't been updated within the staleness window.
+          // This prevents stale 3-day-old coordinates from appearing on the live map.
+          if (locationTs > 0 && locationTs < cutoff) {
+            skipped++;
+            // Remove from cache in case it was previously hydrated
+            locationCache.delete(driver.id);
+            continue;
+          }
+
           locationCache.set(driver.id, {
             driverId: driver.id,
             lat,
             lng,
-            timestamp: driver.lastLocationUpdate?.getTime() || Date.now(),
+            timestamp: locationTs || Date.now(),
             isAvailable: driver.isAvailable === true,
             driverCode: driver.driverCode || undefined,
             driverName: driver.fullName || undefined,
@@ -922,7 +938,7 @@ export async function hydrateLocationCache(): Promise<void> {
       }
     }
     
-    log(`Hydrated location cache with ${count} driver locations`, 'realtime');
+    log(`Hydrated location cache with ${count} driver locations (skipped ${skipped} stale)`, 'realtime');
   } catch (error) {
     log(`Error hydrating location cache: ${error}`, 'realtime');
   }

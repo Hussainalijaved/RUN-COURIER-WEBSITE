@@ -161,7 +161,11 @@ export default function AdminMap() {
     if (d.currentLatitude && d.currentLongitude) {
       const lat = parseFloat(d.currentLatitude);
       const lng = parseFloat(d.currentLongitude);
-      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        // Must be within the 24h window
+        const ts = d.lastLocationUpdate ? new Date(d.lastLocationUpdate as any).getTime() : 0;
+        return ts > (Date.now() - GPS_MAX_AGE_MS);
+      }
     }
     return false;
   };
@@ -179,30 +183,44 @@ export default function AdminMap() {
   const activeJobs = jobs?.filter(j => !['delivered', 'cancelled', 'failed', 'pending'].includes(j.status)) || [];
   const allActiveBookings = jobs?.filter(j => !completedStatuses.includes(j.status)) || [];
 
+  // GPS older than 24 hours should not be shown as a location — fall back to postcode
+  const GPS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
   const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number; source: 'gps' | 'postcode' | null } => {
-    const realtimeLoc = realtimeLocations.get(driver.id);
+    const now = Date.now();
+    const gpsCutoff = now - GPS_MAX_AGE_MS;
 
     // Check DB-stored GPS coordinates and their timestamp
     let dbLat = NaN, dbLng = NaN, dbTimestamp = 0;
     if (driver.currentLatitude && driver.currentLongitude) {
-      dbLat = parseFloat(driver.currentLatitude);
-      dbLng = parseFloat(driver.currentLongitude);
-      if (!isNaN(dbLat) && !isNaN(dbLng)) {
-        dbTimestamp = driver.lastLocationUpdate
+      const parsedLat = parseFloat(driver.currentLatitude);
+      const parsedLng = parseFloat(driver.currentLongitude);
+      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+        const ts = driver.lastLocationUpdate
           ? new Date(driver.lastLocationUpdate as any).getTime()
           : 0;
+        // Only accept if timestamp exists and is within the 24h window
+        if (ts > gpsCutoff) {
+          dbLat = parsedLat;
+          dbLng = parsedLng;
+          dbTimestamp = ts;
+        }
       }
     }
 
-    if (realtimeLoc) {
-      // If DB has a location that is newer than the WebSocket snapshot, prefer DB
-      if (!isNaN(dbLat) && !isNaN(dbLng) && dbTimestamp > realtimeLoc.timestamp) {
+    // WebSocket cache entry — also subject to 24h cutoff
+    const realtimeLoc = realtimeLocations.get(driver.id);
+    const freshRealtimeLoc = realtimeLoc && realtimeLoc.timestamp > gpsCutoff ? realtimeLoc : undefined;
+
+    if (freshRealtimeLoc) {
+      // Prefer whichever source is more recent
+      if (!isNaN(dbLat) && dbTimestamp > freshRealtimeLoc.timestamp) {
         return { lat: dbLat, lng: dbLng, source: 'gps' };
       }
-      return { lat: realtimeLoc.lat, lng: realtimeLoc.lng, source: 'gps' };
+      return { lat: freshRealtimeLoc.lat, lng: freshRealtimeLoc.lng, source: 'gps' };
     }
 
-    if (!isNaN(dbLat) && !isNaN(dbLng)) {
+    if (!isNaN(dbLat)) {
       return { lat: dbLat, lng: dbLng, source: 'gps' };
     }
     
