@@ -51,6 +51,7 @@ import {
   SlidersHorizontal,
   Search,
   BookUser,
+  Layers,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -74,6 +75,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/invoices', label: 'Invoices', icon: Receipt },
     { href: '/admin/business-quote', label: 'Business Quote', icon: Calculator },
     { href: '/admin/map', label: 'Live Map', icon: MapPin },
+    { href: '/admin/postcode-map', label: 'Postcode Map', icon: Layers },
     { href: '/admin/documents', label: 'Documents', icon: FileText },
     { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
     { href: '/admin/contracts', label: 'Contracts', icon: FileSignature },
@@ -121,6 +123,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/supervisor/jobs/create', label: 'Create Job', icon: CheckCircle },
     { href: '/supervisor/quote', label: 'Get Quote', icon: Calculator },
     { href: '/supervisor/map', label: 'Live Map', icon: MapPin },
+    { href: '/supervisor/postcode-map', label: 'Postcode Map', icon: Layers },
     { href: '/supervisor/drivers', label: 'Drivers', icon: Users },
     { href: '/supervisor/customers', label: 'Customers', icon: Users },
     { href: '/supervisor/invoices', label: 'Invoices', icon: Receipt },
