@@ -1037,10 +1037,13 @@ export default function AdminJobs() {
     setJobToEdit(job);
     setEditStatus(job.status);
     setEditDriverId(job.driverId || 'unassigned');
-    setEditTotalPrice(job.totalPrice?.toString() || '0');
+    // Show base delivery price (total minus any existing waiting time charge so it isn't double-counted on save)
+    const existingWtCharge = (job as any).waitingTimeCharge > 0 ? parseFloat(String((job as any).waitingTimeCharge)) : 0;
+    const basePrice = Math.max(0, (job.totalPrice || 0) - existingWtCharge);
+    setEditTotalPrice(basePrice.toFixed(2));
     setEditDriverPrice(job.driverPrice?.toString() || '');
     setEditWaitingTimeMinutes((job as any).waitingTimeMinutes > 0 ? (job as any).waitingTimeMinutes.toString() : '');
-    setEditWaitingTimeCharge((job as any).waitingTimeCharge > 0 ? parseFloat(String((job as any).waitingTimeCharge)).toFixed(2) : '');
+    setEditWaitingTimeCharge(existingWtCharge > 0 ? existingWtCharge.toFixed(2) : '');
     // Extended fields
     setEditPickupAddress(job.pickupAddress || '');
     setEditPickupPostcode(job.pickupPostcode || '');
@@ -1169,12 +1172,17 @@ export default function AdminJobs() {
   const handleSaveEdit = () => {
     if (!jobToEdit) return;
 
+    // Merge base delivery price + waiting time charge into the final customer total
+    const baseDeliveryPrice = parseFloat(editTotalPrice) || 0;
+    const wtCharge = parseFloat(editWaitingTimeCharge) || 0;
+    const finalTotalPrice = (baseDeliveryPrice + wtCharge).toFixed(2);
+
     const updates: Partial<Job> & Record<string, any> = {
       status: editStatus,
-      totalPrice: editTotalPrice,
+      totalPrice: finalTotalPrice,
       driverPrice: editDriverPrice || null,
       waitingTimeMinutes: editWaitingTimeMinutes ? Number(editWaitingTimeMinutes) : 0,
-      waitingTimeCharge: editWaitingTimeCharge || '0',
+      waitingTimeCharge: wtCharge > 0 ? String(wtCharge) : '0',
       // Extended fields
       pickupAddress: editPickupAddress,
       pickupPostcode: editPickupPostcode,
@@ -3099,7 +3107,7 @@ export default function AdminJobs() {
                   <h3 className="font-semibold text-lg">Pricing</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="edit-total-price">Customer Price (£)</Label>
+                      <Label htmlFor="edit-total-price">Base Delivery Price (£)</Label>
                       <Input
                         id="edit-total-price"
                         type="number"
@@ -3109,7 +3117,7 @@ export default function AdminJobs() {
                         onChange={(e) => setEditTotalPrice(e.target.value)}
                         data-testid="input-edit-total-price"
                       />
-                      <p className="text-xs text-muted-foreground">Total amount customer pays</p>
+                      <p className="text-xs text-muted-foreground">Delivery charge before waiting time</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-driver-price">Driver Payment (£)</Label>
@@ -3153,9 +3161,15 @@ export default function AdminJobs() {
                         placeholder="0.00"
                         data-testid="input-edit-waiting-time-charge"
                       />
-                      <p className="text-xs text-muted-foreground">Added as a line item on the invoice</p>
+                      <p className="text-xs text-muted-foreground">Added to invoice total automatically</p>
                     </div>
                   </div>
+                  {(parseFloat(editWaitingTimeCharge) > 0) && (
+                    <div className="flex items-center justify-between px-3 py-2 rounded-md bg-muted text-sm">
+                      <span className="text-muted-foreground">Total charged to customer</span>
+                      <span className="font-semibold">£{((parseFloat(editTotalPrice) || 0) + (parseFloat(editWaitingTimeCharge) || 0)).toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
