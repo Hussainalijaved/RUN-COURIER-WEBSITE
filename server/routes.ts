@@ -10768,7 +10768,7 @@ export async function registerRoutes(
       // Handle both numeric and UUID job IDs
       const { data: jobs, error } = await supabaseAdmin
         .from('jobs')
-        .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+        .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_minutes, waiting_time_charge')
         .in('id', data.jobIds);
       
       if (!error && jobs) {
@@ -10832,6 +10832,8 @@ export async function registerRoutes(
             price: parseFloat(job.total_price) || 0,
             isMultiDrop: job.is_multi_drop || false,
             multiDropStops: stops,
+            waitingTimeMinutes: (job as any).waiting_time_minutes || 0,
+            waitingTimeCharge: parseFloat((job as any).waiting_time_charge) || 0,
           };
         });
       }

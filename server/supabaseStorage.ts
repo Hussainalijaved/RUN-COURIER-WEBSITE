@@ -142,6 +142,7 @@ function mapDbToJob(dbJob: any): Job {
     multiDropCharge: dbJob.multi_drop_charge,
     returnTripCharge: dbJob.return_trip_charge,
     centralLondonCharge: dbJob.central_london_charge,
+    waitingTimeMinutes: dbJob.waiting_time_minutes ?? 0,
     waitingTimeCharge: dbJob.waiting_time_charge,
     totalPrice: dbJob.total_price,
     driverPrice: dbJob.driver_price,
@@ -1138,6 +1139,8 @@ export class SupabaseStorage implements IStorage {
     if (data.distance !== undefined) dbData.distance = data.distance;
     if (data.isMultiDrop !== undefined) dbData.is_multi_drop = data.isMultiDrop;
     if (data.isReturnTrip !== undefined) dbData.is_return_trip = data.isReturnTrip;
+    if (data.waitingTimeMinutes !== undefined) dbData.waiting_time_minutes = data.waitingTimeMinutes;
+    if (data.waitingTimeCharge !== undefined) dbData.waiting_time_charge = data.waitingTimeCharge;
     
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     

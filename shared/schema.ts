@@ -166,6 +166,7 @@ export const jobs = pgTable("jobs", {
   multiDropCharge: decimal("multi_drop_charge", { precision: 10, scale: 2 }).default("0"),
   returnTripCharge: decimal("return_trip_charge", { precision: 10, scale: 2 }).default("0"),
   centralLondonCharge: decimal("central_london_charge", { precision: 10, scale: 2 }).default("0"),
+  waitingTimeMinutes: integer("waiting_time_minutes").default(0),
   waitingTimeCharge: decimal("waiting_time_charge", { precision: 10, scale: 2 }).default("0"),
   serviceType: text("service_type").default("flexible"),
   serviceTypePercent: decimal("service_type_percent", { precision: 5, scale: 2 }).default("0"),

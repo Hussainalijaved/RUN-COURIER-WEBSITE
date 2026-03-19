@@ -500,12 +500,18 @@ export default function AdminInvoices() {
               <div style="font-weight:600;color:#111;margin-bottom:2px;">Same-Day Delivery</div>
               <div style="font-size:11px;color:#555;">${job.pickupAddress || 'N/A'} &rarr; ${job.deliveryAddress || job.recipientName || 'N/A'}</div>
             `;
+            const wtRow = job.waitingTimeCharge > 0 ? `<tr>
+              <td></td>
+              <td></td>
+              <td style="font-size:11px;color:#666;font-style:italic;">Waiting time charge${job.waitingTimeMinutes > 0 ? ` (${job.waitingTimeMinutes} min)` : ''}</td>
+              <td style="text-align:right;font-size:11px;color:#555;">£${job.waitingTimeCharge.toFixed(2)}</td>
+            </tr>` : '';
             return `<tr style="vertical-align:top;">
               <td style="font-family:monospace;font-size:11px;">${job.jobNumber || job.trackingNumber || 'N/A'}</td>
               <td>${job.scheduledDate || 'N/A'}</td>
               <td>${desc}</td>
               <td style="text-align:right;font-weight:600;">£${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}</td>
-            </tr>`;
+            </tr>${wtRow}`;
           }).join('')}
         </tbody>
       </table>
@@ -799,6 +805,22 @@ export default function AdminInvoices() {
         doc.text(job.scheduledDate || 'N/A', margin + 130, y - (isMultiDrop ? rowHeight - 4 : 6) + 4);
         doc.setFont('helvetica', 'bold');
         doc.text(`\u00A3${typeof job.price === 'number' ? job.price.toFixed(2) : '0.00'}`, pageWidth - margin - 2, y - (isMultiDrop ? rowHeight - 4 : 6) + 4, { align: 'right' });
+
+        // Waiting time line item (if applicable)
+        if (job.waitingTimeCharge && job.waitingTimeCharge > 0) {
+          checkPageBreak(10);
+          doc.setFontSize(8.5);
+          doc.setTextColor(100, 100, 100);
+          doc.setFont('helvetica', 'italic');
+          const wtLabel = job.waitingTimeMinutes > 0
+            ? `Waiting time charge (${job.waitingTimeMinutes} min)`
+            : 'Waiting time charge';
+          doc.text(wtLabel, margin + 35, y + 3);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(17, 17, 17);
+          doc.text(`\u00A3${job.waitingTimeCharge.toFixed(2)}`, pageWidth - margin - 2, y + 3, { align: 'right' });
+          y += 8;
+        }
 
         doc.setDrawColor(230, 230, 230);
         doc.line(margin, y + 2, pageWidth - margin, y + 2);
@@ -1450,6 +1472,7 @@ export default function AdminInvoices() {
                           {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => {
                             const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
                             return (
+                              <>
                               <TableRow key={idx} className="align-top">
                                 <TableCell className="font-mono text-sm">{job.jobNumber || job.trackingNumber || 'N/A'}</TableCell>
                                 <TableCell className="text-sm max-w-[300px] break-words">
@@ -1473,6 +1496,16 @@ export default function AdminInvoices() {
                                 </TableCell>
                                 <TableCell className="text-right font-medium">{formatPrice(job.price)}</TableCell>
                               </TableRow>
+                              {job.waitingTimeCharge > 0 && (
+                                <TableRow key={`${idx}-wt`}>
+                                  <TableCell />
+                                  <TableCell className="text-xs text-muted-foreground italic">
+                                    Waiting time charge{job.waitingTimeMinutes > 0 ? ` (${job.waitingTimeMinutes} min)` : ''}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs text-muted-foreground">{formatPrice(job.waitingTimeCharge)}</TableCell>
+                                </TableRow>
+                              )}
+                              </>
                             );
                           })}
                         </TableBody>

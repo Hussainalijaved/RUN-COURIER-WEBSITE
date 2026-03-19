@@ -489,6 +489,8 @@ export default function AdminJobs() {
   const [editDriverId, setEditDriverId] = useState<string>('');
   const [editTotalPrice, setEditTotalPrice] = useState<string>('');
   const [editDriverPrice, setEditDriverPrice] = useState<string>('');
+  const [editWaitingTimeMinutes, setEditWaitingTimeMinutes] = useState<string>('');
+  const [editWaitingTimeCharge, setEditWaitingTimeCharge] = useState<string>('');
   // Extended edit fields
   const [editPickupAddress, setEditPickupAddress] = useState<string>('');
   const [editPickupPostcode, setEditPickupPostcode] = useState<string>('');
@@ -1037,6 +1039,8 @@ export default function AdminJobs() {
     setEditDriverId(job.driverId || 'unassigned');
     setEditTotalPrice(job.totalPrice?.toString() || '0');
     setEditDriverPrice(job.driverPrice?.toString() || '');
+    setEditWaitingTimeMinutes((job as any).waitingTimeMinutes > 0 ? (job as any).waitingTimeMinutes.toString() : '');
+    setEditWaitingTimeCharge((job as any).waitingTimeCharge > 0 ? parseFloat(String((job as any).waitingTimeCharge)).toFixed(2) : '');
     // Extended fields
     setEditPickupAddress(job.pickupAddress || '');
     setEditPickupPostcode(job.pickupPostcode || '');
@@ -1169,6 +1173,8 @@ export default function AdminJobs() {
       status: editStatus,
       totalPrice: editTotalPrice,
       driverPrice: editDriverPrice || null,
+      waitingTimeMinutes: editWaitingTimeMinutes ? Number(editWaitingTimeMinutes) : 0,
+      waitingTimeCharge: editWaitingTimeCharge || '0',
       // Extended fields
       pickupAddress: editPickupAddress,
       pickupPostcode: editPickupPostcode,
@@ -3118,6 +3124,36 @@ export default function AdminJobs() {
                         data-testid="input-edit-driver-price"
                       />
                       <p className="text-xs text-muted-foreground">Amount driver receives</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-waiting-time-minutes">Waiting Time (minutes)</Label>
+                      <Input
+                        id="edit-waiting-time-minutes"
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={editWaitingTimeMinutes}
+                        onChange={(e) => setEditWaitingTimeMinutes(e.target.value)}
+                        placeholder="0"
+                        data-testid="input-edit-waiting-time-minutes"
+                      />
+                      <p className="text-xs text-muted-foreground">Minutes waited at pickup or delivery</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-waiting-time-charge">Waiting Time Charge (£)</Label>
+                      <Input
+                        id="edit-waiting-time-charge"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editWaitingTimeCharge}
+                        onChange={(e) => setEditWaitingTimeCharge(e.target.value)}
+                        placeholder="0.00"
+                        data-testid="input-edit-waiting-time-charge"
+                      />
+                      <p className="text-xs text-muted-foreground">Added as a line item on the invoice</p>
                     </div>
                   </div>
                 </div>
