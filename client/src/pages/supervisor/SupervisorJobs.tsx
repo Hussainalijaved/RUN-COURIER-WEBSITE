@@ -1242,7 +1242,7 @@ export default function SupervisorJobs() {
     const matchesCreatedBy = createdByFilter === 'all'
       ? true
       : createdByFilter === 'admin'
-        ? ((job as any).createdBy?.toLowerCase().startsWith('admin:') || (!(job as any).createdBy && !job.officeCity))
+        ? ((job as any).createdBy?.toLowerCase().startsWith('admin:') || (job as any).createdBy === 'Office' || (!(job as any).createdBy && !job.officeCity))
         : createdByFilter === 'supervisor'
           ? (job as any).createdBy?.toLowerCase().startsWith('supervisor:')
           : true;
@@ -1816,13 +1816,36 @@ export default function SupervisorJobs() {
                               {job.officeCity}
                             </Badge>
                           ) : null}
-                          {(job as any).createdBy ? (
-                            <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
-                              {(job as any).createdBy}
-                            </span>
-                          ) : !job.officeCity ? (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          ) : null}
+                          {(job as any).createdBy ? (() => {
+                            const raw: string = (job as any).createdBy;
+                            if (raw === 'Office') {
+                              return (
+                                <Badge variant="secondary" className="gap-1 text-xs whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
+                                  <Building2 className="h-3 w-3" />
+                                  Office
+                                </Badge>
+                              );
+                            }
+                            if (raw.toLowerCase().startsWith('admin:')) {
+                              return (
+                                <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
+                                  Admin: {raw.slice(6).trim()}
+                                </span>
+                              );
+                            }
+                            if (raw.toLowerCase().startsWith('supervisor:')) {
+                              return (
+                                <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
+                                  Sup: {raw.slice(11).trim()}
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
+                                {raw}
+                              </span>
+                            );
+                          })() : null}
                         </div>
                       </TableCell>
                       <TableCell>

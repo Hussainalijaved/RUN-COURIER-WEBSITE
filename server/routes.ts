@@ -1616,12 +1616,17 @@ export async function registerRoutes(
             'SELECT job_id, office_city, created_by FROM job_admin_notes WHERE job_id = ANY($1::text[])',
             [jobIds]
           );
-          const metaMap = new Map<string, any>(metaResult.rows.map((r: any) => [r.job_id, r]));
+          // Always use String keys — job_admin_notes.job_id is text; resolvedJobs.id may be number or string
+          const metaMap = new Map<string, any>(metaResult.rows.map((r: any) => [String(r.job_id), r]));
           for (const job of resolvedJobs) {
-            const meta = metaMap.get((job as any).id);
+            const meta = metaMap.get(String((job as any).id));
             if (meta) {
               if (meta.office_city) (job as any).officeCity = meta.office_city;
               if (meta.created_by) (job as any).createdBy = meta.created_by;
+            }
+            // If no customer_id and no createdBy → job was created by the office (admin/supervisor)
+            if (!(job as any).customerId && !(job as any).createdBy) {
+              (job as any).createdBy = 'Office';
             }
           }
         }
@@ -1925,7 +1930,7 @@ export async function registerRoutes(
     try {
       const metaResult = await getPgPool().query(
         'SELECT office_city, created_by FROM job_admin_notes WHERE job_id = $1',
-        [req.params.id]
+        [String(req.params.id)]
       );
       if (metaResult.rows.length > 0) {
         const meta = metaResult.rows[0];
@@ -1933,6 +1938,10 @@ export async function registerRoutes(
         if (meta.created_by) (job as any).createdBy = meta.created_by;
       }
     } catch {}
+    // If no customer → job was created by the office
+    if (!(job as any).customerId && !(job as any).createdBy) {
+      (job as any).createdBy = 'Office';
+    }
     
     // SECURITY: Check if user can see pricing
     let isAdminOrSupervisor = false;
