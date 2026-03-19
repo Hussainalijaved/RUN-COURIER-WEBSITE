@@ -1168,7 +1168,7 @@ export class SupabaseStorage implements IStorage {
       try {
         const { db: directDb } = await import('./db');
         const { sql: rawSql } = await import('drizzle-orm');
-        await directDb.execute(rawSql`UPDATE jobs SET waiting_time_minutes = ${waitingTimeMinutes} WHERE id = ${id}::integer`);
+        await directDb.execute(rawSql`UPDATE jobs SET waiting_time_minutes = ${waitingTimeMinutes} WHERE id = ${String(id)}`);
         updated.waiting_time_minutes = waitingTimeMinutes;
       } catch (sqlErr: any) {
         console.warn(`[SupabaseStorage] waiting_time_minutes direct SQL update failed:`, sqlErr?.message);

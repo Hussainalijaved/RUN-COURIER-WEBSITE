@@ -10390,10 +10390,12 @@ export async function registerRoutes(
     try {
       const needsEnrichment = allInvoices.filter((inv: any) => !inv.job_details && inv.job_ids && inv.job_ids.length > 0);
       if (needsEnrichment.length > 0) {
-        const allMissingIds = needsEnrichment.flatMap((inv: any) => inv.job_ids);
+        // id column is character varying in DB — keep as strings for Supabase queries
+        // Exclude waiting_time_minutes from select (not in PostgREST schema cache)
+        const allMissingIds = [...new Set(needsEnrichment.flatMap((inv: any) => inv.job_ids).map((id: any) => String(id)).filter(Boolean))];
         const { data: missingJobs } = await supabaseAdmin
           .from('jobs')
-          .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop')
+          .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
           .in('id', allMissingIds);
 
         const multiDropIds = (missingJobs || []).filter((j: any) => j.is_multi_drop).map((j: any) => j.id);
@@ -10433,7 +10435,7 @@ export async function registerRoutes(
               }];
             }
           }
-          jobMap[j.id] = {
+          const entry = {
             jobNumber: j.tracking_number || String(j.id),
             trackingNumber: j.tracking_number || 'N/A',
             pickupAddress: j.pickup_address || 'N/A',
@@ -10446,11 +10448,17 @@ export async function registerRoutes(
             price: parseFloat(j.total_price) || 0,
             isMultiDrop: j.is_multi_drop || false,
             multiDropStops: stops,
+            waitingTimeMinutes: 0,
+            waitingTimeCharge: parseFloat((j as any).waiting_time_charge) || 0,
           };
+          // Store under both integer and string key for robust lookup
+          jobMap[String(j.id)] = entry;
+          jobMap[parseInt(String(j.id))] = entry;
         }
 
         for (const inv of needsEnrichment) {
-          const details = (inv.job_ids as string[]).map((jid: string) => jobMap[jid]).filter(Boolean);
+          // jobMap keys are integers; job_ids may be stored as strings — normalise both
+          const details = (inv.job_ids as any[]).map((jid: any) => jobMap[String(jid)] || jobMap[parseInt(jid)]).filter(Boolean);
           if (details.length > 0) {
             inv.job_details = JSON.stringify(details);
           }
@@ -10766,11 +10774,29 @@ export async function registerRoutes(
     let jobDetails: any[] = [];
     if (data.jobIds && data.jobIds.length > 0 && supabaseAdmin) {
       // Handle both numeric and UUID job IDs
+      // Note: waiting_time_minutes excluded from select because it may not be in PostgREST schema cache yet
+      // Note: id column is character varying in DB — keep IDs as strings for Supabase queries
+      const numericJobIds = data.jobIds.map(id => parseInt(id)).filter(n => !isNaN(n));
+      const stringJobIds = data.jobIds.map(String);
       const { data: jobs, error } = await supabaseAdmin
         .from('jobs')
-        .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_minutes, waiting_time_charge')
-        .in('id', data.jobIds);
-      
+        .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
+        .in('id', stringJobIds);
+
+      // Fetch waiting_time_minutes separately via direct SQL to bypass schema cache
+      let wtMinutesMap: Record<number, number> = {};
+      try {
+        const { db: directDb } = await import('./db');
+        const { sql: rawSql } = await import('drizzle-orm');
+        if (numericJobIds.length > 0) {
+          const strJobIds = data.jobIds.map(String);
+          const wtRows = await directDb.execute(rawSql`SELECT id, waiting_time_minutes FROM jobs WHERE id = ANY(ARRAY[${rawSql.raw(strJobIds.map(id => `'${id.replace(/'/g, "''")}'`).join(','))}]::text[])`);
+          for (const row of (wtRows as any).rows || wtRows as any) {
+            wtMinutesMap[Number(row.id)] = Number(row.waiting_time_minutes) || 0;
+          }
+        }
+      } catch (_) {}
+
       if (!error && jobs) {
         // Fetch multi-drop stops for all jobs that are multi-drop
         const multiDropJobIds = jobs.filter(j => j.is_multi_drop).map(j => j.id);
@@ -10832,7 +10858,7 @@ export async function registerRoutes(
             price: parseFloat(job.total_price) || 0,
             isMultiDrop: job.is_multi_drop || false,
             multiDropStops: stops,
-            waitingTimeMinutes: (job as any).waiting_time_minutes || 0,
+            waitingTimeMinutes: wtMinutesMap[Number(job.id)] || 0,
             waitingTimeCharge: parseFloat((job as any).waiting_time_charge) || 0,
           };
         });
