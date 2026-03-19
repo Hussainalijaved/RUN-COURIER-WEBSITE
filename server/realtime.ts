@@ -320,6 +320,31 @@ export function setupRealtimeServer(server: Server): WebSocketServer {
     });
   }, HEARTBEAT_INTERVAL_MS);
 
+  // Periodic location snapshot broadcast every 20 seconds
+  // Ensures admin map always has fresh positions even if a WebSocket message was missed
+  const LOCATION_BROADCAST_INTERVAL_MS = 20000;
+  setInterval(async () => {
+    // Re-hydrate from DB so snapshot is always fresh
+    try {
+      await hydrateLocationCache();
+    } catch (_) {}
+
+    const snapshot = Array.from(locationCache.values());
+    if (snapshot.length === 0) return;
+
+    let broadcastCount = 0;
+    observerConnections.forEach((client) => {
+      if (client.isSubscribed && client.ws.readyState === WebSocket.OPEN) {
+        sendMessage(client.ws, { type: 'driver:bulk_snapshot', payload: snapshot });
+        broadcastCount++;
+      }
+    });
+
+    if (broadcastCount > 0) {
+      log(`[Periodic] Broadcast ${snapshot.length} driver locations to ${broadcastCount} observers`, 'realtime');
+    }
+  }, LOCATION_BROADCAST_INTERVAL_MS);
+
   return wss;
 }
 
@@ -917,11 +942,15 @@ export function broadcastLocationUpdate(
   lng: number, 
   status: 'available' | 'busy' | 'offline' = 'available'
 ): void {
+  const existing = locationCache.get(driverId);
   const location: DriverLocation = {
     driverId,
     lat,
     lng,
     timestamp: Date.now(),
+    isAvailable: status === 'available',
+    driverCode: existing?.driverCode,
+    driverName: existing?.driverName,
   };
 
   locationCache.set(driverId, location);

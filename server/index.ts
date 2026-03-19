@@ -319,21 +319,54 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (supabaseAdmin) {
-        const { error: tableCheck } = await supabaseAdmin.from('driver_locations').select('id').limit(1);
-        if (tableCheck?.message?.includes('Could not find')) {
-          console.log("[MIGRATION] driver_locations table does not exist yet.");
-          console.log("[MIGRATION] Please run supabase/migrations/031_create_driver_locations.sql in Supabase SQL Editor");
-          console.log("[MIGRATION] GPS tracking will use WebSocket + drivers table as fallback until then");
-        } else if (tableCheck) {
-          console.warn("[MIGRATION] driver_locations check error:", tableCheck.message);
-        } else {
-          console.log("[MIGRATION] driver_locations table exists and is accessible");
-        }
-      }
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        host: process.env.PGHOST,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false },
+        max: 2,
+      });
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS driver_locations (
+          id BIGSERIAL PRIMARY KEY,
+          driver_id UUID NOT NULL,
+          job_id UUID,
+          latitude DOUBLE PRECISION NOT NULL,
+          longitude DOUBLE PRECISION NOT NULL,
+          speed REAL,
+          heading REAL,
+          accuracy REAL,
+          is_moving BOOLEAN DEFAULT false,
+          recorded_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_driver_locations_driver_id
+          ON driver_locations (driver_id)
+      `);
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_driver_locations_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await pool.query(`
+        CREATE OR REPLACE TRIGGER trigger_driver_locations_updated_at
+        BEFORE UPDATE ON driver_locations
+        FOR EACH ROW
+        EXECUTE FUNCTION update_driver_locations_updated_at()
+      `);
+      await pool.end();
+      console.log("[MIGRATION] driver_locations table created/verified successfully");
     } catch (e: any) {
-      console.warn("[MIGRATION] driver_locations check:", e?.message);
+      console.warn("[MIGRATION] driver_locations table creation:", e?.message);
     }
   })();
 

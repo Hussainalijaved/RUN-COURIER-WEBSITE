@@ -82,7 +82,8 @@ export default function AdminMap() {
 
   const { data: drivers, isLoading: driversLoading, refetch: refetchDrivers } = useQuery<Driver[]>({
     queryKey: ['/api/drivers'],
-    staleTime: 30000,
+    staleTime: 10000,
+    refetchInterval: 15000,
   });
 
   const { data: jobs, refetch: refetchJobs } = useQuery<Job[]>({
@@ -149,16 +150,23 @@ export default function AdminMap() {
     return (a.driverCode || '').localeCompare(b.driverCode || '');
   });
 
-  const liveGpsCount = activeDrivers.filter(d => {
-    if (realtimeLocations.has(d.id)) return true;
+  const LIVE_GPS_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+  const isDriverLiveGps = (d: typeof activeDrivers[0]) => {
+    const loc = realtimeLocations.get(d.id);
+    if (loc && (Date.now() - loc.timestamp) < LIVE_GPS_THRESHOLD_MS) return true;
+    return false;
+  };
+  const hasAnyGps = (d: typeof activeDrivers[0]) => {
+    if (isDriverLiveGps(d)) return true;
     if (d.currentLatitude && d.currentLongitude) {
       const lat = parseFloat(d.currentLatitude);
       const lng = parseFloat(d.currentLongitude);
       return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
     }
     return false;
-  }).length;
-  const postcodeOnlyCount = activeDrivers.length - liveGpsCount;
+  };
+  const liveGpsCount = activeDrivers.filter(isDriverLiveGps).length;
+  const postcodeOnlyCount = activeDrivers.filter(d => !hasAnyGps(d)).length;
   
   const availableDrivers = activeDrivers.filter(d => {
     const realtimeLoc = realtimeLocations.get(d.id);
@@ -173,16 +181,29 @@ export default function AdminMap() {
 
   const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number; source: 'gps' | 'postcode' | null } => {
     const realtimeLoc = realtimeLocations.get(driver.id);
+
+    // Check DB-stored GPS coordinates and their timestamp
+    let dbLat = NaN, dbLng = NaN, dbTimestamp = 0;
+    if (driver.currentLatitude && driver.currentLongitude) {
+      dbLat = parseFloat(driver.currentLatitude);
+      dbLng = parseFloat(driver.currentLongitude);
+      if (!isNaN(dbLat) && !isNaN(dbLng)) {
+        dbTimestamp = driver.lastLocationUpdate
+          ? new Date(driver.lastLocationUpdate as any).getTime()
+          : 0;
+      }
+    }
+
     if (realtimeLoc) {
+      // If DB has a location that is newer than the WebSocket snapshot, prefer DB
+      if (!isNaN(dbLat) && !isNaN(dbLng) && dbTimestamp > realtimeLoc.timestamp) {
+        return { lat: dbLat, lng: dbLng, source: 'gps' };
+      }
       return { lat: realtimeLoc.lat, lng: realtimeLoc.lng, source: 'gps' };
     }
-    
-    if (driver.currentLatitude && driver.currentLongitude) {
-      const lat = parseFloat(driver.currentLatitude);
-      const lng = parseFloat(driver.currentLongitude);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        return { lat, lng, source: 'gps' };
-      }
+
+    if (!isNaN(dbLat) && !isNaN(dbLng)) {
+      return { lat: dbLat, lng: dbLng, source: 'gps' };
     }
     
     const d = driver as any;
@@ -504,9 +525,13 @@ export default function AdminMap() {
             ? `${driver.driverCode} · ${driver.fullName || 'Driver'}` 
             : driver.fullName || 'Driver';
           const postcodeInfo = driver.postcode ? `<div style="font-size: 11px; color: #666; margin-top: 2px;">Area: ${driver.postcode}</div>` : '';
+          const realtimeLoc = realtimeLocations.get(driver.id);
+          const isReallyLive = realtimeLoc !== undefined && (Date.now() - realtimeLoc.timestamp) < LIVE_GPS_THRESHOLD_MS;
           const locationStatus = noGps 
             ? `<div style="font-size: 11px; color: ${isOnlineNoGps ? '#F97316' : '#6B7280'}; font-weight: 600; margin-top: 4px;">${hasPostcode ? 'POSTCODE ONLY - Not real-time' : 'NO GPS DATA'}</div>`
-            : `<div style="font-size: 11px; color: #22C55E; font-weight: 600; margin-top: 4px;">LIVE GPS TRACKING</div>`;
+            : isReallyLive
+              ? `<div style="font-size: 11px; color: #22C55E; font-weight: 600; margin-top: 4px;">LIVE GPS TRACKING</div>`
+              : `<div style="font-size: 11px; color: #EAB308; font-weight: 600; margin-top: 4px;">GPS (LAST KNOWN)</div>`;
           infoWindowRef.current.setContent(`
             <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 180px;">
               <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${driverDisplay}</div>
@@ -1000,7 +1025,7 @@ export default function AdminMap() {
                   ) : filteredDrivers.length > 0 ? (
                     filteredDrivers.map((driver) => {
                       const currentJob = getDriverCurrentJob(driver.id);
-                      const isLive = realtimeLocations.has(driver.id);
+                      const isLive = isDriverLiveGps(driver);
                       const driverLoc = getDriverLocation(driver);
                       const hasGpsLocation = driverLoc.source === 'gps';
                       const hasPostcodeLocation = driverLoc.source === 'postcode';
@@ -1160,7 +1185,7 @@ export default function AdminMap() {
                             <span className="text-xs font-mono">
                               {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
                             </span>
-                            {realtimeLocations.has(selectedDriver.id) && (
+                            {isDriverLiveGps(selectedDriver) && (
                               <Badge className="bg-green-500 text-white text-[10px] px-1 py-0">LIVE GPS</Badge>
                             )}
                             {loc.source === 'postcode' && (
@@ -1181,7 +1206,7 @@ export default function AdminMap() {
                           </div>
                         );
                       }
-                      if (loc.source === 'gps' && !realtimeLocations.has(selectedDriver.id) && selectedDriver.lastLocationUpdate) {
+                      if (loc.source === 'gps' && !isDriverLiveGps(selectedDriver) && selectedDriver.lastLocationUpdate) {
                         const diff = Date.now() - new Date(selectedDriver.lastLocationUpdate).getTime();
                         const mins = Math.floor(diff / 60000);
                         const timeStr = mins < 60 ? `${mins} minutes` : mins < 1440 ? `${Math.floor(mins / 60)} hours` : `${Math.floor(mins / 1440)} days`;
