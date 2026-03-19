@@ -897,15 +897,10 @@ function sendMessage(ws: WebSocket, message: OutgoingMessage): void {
   }
 }
 
-// Only cache GPS locations updated within this window. Older entries are too stale to show.
-const LOCATION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
-
 export async function hydrateLocationCache(): Promise<void> {
   try {
     const drivers = await storage.getDrivers();
     let count = 0;
-    let skipped = 0;
-    const cutoff = Date.now() - LOCATION_CACHE_MAX_AGE_MS;
     
     for (const driver of drivers) {
       if (driver.currentLatitude && driver.currentLongitude) {
@@ -914,17 +909,6 @@ export async function hydrateLocationCache(): Promise<void> {
         
         if (!isNaN(lat) && !isNaN(lng)) {
           const locationTs = driver.lastLocationUpdate?.getTime() || 0;
-
-          // Skip drivers whose GPS hasn't been updated within the staleness window.
-          // This prevents stale 3-day-old coordinates from appearing on the live map.
-          if (locationTs > 0 && locationTs < cutoff) {
-            const ageHours = Math.round((Date.now() - locationTs) / 3600000);
-            log(`Skipping stale GPS for ${driver.driverCode || driver.id} (last update ${ageHours}h ago)`, 'realtime');
-            skipped++;
-            // Remove from cache in case it was previously hydrated
-            locationCache.delete(driver.id);
-            continue;
-          }
 
           locationCache.set(driver.id, {
             driverId: driver.id,
@@ -940,7 +924,7 @@ export async function hydrateLocationCache(): Promise<void> {
       }
     }
     
-    log(`Hydrated location cache with ${count} driver locations (skipped ${skipped} stale)`, 'realtime');
+    log(`Hydrated location cache with ${count} driver locations`, 'realtime');
   } catch (error) {
     log(`Error hydrating location cache: ${error}`, 'realtime');
   }

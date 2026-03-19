@@ -20,8 +20,6 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { Driver, Job } from '@shared/schema';
 
-// GPS older than 24 hours should not be shown — fall back to postcode
-const GPS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 interface MultiDropStop {
   id: string;
@@ -165,9 +163,7 @@ export default function AdminMap() {
       const lat = parseFloat(d.currentLatitude);
       const lng = parseFloat(d.currentLongitude);
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-        const ts = d.lastLocationUpdate ? new Date(d.lastLocationUpdate as any).getTime() : 0;
-        // Accept if timestamp unknown (null) OR known to be within 24h window
-        return ts === 0 || ts > (Date.now() - GPS_MAX_AGE_MS);
+        return true;
       }
     }
     return false;
@@ -187,38 +183,29 @@ export default function AdminMap() {
   const allActiveBookings = jobs?.filter(j => !completedStatuses.includes(j.status)) || [];
 
   const getDriverLocation = useCallback((driver: Driver): { lat: number; lng: number; source: 'gps' | 'postcode' | null } => {
-    const now = Date.now();
-    const gpsCutoff = now - GPS_MAX_AGE_MS;
-
-    // Check DB-stored GPS coordinates and their timestamp
+    // Check DB-stored GPS coordinates — accept any age, staleness shown by badge not exclusion
     let dbLat = NaN, dbLng = NaN, dbTimestamp = 0;
     if (driver.currentLatitude && driver.currentLongitude) {
       const parsedLat = parseFloat(driver.currentLatitude);
       const parsedLng = parseFloat(driver.currentLongitude);
       if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-        const ts = driver.lastLocationUpdate
+        dbLat = parsedLat;
+        dbLng = parsedLng;
+        dbTimestamp = driver.lastLocationUpdate
           ? new Date(driver.lastLocationUpdate as any).getTime()
           : 0;
-        // Accept if: timestamp is unknown (null → 0) OR it is within the 24h window.
-        // Only reject if we positively know the timestamp is stale.
-        if (ts === 0 || ts > gpsCutoff) {
-          dbLat = parsedLat;
-          dbLng = parsedLng;
-          dbTimestamp = ts;
-        }
       }
     }
 
-    // WebSocket cache entry — apply 24h cutoff only when timestamp is known
+    // WebSocket realtime cache entry — always trust it regardless of age
     const realtimeLoc = realtimeLocations.get(driver.id);
-    const freshRealtimeLoc = realtimeLoc && (realtimeLoc.timestamp === 0 || realtimeLoc.timestamp > gpsCutoff) ? realtimeLoc : undefined;
 
-    if (freshRealtimeLoc) {
+    if (realtimeLoc) {
       // Prefer whichever source is more recent
-      if (!isNaN(dbLat) && dbTimestamp > freshRealtimeLoc.timestamp) {
+      if (!isNaN(dbLat) && dbTimestamp > realtimeLoc.timestamp) {
         return { lat: dbLat, lng: dbLng, source: 'gps' };
       }
-      return { lat: freshRealtimeLoc.lat, lng: freshRealtimeLoc.lng, source: 'gps' };
+      return { lat: realtimeLoc.lat, lng: realtimeLoc.lng, source: 'gps' };
     }
 
     if (!isNaN(dbLat)) {
@@ -466,13 +453,19 @@ export default function AdminMap() {
       const hasPostcode = location.source === 'postcode';
       const noGps = !hasGps;
       const isOnlineNoGps = driver.isAvailable && noGps;
+      const isLive = isDriverLiveGps(driver);
+      const isStaleGps = hasGps && !isLive;
       if (!location.source) return;
       const displayLocation = { lat: location.lat, lng: location.lng };
 
       currentMarkerIds.add(driver.id);
       const status = getDriverStatus(driver);
-      const fillColor = noGps ? (isOnlineNoGps ? '#F97316' : '#6B7280') : (status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF');
-      const markerOpacity = hasPostcode ? 0.7 : 1;
+      const fillColor = noGps
+        ? (isOnlineNoGps ? '#F97316' : '#6B7280')
+        : isStaleGps
+          ? '#A78BFA'
+          : (status === 'on_delivery' ? '#3B82F6' : status === 'available' ? '#22C55E' : '#9CA3AF');
+      const markerOpacity = (hasPostcode || isStaleGps) ? 0.7 : 1;
 
       const existingMarker = driverMarkersRef.current.get(driver.id);
       
@@ -501,7 +494,7 @@ export default function AdminMap() {
       const vType = driver.vehicleType || 'car';
       const iconData = vehicleIcons[vType] || vehicleIcons.car;
       
-      const strokeColor = noGps ? (isOnlineNoGps ? '#F97316' : '#6B7280') : '#1a1a1a';
+      const strokeColor = noGps ? (isOnlineNoGps ? '#F97316' : '#6B7280') : isStaleGps ? '#7C3AED' : '#1a1a1a';
       const baseScale = iconData.scale;
       const iconConfig = {
         path: iconData.path,
@@ -517,7 +510,9 @@ export default function AdminMap() {
         existingMarker.setPosition(displayLocation);
         existingMarker.setIcon(iconConfig);
       } else {
-        const gpsLabel = noGps ? (hasPostcode ? ' (POSTCODE)' : ' (NO GPS)') : '';
+        const gpsLabel = noGps
+          ? (hasPostcode ? ' (POSTCODE)' : ' (NO GPS)')
+          : isStaleGps ? ' (LAST KNOWN GPS)' : '';
         const driverLabel = driver.driverCode 
           ? `${driver.driverCode} · ${driver.fullName || 'Driver'}${gpsLabel}` 
           : (driver.fullName || driver.vehicleRegistration || 'Driver') + gpsLabel;
@@ -1048,6 +1043,7 @@ export default function AdminMap() {
                       const driverLoc = getDriverLocation(driver);
                       const hasGpsLocation = driverLoc.source === 'gps';
                       const hasPostcodeLocation = driverLoc.source === 'postcode';
+                      const isStaleGpsCard = hasGpsLocation && !isLive;
                       const isOnlineNoGps = driver.isAvailable && !hasGpsLocation;
                       
                       return (
@@ -1075,6 +1071,9 @@ export default function AdminMap() {
                               </Avatar>
                               {isLive && (
                                 <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+                              )}
+                              {isStaleGpsCard && (
+                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-purple-400 rounded-full border-2 border-background" />
                               )}
                               {isOnlineNoGps && (
                                 <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-orange-500 rounded-full border-2 border-background" />
