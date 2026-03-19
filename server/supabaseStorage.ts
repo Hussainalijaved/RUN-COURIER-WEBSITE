@@ -1139,8 +1139,11 @@ export class SupabaseStorage implements IStorage {
     if (data.distance !== undefined) dbData.distance = data.distance;
     if (data.isMultiDrop !== undefined) dbData.is_multi_drop = data.isMultiDrop;
     if (data.isReturnTrip !== undefined) dbData.is_return_trip = data.isReturnTrip;
-    if (data.waitingTimeMinutes !== undefined) dbData.waiting_time_minutes = data.waitingTimeMinutes;
+    // waiting_time_charge goes through normal Supabase JS client (column pre-exists)
     if (data.waitingTimeCharge !== undefined) dbData.waiting_time_charge = data.waitingTimeCharge;
+
+    // waiting_time_minutes is handled separately via direct SQL to avoid PostgREST schema cache issues
+    const waitingTimeMinutes = data.waitingTimeMinutes;
     
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
@@ -1159,6 +1162,19 @@ export class SupabaseStorage implements IStorage {
       console.warn(`[SupabaseStorage] updateJob ${id} returned no data`);
       return undefined;
     }
+
+    // Apply waiting_time_minutes via direct SQL (bypasses PostgREST schema cache)
+    if (waitingTimeMinutes !== undefined) {
+      try {
+        const { db: directDb } = await import('./db');
+        const { sql: rawSql } = await import('drizzle-orm');
+        await directDb.execute(rawSql`UPDATE jobs SET waiting_time_minutes = ${waitingTimeMinutes} WHERE id = ${id}::integer`);
+        updated.waiting_time_minutes = waitingTimeMinutes;
+      } catch (sqlErr: any) {
+        console.warn(`[SupabaseStorage] waiting_time_minutes direct SQL update failed:`, sqlErr?.message);
+      }
+    }
+
     console.log(`[SupabaseStorage] updateJob ${id} success, pickup coords: ${updated.pickup_latitude}, ${updated.pickup_longitude}`);
     return mapDbToJob(updated);
   }
