@@ -126,7 +126,7 @@ export default function PostcodeMap() {
     } catch (e) {
       setMapError('Failed to load map');
     }
-  }, [isLoaded]);
+  }, [isReady]);
 
   // Autocomplete from postcodes.io
   const fetchSuggestions = useCallback(async (query: string) => {
