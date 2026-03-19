@@ -1718,6 +1718,21 @@ export function registerMobileRoutes(app: Express): void {
           const beforeHiddenFilter = supabaseJobs.length;
           supabaseJobs = supabaseJobs.filter(j => j.driver_hidden !== true);
           console.log(`[Mobile Jobs] Filtered ${beforeHiddenFilter - supabaseJobs.length} hidden jobs, ${supabaseJobs.length} remaining`);
+
+          // AUTO-WITHDRAW: Remove completed jobs older than 7 days from the mobile app view.
+          // Active and pending jobs are never removed by age — only delivered/cancelled/failed.
+          const COMPLETED_JOB_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+          const sevenDaysAgo = new Date(Date.now() - COMPLETED_JOB_MAX_AGE_MS).toISOString();
+          const completedJobStatuses = ['delivered', 'cancelled', 'failed'];
+          const beforeAgeFilter = supabaseJobs.length;
+          supabaseJobs = supabaseJobs.filter(j => {
+            if (!completedJobStatuses.includes(j.status)) return true; // keep all active/pending
+            const jobDate = j.updated_at || j.created_at;
+            return jobDate && jobDate > sevenDaysAgo;
+          });
+          if (beforeAgeFilter - supabaseJobs.length > 0) {
+            console.log(`[Mobile Jobs] Auto-withdrew ${beforeAgeFilter - supabaseJobs.length} completed jobs older than 7 days, ${supabaseJobs.length} remaining`);
+          }
           
           // Create assignment map for driver_price lookup (using filtered valid assignments)
           const assignments = validAssignments || [];
@@ -1851,6 +1866,14 @@ export function registerMobileRoutes(app: Express): void {
       // "pending" = job offers waiting for driver to accept/decline
       // "completed" = job history (delivered, cancelled, failed)
       const completedStatuses = ["delivered", "cancelled", "failed"];
+
+      // AUTO-WITHDRAW: Remove completed jobs older than 7 days (fallback path)
+      const fallbackSevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      jobs = jobs.filter(j => {
+        if (!completedStatuses.includes(j.status)) return true;
+        const jobDate = new Date((j as any).createdAt || (j as any).created_at || 0);
+        return jobDate > fallbackSevenDaysAgo;
+      });
       
       if (status === "active") {
         // Filter out hidden jobs for active view
@@ -1865,8 +1888,7 @@ export function registerMobileRoutes(app: Express): void {
         jobs = jobs.filter(j => (j as any).driverHidden !== true);
         jobs = jobs.filter(j => ["assigned", "pending", "offered"].includes(j.status));
       } else if (status === "completed") {
-        // For history/completed jobs, show ALL completed jobs INCLUDING hidden ones
-        // Do NOT filter by driverHidden - completed jobs should always be in history
+        // For history/completed jobs, show only recent completed jobs (already age-filtered above)
         jobs = jobs.filter(j => completedStatuses.includes(j.status));
       } else {
         // No filter - show all, only filter hidden for non-completed
