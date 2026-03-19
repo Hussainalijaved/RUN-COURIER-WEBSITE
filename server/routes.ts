@@ -10388,15 +10388,25 @@ export async function registerRoutes(
     // Fill in job_details for invoices that have job_ids but no job_details stored
     // (happens for card-payment invoices created at booking time)
     try {
-      const needsEnrichment = allInvoices.filter((inv: any) => !inv.job_details && inv.job_ids && inv.job_ids.length > 0);
+      const needsEnrichment = allInvoices.filter((inv: any) => {
+        if (!inv.job_ids || inv.job_ids.length === 0) return false;
+        if (!inv.job_details) return true;
+        // Also enrich if job_details is stored as an empty array (e.g. "[]")
+        try {
+          const parsed = typeof inv.job_details === 'string' ? JSON.parse(inv.job_details) : inv.job_details;
+          return !Array.isArray(parsed) || parsed.length === 0;
+        } catch { return true; }
+      });
       if (needsEnrichment.length > 0) {
         // id column is character varying in DB — keep as strings for Supabase queries
         // Exclude waiting_time_minutes from select (not in PostgREST schema cache)
         const allMissingIds = [...new Set(needsEnrichment.flatMap((inv: any) => inv.job_ids).map((id: any) => String(id)).filter(Boolean))];
-        const { data: missingJobs } = await supabaseAdmin
+        console.log(`[Invoices] Enriching ${needsEnrichment.length} invoices, job IDs:`, allMissingIds);
+        const { data: missingJobs, error: missingJobsError } = await supabaseAdmin
           .from('jobs')
           .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
           .in('id', allMissingIds);
+        console.log(`[Invoices] Job fetch result: ${missingJobs?.length ?? 0} jobs, error:`, missingJobsError?.message ?? 'none');
 
         const multiDropIds = (missingJobs || []).filter((j: any) => j.is_multi_drop).map((j: any) => j.id);
         let freshStopsMap: Record<string, any[]> = {};
@@ -10461,6 +10471,13 @@ export async function registerRoutes(
           const details = (inv.job_ids as any[]).map((jid: any) => jobMap[String(jid)] || jobMap[parseInt(jid)]).filter(Boolean);
           if (details.length > 0) {
             inv.job_details = JSON.stringify(details);
+            if (inv.invoice_number === 'INV-202603-VA3E') {
+              console.log(`[Invoices] VA3E enriched with ${details.length} jobs:`, JSON.stringify(details[0]).substring(0, 150));
+            }
+          } else {
+            if (inv.invoice_number === 'INV-202603-VA3E') {
+              console.log(`[Invoices] VA3E NOT enriched — job_ids: ${JSON.stringify(inv.job_ids)}, jobMap keys sample:`, Object.keys(jobMap).slice(0,5));
+            }
           }
         }
         console.log(`[Invoices] Enriched ${needsEnrichment.length} invoices with live job details`);
