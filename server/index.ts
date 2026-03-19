@@ -444,6 +444,8 @@ async function runBackgroundTasks() {
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by TEXT`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS admin_notes TEXT`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS waiting_time_minutes INTEGER DEFAULT 0`);
+      // Reload PostgREST schema cache so Supabase JS client picks up new columns
+      try { await db.execute(sql`NOTIFY pgrst, 'reload schema'`); } catch (_) {}
       console.log("[MIGRATION] Service type columns created/verified successfully");
     } catch (e: any) {
       console.warn("[MIGRATION] Service type columns migration error:", e?.message);
