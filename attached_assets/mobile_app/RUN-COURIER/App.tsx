@@ -1,3 +1,6 @@
+// Register background location task at module level — MUST be before any component code
+import './services/backgroundLocation';
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Platform, View, ActivityIndicator } from 'react-native';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';

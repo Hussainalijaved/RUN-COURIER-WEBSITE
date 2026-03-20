@@ -17,6 +17,14 @@ import { useAuth } from '@/context/AuthContext';
 import { sendPODEmail, PODEmailData } from '@/services/emailService';
 import { DriverJobMap } from '@/components/DriverJobMap';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  startBackgroundLocationTracking,
+  stopBackgroundLocationTracking,
+  saveDriverContextForBg,
+  clearDriverContextForBg,
+  requestBackgroundPermission,
+} from '@/services/backgroundLocation';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
@@ -243,7 +251,6 @@ export function ActiveJobScreen({ navigation }: any) {
     if (currentJob.status === 'delivered') return;
 
     // FREEZE PREVENTION: Race permission request against timeout
-    // If permission takes too long (iOS dialog active), we don't change state
     let permissionStatus = 'undetermined';
     let permissionTimedOut = false;
     
@@ -263,7 +270,6 @@ export function ActiveJobScreen({ navigation }: any) {
 
     try {
       if (permissionStatus !== 'granted' || permissionTimedOut) {
-        // Non-blocking - user can still use the app without location
         if (isMountedRef.current) {
           setLocationPermissionDenied(!permissionTimedOut);
           setIsTrackingEnabled(false);
@@ -285,11 +291,9 @@ export function ActiveJobScreen({ navigation }: any) {
       if (location && isMountedRef.current) {
         setCurrentLocation(location);
         updateDriverLocation(location.coords.latitude, location.coords.longitude).catch(() => {});
-      } else {
-        console.log('[ActiveJob] Could not get current position, continuing without');
       }
 
-      // Start watching location - this is non-blocking by design
+      // ── Foreground watcher (high accuracy, works when app is visible) ──
       try {
         locationSubscription.current = await Location.watchPositionAsync(
           {
@@ -306,20 +310,44 @@ export function ActiveJobScreen({ navigation }: any) {
           }
         );
       } catch (watchErr) {
-        console.log('[ActiveJob] Could not start watcher, continuing without');
+        console.log('[ActiveJob] Could not start foreground watcher:', watchErr);
+      }
+
+      // ── Background tracking (continues when app is minimised / screen locked) ──
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const currentDriverId = driverIdRef.current;
+
+        if (token && currentDriverId) {
+          // Save context for the background task process
+          await saveDriverContextForBg(token, currentDriverId, String(currentJob.id), true);
+
+          // Request background permission (shows system dialog if not yet granted)
+          const bgGranted = await requestBackgroundPermission();
+          if (bgGranted) {
+            await startBackgroundLocationTracking();
+          } else {
+            console.log('[ActiveJob] Background permission not granted — foreground only');
+          }
+        }
+      } catch (bgErr) {
+        console.log('[ActiveJob] Background tracking setup failed (non-blocking):', bgErr);
       }
     } catch (error) {
-      // FREEZE PREVENTION: Catch-all - never block UI
       console.warn('[ActiveJob] Error starting location tracking (recovered):', error);
       if (isMountedRef.current) setIsTrackingEnabled(false);
     }
   }, [user, updateDriverLocation]);
 
-  const stopLocationTracking = () => {
+  const stopLocationTracking = async () => {
     if (locationSubscription.current) {
       locationSubscription.current.remove();
       locationSubscription.current = null;
     }
+    // Stop background tracking and clear stored context
+    await stopBackgroundLocationTracking().catch(() => {});
+    await clearDriverContextForBg().catch(() => {});
   };
 
   useEffect(() => {

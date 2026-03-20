@@ -17,6 +17,13 @@ import AlarmService from '@/services/AlarmService';
 import { sendJobRejectionEmail } from '@/services/emailService';
 import { JobOfferMapPreview } from '@/components/JobOfferMapPreview';
 import * as Location from 'expo-location';
+import {
+  startBackgroundLocationTracking,
+  stopBackgroundLocationTracking,
+  saveDriverContextForBg,
+  clearDriverContextForBg,
+  requestBackgroundPermission,
+} from '@/services/backgroundLocation';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -222,8 +229,6 @@ export function JobOffersScreen({ navigation }: any) {
   // Location is COMPLETELY OPTIONAL - never blocks UI
   // This complies with Apple App Store Guidelines 5.1.5
   const startLocationTracking = async () => {
-    // FREEZE PREVENTION: Race permission request against timeout
-    // If permission takes too long (iOS dialog active), we still go online without location
     let permissionStatus = 'undetermined';
     let permissionTimedOut = false;
     
@@ -242,28 +247,23 @@ export function JobOffersScreen({ navigation }: any) {
     }
 
     try {
-      
       if (permissionStatus !== 'granted' || permissionTimedOut) {
-        // Location not available - still allow driver to go online without location
-        // Non-blocking per Apple Guidelines 5.1.5
-        updateDriverStatus(true).catch(() => {}); // Fire and forget
-        return true; // Still return true - location is optional
+        updateDriverStatus(true).catch(() => {});
+        return true;
       }
 
-      // FREEZE PREVENTION: Get location with timeout (always resolves)
       const location = await safeTimeout(
         Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
         LOCATION_TIMEOUT_MS,
         null as any
       );
       if (location) {
-        updateDriverStatus(true, location).catch(() => {}); // Non-blocking
+        updateDriverStatus(true, location).catch(() => {});
       } else {
-        console.log('[LOCATION] Could not get current position, continuing without');
-        updateDriverStatus(true).catch(() => {}); // Fire and forget
+        updateDriverStatus(true).catch(() => {});
       }
 
-      // Start watching location - this is non-blocking by design
+      // ── Foreground watcher (when app is visible) ──
       try {
         locationWatcherRef.current = await Location.watchPositionAsync(
           {
@@ -273,19 +273,34 @@ export function JobOffersScreen({ navigation }: any) {
           },
           (newLocation) => {
             if (isMountedRef.current) {
-              updateDriverStatus(true, newLocation).catch(() => {}); // Non-blocking
+              updateDriverStatus(true, newLocation).catch(() => {});
             }
           }
         );
       } catch (watchErr) {
-        console.log('[LOCATION] Could not start watcher, continuing without');
+        console.log('[LOCATION] Could not start foreground watcher:', watchErr);
+      }
+
+      // ── Background tracking (when app is minimised / screen off) ──
+      try {
+        const token = await getAuthToken();
+        if (token && driverId) {
+          await saveDriverContextForBg(token, driverId, null, true);
+          const bgGranted = await requestBackgroundPermission();
+          if (bgGranted) {
+            await startBackgroundLocationTracking();
+          } else {
+            console.log('[LOCATION] Background permission denied — foreground only');
+          }
+        }
+      } catch (bgErr) {
+        console.log('[LOCATION] Background tracking setup failed (non-blocking):', bgErr);
       }
 
       return true;
     } catch (error) {
       console.warn('[LOCATION] Error starting tracking (recovered):', error);
-      // FREEZE PREVENTION: Still allow going online without location
-      updateDriverStatus(true).catch(() => {}); // Fire and forget
+      updateDriverStatus(true).catch(() => {});
       return true;
     }
   };
@@ -296,10 +311,13 @@ export function JobOffersScreen({ navigation }: any) {
       try {
         locationWatcherRef.current.remove();
       } catch (e) {
-        // Ignore removal errors on web - removeSubscription not available
+        // Ignore removal errors on web
       }
       locationWatcherRef.current = null;
     }
+    // Stop background tracking and clear stored context
+    await stopBackgroundLocationTracking().catch(() => {});
+    await clearDriverContextForBg().catch(() => {});
     await updateDriverStatus(false);
   };
 
