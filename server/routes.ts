@@ -1920,6 +1920,107 @@ export async function registerRoutes(
     });
   }));
 
+  // Public live-tracking endpoint — returns pickup/delivery coords + driver position
+  // Security: driver lat/lng only returned for active jobs with an assigned driver
+  app.get("/api/jobs/track/:trackingNumber/live", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import("./supabaseAdmin");
+    const { getDriverLocationFromCache } = await import("./realtime");
+
+    const trackingNumber = req.params.trackingNumber.toUpperCase();
+
+    const ACTIVE_STATUSES = new Set([
+      'assigned', 'accepted', 'offered',
+      'on_the_way_pickup', 'arrived_pickup',
+      'collected', 'picked_up',
+      'on_the_way_delivery', 'on_the_way',
+    ]);
+
+    const STATUS_LABELS: Record<string, string> = {
+      assigned: 'Driver assigned, preparing for pickup',
+      offered: 'Driver assigned, preparing for pickup',
+      accepted: 'Driver assigned, preparing for pickup',
+      on_the_way_pickup: 'Driver on the way to pickup',
+      arrived_pickup: 'Driver has arrived at pickup',
+      collected: 'Parcel collected — driver on the way',
+      picked_up: 'Parcel collected — driver on the way',
+      on_the_way_delivery: 'Driver on the way to delivery',
+      on_the_way: 'Driver on the way to delivery',
+      delivered: 'Delivered successfully',
+      cancelled: 'Delivery cancelled',
+      failed: 'Delivery could not be completed',
+      pending: 'Order received — awaiting driver',
+    };
+
+    // Helper: geocode postcode via postcodes.io (free, no key)
+    async function geocodePostcode(postcode: string): Promise<{ lat: number; lng: number } | null> {
+      try {
+        const resp = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`);
+        const data = await resp.json();
+        if (data.status === 200 && data.result) {
+          return { lat: data.result.latitude, lng: data.result.longitude };
+        }
+      } catch { /* ignore */ }
+      return null;
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(503).json({ error: 'Service unavailable' });
+    }
+
+    const { data: job, error } = await supabaseAdmin
+      .from('jobs')
+      .select('id, status, driver_id, pickup_postcode, delivery_postcode, pickup_latitude, pickup_longitude, delivery_latitude, delivery_longitude')
+      .eq('tracking_number', trackingNumber)
+      .single();
+
+    if (error || !job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const status = (job as any).status as string;
+    const isActive = ACTIVE_STATUSES.has(status);
+
+    // Resolve pickup coords
+    let pickup: { lat: number; lng: number } | null = null;
+    if ((job as any).pickup_latitude && (job as any).pickup_longitude) {
+      pickup = { lat: parseFloat((job as any).pickup_latitude), lng: parseFloat((job as any).pickup_longitude) };
+    } else if ((job as any).pickup_postcode) {
+      pickup = await geocodePostcode((job as any).pickup_postcode);
+    }
+
+    // Resolve delivery coords
+    let delivery: { lat: number; lng: number } | null = null;
+    if ((job as any).delivery_latitude && (job as any).delivery_longitude) {
+      delivery = { lat: parseFloat((job as any).delivery_latitude), lng: parseFloat((job as any).delivery_longitude) };
+    } else if ((job as any).delivery_postcode) {
+      delivery = await geocodePostcode((job as any).delivery_postcode);
+    }
+
+    // Driver location — ONLY for active jobs with a driver assigned
+    let driver: { lat: number; lng: number; updatedAt: number; isLive: boolean } | null = null;
+    if (isActive && (job as any).driver_id) {
+      const cached = getDriverLocationFromCache((job as any).driver_id);
+      if (cached) {
+        const ageMs = Date.now() - cached.timestamp;
+        driver = {
+          lat: cached.lat,
+          lng: cached.lng,
+          updatedAt: cached.timestamp,
+          isLive: ageMs < 5 * 60 * 1000, // live if updated within 5 min
+        };
+      }
+    }
+
+    return res.json({
+      status,
+      statusLabel: STATUS_LABELS[status] ?? status,
+      isActive,
+      pickup,
+      delivery,
+      driver,
+    });
+  }));
+
   app.get("/api/jobs/:id", asyncHandler(async (req, res) => {
     const job = await storage.getJob(req.params.id);
     if (!job) {

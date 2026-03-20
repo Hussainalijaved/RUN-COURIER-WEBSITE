@@ -897,6 +897,10 @@ function sendMessage(ws: WebSocket, message: OutgoingMessage): void {
   }
 }
 
+export function getDriverLocationFromCache(driverId: string): DriverLocation | null {
+  return locationCache.get(driverId) || null;
+}
+
 export async function hydrateLocationCache(): Promise<void> {
   try {
     const drivers = await storage.getDrivers();

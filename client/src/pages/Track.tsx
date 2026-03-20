@@ -20,6 +20,7 @@ import {
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept.png';
 import type { JobStatus } from '@shared/schema';
+import { TrackingLiveMap } from '@/components/TrackingLiveMap';
 
 const statusSteps: { status: JobStatus; label: string; icon: any }[] = [
   { status: 'pending', label: 'Order Placed', icon: Package },
@@ -356,6 +357,12 @@ export default function Track() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Live tracking map — added between status steps and details cards */}
+              <TrackingLiveMap
+                trackingNumber={job.trackingNumber}
+                jobStatus={job.status}
+              />
 
               <div className="grid md:grid-cols-2 gap-6">
                 <Card>
