@@ -195,7 +195,7 @@ export function TrackingLiveMap({ trackingNumber, jobStatus }: TrackingLiveMapPr
         const title = `Stop ${stop.stopOrder}: ${stop.address}`;
 
         if (!stopMarkersRef.current[idx]) {
-          const marker = new google.maps.Marker({ map, title, icon, zIndex: 9 });
+          const marker = new google.maps.Marker({ map, position: pos, title, icon, zIndex: 9 });
           // Click opens info window with address + status
           marker.addListener('click', () => {
             infoWindowRef.current?.setContent(
