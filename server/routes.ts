@@ -1979,7 +1979,27 @@ export async function registerRoutes(
 
     const status = (job as any).status as string;
     const isActive = ACTIVE_STATUSES.has(status);
-    const isMultiDrop = !!(job as any).is_multi_drop;
+
+    console.log(`[LiveTrack] ${trackingNumber} → id=${(job as any).id} status=${status} is_multi_drop=${(job as any).is_multi_drop}`);
+
+    // Always fetch stops via direct SQL (bypasses Supabase schema cache issues)
+    let rawStops: any[] = [];
+    try {
+      const stopsResult = await getPgPool().query(
+        `SELECT stop_order, address, postcode, latitude, longitude, status
+         FROM multi_drop_stops
+         WHERE job_id = $1
+         ORDER BY stop_order ASC`,
+        [String((job as any).id)]
+      );
+      rawStops = stopsResult.rows;
+    } catch (sqlErr: any) {
+      console.error(`[LiveTrack] SQL error fetching stops:`, sqlErr.message);
+    }
+
+    console.log(`[LiveTrack] stops fetched via SQL: ${rawStops.length} for job_id=${(job as any).id}`);
+
+    const isMultiDrop = rawStops.length > 0 || !!(job as any).is_multi_drop;
 
     // Resolve pickup coords
     let pickup: { lat: number; lng: number } | null = null;
@@ -1989,7 +2009,7 @@ export async function registerRoutes(
       pickup = await geocodePostcode((job as any).pickup_postcode);
     }
 
-    // Resolve delivery coords (only used for single-drop jobs)
+    // Resolve delivery coords (only for single-drop jobs)
     let delivery: { lat: number; lng: number } | null = null;
     if (!isMultiDrop) {
       if ((job as any).delivery_latitude && (job as any).delivery_longitude) {
@@ -1999,26 +2019,17 @@ export async function registerRoutes(
       }
     }
 
-    // Multi-drop stops — fetch and geocode if needed
-    let stops: { stopOrder: number; address: string; postcode: string; lat: number | null; lng: number | null; status: string }[] = [];
-    if (isMultiDrop) {
-      const { data: rawStops } = await supabaseAdmin
-        .from('multi_drop_stops')
-        .select('stop_order, address, postcode, latitude, longitude, status')
-        .eq('job_id', (job as any).id)
-        .order('stop_order', { ascending: true });
-
-      if (rawStops) {
-        for (const s of rawStops) {
-          let lat: number | null = s.latitude ? parseFloat(s.latitude) : null;
-          let lng: number | null = s.longitude ? parseFloat(s.longitude) : null;
-          if ((lat === null || lng === null) && s.postcode) {
-            const geo = await geocodePostcode(s.postcode);
-            if (geo) { lat = geo.lat; lng = geo.lng; }
-          }
-          stops.push({ stopOrder: s.stop_order, address: s.address, postcode: s.postcode, lat, lng, status: s.status || 'pending' });
-        }
+    // Geocode stops that are missing coordinates
+    const stops: { stopOrder: number; address: string; postcode: string; lat: number | null; lng: number | null; status: string }[] = [];
+    for (const s of rawStops) {
+      let lat: number | null = s.latitude ? parseFloat(String(s.latitude)) : null;
+      let lng: number | null = s.longitude ? parseFloat(String(s.longitude)) : null;
+      if ((lat === null || isNaN(lat) || lng === null || isNaN(lng)) && s.postcode) {
+        const geo = await geocodePostcode(s.postcode);
+        if (geo) { lat = geo.lat; lng = geo.lng; }
       }
+      console.log(`[LiveTrack]   stop ${s.stop_order}: ${s.address} → lat=${lat} lng=${lng} status=${s.status}`);
+      stops.push({ stopOrder: s.stop_order, address: s.address, postcode: s.postcode, lat, lng, status: s.status || 'pending' });
     }
 
     // Driver location — ONLY for active jobs with a driver assigned

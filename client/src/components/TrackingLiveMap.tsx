@@ -86,6 +86,7 @@ export function TrackingLiveMap({ trackingNumber, jobStatus }: TrackingLiveMapPr
       const res = await fetch(`/api/jobs/track/${trackingNumber}/live`);
       if (!res.ok) return;
       const data: LiveData = await res.json();
+      console.log('[TrackingLiveMap] live data:', JSON.stringify({ isMultiDrop: data.isMultiDrop, stopsCount: data.stops?.length, stops: data.stops, pickup: data.pickup, delivery: data.delivery }));
       setLiveData(data);
     } catch { /* silent */ }
   }, [trackingNumber]);
