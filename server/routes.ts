@@ -1884,6 +1884,16 @@ export async function registerRoutes(
             postcode: s.postcode,
           }));
         }
+        // Some jobs store the final stop only in delivery_address — append it if missing
+        const deliveryPostcode = job.delivery_postcode;
+        if (deliveryPostcode && !multiDropStops.some(s => s.postcode === deliveryPostcode)) {
+          const nextOrder = multiDropStops.length > 0 ? Math.max(...multiDropStops.map(s => s.stopOrder)) + 1 : 1;
+          multiDropStops.push({
+            stopOrder: nextOrder,
+            address: job.delivery_address || deliveryPostcode,
+            postcode: deliveryPostcode,
+          });
+        }
       }
 
       // Map snake_case to camelCase for frontend
@@ -2055,6 +2065,21 @@ export async function registerRoutes(
         if (geo) { lat = geo.lat; lng = geo.lng; }
       }
       stops.push({ stopOrder: s.stop_order, address: s.address, postcode: s.postcode, lat, lng, status: s.status || 'pending' });
+    }
+
+    // Some jobs store the final stop only in delivery_address — append it if missing
+    const deliveryPostcode = (job as any).delivery_postcode as string | null;
+    if (isMultiDrop && deliveryPostcode && !stops.some(s => s.postcode === deliveryPostcode)) {
+      let dLat: number | null = null, dLng: number | null = null;
+      if ((job as any).delivery_latitude && (job as any).delivery_longitude) {
+        dLat = parseFloat(String((job as any).delivery_latitude));
+        dLng = parseFloat(String((job as any).delivery_longitude));
+      } else {
+        const geo = await geocodePostcode(deliveryPostcode);
+        if (geo) { dLat = geo.lat; dLng = geo.lng; }
+      }
+      const nextOrder = stops.length > 0 ? Math.max(...stops.map(s => s.stopOrder)) + 1 : 1;
+      stops.push({ stopOrder: nextOrder, address: (job as any).delivery_address || deliveryPostcode, postcode: deliveryPostcode, lat: dLat, lng: dLng, status: 'pending' });
     }
 
     // Driver location — ONLY for active jobs with a driver assigned
