@@ -2323,7 +2323,63 @@ export async function registerRoutes(
     if (!supabaseAdmin) {
       return res.status(500).json({ error: "Database not available" });
     }
-    
+
+    // If this is a fallback stop (not yet in DB), insert it first then update
+    let realStopId = stopId;
+    if (stopId.startsWith('fallback-')) {
+      // Fetch the job's delivery address to build the real stop row
+      const { data: jobRow } = await supabaseAdmin
+        .from('jobs')
+        .select('delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, recipient_name')
+        .eq('id', jobId)
+        .single();
+
+      // Find the next stop_order
+      const { data: existingStops } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('stop_order')
+        .eq('job_id', jobId)
+        .order('stop_order', { ascending: false })
+        .limit(1);
+      const nextOrder = existingStops && existingStops.length > 0 ? (existingStops[0].stop_order + 1) : 1;
+
+      const insertPayload: Record<string, any> = {
+        job_id: jobId,
+        stop_order: nextOrder,
+        address: jobRow?.delivery_address || null,
+        postcode: jobRow?.delivery_postcode || null,
+        latitude: jobRow?.delivery_latitude || null,
+        longitude: jobRow?.delivery_longitude || null,
+        recipient_name: jobRow?.recipient_name || null,
+        status,
+        delivered_at: status === 'delivered' ? new Date().toISOString() : null,
+      };
+
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      if (insertError || !inserted) {
+        console.error('[Stops] Error inserting fallback stop:', insertError);
+        return res.status(500).json({ error: "Failed to create stop record" });
+      }
+
+      console.log(`[Stops] Inserted fallback stop ${inserted.id} for job ${jobId} with status ${status}`);
+      cache.clear();
+      return res.json({
+        success: true,
+        stop: {
+          id: inserted.id,
+          jobId: inserted.job_id,
+          stopOrder: inserted.stop_order,
+          status: inserted.status,
+          deliveredAt: inserted.delivered_at,
+        }
+      });
+    }
+
     // Update the stop status
     const updateData: Record<string, any> = { status };
     if (status === 'delivered') {
@@ -2335,7 +2391,7 @@ export async function registerRoutes(
     const { data: updatedStop, error } = await supabaseAdmin
       .from('multi_drop_stops')
       .update(updateData)
-      .eq('id', stopId)
+      .eq('id', realStopId)
       .eq('job_id', jobId)
       .select()
       .single();
@@ -2345,7 +2401,7 @@ export async function registerRoutes(
       return res.status(500).json({ error: "Failed to update stop status" });
     }
     
-    console.log(`[Stops] Updated stop ${stopId} status to ${status}, job ${jobId}`);
+    console.log(`[Stops] Updated stop ${realStopId} status to ${status}, job ${jobId}`);
     
     cache.clear();
     
