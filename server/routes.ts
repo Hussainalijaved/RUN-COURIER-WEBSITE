@@ -2240,6 +2240,29 @@ export async function registerRoutes(
       podRecipientName: stop.pod_recipient_name,
     }));
     
+    // Some jobs store the final stop only in delivery_address — append it if missing
+    const jobDeliveryPostcode = (job as any).deliveryPostcode as string | undefined;
+    if (job.isMultiDrop && jobDeliveryPostcode && !mappedStops.some((s: any) => s.postcode === jobDeliveryPostcode)) {
+      const nextOrder = mappedStops.length > 0 ? Math.max(...mappedStops.map((s: any) => s.stopOrder)) + 1 : 1;
+      mappedStops.push({
+        id: `fallback-${jobId}`,
+        jobId,
+        stopOrder: nextOrder,
+        address: (job as any).deliveryAddress || jobDeliveryPostcode,
+        postcode: jobDeliveryPostcode,
+        latitude: (job as any).deliveryLatitude || null,
+        longitude: (job as any).deliveryLongitude || null,
+        recipientName: (job as any).recipientName || null,
+        recipientPhone: null,
+        instructions: null,
+        status: 'pending',
+        deliveredAt: null,
+        podPhotoUrl: null,
+        podSignatureUrl: null,
+        podRecipientName: null,
+      });
+    }
+
     // Resolve POD URLs to signed URLs
     const resolvedStops = await Promise.all(mappedStops.map(async (stop: any) => {
       const resolved = { ...stop };
