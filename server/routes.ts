@@ -1969,7 +1969,7 @@ export async function registerRoutes(
 
     const { data: job, error } = await supabaseAdmin
       .from('jobs')
-      .select('id, status, driver_id, pickup_postcode, delivery_postcode, pickup_latitude, pickup_longitude, delivery_latitude, delivery_longitude')
+      .select('id, status, driver_id, pickup_postcode, delivery_postcode, pickup_latitude, pickup_longitude, delivery_latitude, delivery_longitude, is_multi_drop')
       .eq('tracking_number', trackingNumber)
       .single();
 
@@ -1979,6 +1979,7 @@ export async function registerRoutes(
 
     const status = (job as any).status as string;
     const isActive = ACTIVE_STATUSES.has(status);
+    const isMultiDrop = !!(job as any).is_multi_drop;
 
     // Resolve pickup coords
     let pickup: { lat: number; lng: number } | null = null;
@@ -1988,12 +1989,36 @@ export async function registerRoutes(
       pickup = await geocodePostcode((job as any).pickup_postcode);
     }
 
-    // Resolve delivery coords
+    // Resolve delivery coords (only used for single-drop jobs)
     let delivery: { lat: number; lng: number } | null = null;
-    if ((job as any).delivery_latitude && (job as any).delivery_longitude) {
-      delivery = { lat: parseFloat((job as any).delivery_latitude), lng: parseFloat((job as any).delivery_longitude) };
-    } else if ((job as any).delivery_postcode) {
-      delivery = await geocodePostcode((job as any).delivery_postcode);
+    if (!isMultiDrop) {
+      if ((job as any).delivery_latitude && (job as any).delivery_longitude) {
+        delivery = { lat: parseFloat((job as any).delivery_latitude), lng: parseFloat((job as any).delivery_longitude) };
+      } else if ((job as any).delivery_postcode) {
+        delivery = await geocodePostcode((job as any).delivery_postcode);
+      }
+    }
+
+    // Multi-drop stops — fetch and geocode if needed
+    let stops: { stopOrder: number; address: string; postcode: string; lat: number | null; lng: number | null; status: string }[] = [];
+    if (isMultiDrop) {
+      const { data: rawStops } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('stop_order, address, postcode, latitude, longitude, status')
+        .eq('job_id', (job as any).id)
+        .order('stop_order', { ascending: true });
+
+      if (rawStops) {
+        for (const s of rawStops) {
+          let lat: number | null = s.latitude ? parseFloat(s.latitude) : null;
+          let lng: number | null = s.longitude ? parseFloat(s.longitude) : null;
+          if ((lat === null || lng === null) && s.postcode) {
+            const geo = await geocodePostcode(s.postcode);
+            if (geo) { lat = geo.lat; lng = geo.lng; }
+          }
+          stops.push({ stopOrder: s.stop_order, address: s.address, postcode: s.postcode, lat, lng, status: s.status || 'pending' });
+        }
+      }
     }
 
     // Driver location — ONLY for active jobs with a driver assigned
@@ -2015,8 +2040,10 @@ export async function registerRoutes(
       status,
       statusLabel: STATUS_LABELS[status] ?? status,
       isActive,
+      isMultiDrop,
       pickup,
       delivery,
+      stops,
       driver,
     });
   }));
