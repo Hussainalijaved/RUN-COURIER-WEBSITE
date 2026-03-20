@@ -1982,22 +1982,25 @@ export async function registerRoutes(
 
     console.log(`[LiveTrack] ${trackingNumber} → id=${(job as any).id} status=${status} is_multi_drop=${(job as any).is_multi_drop}`);
 
-    // Always fetch stops via direct SQL (bypasses Supabase schema cache issues)
+    // Always fetch stops — job_id is stored as string in multi_drop_stops
+    const jobIdStr = String((job as any).id);
     let rawStops: any[] = [];
     try {
-      const stopsResult = await getPgPool().query(
-        `SELECT stop_order, address, postcode, latitude, longitude, status
-         FROM multi_drop_stops
-         WHERE job_id = $1
-         ORDER BY stop_order ASC`,
-        [String((job as any).id)]
-      );
-      rawStops = stopsResult.rows;
-    } catch (sqlErr: any) {
-      console.error(`[LiveTrack] SQL error fetching stops:`, sqlErr.message);
+      const { data: stopsData, error: stopsError } = await supabaseAdmin
+        .from('multi_drop_stops')
+        .select('stop_order, address, postcode, latitude, longitude, status')
+        .eq('job_id', jobIdStr)
+        .order('stop_order', { ascending: true });
+      if (stopsError) {
+        console.error(`[LiveTrack] Supabase stops error: ${stopsError.message}`);
+      } else {
+        rawStops = stopsData ?? [];
+      }
+    } catch (err: any) {
+      console.error(`[LiveTrack] stops fetch exception:`, err.message);
     }
 
-    console.log(`[LiveTrack] stops fetched via SQL: ${rawStops.length} for job_id=${(job as any).id}`);
+    console.log(`[LiveTrack] stops fetched: ${rawStops.length} for job_id=${jobIdStr}`);
 
     const isMultiDrop = rawStops.length > 0 || !!(job as any).is_multi_drop;
 
