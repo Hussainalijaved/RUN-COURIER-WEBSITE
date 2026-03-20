@@ -106,6 +106,8 @@ interface MockJob {
   status: JobStatus;
   pickupAddress: string;
   deliveryAddress: string;
+  isMultiDrop: boolean;
+  multiDropStops: { stopOrder: number; address: string; postcode: string }[];
   driverName?: string;
   driverPhone?: string;
   driverVehicleType?: string;
@@ -162,6 +164,8 @@ export default function Track() {
           status: newStatus,
           pickupAddress: `${data.pickupAddress}, ${data.pickupPostcode}`,
           deliveryAddress: `${data.deliveryAddress}, ${data.deliveryPostcode}`,
+          isMultiDrop: !!data.isMultiDrop,
+          multiDropStops: data.multiDropStops || [],
           driverName: data.driverName || undefined,
           driverPhone: data.driverPhone || undefined,
           driverVehicleType: data.driverVehicleType
@@ -377,10 +381,28 @@ export default function Track() {
                       <p className="text-sm text-muted-foreground">From</p>
                       <p className="font-medium">{job.pickupAddress}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">To</p>
-                      <p className="font-medium">{job.deliveryAddress}</p>
-                    </div>
+                    {job.isMultiDrop && job.multiDropStops.length > 0 ? (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1.5">
+                          Delivery Stops ({job.multiDropStops.length})
+                        </p>
+                        <div className="space-y-1.5">
+                          {job.multiDropStops.map((stop) => (
+                            <div key={stop.stopOrder} className="flex items-start gap-2 text-sm">
+                              <span className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
+                                {stop.stopOrder}
+                              </span>
+                              <span className="text-foreground">{stop.address}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-muted-foreground">To</p>
+                        <p className="font-medium">{job.deliveryAddress}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm text-muted-foreground">Booked Vehicle</p>
                       <p className="font-medium capitalize">{job.vehicleType}</p>

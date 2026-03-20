@@ -1825,6 +1825,7 @@ export async function registerRoutes(
         .select(`
           id,
           tracking_number,
+          job_number,
           status,
           vehicle_type,
           pickup_address,
@@ -1835,6 +1836,7 @@ export async function registerRoutes(
           estimated_delivery_time,
           created_at,
           driver_id,
+          is_multi_drop,
           pod_photo_url,
           pod_photos,
           pod_signature_url
@@ -1865,6 +1867,25 @@ export async function registerRoutes(
         }
       }
       
+      // Fetch multi-drop stops if applicable
+      const isMultiDrop = !!(job as any).is_multi_drop;
+      let multiDropStops: { stopOrder: number; address: string; postcode: string }[] = [];
+      if (isMultiDrop) {
+        const jobIdStr = String(job.id);
+        const { data: stops } = await supabaseAdmin
+          .from('multi_drop_stops')
+          .select('stop_order, address, postcode')
+          .eq('job_id', jobIdStr)
+          .order('stop_order', { ascending: true });
+        if (stops && stops.length > 0) {
+          multiDropStops = stops.map((s: any) => ({
+            stopOrder: s.stop_order,
+            address: s.address,
+            postcode: s.postcode,
+          }));
+        }
+      }
+
       // Map snake_case to camelCase for frontend
       const trackResult: any = {
         id: job.id,
@@ -1876,6 +1897,8 @@ export async function registerRoutes(
         pickupPostcode: job.pickup_postcode,
         deliveryAddress: job.delivery_address,
         deliveryPostcode: job.delivery_postcode,
+        isMultiDrop,
+        multiDropStops,
         recipientName: job.recipient_name,
         estimatedDeliveryTime: job.estimated_delivery_time,
         createdAt: job.created_at,
@@ -2031,7 +2054,6 @@ export async function registerRoutes(
         const geo = await geocodePostcode(s.postcode);
         if (geo) { lat = geo.lat; lng = geo.lng; }
       }
-      console.log(`[LiveTrack]   stop ${s.stop_order}: ${s.address} → lat=${lat} lng=${lng} status=${s.status}`);
       stops.push({ stopOrder: s.stop_order, address: s.address, postcode: s.postcode, lat, lng, status: s.status || 'pending' });
     }
 
