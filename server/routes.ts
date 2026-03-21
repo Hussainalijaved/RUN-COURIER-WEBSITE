@@ -1204,6 +1204,15 @@ export async function registerRoutes(
     });
   }));
 
+  // Normalise a UK postcode to the standard "AA9 9AA" format (insert space before last 3 chars)
+  function normalizeUKPostcode(pc: string): string {
+    const clean = pc.replace(/\s+/g, '').toUpperCase().trim();
+    if (clean.length >= 5) {
+      return clean.slice(0, -3) + ' ' + clean.slice(-3);
+    }
+    return clean;
+  }
+
   // Google Maps Optimized Route endpoint - finds optimal route through all drops
   // Uses Distance Matrix API to get all distances, then implements nearest-neighbor TSP
   app.get("/api/maps/optimized-route", asyncHandler(async (req, res) => {
@@ -1219,14 +1228,15 @@ export async function registerRoutes(
     }
 
     try {
-      const dropList = (drops as string).split('|').filter(w => w.trim());
+      const normalizedOrigin = normalizeUKPostcode(origin as string);
+      const dropList = (drops as string).split('|').filter(w => w.trim()).map(normalizeUKPostcode);
       if (dropList.length === 0) {
         return res.status(400).json({ error: 'At least one drop is required' });
       }
 
       // For single drop, no optimization needed
       if (dropList.length === 1) {
-        const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin as string)}&destinations=${encodeURIComponent(dropList[0])}&key=${apiKey}`;
+        const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(normalizedOrigin)}&destinations=${encodeURIComponent(dropList[0])}&key=${apiKey}`;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -1240,14 +1250,14 @@ export async function registerRoutes(
         }
 
         const legs = [{
-          from: origin + ', UK',
+          from: normalizedOrigin + ', UK',
           to: dropList[0] + ', UK',
           distance: element.distance.value / 1609.34,
           duration: Math.round(element.duration.value / 60),
         }];
 
-        const markers = `markers=color:green|label:A|${encodeURIComponent(origin as string)}&markers=color:red|label:B|${encodeURIComponent(dropList[0])}`;
-        const path = `path=color:0x007BFF|weight:4|${encodeURIComponent(origin as string)}|${encodeURIComponent(dropList[0])}`;
+        const markers = `markers=color:green|label:A|${encodeURIComponent(normalizedOrigin)}&markers=color:red|label:B|${encodeURIComponent(dropList[0])}`;
+        const path = `path=color:0x007BFF|weight:4|${encodeURIComponent(normalizedOrigin)}|${encodeURIComponent(dropList[0])}`;
         const routeMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&${markers}&${path}&key=${apiKey}`;
 
         return res.json({
@@ -1261,7 +1271,7 @@ export async function registerRoutes(
 
       // For multiple drops, use Distance Matrix to get all pairwise distances
       // Then solve TSP using nearest-neighbor heuristic
-      const allPoints = [origin as string, ...dropList];
+      const allPoints = [normalizedOrigin, ...dropList];
       const n = allPoints.length;
       
       // Initialize distance and duration matrices

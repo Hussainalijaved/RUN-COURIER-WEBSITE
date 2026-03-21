@@ -62,6 +62,12 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+function normalizeUKPostcode(pc: string): string {
+  const clean = pc.replace(/\s+/g, '').toUpperCase().trim();
+  if (clean.length >= 5) return clean.slice(0, -3) + ' ' + clean.slice(-3);
+  return clean;
+}
+
 interface DropPoint {
   id: string;
   postcode: string;
@@ -276,9 +282,9 @@ export default function AdminCreateJob() {
     setRouteLegs([]);
 
     try {
-      const dropPostcodes = validDrops.map(d => d.postcode).join('|');
+      const dropPostcodes = validDrops.map(d => normalizeUKPostcode(d.postcode)).join('|');
       const routeResponse = await fetch(
-        `/api/maps/optimized-route?origin=${encodeURIComponent(pickupPostcode)}&drops=${encodeURIComponent(dropPostcodes)}`
+        `/api/maps/optimized-route?origin=${encodeURIComponent(normalizeUKPostcode(pickupPostcode))}&drops=${encodeURIComponent(dropPostcodes)}`
       );
       
       if (!routeResponse.ok) {
@@ -375,7 +381,7 @@ export default function AdminCreateJob() {
       if (pickupPostcode && deliveryPostcode && pickupPostcode.length >= 3 && deliveryPostcode.length >= 3) {
         setIsCalculating(true);
         try {
-          const distResult = await calculateDistanceFromPostcodes(pickupPostcode, deliveryPostcode);
+          const distResult = await calculateDistanceFromPostcodes(normalizeUKPostcode(pickupPostcode), normalizeUKPostcode(deliveryPostcode));
           if (distResult) {
             setDistance(distResult.distance);
             setDriverPrice(calcAutoDriverPrice(distResult.distance, vehicleType));
@@ -515,7 +521,7 @@ export default function AdminCreateJob() {
     if (values.pickupPostcode && values.deliveryPostcode) {
       setIsCalculating(true);
       try {
-        const distResult = await calculateDistanceFromPostcodes(values.pickupPostcode, values.deliveryPostcode);
+        const distResult = await calculateDistanceFromPostcodes(normalizeUKPostcode(values.pickupPostcode), normalizeUKPostcode(values.deliveryPostcode));
         if (distResult) {
           setDistance(distResult.distance);
           setDriverPrice(calcAutoDriverPrice(distResult.distance, values.vehicleType));
