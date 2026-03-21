@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { requireSupabaseAuth, requireDriverRole } from "./mobileAuth";
-import { broadcastLocationUpdate, broadcastDriverAvailability } from "./realtime";
+import { broadcastLocationUpdate, broadcastDriverAvailability, broadcastJobUpdate } from "./realtime";
 import { db } from "./db";
 import { jobs as jobsTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -2195,17 +2195,106 @@ export function registerMobileRoutes(app: Express): void {
       // Check if all stops are now completed
       const { data: allStops, error: allStopsError } = await supabaseAdmin
         .from('multi_drop_stops')
-        .select('id, status')
-        .eq('job_id', String(jobId));
+        .select('id, status, pod_photo_url, pod_recipient_name, stop_order')
+        .eq('job_id', String(jobId))
+        .order('stop_order', { ascending: true });
       
-      const allCompleted = allStops && allStops.every(s => s.status === 'delivered');
+      const allCompleted = allStops && allStops.length > 0 && allStops.every(s => s.status === 'delivered');
       const completedCount = allStops?.filter(s => s.status === 'delivered').length || 0;
       const totalCount = allStops?.length || 0;
       
       console.log(`[Multi-Drop] Stop ${stopId} completed. Progress: ${completedCount}/${totalCount}`);
       
+      if (allCompleted) {
+        console.log(`[Multi-Drop] All ${totalCount} stops delivered for job ${jobId} — auto-completing job`);
+
+        // Build synthetic POD from stop data
+        const syntheticPodRecipient = updatedStop.pod_recipient_name || 'Multi-drop complete';
+        const syntheticPodPhoto = allStops!.find(s => s.pod_photo_url)?.pod_photo_url || null;
+
+        // Set synthetic POD on the main job
+        await storage.updateJob(String(jobId), {
+          podNotes: `Multi-drop delivery completed. ${totalCount} stops delivered.`,
+          podRecipientName: syntheticPodRecipient,
+          podPhotoUrl: syntheticPodPhoto,
+        });
+
+        // Mark job as delivered
+        const deliveredJob = await storage.updateJobStatus(String(jobId), 'delivered');
+
+        if (deliveredJob) {
+          console.log(`[Multi-Drop] Job ${jobId} auto-completed successfully`);
+
+          // Broadcast WebSocket update
+          broadcastJobUpdate({
+            id: deliveredJob.id,
+            trackingNumber: deliveredJob.trackingNumber,
+            status: 'delivered',
+            previousStatus: job.status,
+            customerId: deliveredJob.customerId,
+            driverId: deliveredJob.driverId,
+            updatedAt: deliveredJob.updatedAt,
+          });
+
+          // Send delivery confirmation email (non-blocking)
+          (async () => {
+            try {
+              let customerEmail = (deliveredJob as any).customerEmail;
+              if (!customerEmail && deliveredJob.customerId) {
+                const customer = await storage.getUser(deliveredJob.customerId);
+                customerEmail = customer?.email;
+              }
+              if (!customerEmail && supabaseAdmin) {
+                const { data: sJob } = await supabaseAdmin
+                  .from('jobs')
+                  .select('customer_email')
+                  .eq('id', String(jobId))
+                  .single();
+                if (sJob?.customer_email) customerEmail = sJob.customer_email;
+              }
+              if (customerEmail) {
+                await sendDeliveryConfirmationEmail(customerEmail, {
+                  trackingNumber: deliveredJob.trackingNumber,
+                  jobNumber: deliveredJob.jobNumber || '',
+                  pickupAddress: deliveredJob.pickupAddress,
+                  pickupPostcode: deliveredJob.pickupPostcode,
+                  deliveryAddress: deliveredJob.deliveryAddress,
+                  deliveryPostcode: deliveredJob.deliveryPostcode,
+                  recipientName: deliveredJob.recipientName,
+                  podRecipientName: syntheticPodRecipient,
+                  podPhotoUrl: syntheticPodPhoto,
+                  deliveredAt: new Date().toISOString(),
+                });
+                console.log(`[Multi-Drop] Delivery confirmation email sent for job ${jobId}`);
+              }
+            } catch (emailErr) {
+              console.error(`[Multi-Drop] Failed to send delivery email for job ${jobId}:`, emailErr);
+            }
+          })();
+        }
+
+        return res.json({
+          success: true,
+          jobCompleted: true,
+          stop: {
+            id: updatedStop.id,
+            stopOrder: updatedStop.stop_order,
+            address: updatedStop.address,
+            status: updatedStop.status,
+            deliveredAt: updatedStop.delivered_at,
+          },
+          progress: {
+            completed: completedCount,
+            total: totalCount,
+            allCompleted: true,
+          },
+          message: `All ${totalCount} stops delivered. Job completed.`,
+        });
+      }
+
       res.json({
         success: true,
+        jobCompleted: false,
         stop: {
           id: updatedStop.id,
           stopOrder: updatedStop.stop_order,
@@ -2216,11 +2305,9 @@ export function registerMobileRoutes(app: Express): void {
         progress: {
           completed: completedCount,
           total: totalCount,
-          allCompleted,
+          allCompleted: false,
         },
-        message: allCompleted 
-          ? "All stops completed! You can now mark the job as delivered."
-          : `Stop ${completedCount} of ${totalCount} completed.`
+        message: `Stop ${completedCount} of ${totalCount} completed.`,
       });
     })
   );
