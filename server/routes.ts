@@ -427,6 +427,22 @@ function validateBasePrice(vehicleType: string, basePrice: number): number {
   return basePrice;
 }
 
+// MINIMUM DRIVER PAYMENT per vehicle type
+// Rule: no job can pay a driver less than these amounts
+function getMinDriverPrice(vehicleType: string | null | undefined): number {
+  const vt = String(vehicleType || 'car').toLowerCase().split('|')[0]; // strip vehicle reg suffix
+  switch (vt) {
+    case 'motorbike': return 5;
+    case 'car':       return 12;
+    case 'small_van': return 15;
+    case 'medium_van': return 17;
+    case 'large_van':  return 17;
+    case 'luton_van':  return 17;
+    case 'flatbed':    return 17;
+    default:           return 12;
+  }
+}
+
 // SECURITY: Centralized helper to strip ALL customer pricing fields from job objects
 // This is the SINGLE SOURCE OF TRUTH for driver-safe job serialization
 // All non-admin endpoints MUST use this to prevent price leakage
@@ -3770,7 +3786,15 @@ export async function registerRoutes(
         error: "Driver price is required. Please specify the amount the driver will be paid for this job." 
       });
     }
-    const finalDriverPrice = String(driverPrice);
+    // Enforce minimum driver price per vehicle type
+    const jobVehicleType = previousJob?.vehicleType || 'car';
+    const minPrice = getMinDriverPrice(jobVehicleType);
+    const requestedPrice = parseFloat(driverPrice);
+    const enforcedPrice = Math.max(requestedPrice, minPrice);
+    if (enforcedPrice !== requestedPrice) {
+      console.log(`[Jobs] Driver price £${requestedPrice} below minimum £${minPrice} for ${jobVehicleType} — raised to £${enforcedPrice}`);
+    }
+    const finalDriverPrice = String(enforcedPrice.toFixed(2));
     
     const job = await storage.assignDriver(req.params.id, actualDriverId, dispatcherId);
     if (!job) {
@@ -12546,13 +12570,22 @@ export async function registerRoutes(
       }
     }
 
+    // Enforce minimum driver price per vehicle type
+    const assignMinPrice = getMinDriverPrice(job.vehicleType);
+    const assignRequestedPrice = parseFloat(String(driverPrice));
+    const assignEnforcedPrice = Math.max(assignRequestedPrice, assignMinPrice);
+    const enforcedDriverPrice = assignEnforcedPrice.toFixed(2);
+    if (assignEnforcedPrice !== assignRequestedPrice) {
+      console.log(`[Job Assignment] Driver price £${assignRequestedPrice} below minimum £${assignMinPrice} for ${job.vehicleType} — raised to £${assignEnforcedPrice}`);
+    }
+
     // Create the assignment
-    console.log(`[Job Assignment] Creating assignment: jobId=${jobId}, driverId=${driverId}, price=${driverPrice}`);
+    console.log(`[Job Assignment] Creating assignment: jobId=${jobId}, driverId=${driverId}, price=${enforcedDriverPrice}`);
     const assignment = await storage.createJobAssignment({
       jobId,
       driverId,
       assignedBy,
-      driverPrice,
+      driverPrice: enforcedDriverPrice,
       status: "sent",
       sentAt: new Date(),
       expiresAt: expiresAt ? new Date(expiresAt) : null,
@@ -12759,12 +12792,21 @@ export async function registerRoutes(
         continue;
       }
 
+      // Enforce minimum driver price per vehicle type for this job
+      const batchMinPrice = getMinDriverPrice(job.vehicleType);
+      const batchRequestedPrice = parseFloat(String(driverPrice));
+      const batchEnforcedPrice = Math.max(batchRequestedPrice, batchMinPrice);
+      const batchFinalPrice = batchEnforcedPrice.toFixed(2);
+      if (batchEnforcedPrice !== batchRequestedPrice) {
+        console.log(`[BatchAssign] Job ${jobId} (${job.vehicleType}): price raised from £${batchRequestedPrice} to minimum £${batchEnforcedPrice}`);
+      }
+
       // Create the assignment
       const assignment = await storage.createJobAssignment({
         jobId,
         driverId,
         assignedBy,
-        driverPrice,
+        driverPrice: batchFinalPrice,
         status: "sent",
         sentAt: new Date(),
         expiresAt: expiresAt ? new Date(expiresAt) : null,
@@ -12775,7 +12817,7 @@ export async function registerRoutes(
       await storage.updateJob(jobId, {
         status: "assigned" as any,
         driverId: driverId,
-        driverPrice: driverPrice
+        driverPrice: batchFinalPrice
       });
 
       // Tag office_city if assigned by a supervisor and job not already tagged

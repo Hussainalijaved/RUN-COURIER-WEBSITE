@@ -121,6 +121,22 @@ const JOB_STATUSES: { value: JobStatus; label: string }[] = [
   { value: 'failed', label: 'Failed' },
 ];
 
+// Minimum driver payment per vehicle type — must match server/routes.ts getMinDriverPrice
+const DRIVER_MIN_PRICES: Record<string, number> = {
+  motorbike: 5,
+  car: 12,
+  small_van: 15,
+  medium_van: 17,
+  large_van: 17,
+  luton_van: 17,
+  flatbed: 17,
+};
+
+function getMinDriverPrice(vehicleType: string | null | undefined): number {
+  const vt = String(vehicleType || 'car').toLowerCase().split('|')[0];
+  return DRIVER_MIN_PRICES[vt] ?? 12;
+}
+
 const getStatusBadge = (status: JobStatus) => {
   const statusConfig: Record<JobStatus, { label: string; className: string }> = {
     pending: { label: 'Pending', className: 'bg-yellow-500' },
@@ -2626,7 +2642,14 @@ export default function AdminJobs() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="assign-driver-price">Driver Payment (£)</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="assign-driver-price">Driver Payment (£)</Label>
+                    {jobToAssign && (
+                      <span className="text-xs text-muted-foreground">
+                        Min. for {jobToAssign.vehicleType || 'car'}: <span className="font-semibold text-foreground">£{getMinDriverPrice(jobToAssign.vehicleType)}</span>
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
                     <Input
@@ -2641,9 +2664,15 @@ export default function AdminJobs() {
                       data-testid="input-assign-driver-price"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    This is the amount the driver will receive for completing this job.
-                  </p>
+                  {jobToAssign && assignDriverPrice && parseFloat(assignDriverPrice) < getMinDriverPrice(jobToAssign.vehicleType) ? (
+                    <p className="text-xs text-amber-600 font-medium">
+                      Below minimum — will be raised to £{getMinDriverPrice(jobToAssign.vehicleType).toFixed(2)} on save.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Amount the driver will receive. Minimum applies per vehicle type.
+                    </p>
+                  )}
                 </div>
 
                 {selectedDriverForAssign && assignDriverPrice && (
@@ -3165,7 +3194,14 @@ export default function AdminJobs() {
                       <p className="text-xs text-muted-foreground">Delivery charge before waiting time</p>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="edit-driver-price">Driver Payment (£)</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="edit-driver-price">Driver Payment (£)</Label>
+                        {jobToEdit && (
+                          <span className="text-xs text-muted-foreground">
+                            Min: <span className="font-semibold text-foreground">£{getMinDriverPrice(jobToEdit.vehicleType)}</span>
+                          </span>
+                        )}
+                      </div>
                       <Input
                         id="edit-driver-price"
                         type="number"
@@ -3176,7 +3212,13 @@ export default function AdminJobs() {
                         placeholder="Optional"
                         data-testid="input-edit-driver-price"
                       />
-                      <p className="text-xs text-muted-foreground">Amount driver receives</p>
+                      {jobToEdit && editDriverPrice && parseFloat(editDriverPrice) > 0 && parseFloat(editDriverPrice) < getMinDriverPrice(jobToEdit.vehicleType) ? (
+                        <p className="text-xs text-amber-600 font-medium">
+                          Below minimum of £{getMinDriverPrice(jobToEdit.vehicleType).toFixed(2)} for {jobToEdit.vehicleType || 'car'}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Amount driver receives</p>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 pt-3 border-t">
@@ -3461,7 +3503,7 @@ export default function AdminJobs() {
                   data-testid="input-batch-driver-price"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Total: £{((parseFloat(batchDriverPrice) || 0) * selectedJobIds.size).toFixed(2)} for {selectedJobIds.size} job{selectedJobIds.size > 1 ? 's' : ''}
+                  Total: £{((parseFloat(batchDriverPrice) || 0) * selectedJobIds.size).toFixed(2)} for {selectedJobIds.size} job{selectedJobIds.size > 1 ? 's' : ''} · Minimums: motorbike £5, car £12, small van £15, medium van £17
                 </p>
               </div>
             </div>
