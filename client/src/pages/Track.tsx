@@ -384,16 +384,26 @@ export default function Track() {
                           Multi-Drop Route ({job.multiDropStops.length + 1} stops)
                         </p>
                         <div className="space-y-2">
-                          {/* Pickup — first point */}
-                          <div className="flex items-start gap-2 text-sm">
-                            <span className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
-                              P
-                            </span>
-                            <div>
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 block leading-tight">Pickup</span>
-                              <span className="text-foreground">{job.pickupAddress}</span>
-                            </div>
-                          </div>
+                          {/* Pickup — first point, marked Done once parcel is collected */}
+                          {(() => {
+                            const pickupDone = ['collected', 'picked_up', 'on_the_way_delivery', 'on_the_way', 'delivered'].includes(job.status);
+                            return (
+                              <div className="flex items-start gap-2 text-sm">
+                                <span className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${pickupDone ? 'bg-green-600' : 'bg-blue-600'}`}>
+                                  P
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-[10px] font-semibold uppercase tracking-wide block leading-tight ${pickupDone ? 'text-green-600' : 'text-blue-600'}`}>Pickup</span>
+                                    {pickupDone && (
+                                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">Done</span>
+                                    )}
+                                  </div>
+                                  <span className={pickupDone ? 'line-through text-muted-foreground' : 'text-foreground'}>{job.pickupAddress}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
                           {/* Delivery stops */}
                           {job.multiDropStops.map((stop) => (
                             <div key={stop.stopOrder} className="flex items-start gap-2 text-sm">

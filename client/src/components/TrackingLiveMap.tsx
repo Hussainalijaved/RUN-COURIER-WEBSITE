@@ -333,18 +333,21 @@ export function TrackingLiveMap({ trackingNumber, jobStatus, pickupAddress }: Tr
             Route · {deliveredCount}/{stops.length} stops done
           </p>
           <div className="space-y-1.5">
-            {/* Pickup — always first */}
-            {pickupAddress && (
-              <div className="flex items-center gap-2.5 text-sm">
-                <span className="flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-green-600">
-                  P
-                </span>
-                <span className="flex-1 truncate text-foreground">{pickupAddress}</span>
-                <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">
-                  Pickup
-                </span>
-              </div>
-            )}
+            {/* Pickup — always first, marked Done once parcel is collected */}
+            {pickupAddress && (() => {
+              const pickupDone = liveData ? ['collected', 'picked_up', 'on_the_way_delivery', 'on_the_way', 'delivered'].includes(liveData.status) : false;
+              return (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <span className={`flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${pickupDone ? 'bg-green-600' : 'bg-blue-600'}`}>
+                    P
+                  </span>
+                  <span className={`flex-1 truncate ${pickupDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{pickupAddress}</span>
+                  <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${pickupDone ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {pickupDone ? 'Done' : 'Pickup'}
+                  </span>
+                </div>
+              );
+            })()}
             {stops.map((stop, idx) => (
               <div key={stop.stopOrder} className="flex items-center gap-2.5 text-sm">
                 <span
