@@ -76,6 +76,7 @@ import {
   Smartphone,
   PoundSterling,
   FileText,
+  Pencil,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -120,6 +121,21 @@ const JOB_STATUSES: { value: JobStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'failed', label: 'Failed' },
 ];
+
+const DRIVER_MIN_PRICES: Record<string, number> = {
+  motorbike: 5,
+  car: 12,
+  small_van: 15,
+  medium_van: 17,
+  large_van: 17,
+  luton_van: 17,
+  flatbed: 17,
+};
+
+function getMinDriverPrice(vehicleType: string | null | undefined): number {
+  const vt = String(vehicleType || 'car').toLowerCase().split('|')[0];
+  return DRIVER_MIN_PRICES[vt] ?? 12;
+}
 
 const getStatusBadge = (status: JobStatus) => {
   const statusConfig: Record<JobStatus, { label: string; className: string }> = {
@@ -533,6 +549,8 @@ export default function SupervisorJobs() {
   const [jobToCancel, setJobToCancel] = useState<Job | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
+  const [editingDriverPrice, setEditingDriverPrice] = useState(false);
+  const [driverPriceDraft, setDriverPriceDraft] = useState('');
 
   const { data: notesData } = useQuery<{ adminNotes: string | null }>({
     queryKey: ['/api/jobs', selectedJob?.id, 'admin-notes'],
@@ -609,6 +627,12 @@ export default function SupervisorJobs() {
     
     prevJobCountRef.current = currentCount;
   }, [jobs, playAlert, toast]);
+
+  // Reset inline price editor when switching between jobs
+  useEffect(() => {
+    setEditingDriverPrice(false);
+    setDriverPriceDraft('');
+  }, [selectedJob?.id]);
 
   // Fetch drivers from local storage (for vehicle info)
   const { data: drivers } = useQuery<Driver[]>({
@@ -866,6 +890,20 @@ export default function SupervisorJobs() {
     },
     onError: () => {
       toast({ title: 'Failed to update job', variant: 'destructive' });
+    },
+  });
+
+  const updateDriverPriceMutation = useMutation({
+    mutationFn: async ({ jobId, driverPrice }: { jobId: string; driverPrice: string }) => {
+      return apiRequest('PATCH', `/api/jobs/${jobId}/driver-price`, { driverPrice });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: 'Driver price updated', description: 'Push notification sent to driver.' });
+      setEditingDriverPrice(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to update driver price', variant: 'destructive' });
     },
   });
 
@@ -1920,7 +1958,13 @@ export default function SupervisorJobs() {
                             </DropdownMenuItem>
                             {!job.driverId && job.status === 'pending' && (
                               <DropdownMenuItem 
-                                onClick={() => { setJobToAssign(job); setAssignDriverPrice(''); setAssignDialogOpen(true); }}
+                                onClick={() => {
+                                  const dist = parseFloat(String(job.distance || '0'));
+                                  const auto = Math.max(dist > 0 ? dist * 1.00 : 0, getMinDriverPrice(job.vehicleType));
+                                  setJobToAssign(job);
+                                  setAssignDriverPrice(auto.toFixed(2));
+                                  setAssignDialogOpen(true);
+                                }}
                                 data-testid={`menu-assign-${job.id}`}
                               >
                                 <UserPlus className="mr-2 h-4 w-4" />
@@ -1929,7 +1973,13 @@ export default function SupervisorJobs() {
                             )}
                             {job.driverId && job.status !== 'delivered' && job.status !== 'cancelled' && (
                               <DropdownMenuItem 
-                                onClick={() => { setJobToAssign(job); setAssignDriverPrice(job.driverPrice?.toString() || ''); setAssignDialogOpen(true); }}
+                                onClick={() => {
+                                  const dist = parseFloat(String(job.distance || '0'));
+                                  const auto = Math.max(dist > 0 ? dist * 1.00 : 0, getMinDriverPrice(job.vehicleType));
+                                  setJobToAssign(job);
+                                  setAssignDriverPrice(auto.toFixed(2));
+                                  setAssignDialogOpen(true);
+                                }}
                                 data-testid={`menu-reassign-${job.id}`}
                               >
                                 <UserPlus className="mr-2 h-4 w-4" />
@@ -2226,7 +2276,7 @@ export default function SupervisorJobs() {
                 )}
                 {selectedJob.driverPrice && (
                   <div className="p-3 bg-muted/50 rounded-md space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
                       <p className="text-sm text-muted-foreground">Driver Payment</p>
                       <Badge 
                         variant="default"
@@ -2240,7 +2290,62 @@ export default function SupervisorJobs() {
                         {selectedJob.driverPaymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
                       </Badge>
                     </div>
-                    <p className="font-semibold text-lg text-green-600">{formatPrice(selectedJob.driverPrice)}</p>
+                    {editingDriverPrice ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">£</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="w-full pl-6 pr-2 py-1.5 border rounded-md text-sm bg-background"
+                              value={driverPriceDraft}
+                              onChange={e => setDriverPriceDraft(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') updateDriverPriceMutation.mutate({ jobId: selectedJob.id, driverPrice: driverPriceDraft });
+                                if (e.key === 'Escape') setEditingDriverPrice(false);
+                              }}
+                              autoFocus
+                              data-testid="input-driver-price-edit"
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => updateDriverPriceMutation.mutate({ jobId: selectedJob.id, driverPrice: driverPriceDraft })}
+                            disabled={updateDriverPriceMutation.isPending || !driverPriceDraft}
+                            data-testid="button-save-driver-price"
+                          >
+                            {updateDriverPriceMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingDriverPrice(false)} data-testid="button-cancel-driver-price">
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Min. for {selectedJob.vehicleType || 'car'}: <span className="font-semibold">£{getMinDriverPrice(selectedJob.vehicleType).toFixed(2)}</span>
+                          {selectedJob.distance ? ` · Auto (£1/mile): £${(parseFloat(String(selectedJob.distance)) * 1.00).toFixed(2)}` : ''}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-lg text-green-600">{formatPrice(selectedJob.driverPrice)}</p>
+                        {selectedJob.driverPaymentStatus !== 'paid' && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setDriverPriceDraft(selectedJob.driverPrice?.toString() || '');
+                              setEditingDriverPrice(true);
+                            }}
+                            data-testid="button-edit-driver-price"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     {selectedJob.driverPaymentStatus === 'paid' && selectedJob.driverPaidAt && (
                       <p className="text-xs text-muted-foreground">
                         Paid on {new Date(selectedJob.driverPaidAt).toLocaleDateString('en-GB', { 
@@ -2619,9 +2724,17 @@ export default function SupervisorJobs() {
                       data-testid="input-assign-driver-price"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    This is the amount the driver will receive for completing this job.
-                  </p>
+                  {jobToAssign && assignDriverPrice && parseFloat(assignDriverPrice) < getMinDriverPrice(jobToAssign.vehicleType) ? (
+                    <p className="text-xs text-amber-600 font-medium">
+                      Below minimum — will be raised to £{getMinDriverPrice(jobToAssign.vehicleType).toFixed(2)} on save.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Auto-calculated at £1.00/mile
+                      {jobToAssign?.distance ? ` (${jobToAssign.distance} miles)` : ''}
+                      . Edit as needed — minimum applies per vehicle type.
+                    </p>
+                  )}
                 </div>
 
                 {selectedDriverForAssign && assignDriverPrice && (

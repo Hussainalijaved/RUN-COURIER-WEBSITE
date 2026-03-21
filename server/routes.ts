@@ -89,7 +89,7 @@ async function getMustChangePassword(userId: string): Promise<boolean> {
     return false;
   }
 }
-import { sendJobOfferNotification, sendJobWithdrawalNotification } from "./pushNotifications";
+import { sendJobOfferNotification, sendJobWithdrawalNotification, sendPriceUpdateNotification } from "./pushNotifications";
 import { isAdminByEmail, supabaseAdmin, verifyAccessToken } from "./supabaseAdmin";
 import { cache, CACHE_TTL } from "./cache";
 
@@ -3620,6 +3620,90 @@ export async function registerRoutes(
     
     const updatedJob = await storage.updateJob(req.params.id, updates);
     console.log(`[Jobs] Driver payment status updated for job ${req.params.id}: ${driverPaymentStatus}`);
+    res.json(ensureJobNumber(updatedJob));
+  }));
+
+  // Update driver price for a job (admin/supervisor only) — updates jobs + active assignment + sends push notification
+  app.patch("/api/jobs/:id/driver-price", requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const jobId = req.params.id;
+    const { driverPrice } = req.body;
+
+    if (driverPrice === undefined || driverPrice === null || driverPrice === '') {
+      return res.status(400).json({ error: "driverPrice is required" });
+    }
+
+    const requestedPrice = parseFloat(String(driverPrice));
+    if (isNaN(requestedPrice) || requestedPrice < 0) {
+      return res.status(400).json({ error: "Invalid driver price" });
+    }
+
+    const job = await storage.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    // Enforce minimum based on vehicle type
+    const minPrice = getMinDriverPrice(job.vehicleType);
+    const enforcedPrice = Math.max(requestedPrice, minPrice);
+    const finalPrice = enforcedPrice.toFixed(2);
+
+    // 1. Update the job's driver_price
+    const updatedJob = await storage.updateJob(jobId, { driverPrice: finalPrice });
+
+    // 2. Update active job_assignments record
+    try {
+      const { supabaseAdmin: sa } = await import('./supabaseAdmin');
+      if (sa) {
+        await sa
+          .from('job_assignments')
+          .update({ driver_price: finalPrice })
+          .eq('job_id', jobId)
+          .eq('status', 'sent')
+          .then();
+        // Also update accepted assignments
+        await sa
+          .from('job_assignments')
+          .update({ driver_price: finalPrice })
+          .eq('job_id', jobId)
+          .eq('status', 'accepted')
+          .then();
+      }
+    } catch (err: any) {
+      console.error('[DriverPrice] Failed to update job_assignments:', err.message);
+    }
+
+    // 3. Send push notification to driver if assigned
+    if (job.driverId) {
+      (async () => {
+        try {
+          const result = await sendPriceUpdateNotification(job.driverId!, {
+            jobId,
+            trackingNumber: job.trackingNumber || '',
+            jobNumber: job.jobNumber,
+            newPrice: finalPrice,
+            pickupPostcode: job.pickupPostcode,
+            deliveryPostcode: job.deliveryPostcode,
+          });
+          if (result.success) {
+            console.log(`[DriverPrice] Push notification sent to driver ${job.driverId} — new price £${finalPrice}`);
+          } else {
+            console.log(`[DriverPrice] No push devices for driver ${job.driverId}`);
+          }
+        } catch (err: any) {
+          console.error('[DriverPrice] Failed to send push notification:', err.message);
+        }
+      })();
+    }
+
+    // 4. Broadcast WebSocket update
+    try {
+      const { broadcastJobUpdate } = await import('./realtime');
+      broadcastJobUpdate(jobId, { driverPrice: finalPrice });
+    } catch (err: any) {
+      console.error('[DriverPrice] WebSocket broadcast failed:', err.message);
+    }
+
+    console.log(`[DriverPrice] Job ${jobId} driver price updated: £${finalPrice} (requested £${requestedPrice}, min £${minPrice})`);
     res.json(ensureJobNumber(updatedJob));
   }));
 

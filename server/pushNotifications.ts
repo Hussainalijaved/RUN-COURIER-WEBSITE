@@ -298,6 +298,51 @@ export async function sendJobOfferNotification(
   return { success: successCount > 0, sentCount: successCount };
 }
 
+export async function sendPriceUpdateNotification(
+  driverId: string,
+  jobDetails: {
+    jobId: string;
+    trackingNumber: string;
+    jobNumber?: string | null;
+    newPrice: string;
+    pickupPostcode?: string;
+    deliveryPostcode?: string;
+  }
+): Promise<{ success: boolean; sentCount: number }> {
+  const devices = await getDriverDevices(driverId);
+
+  if (devices.length === 0) {
+    log(`No registered devices for driver ${driverId} - cannot send price update notification`, "push");
+    return { success: false, sentCount: 0 };
+  }
+
+  const priceText = `£${parseFloat(jobDetails.newPrice).toFixed(2)}`;
+  const jobRef = jobDetails.jobNumber || jobDetails.trackingNumber;
+
+  const messages: ExpoPushMessage[] = devices.map(device => ({
+    to: device.push_token,
+    sound: "default",
+    title: "Driver Payment Updated",
+    body: `Job ${jobRef}: your payment has been updated to ${priceText}`,
+    data: {
+      type: "price_update",
+      jobId: jobDetails.jobId,
+      trackingNumber: jobDetails.trackingNumber,
+      jobNumber: jobDetails.jobNumber || null,
+      newPrice: jobDetails.newPrice,
+      screen: "JobOffers",
+    },
+    priority: "high",
+    channelId: "job-alerts",
+  }));
+
+  const tickets = await sendExpoPushNotifications(messages);
+  const successCount = tickets.filter(t => t.status === "ok").length;
+
+  log(`Sent price update notification to ${successCount}/${devices.length} devices for driver ${driverId}`, "push");
+  return { success: successCount > 0, sentCount: successCount };
+}
+
 export async function sendJobWithdrawalNotification(
   driverId: string,
   jobDetails: {
