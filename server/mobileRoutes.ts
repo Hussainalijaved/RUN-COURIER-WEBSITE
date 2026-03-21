@@ -3833,14 +3833,13 @@ export function registerMobileRoutes(app: Express): void {
       const { jobId } = req.params;
       const { minutes } = req.body;
 
-      const FREE_MINUTES = 10;
       const CUSTOMER_RATE = 0.50; // £0.50/min charged to customer
       const DRIVER_RATE = 0.20;   // £0.20/min paid to driver
       const MAX_MINUTES = 50;
 
       const totalMinutes = parseInt(String(minutes), 10);
-      if (isNaN(totalMinutes) || totalMinutes < FREE_MINUTES || totalMinutes > MAX_MINUTES) {
-        return res.status(400).json({ error: `Waiting time must be between ${FREE_MINUTES} and ${MAX_MINUTES} minutes` });
+      if (isNaN(totalMinutes) || totalMinutes < 1 || totalMinutes > MAX_MINUTES) {
+        return res.status(400).json({ error: `Waiting time must be between 1 and ${MAX_MINUTES} minutes` });
       }
 
       // Fetch current job to verify ownership and get current prices
@@ -3860,13 +3859,11 @@ export function registerMobileRoutes(app: Express): void {
         return res.status(403).json({ error: 'Not authorized for this job' });
       }
 
-      // Business logic — two separate rates
-      const chargeableMinutes = Math.max(0, totalMinutes - FREE_MINUTES);
-      const newCustomerCharge = parseFloat((chargeableMinutes * CUSTOMER_RATE).toFixed(2));
-      const newDriverWaitPay = parseFloat((chargeableMinutes * DRIVER_RATE).toFixed(2));
+      // Business logic — two separate rates, no free minutes
+      const newCustomerCharge = parseFloat((totalMinutes * CUSTOMER_RATE).toFixed(2));
+      const newDriverWaitPay = parseFloat((totalMinutes * DRIVER_RATE).toFixed(2));
 
       // Replace old waiting pay with new one (idempotent)
-      // Old waiting_time_charge stored the old driver pay (rate was same before), use it to back out
       const oldDriverWaitPay = parseFloat(String(job.waiting_time_charge || 0));
       const currentDriverPrice = parseFloat(String(job.driver_price || 0));
       const newDriverPrice = parseFloat((currentDriverPrice - oldDriverWaitPay + newDriverWaitPay).toFixed(2));
