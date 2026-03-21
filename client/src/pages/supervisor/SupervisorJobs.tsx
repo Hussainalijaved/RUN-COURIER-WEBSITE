@@ -77,6 +77,8 @@ import {
   PoundSterling,
   FileText,
   Pencil,
+  ExternalLink,
+  Radio,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -1948,6 +1950,13 @@ export default function SupervisorJobs() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => window.open(`/track/${job.trackingNumber}`, '_blank')}
+                              data-testid={`menu-track-${job.id}`}
+                            >
+                              <Radio className="mr-2 h-4 w-4 text-green-500" />
+                              Live Tracking
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(job)} data-testid={`menu-edit-${job.id}`}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit Job
@@ -2119,10 +2128,27 @@ export default function SupervisorJobs() {
         <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="flex-shrink-0">
-              <DialogTitle>Job Details - {(selectedJob as any)?.jobNumber || selectedJob?.trackingNumber}</DialogTitle>
-              <DialogDescription>
-                Created on {selectedJob && formatDate(selectedJob.createdAt)}
-              </DialogDescription>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <DialogTitle>Job Details - {(selectedJob as any)?.jobNumber || selectedJob?.trackingNumber}</DialogTitle>
+                  <DialogDescription>
+                    Created on {selectedJob && formatDate(selectedJob.createdAt)}
+                  </DialogDescription>
+                </div>
+                {selectedJob && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    onClick={() => window.open(`/track/${selectedJob.trackingNumber}`, '_blank')}
+                    data-testid="button-live-tracking"
+                  >
+                    <Radio className="h-3.5 w-3.5 text-green-500" />
+                    Live Tracking
+                    <ExternalLink className="h-3 w-3 opacity-60" />
+                  </Button>
+                )}
+              </div>
             </DialogHeader>
             {selectedJob && (
               <div className="space-y-6 overflow-y-auto flex-1 pr-2">
