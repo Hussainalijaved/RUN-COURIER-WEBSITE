@@ -3329,19 +3329,21 @@ export default function SupervisorJobs() {
                           const mins = e.target.value;
                           setEditWaitingTimeMinutes(mins);
                           const FREE_MINUTES = 10;
-                          const RATE_PER_MINUTE = 0.20;
+                          const CUSTOMER_RATE = 0.50;
+                          const DRIVER_RATE = 0.20;
                           const MAX_MINUTES = 50;
                           const m = Math.min(parseFloat(mins) || 0, MAX_MINUTES);
-                          const charge = Math.max(0, m - FREE_MINUTES) * RATE_PER_MINUTE;
-                          const chargeStr = charge > 0 ? charge.toFixed(2) : '';
-                          setEditWaitingTimeCharge(chargeStr);
+                          const chargeableMinutes = Math.max(0, m - FREE_MINUTES);
+                          const customerCharge = chargeableMinutes * CUSTOMER_RATE;
+                          const driverCharge = chargeableMinutes * DRIVER_RATE;
+                          setEditWaitingTimeCharge(customerCharge > 0 ? customerCharge.toFixed(2) : '');
                           const base = parseFloat(editBaseDriverPrice) || 0;
-                          setEditDriverPrice((base + charge).toFixed(2));
+                          setEditDriverPrice((base + driverCharge).toFixed(2));
                         }}
                         placeholder="0"
                         data-testid="input-edit-waiting-time-minutes"
                       />
-                      <p className="text-xs text-muted-foreground">First 10 min free, then £0.20/min (max 50 min)</p>
+                      <p className="text-xs text-muted-foreground">First 10 min free · Customer: £0.50/min · Driver: £0.20/min</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-waiting-time-charge">Waiting Time Charge (£)</Label>

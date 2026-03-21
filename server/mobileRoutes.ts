@@ -3834,7 +3834,8 @@ export function registerMobileRoutes(app: Express): void {
       const { minutes } = req.body;
 
       const FREE_MINUTES = 10;
-      const RATE_PER_MINUTE = 0.20;
+      const CUSTOMER_RATE = 0.50; // £0.50/min charged to customer
+      const DRIVER_RATE = 0.20;   // £0.20/min paid to driver
       const MAX_MINUTES = 50;
 
       const totalMinutes = parseInt(String(minutes), 10);
@@ -3859,20 +3860,22 @@ export function registerMobileRoutes(app: Express): void {
         return res.status(403).json({ error: 'Not authorized for this job' });
       }
 
-      // Business logic
+      // Business logic — two separate rates
       const chargeableMinutes = Math.max(0, totalMinutes - FREE_MINUTES);
-      const newWaitingCharge = parseFloat((chargeableMinutes * RATE_PER_MINUTE).toFixed(2));
+      const newCustomerCharge = parseFloat((chargeableMinutes * CUSTOMER_RATE).toFixed(2));
+      const newDriverWaitPay = parseFloat((chargeableMinutes * DRIVER_RATE).toFixed(2));
 
-      // Replace old waiting charge with new one (idempotent)
-      const oldWaitingCharge = parseFloat(String(job.waiting_time_charge || 0));
+      // Replace old waiting pay with new one (idempotent)
+      // Old waiting_time_charge stored the old driver pay (rate was same before), use it to back out
+      const oldDriverWaitPay = parseFloat(String(job.waiting_time_charge || 0));
       const currentDriverPrice = parseFloat(String(job.driver_price || 0));
-      const newDriverPrice = parseFloat((currentDriverPrice - oldWaitingCharge + newWaitingCharge).toFixed(2));
+      const newDriverPrice = parseFloat((currentDriverPrice - oldDriverWaitPay + newDriverWaitPay).toFixed(2));
 
-      // Update waiting_time_charge and driver_price (both in PostgREST schema cache)
+      // Update waiting_time_charge (customer-facing) and driver_price
       const { error: updateError } = await supabaseAdmin!
         .from('jobs')
         .update({
-          waiting_time_charge: String(newWaitingCharge),
+          waiting_time_charge: String(newCustomerCharge),
           driver_price: String(newDriverPrice),
           updated_at: new Date().toISOString(),
         })
@@ -3892,12 +3895,13 @@ export function registerMobileRoutes(app: Express): void {
         console.warn('[WaitingTime] Could not update waiting_time_minutes (non-critical):', sqlErr);
       }
 
-      console.log(`[WaitingTime] Job ${jobId}: ${totalMinutes} min, charge £${newWaitingCharge}, new driver_price £${newDriverPrice}`);
+      console.log(`[WaitingTime] Job ${jobId}: ${totalMinutes} min, customer charge £${newCustomerCharge}, driver pay +£${newDriverWaitPay}, new driver_price £${newDriverPrice}`);
 
       res.json({
         success: true,
         waitingTimeMinutes: totalMinutes,
-        waitingTimeCharge: newWaitingCharge,
+        waitingTimeCharge: newCustomerCharge,
+        driverWaitPay: newDriverWaitPay,
         chargeableMinutes,
         driverPrice: newDriverPrice,
       });
