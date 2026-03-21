@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Platform, Pressable, Text, ActivityIndicator } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useTheme } from '@/hooks/useTheme';
@@ -367,6 +367,19 @@ export function DriverJobMap({
   );
 }
 
+// Minimal map style for Google Maps (Android) — hides POIs, transit, and visual clutter
+// while keeping road names for navigation context
+const CLEAN_MAP_STYLE = [
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'simplified', lightness: 60 }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road.local', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.neighborhood', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+  { featureType: 'landscape.man_made', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+];
+
 function NativeMapWithRoute({
   pickupLat,
   pickupLng,
@@ -398,64 +411,75 @@ function NativeMapWithRoute({
   const { Marker, Polyline, PROVIDER_GOOGLE } = require('react-native-maps');
   const mapRef = useRef<any>(null);
 
-  useEffect(() => {
-    if (mapRef.current && hasPickup && hasDropoff) {
-      const coordinates = [
-        { latitude: pickupLat!, longitude: pickupLng! },
-        { latitude: dropoffLat!, longitude: dropoffLng! },
-      ];
-      
-      setTimeout(() => {
-        mapRef.current?.fitToCoordinates(coordinates, {
-          edgePadding: { top: 80, right: 60, bottom: 200, left: 60 },
-          animated: true,
-        });
-      }, 300);
-    }
-  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, routePoints]);
+  // Fit the camera to all visible trip points (pickup, dropoff, driver)
+  const fitToTrip = useCallback((animated = true) => {
+    if (!mapRef.current) return;
+    const coordinates: Array<{ latitude: number; longitude: number }> = [];
+    if (hasPickup) coordinates.push({ latitude: pickupLat!, longitude: pickupLng! });
+    if (hasDropoff) coordinates.push({ latitude: dropoffLat!, longitude: dropoffLng! });
+    if (hasDriver) coordinates.push({ latitude: driverLat!, longitude: driverLng! });
+    if (coordinates.length === 0) return;
 
-  const initialRegion = hasPickup 
-    ? {
-        latitude: pickupLat!,
-        longitude: pickupLng!,
-        latitudeDelta: 0.1,
-        longitudeDelta: 0.1,
-      }
-    : hasDropoff 
-    ? {
-        latitude: dropoffLat!,
-        longitude: dropoffLng!,
-        latitudeDelta: 0.1,
-        longitudeDelta: 0.1,
-      }
-    : {
-        latitude: 51.5074,
-        longitude: -0.1278,
-        latitudeDelta: 0.1,
-        longitudeDelta: 0.1,
-      };
+    if (coordinates.length === 1) {
+      mapRef.current?.animateToRegion({
+        latitude: coordinates[0].latitude,
+        longitude: coordinates[0].longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 400);
+    } else {
+      mapRef.current?.fitToCoordinates(coordinates, {
+        edgePadding: { top: 80, right: 60, bottom: 210, left: 60 },
+        animated,
+      });
+    }
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, hasPickup, hasDropoff, hasDriver]);
+
+  // Re-fit when key coordinates or route load
+  useEffect(() => {
+    const timer = setTimeout(() => fitToTrip(true), 350);
+    return () => clearTimeout(timer);
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, routePoints]);
+
+  const initialRegion = hasPickup
+    ? { latitude: pickupLat!, longitude: pickupLng!, latitudeDelta: 0.08, longitudeDelta: 0.08 }
+    : hasDropoff
+    ? { latitude: dropoffLat!, longitude: dropoffLng!, latitudeDelta: 0.08, longitudeDelta: 0.08 }
+    : { latitude: 51.5074, longitude: -0.1278, latitudeDelta: 0.08, longitudeDelta: 0.08 };
+
+  const isIOS = Platform.OS === 'ios';
+  const isAndroid = Platform.OS === 'android';
 
   return (
     <View style={styles.mapWrapper}>
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        provider={isAndroid ? PROVIDER_GOOGLE : undefined}
         initialRegion={initialRegion}
-        showsUserLocation={true}
+        // Clean appearance: muted style on iOS, custom style on Android
+        mapType={isIOS ? 'mutedStandard' : 'standard'}
+        customMapStyle={isAndroid ? CLEAN_MAP_STYLE : undefined}
+        // Hide all UI clutter
+        showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}
         showsScale={false}
         showsBuildings={false}
         showsTraffic={false}
         showsIndoors={false}
+        showsPointsOfInterest={false}
         toolbarEnabled={false}
+        moveOnMarkerPress={false}
+        // Bottom padding so info overlay doesn't overlap route
         mapPadding={{ top: 0, right: 0, bottom: 180, left: 0 }}
       >
+        {/* Pickup marker — green */}
         {hasPickup ? (
           <Marker
             coordinate={{ latitude: pickupLat!, longitude: pickupLng! }}
             anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
           >
             <View style={styles.customMarker}>
               <View style={[styles.markerPin, { backgroundColor: '#4CAF50' }]}>
@@ -465,11 +489,13 @@ function NativeMapWithRoute({
             </View>
           </Marker>
         ) : null}
-        
+
+        {/* Dropoff marker — red */}
         {hasDropoff ? (
           <Marker
             coordinate={{ latitude: dropoffLat!, longitude: dropoffLng! }}
             anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
           >
             <View style={styles.customMarker}>
               <View style={[styles.markerPin, { backgroundColor: '#F44336' }]}>
@@ -480,10 +506,12 @@ function NativeMapWithRoute({
           </Marker>
         ) : null}
 
+        {/* Driver marker — blue */}
         {hasDriver ? (
           <Marker
             coordinate={{ latitude: driverLat!, longitude: driverLng! }}
             anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
           >
             <View style={styles.driverMarker}>
               <View style={[styles.driverMarkerInner, { backgroundColor: '#2196F3' }]}>
@@ -493,12 +521,15 @@ function NativeMapWithRoute({
           </Marker>
         ) : null}
 
+        {/* Route polyline */}
         {routePoints && routePoints.length > 0 ? (
           <Polyline
             coordinates={routePoints}
-            strokeColor="#2196F3"
-            strokeWidth={4}
+            strokeColor="#2563EB"
+            strokeWidth={5}
             lineDashPattern={[0]}
+            lineJoin="round"
+            lineCap="round"
           />
         ) : null}
       </MapView>
