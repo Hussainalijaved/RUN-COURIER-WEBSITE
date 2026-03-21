@@ -112,6 +112,14 @@ export function ActiveJobScreen({ navigation }: any) {
   const [isTrackingEnabled, setIsTrackingEnabled] = useState(false);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
 
+  // Waiting time state
+  const [arrivedPickupTime, setArrivedPickupTime] = useState<number | null>(null);
+  const [waitingTimerSeconds, setWaitingTimerSeconds] = useState(0);
+  const [showWaitingTimeModal, setShowWaitingTimeModal] = useState(false);
+  const [waitingMinutesInput, setWaitingMinutesInput] = useState('');
+  const [submittingWaitingTime, setSubmittingWaitingTime] = useState(false);
+  const [waitingTimeLogged, setWaitingTimeLogged] = useState(false);
+
   // CRITICAL: Use both driver.id AND user.id to catch jobs assigned with either ID
   const driverRecordId = driver?.id;
   const authUserId = user?.id;
@@ -142,6 +150,34 @@ export function ActiveJobScreen({ navigation }: any) {
       setDeliveryBarcode(null);
     }
   }, [activeJob?.id]);
+
+  // Restore arrivedPickupTime from AsyncStorage when job loads or status changes
+  useEffect(() => {
+    const restoreArrivedTime = async () => {
+      if (activeJob?.status === 'arrived_pickup') {
+        try {
+          const stored = await AsyncStorage.getItem(`arrivedPickupTime_${activeJob.id}`);
+          if (stored) {
+            setArrivedPickupTime(parseInt(stored, 10));
+          }
+        } catch (e) {}
+      } else {
+        setArrivedPickupTime(null);
+        setWaitingTimerSeconds(0);
+      }
+    };
+    restoreArrivedTime();
+  }, [activeJob?.id, activeJob?.status]);
+
+  // 1-second countdown timer when waiting at pickup
+  useEffect(() => {
+    if (!arrivedPickupTime || activeJob?.status !== 'arrived_pickup') return;
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - arrivedPickupTime) / 1000);
+      setWaitingTimerSeconds(elapsed);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [arrivedPickupTime, activeJob?.status]);
 
   // FREEZE PREVENTION: Fetch request counter to ignore late-arriving results
   const fetchRequestIdRef = useRef(0);
@@ -672,6 +708,19 @@ export function ActiveJobScreen({ navigation }: any) {
         .eq('id', activeJob.id);
 
       if (error) throw error;
+
+      // Waiting time: save arrived time when arriving at pickup, clear when leaving
+      if (newStatus === 'arrived_pickup') {
+        const arrivedTime = Date.now();
+        setArrivedPickupTime(arrivedTime);
+        setWaitingTimerSeconds(0);
+        setWaitingTimeLogged(false);
+        AsyncStorage.setItem(`arrivedPickupTime_${activeJob.id}`, String(arrivedTime)).catch(() => {});
+      } else if (newStatus === 'picked_up' || newStatus === 'on_the_way') {
+        setArrivedPickupTime(null);
+        setWaitingTimerSeconds(0);
+        AsyncStorage.removeItem(`arrivedPickupTime_${activeJob.id}`).catch(() => {});
+      }
       
       // Sync status to customer booking for real-time tracking
       await syncToCustomerBooking(activeJob.id, newStatus);
@@ -1156,6 +1205,50 @@ export function ActiveJobScreen({ navigation }: any) {
         .eq('id', activeJob.id);
     } catch (error) {
       console.error('Error saving barcode:', error);
+    }
+  };
+
+  const formatWaitingTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const submitWaitingTime = async () => {
+    if (!activeJob) return;
+    const minutes = parseInt(waitingMinutesInput, 10);
+    if (isNaN(minutes) || minutes < 10 || minutes > 50) {
+      Alert.alert('Invalid Time', 'Please enter a waiting time between 10 and 50 minutes.');
+      return;
+    }
+    setSubmittingWaitingTime(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/mobile/v1/driver/jobs/${activeJob.id}/waiting-time`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ minutes }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to log waiting time');
+      const chargeableMinutes = Math.max(0, minutes - 10);
+      const charge = chargeableMinutes * 0.20;
+      setShowWaitingTimeModal(false);
+      setWaitingTimeLogged(true);
+      Alert.alert(
+        'Waiting Time Saved',
+        charge > 0
+          ? `${minutes} minutes recorded.\n£${charge.toFixed(2)} added to your earnings.`
+          : `${minutes} minutes recorded.\nNo charge (within free period).`
+      );
+      fetchActiveJob();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to log waiting time. Please try again.');
+    } finally {
+      setSubmittingWaitingTime(false);
     }
   };
 
@@ -1716,6 +1809,54 @@ export function ActiveJobScreen({ navigation }: any) {
             ) : null}
           </ThemedView>
 
+          {/* Waiting Time Card — shown only when driver is at pickup */}
+          {activeJob.status === 'arrived_pickup' ? (
+            <ThemedView style={[styles.card, { marginTop: Spacing.sm, borderWidth: 1, borderColor: '#F59E0B' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.xs }}>
+                <ThemedText style={[styles.sectionTitle, { color: '#F59E0B' }]}>Waiting Timer</ThemedText>
+                {waitingTimeLogged ? (
+                  <View style={{ backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}>
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Logged</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Big timer display */}
+              <View style={{ alignItems: 'center', paddingVertical: Spacing.sm }}>
+                <Text style={{ fontSize: 42, fontWeight: '700', color: waitingTimerSeconds >= 600 ? '#F59E0B' : theme.text, letterSpacing: 2 }}>
+                  {formatWaitingTimer(waitingTimerSeconds)}
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.secondaryText, marginTop: 4 }}>
+                  {waitingTimerSeconds < 600
+                    ? `Free period — ${formatWaitingTimer(600 - waitingTimerSeconds)} remaining`
+                    : `Chargeable: ${Math.floor((waitingTimerSeconds - 600) / 60)} min × £0.20/min`}
+                </Text>
+              </View>
+
+              <View style={{ backgroundColor: theme.backgroundSecondary, borderRadius: 8, padding: Spacing.xs, marginBottom: Spacing.sm }}>
+                <Text style={{ fontSize: 12, color: theme.secondaryText, textAlign: 'center' }}>
+                  First 10 min free · £0.20/min after · Max 50 min
+                </Text>
+              </View>
+
+              <Button
+                title={waitingTimeLogged ? 'Update Waiting Time' : 'Log Waiting Time'}
+                onPress={() => {
+                  setWaitingMinutesInput('');
+                  setShowWaitingTimeModal(true);
+                }}
+                variant="secondary"
+                disabled={waitingTimerSeconds < 600}
+                style={{ opacity: waitingTimerSeconds < 600 ? 0.5 : 1 }}
+              />
+              {waitingTimerSeconds < 600 ? (
+                <Text style={{ fontSize: 11, color: theme.secondaryText, textAlign: 'center', marginTop: 6 }}>
+                  Available after 10-minute free period
+                </Text>
+              ) : null}
+            </ThemedView>
+          ) : null}
+
           <View style={styles.actionButtonsRow}>
             <Button 
               title={updating ? 'Updating...' : getButtonText()}
@@ -2173,6 +2314,91 @@ export function ActiveJobScreen({ navigation }: any) {
             </View>
           </ThemedView>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Waiting Time Modal */}
+      <Modal
+        visible={showWaitingTimeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowWaitingTimeModal(false)}
+      >
+        <View style={styles.navModalOverlay}>
+          <Pressable style={styles.navModalDismiss} onPress={() => setShowWaitingTimeModal(false)} />
+          <View style={[styles.navModalContent, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={[styles.navModalHeader, { borderBottomColor: theme.border }]}>
+              <ThemedText style={styles.navModalTitle}>Log Waiting Time</ThemedText>
+              <Pressable onPress={() => setShowWaitingTimeModal(false)} style={styles.closeButton}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <View style={{ padding: Spacing.md }}>
+              {/* Timer reference */}
+              <View style={{ backgroundColor: '#FEF3C7', borderRadius: 8, padding: Spacing.sm, marginBottom: Spacing.md }}>
+                <Text style={{ color: '#92400E', fontSize: 13, textAlign: 'center' }}>
+                  Current wait time: {formatWaitingTimer(waitingTimerSeconds)}
+                </Text>
+              </View>
+
+              <ThemedText style={{ fontSize: 14, color: theme.secondaryText, marginBottom: Spacing.xs }}>
+                Total minutes waited at pickup (10–50):
+              </ThemedText>
+              <TextInput
+                value={waitingMinutesInput}
+                onChangeText={setWaitingMinutesInput}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="e.g. 20"
+                placeholderTextColor={theme.secondaryText}
+                style={{
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  borderRadius: 8,
+                  padding: Spacing.sm,
+                  fontSize: 24,
+                  color: theme.text,
+                  textAlign: 'center',
+                  backgroundColor: theme.backgroundSecondary,
+                  marginBottom: Spacing.sm,
+                }}
+              />
+
+              {/* Charge preview */}
+              {waitingMinutesInput ? (() => {
+                const mins = parseInt(waitingMinutesInput, 10);
+                if (!isNaN(mins) && mins >= 10 && mins <= 50) {
+                  const chargeable = Math.max(0, mins - 10);
+                  const charge = chargeable * 0.20;
+                  return (
+                    <View style={{ backgroundColor: theme.backgroundSecondary, borderRadius: 8, padding: Spacing.sm, marginBottom: Spacing.md }}>
+                      <Text style={{ color: theme.secondaryText, fontSize: 13, marginBottom: 4 }}>
+                        {chargeable} chargeable min × £0.20
+                      </Text>
+                      <Text style={{ color: charge > 0 ? '#16A34A' : theme.secondaryText, fontSize: 18, fontWeight: '700' }}>
+                        {charge > 0 ? `+£${charge.toFixed(2)} added to earnings` : 'No charge (within free period)'}
+                      </Text>
+                    </View>
+                  );
+                }
+                return null;
+              })() : null}
+
+              <Button
+                title={submittingWaitingTime ? 'Saving...' : 'Confirm Waiting Time'}
+                onPress={submitWaitingTime}
+                disabled={submittingWaitingTime || !waitingMinutesInput}
+                style={{ marginBottom: Spacing.sm }}
+              />
+              <Button
+                title="Cancel"
+                variant="secondary"
+                onPress={() => setShowWaitingTimeModal(false)}
+                disabled={submittingWaitingTime}
+              />
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <Modal

@@ -2288,6 +2288,28 @@ export default function AdminJobs() {
                     </div>
                   </div>
                 )}
+                {(selectedJob as any).waitingTimeCharge > 0 && (
+                  <div className="p-3 bg-muted/50 rounded-md space-y-1" data-testid="waiting-time-info">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">Waiting Time</p>
+                      <Badge variant="outline" className="text-amber-600 border-amber-400">
+                        Charged
+                      </Badge>
+                    </div>
+                    {(selectedJob as any).waitingTimeMinutes > 0 && (
+                      <p className="text-sm text-foreground">
+                        {(selectedJob as any).waitingTimeMinutes} minutes logged
+                        {' '}
+                        <span className="text-muted-foreground">
+                          (first 10 min free, {Math.max(0, (selectedJob as any).waitingTimeMinutes - 10)} min charged @ £0.20/min)
+                        </span>
+                      </p>
+                    )}
+                    <p className="font-semibold text-amber-600">
+                      +£{parseFloat(String((selectedJob as any).waitingTimeCharge)).toFixed(2)} waiting charge
+                    </p>
+                  </div>
+                )}
                 <div className="flex gap-2 flex-wrap">
                   {getStatusBadge(selectedJob.status)}
                   {selectedJob.driverId && (

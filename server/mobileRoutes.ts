@@ -3822,4 +3822,86 @@ export function registerMobileRoutes(app: Express): void {
     })
   );
 
+  // ============= WAITING TIME =============
+  // POST /api/mobile/v1/driver/jobs/:jobId/waiting-time
+  // Driver logs waiting time at pickup. First 10 min free, then £0.20/min, max 50 min total.
+  app.post("/api/mobile/v1/driver/jobs/:jobId/waiting-time",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { jobId } = req.params;
+      const { minutes } = req.body;
+
+      const FREE_MINUTES = 10;
+      const RATE_PER_MINUTE = 0.20;
+      const MAX_MINUTES = 50;
+
+      const totalMinutes = parseInt(String(minutes), 10);
+      if (isNaN(totalMinutes) || totalMinutes < FREE_MINUTES || totalMinutes > MAX_MINUTES) {
+        return res.status(400).json({ error: `Waiting time must be between ${FREE_MINUTES} and ${MAX_MINUTES} minutes` });
+      }
+
+      // Fetch current job to verify ownership and get current prices
+      const { data: job, error: jobError } = await supabaseAdmin!
+        .from('jobs')
+        .select('id, driver_id, driver_price, waiting_time_charge, status')
+        .eq('id', String(jobId))
+        .single();
+
+      if (jobError || !job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      // Ensure job belongs to this driver
+      const driverIds = [String(driver.id), driver.authUserId ? String(driver.authUserId) : ''].filter(Boolean);
+      if (!driverIds.includes(String(job.driver_id))) {
+        return res.status(403).json({ error: 'Not authorized for this job' });
+      }
+
+      // Business logic
+      const chargeableMinutes = Math.max(0, totalMinutes - FREE_MINUTES);
+      const newWaitingCharge = parseFloat((chargeableMinutes * RATE_PER_MINUTE).toFixed(2));
+
+      // Replace old waiting charge with new one (idempotent)
+      const oldWaitingCharge = parseFloat(String(job.waiting_time_charge || 0));
+      const currentDriverPrice = parseFloat(String(job.driver_price || 0));
+      const newDriverPrice = parseFloat((currentDriverPrice - oldWaitingCharge + newWaitingCharge).toFixed(2));
+
+      // Update waiting_time_charge and driver_price (both in PostgREST schema cache)
+      const { error: updateError } = await supabaseAdmin!
+        .from('jobs')
+        .update({
+          waiting_time_charge: String(newWaitingCharge),
+          driver_price: String(newDriverPrice),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', String(jobId));
+
+      if (updateError) {
+        console.error('[WaitingTime] Failed to update job:', updateError);
+        return res.status(500).json({ error: 'Failed to save waiting time' });
+      }
+
+      // Update waiting_time_minutes via direct SQL (NOT in PostgREST schema cache)
+      try {
+        const { db: directDb } = await import('./db');
+        const { sql: rawSql } = await import('drizzle-orm');
+        await directDb.execute(rawSql`UPDATE jobs SET waiting_time_minutes = ${totalMinutes} WHERE id = ${String(jobId)}`);
+      } catch (sqlErr) {
+        console.warn('[WaitingTime] Could not update waiting_time_minutes (non-critical):', sqlErr);
+      }
+
+      console.log(`[WaitingTime] Job ${jobId}: ${totalMinutes} min, charge £${newWaitingCharge}, new driver_price £${newDriverPrice}`);
+
+      res.json({
+        success: true,
+        waitingTimeMinutes: totalMinutes,
+        waitingTimeCharge: newWaitingCharge,
+        chargeableMinutes,
+        driverPrice: newDriverPrice,
+      });
+    })
+  );
+
 }
