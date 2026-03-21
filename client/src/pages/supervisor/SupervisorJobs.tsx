@@ -509,6 +509,7 @@ export default function SupervisorJobs() {
   const [editDriverPrice, setEditDriverPrice] = useState<string>('');
   const [editWaitingTimeMinutes, setEditWaitingTimeMinutes] = useState<string>('');
   const [editWaitingTimeCharge, setEditWaitingTimeCharge] = useState<string>('');
+  const [editBaseDriverPrice, setEditBaseDriverPrice] = useState<string>('');
   // Extended edit fields
   const [editPickupAddress, setEditPickupAddress] = useState<string>('');
   const [editPickupPostcode, setEditPickupPostcode] = useState<string>('');
@@ -1081,7 +1082,9 @@ export default function SupervisorJobs() {
     const existingWtCharge = (job as any).waitingTimeCharge > 0 ? parseFloat(String((job as any).waitingTimeCharge)) : 0;
     const basePrice = Math.max(0, (job.totalPrice || 0) - existingWtCharge);
     setEditTotalPrice(basePrice.toFixed(2));
+    const baseDriverPrice = Math.max(0, (job.driverPrice || 0) - existingWtCharge);
     setEditDriverPrice(job.driverPrice?.toString() || '');
+    setEditBaseDriverPrice(baseDriverPrice.toFixed(2));
     setEditWaitingTimeMinutes((job as any).waitingTimeMinutes > 0 ? (job as any).waitingTimeMinutes.toString() : '');
     setEditWaitingTimeCharge(existingWtCharge > 0 ? existingWtCharge.toFixed(2) : '');
     // Extended fields
@@ -3320,12 +3323,25 @@ export default function SupervisorJobs() {
                         type="number"
                         step="1"
                         min="0"
+                        max="50"
                         value={editWaitingTimeMinutes}
-                        onChange={(e) => setEditWaitingTimeMinutes(e.target.value)}
+                        onChange={(e) => {
+                          const mins = e.target.value;
+                          setEditWaitingTimeMinutes(mins);
+                          const FREE_MINUTES = 10;
+                          const RATE_PER_MINUTE = 0.20;
+                          const MAX_MINUTES = 50;
+                          const m = Math.min(parseFloat(mins) || 0, MAX_MINUTES);
+                          const charge = Math.max(0, m - FREE_MINUTES) * RATE_PER_MINUTE;
+                          const chargeStr = charge > 0 ? charge.toFixed(2) : '';
+                          setEditWaitingTimeCharge(chargeStr);
+                          const base = parseFloat(editBaseDriverPrice) || 0;
+                          setEditDriverPrice((base + charge).toFixed(2));
+                        }}
                         placeholder="0"
                         data-testid="input-edit-waiting-time-minutes"
                       />
-                      <p className="text-xs text-muted-foreground">Minutes waited at pickup or delivery</p>
+                      <p className="text-xs text-muted-foreground">First 10 min free, then £0.20/min (max 50 min)</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-waiting-time-charge">Waiting Time Charge (£)</Label>
@@ -3335,17 +3351,24 @@ export default function SupervisorJobs() {
                         step="0.01"
                         min="0"
                         value={editWaitingTimeCharge}
-                        onChange={(e) => setEditWaitingTimeCharge(e.target.value)}
+                        readOnly
+                        className="bg-muted cursor-default"
                         placeholder="0.00"
                         data-testid="input-edit-waiting-time-charge"
                       />
-                      <p className="text-xs text-muted-foreground">Added to invoice total automatically</p>
+                      <p className="text-xs text-muted-foreground">Auto-calculated from minutes above</p>
                     </div>
                   </div>
                   {(parseFloat(editWaitingTimeCharge) > 0) && (
-                    <div className="flex items-center justify-between px-3 py-2 rounded-md bg-muted text-sm">
-                      <span className="text-muted-foreground">Total charged to customer</span>
-                      <span className="font-semibold">£{((parseFloat(editTotalPrice) || 0) + (parseFloat(editWaitingTimeCharge) || 0)).toFixed(2)}</span>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between px-3 py-2 rounded-md bg-muted text-sm">
+                        <span className="text-muted-foreground">Total charged to customer</span>
+                        <span className="font-semibold">£{((parseFloat(editTotalPrice) || 0) + (parseFloat(editWaitingTimeCharge) || 0)).toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-3 py-2 rounded-md bg-muted text-sm">
+                        <span className="text-muted-foreground">Driver pay (incl. waiting)</span>
+                        <span className="font-semibold text-green-600">£{(parseFloat(editDriverPrice) || 0).toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
                 </div>
