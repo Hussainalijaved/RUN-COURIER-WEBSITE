@@ -418,16 +418,42 @@ export default function Track() {
                         </div>
                       </div>
                     ) : (
-                      <>
-                        <div>
-                          <p className="text-sm text-muted-foreground">From</p>
-                          <p className="font-medium">{job.pickupAddress}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">To</p>
-                          <p className="font-medium">{job.deliveryAddress}</p>
-                        </div>
-                      </>
+                      <div className="space-y-2">
+                        {(() => {
+                          const pickupDone = ['collected', 'picked_up', 'on_the_way_delivery', 'on_the_way', 'delivered'].includes(job.status);
+                          const deliveryDone = job.status === 'delivered';
+                          return (
+                            <>
+                              {/* Pickup row */}
+                              <div className="flex items-start gap-2 text-sm">
+                                <span className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${pickupDone ? 'bg-green-600' : 'bg-blue-600'}`}>
+                                  P
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${pickupDone ? 'text-green-600' : 'text-blue-600'}`}>Pickup</span>
+                                    {pickupDone && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">Done</span>}
+                                  </div>
+                                  <span className={pickupDone ? 'line-through text-muted-foreground' : 'text-foreground'}>{job.pickupAddress}</span>
+                                </div>
+                              </div>
+                              {/* Delivery row */}
+                              <div className="flex items-start gap-2 text-sm">
+                                <span className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${deliveryDone ? 'bg-green-600' : 'bg-primary/40'}`}>
+                                  D
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${deliveryDone ? 'text-green-600' : 'text-muted-foreground'}`}>Delivery</span>
+                                    {deliveryDone && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">Done</span>}
+                                  </div>
+                                  <span className={deliveryDone ? 'line-through text-muted-foreground' : 'text-foreground'}>{job.deliveryAddress}</span>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
                     )}
                     <div>
                       <p className="text-sm text-muted-foreground">Booked Vehicle</p>
