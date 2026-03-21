@@ -25,6 +25,7 @@ interface LiveData {
 interface TrackingLiveMapProps {
   trackingNumber: string;
   jobStatus: string;
+  pickupAddress?: string;
 }
 
 const POLL_INTERVAL_MS = 5000;
@@ -64,7 +65,7 @@ function stopFill(status: string, idx: number): string {
   return COLORS[idx % COLORS.length];
 }
 
-export function TrackingLiveMap({ trackingNumber, jobStatus }: TrackingLiveMapProps) {
+export function TrackingLiveMap({ trackingNumber, jobStatus, pickupAddress }: TrackingLiveMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const pickupMarkerRef = useRef<google.maps.Marker | null>(null);
@@ -328,8 +329,22 @@ export function TrackingLiveMap({ trackingNumber, jobStatus }: TrackingLiveMapPr
       {/* Multi-drop stop list */}
       {isMultiDrop && stops.length > 0 && (
         <div className="border-t border-border px-4 py-3">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Delivery Stops</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">
+            Route · {deliveredCount}/{stops.length} stops done
+          </p>
           <div className="space-y-1.5">
+            {/* Pickup — always first */}
+            {pickupAddress && (
+              <div className="flex items-center gap-2.5 text-sm">
+                <span className="flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-green-600">
+                  P
+                </span>
+                <span className="flex-1 truncate text-foreground">{pickupAddress}</span>
+                <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                  Pickup
+                </span>
+              </div>
+            )}
             {stops.map((stop, idx) => (
               <div key={stop.stopOrder} className="flex items-center gap-2.5 text-sm">
                 <span

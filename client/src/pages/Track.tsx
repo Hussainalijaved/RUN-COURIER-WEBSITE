@@ -366,6 +366,7 @@ export default function Track() {
               <TrackingLiveMap
                 trackingNumber={job.trackingNumber}
                 jobStatus={job.status}
+                pickupAddress={job.isMultiDrop ? job.pickupAddress : undefined}
               />
 
               <div className="grid md:grid-cols-2 gap-6">
@@ -377,16 +378,23 @@ export default function Track() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">From</p>
-                      <p className="font-medium">{job.pickupAddress}</p>
-                    </div>
                     {job.isMultiDrop && job.multiDropStops.length > 0 ? (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1.5">
-                          Delivery Stops ({job.multiDropStops.length})
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Multi-Drop Route ({job.multiDropStops.length + 1} stops)
                         </p>
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
+                          {/* Pickup — first point */}
+                          <div className="flex items-start gap-2 text-sm">
+                            <span className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                              P
+                            </span>
+                            <div>
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 block leading-tight">Pickup</span>
+                              <span className="text-foreground">{job.pickupAddress}</span>
+                            </div>
+                          </div>
+                          {/* Delivery stops */}
                           {job.multiDropStops.map((stop) => (
                             <div key={stop.stopOrder} className="flex items-start gap-2 text-sm">
                               <span className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
@@ -400,10 +408,16 @@ export default function Track() {
                         </div>
                       </div>
                     ) : (
-                      <div>
-                        <p className="text-sm text-muted-foreground">To</p>
-                        <p className="font-medium">{job.deliveryAddress}</p>
-                      </div>
+                      <>
+                        <div>
+                          <p className="text-sm text-muted-foreground">From</p>
+                          <p className="font-medium">{job.pickupAddress}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">To</p>
+                          <p className="font-medium">{job.deliveryAddress}</p>
+                        </div>
+                      </>
                     )}
                     <div>
                       <p className="text-sm text-muted-foreground">Booked Vehicle</p>
