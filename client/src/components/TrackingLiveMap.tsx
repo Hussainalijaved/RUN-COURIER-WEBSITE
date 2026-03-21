@@ -339,7 +339,7 @@ export function TrackingLiveMap({ trackingNumber, jobStatus }: TrackingLiveMapPr
                   {stop.stopOrder}
                 </span>
                 <span className={`flex-1 truncate ${stop.status === 'delivered' ? 'line-through text-muted-foreground' : ''}`}>
-                  {stop.address}
+                  {stop.address && stop.address.trim() ? stop.address : stop.postcode || '—'}
                 </span>
                 <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${
                   stop.status === 'delivered'

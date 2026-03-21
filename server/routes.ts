@@ -2043,7 +2043,8 @@ export async function registerRoutes(
     const status = (job as any).status as string;
     const isActive = ACTIVE_STATUSES.has(status);
 
-    console.log(`[LiveTrack] ${trackingNumber} → id=${(job as any).id} status=${status} is_multi_drop=${(job as any).is_multi_drop}`);
+    const driverIdRaw = (job as any).driver_id as string | null;
+    console.log(`[LiveTrack] ${trackingNumber} → id=${(job as any).id} status=${status} driver_id=${driverIdRaw ?? 'none'}`);
 
     // Always fetch stops — job_id is stored as string in multi_drop_stops
     const jobIdStr = String((job as any).id);
@@ -2088,13 +2089,15 @@ export async function registerRoutes(
     // Geocode stops that are missing coordinates
     const stops: { stopOrder: number; address: string; postcode: string; lat: number | null; lng: number | null; status: string }[] = [];
     for (const s of rawStops) {
+      const normPc = normalizeUKPostcode(s.postcode || '');
       let lat: number | null = s.latitude ? parseFloat(String(s.latitude)) : null;
       let lng: number | null = s.longitude ? parseFloat(String(s.longitude)) : null;
-      if ((lat === null || isNaN(lat) || lng === null || isNaN(lng)) && s.postcode) {
-        const geo = await geocodePostcode(s.postcode);
+      if ((lat === null || isNaN(lat) || lng === null || isNaN(lng)) && normPc) {
+        const geo = await geocodePostcode(normPc);
         if (geo) { lat = geo.lat; lng = geo.lng; }
       }
-      stops.push({ stopOrder: s.stop_order, address: s.address, postcode: s.postcode, lat, lng, status: s.status || 'pending' });
+      const displayAddr = s.address && s.address.trim() ? s.address : normPc;
+      stops.push({ stopOrder: s.stop_order, address: displayAddr, postcode: normPc, lat, lng, status: s.status || 'pending' });
     }
 
     // Some jobs store the final stop only in delivery_address — append it if missing
@@ -2114,16 +2117,46 @@ export async function registerRoutes(
 
     // Driver location — ONLY for active jobs with a driver assigned
     let driver: { lat: number; lng: number; updatedAt: number; isLive: boolean } | null = null;
-    if (isActive && (job as any).driver_id) {
-      const cached = getDriverLocationFromCache((job as any).driver_id);
+    if (isActive && driverIdRaw) {
+      const driverId = driverIdRaw;
+      const cached = getDriverLocationFromCache(driverId);
       if (cached) {
         const ageMs = Date.now() - cached.timestamp;
         driver = {
           lat: cached.lat,
           lng: cached.lng,
           updatedAt: cached.timestamp,
-          isLive: ageMs < 5 * 60 * 1000, // live if updated within 5 min
+          isLive: ageMs < 5 * 60 * 1000,
         };
+      } else {
+        // Cache miss — fall back to Supabase drivers table (current_latitude/current_longitude)
+        try {
+          const { data: driverRow } = await supabaseAdmin
+            .from('drivers')
+            .select('current_latitude, current_longitude, last_location_update, postcode')
+            .eq('id', driverId)
+            .single();
+          if (driverRow?.current_latitude && driverRow?.current_longitude) {
+            const updatedAt = driverRow.last_location_update
+              ? new Date(driverRow.last_location_update).getTime()
+              : Date.now();
+            const ageMs = Date.now() - updatedAt;
+            driver = {
+              lat: parseFloat(String(driverRow.current_latitude)),
+              lng: parseFloat(String(driverRow.current_longitude)),
+              updatedAt,
+              isLive: ageMs < 5 * 60 * 1000,
+            };
+            console.log(`[LiveTrack] driver found in DB lat=${driver.lat} lng=${driver.lng} isLive=${driver.isLive}`);
+          } else if (driverRow?.postcode) {
+            // Last resort: geocode the driver's home postcode
+            const geo = await geocodePostcode(driverRow.postcode);
+            if (geo) {
+              driver = { lat: geo.lat, lng: geo.lng, updatedAt: Date.now(), isLive: false };
+              console.log(`[LiveTrack] driver geocoded from postcode lat=${driver.lat} lng=${driver.lng}`);
+            }
+          }
+        } catch { /* ignore */ }
       }
     }
 
