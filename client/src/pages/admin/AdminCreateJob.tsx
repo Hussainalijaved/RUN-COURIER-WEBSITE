@@ -94,7 +94,6 @@ const createJobSchema = z.object({
   vehicleType: z.enum(['motorbike', 'car', 'small_van', 'medium_van']),
   isMultiDrop: z.boolean().default(false),
   isReturnTrip: z.boolean().default(false),
-  waitingTime: z.coerce.number().min(0).optional().default(0),
   driverId: z.string().optional(),
   pickupDate: z.string().optional().default(''),
   pickupTime: z.string().optional().default(''),
@@ -192,7 +191,6 @@ export default function AdminCreateJob() {
       vehicleType: 'car',
       isMultiDrop: false,
       isReturnTrip: false,
-      waitingTime: 0,
       driverId: '',
       pickupDate: getTodayDate(),
       pickupTime: getCurrentTime(),
@@ -256,7 +254,6 @@ export default function AdminCreateJob() {
   const weight = form.watch('weight');
   const vehicleType = form.watch('vehicleType');
   const isReturnTrip = form.watch('isReturnTrip');
-  const waitingTime = form.watch('waitingTime');
   const pickupDate = form.watch('pickupDate');
   const pickupTime = form.watch('pickupTime');
 
@@ -344,7 +341,7 @@ export default function AdminCreateJob() {
         isReturnTrip: isReturnTrip || false,
         returnToSameLocation: isReturnTrip || false,
         scheduledTime,
-        waitingTimeMinutes: waitingTime || 0,
+        waitingTimeMinutes: 0,
       });
       
       setQuote(quoteResult);
@@ -399,7 +396,7 @@ export default function AdminCreateJob() {
               isReturnTrip: isReturnTrip || false,
               returnToSameLocation: isReturnTrip || false,
               scheduledTime,
-              waitingTimeMinutes: waitingTime || 0,
+              waitingTimeMinutes: 0,
             });
             
             setQuote(quoteResult);
@@ -417,7 +414,7 @@ export default function AdminCreateJob() {
 
     const timer = setTimeout(calculateQuoteFromFields, 500);
     return () => clearTimeout(timer);
-  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, waitingTime, isMultiDropMode, pickupDate, pickupTime]);
+  }, [pickupPostcode, deliveryPostcode, weight, vehicleType, isReturnTrip, isMultiDropMode, pickupDate, pickupTime]);
 
 
   const createJobMutation = useMutation({
@@ -539,7 +536,7 @@ export default function AdminCreateJob() {
             isReturnTrip: values.isReturnTrip || false,
             returnToSameLocation: values.isReturnTrip || false,
             scheduledTime,
-            waitingTimeMinutes: values.waitingTime || 0,
+            waitingTimeMinutes: 0,
           });
           
           setQuote(quoteResult);
@@ -1185,33 +1182,6 @@ export default function AdminCreateJob() {
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={form.control}
-                        name="waitingTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Waiting Time (minutes)</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  {...field}
-                                  type="number"
-                                  step="1"
-                                  min="0"
-                                  className="pl-10"
-                                  placeholder="0"
-                                  data-testid="input-waiting-time"
-                                />
-                              </div>
-                            </FormControl>
-                            <FormDescription>
-                              First 10 mins free, then £0.50/min
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
@@ -1425,14 +1395,6 @@ export default function AdminCreateJob() {
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Return Trip</span>
                               <span data-testid="text-return-charge">{formatPrice(quote.returnTripCharge)}</span>
-                            </div>
-                          )}
-                          {quote.waitingTimeCharge > 0 && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                Waiting Time ({quote.waitingTimeMinutes} mins)
-                              </span>
-                              <span data-testid="text-waiting-time-charge">{formatPrice(quote.waitingTimeCharge)}</span>
                             </div>
                           )}
                           {quote.rushHourApplied && (
