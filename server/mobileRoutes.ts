@@ -2796,6 +2796,24 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
+      // If the job is already in the requested status (idempotent) — return success immediately.
+      // This handles multi-drop auto-completion: the server already marked the job delivered
+      // when the last stop was saved, so the mobile app's "Mark as Delivered" tap is a no-op.
+      if (effectiveStatus === status) {
+        const existingJob = job || await storage.getJob(jobId);
+        console.log(`[Status Update] Job ${jobId} already in status '${status}' — returning success (idempotent)`);
+        return res.json({
+          success: true,
+          alreadyInStatus: true,
+          job: {
+            id: jobId,
+            trackingNumber: existingJob?.trackingNumber || '',
+            status,
+            updatedAt: existingJob?.updatedAt || new Date(),
+          },
+        });
+      }
+
       const allowedTransitions = VALID_JOB_TRANSITIONS[effectiveStatus as JobStatus] || [];
       
       if (!allowedTransitions.includes(status)) {
