@@ -177,7 +177,7 @@ interface MultiDropStop {
 }
 
 // Component to display multi-drop stops for a job with status update capability
-function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiDrop?: boolean }) {
+function MultiDropStopsSection({ jobId, isMultiDrop, pickupAddress, pickupPostcode, pickupBuildingName }: { jobId: string; isMultiDrop?: boolean; pickupAddress?: string; pickupPostcode?: string; pickupBuildingName?: string }) {
   const { toast } = useToast();
   const [updatingStopId, setUpdatingStopId] = useState<string | null>(null);
   const [uploadingStopId, setUploadingStopId] = useState<string | null>(null);
@@ -318,7 +318,7 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
     <div className="border-t pt-4">
       <h4 className="font-semibold mb-3 flex items-center gap-2">
         <MapPin className="h-4 w-4 text-blue-600" />
-        Multi-Drop Stops ({stops.length} stops)
+        Multi-Drop Route ({stops.length + 1} stops)
       </h4>
       <input
         type="file"
@@ -329,6 +329,20 @@ function MultiDropStopsSection({ jobId, isMultiDrop }: { jobId: string; isMultiD
         data-testid="input-stop-pod-upload"
       />
       <div className="space-y-3">
+        {/* Pickup — first point in route */}
+        {(pickupAddress || pickupPostcode) && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="stop-pickup">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <Badge className="bg-blue-600 text-white text-xs">Pickup</Badge>
+              <Badge variant="secondary" className="text-xs">Collection Point</Badge>
+            </div>
+            {pickupBuildingName && (
+              <p className="text-sm font-medium">{pickupBuildingName}</p>
+            )}
+            <p className="text-sm font-medium">{pickupAddress}</p>
+            <p className="text-sm font-mono text-muted-foreground">{pickupPostcode}</p>
+          </div>
+        )}
         {stops.map((stop) => (
           <div 
             key={stop.id} 
@@ -2468,7 +2482,13 @@ export default function SupervisorJobs() {
                   )}
                 </div>
                 {/* Multi-Drop Stops Section */}
-                <MultiDropStopsSection jobId={selectedJob.id} isMultiDrop={selectedJob.isMultiDrop ?? false} />
+                <MultiDropStopsSection
+                  jobId={selectedJob.id}
+                  isMultiDrop={selectedJob.isMultiDrop ?? false}
+                  pickupAddress={selectedJob.pickupAddress}
+                  pickupPostcode={selectedJob.pickupPostcode}
+                  pickupBuildingName={(selectedJob as any).pickupBuildingName}
+                />
                 
                 {/* Proof of Delivery Section */}
                 <div className="border-t pt-4">

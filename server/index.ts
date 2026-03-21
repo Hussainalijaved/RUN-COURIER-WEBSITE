@@ -319,6 +319,25 @@ async function runBackgroundTasks() {
 
   (async () => {
     try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      const { error: wmCheck } = await supabaseAdmin.from('jobs').select('waiting_time_minutes').limit(1);
+      if (wmCheck?.message?.includes('waiting_time_minutes')) {
+        console.warn("[MIGRATION] ⚠️  waiting_time_minutes column missing from Supabase jobs table.");
+        console.warn("[MIGRATION] Run in Supabase SQL Editor:");
+        console.warn("[MIGRATION]   ALTER TABLE jobs ADD COLUMN IF NOT EXISTS waiting_time_minutes INTEGER DEFAULT 0;");
+        console.warn("[MIGRATION]   NOTIFY pgrst, 'reload schema';");
+        console.warn("[MIGRATION] Until this is run, waiting time minutes will not be persisted (charge still saves correctly).");
+      } else {
+        console.log("[MIGRATION] waiting_time_minutes column exists on jobs table");
+      }
+    } catch (e: any) {
+      console.warn("[MIGRATION] waiting_time_minutes column check:", e?.message);
+    }
+  })();
+
+  (async () => {
+    try {
       const { Pool } = await import('pg');
       const pool = new Pool({
         host: process.env.PGHOST,
