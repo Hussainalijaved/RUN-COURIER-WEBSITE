@@ -1904,14 +1904,18 @@ export async function registerRoutes(
           .eq('job_id', jobIdStr)
           .order('stop_order', { ascending: true });
         if (stops && stops.length > 0) {
-          multiDropStops = stops.map((s: any) => ({
-            stopOrder: s.stop_order,
-            address: s.address,
-            postcode: s.postcode,
-          }));
+          multiDropStops = stops.map((s: any) => {
+            const normPostcode = normalizeUKPostcode(s.postcode || '');
+            const addr = s.address && s.address.trim() ? s.address : normPostcode;
+            return {
+              stopOrder: s.stop_order,
+              address: addr,
+              postcode: normPostcode,
+            };
+          });
         }
         // Some jobs store the final stop only in delivery_address — append it if missing
-        const deliveryPostcode = job.delivery_postcode;
+        const deliveryPostcode = normalizeUKPostcode(job.delivery_postcode || '');
         if (deliveryPostcode && !multiDropStops.some(s => s.postcode === deliveryPostcode)) {
           const nextOrder = multiDropStops.length > 0 ? Math.max(...multiDropStops.map(s => s.stopOrder)) + 1 : 1;
           multiDropStops.push({

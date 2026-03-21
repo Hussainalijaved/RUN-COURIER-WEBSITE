@@ -392,7 +392,9 @@ export default function Track() {
                               <span className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
                                 {stop.stopOrder}
                               </span>
-                              <span className="text-foreground">{stop.address}</span>
+                              <span className="text-foreground">
+                                {stop.address && stop.address.trim() ? stop.address : stop.postcode || '—'}
+                              </span>
                             </div>
                           ))}
                         </div>
