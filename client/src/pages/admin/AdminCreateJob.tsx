@@ -96,6 +96,22 @@ const createJobSchema = z.object({
   deliveryTime: z.string().optional(),
 });
 
+const DRIVER_MIN_PRICES: Record<string, number> = {
+  motorbike: 5,
+  car: 12,
+  small_van: 15,
+  medium_van: 17,
+  large_van: 17,
+  luton_van: 17,
+  flatbed: 17,
+};
+
+function calcAutoDriverPrice(distanceMiles: number, vehicleType: string | undefined | null): number {
+  const vt = String(vehicleType || 'car').toLowerCase().split('|')[0];
+  const minPrice = DRIVER_MIN_PRICES[vt] ?? 12;
+  return Math.max(distanceMiles * 1.00, minPrice);
+}
+
 const getTodayDate = () => {
   const today = new Date();
   return today.toISOString().split('T')[0];
@@ -292,6 +308,7 @@ export default function AdminCreateJob() {
       const totalDistance = routeData.totalDistance || legs.reduce((sum: number, leg: any) => sum + leg.distance, 0);
       
       setDistance(totalDistance);
+      setDriverPrice(calcAutoDriverPrice(totalDistance, vehicleType));
       setRouteLegs(legs);
       
       // Reorder drops based on optimized route (same as AdminBusinessQuote)
@@ -361,6 +378,7 @@ export default function AdminCreateJob() {
           const distResult = await calculateDistanceFromPostcodes(pickupPostcode, deliveryPostcode);
           if (distResult) {
             setDistance(distResult.distance);
+            setDriverPrice(calcAutoDriverPrice(distResult.distance, vehicleType));
             
             // Use scheduled pickup time for rush hour calculation if available
             let scheduledTime: Date | undefined;
@@ -500,6 +518,7 @@ export default function AdminCreateJob() {
         const distResult = await calculateDistanceFromPostcodes(values.pickupPostcode, values.deliveryPostcode);
         if (distResult) {
           setDistance(distResult.distance);
+          setDriverPrice(calcAutoDriverPrice(distResult.distance, values.vehicleType));
           
           // Use scheduled pickup time for rush hour calculation if available
           let scheduledTime: Date | undefined;
@@ -1535,7 +1554,7 @@ export default function AdminCreateJob() {
                               </div>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              This is the amount the driver will see and get paid for this job.
+                              Auto-calculated at £1.00/mile ({distance.toFixed(1)} miles). Edit to override — minimum applies per vehicle type.
                             </p>
                           </div>
                         </div>
