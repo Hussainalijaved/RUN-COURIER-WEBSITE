@@ -3833,9 +3833,10 @@ export function registerMobileRoutes(app: Express): void {
       const { jobId } = req.params;
       const { minutes } = req.body;
 
-      const CUSTOMER_RATE = 0.50; // £0.50/min charged to customer
-      const DRIVER_RATE = 0.20;   // £0.20/min paid to driver
-      const MAX_MINUTES = 50;
+      const FREE_MINUTES = 10;
+      const CUSTOMER_RATE = 0.50; // £0.50/min charged to customer (after free period)
+      const DRIVER_RATE = 0.20;   // £0.20/min paid to driver (after free period)
+      const MAX_MINUTES = 60;
 
       const totalMinutes = parseInt(String(minutes), 10);
       if (isNaN(totalMinutes) || totalMinutes < 1 || totalMinutes > MAX_MINUTES) {
@@ -3859,9 +3860,10 @@ export function registerMobileRoutes(app: Express): void {
         return res.status(403).json({ error: 'Not authorized for this job' });
       }
 
-      // Business logic — two separate rates, no free minutes
-      const newCustomerCharge = parseFloat((totalMinutes * CUSTOMER_RATE).toFixed(2));
-      const newDriverWaitPay = parseFloat((totalMinutes * DRIVER_RATE).toFixed(2));
+      // Business logic — first 10 min free, then separate rates
+      const chargeableMinutes = Math.max(0, totalMinutes - FREE_MINUTES);
+      const newCustomerCharge = parseFloat((chargeableMinutes * CUSTOMER_RATE).toFixed(2));
+      const newDriverWaitPay = parseFloat((chargeableMinutes * DRIVER_RATE).toFixed(2));
 
       // Replace old waiting pay with new one (idempotent)
       const oldDriverWaitPay = parseFloat(String(job.waiting_time_charge || 0));

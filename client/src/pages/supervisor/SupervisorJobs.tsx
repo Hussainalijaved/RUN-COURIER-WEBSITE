@@ -3323,17 +3323,19 @@ export default function SupervisorJobs() {
                         type="number"
                         step="1"
                         min="0"
-                        max="50"
+                        max="60"
                         value={editWaitingTimeMinutes}
                         onChange={(e) => {
                           const mins = e.target.value;
                           setEditWaitingTimeMinutes(mins);
+                          const FREE_MINUTES = 10;
                           const CUSTOMER_RATE = 0.50;
                           const DRIVER_RATE = 0.20;
-                          const MAX_MINUTES = 50;
+                          const MAX_MINUTES = 60;
                           const m = Math.min(parseFloat(mins) || 0, MAX_MINUTES);
-                          const customerCharge = m * CUSTOMER_RATE;
-                          const driverCharge = m * DRIVER_RATE;
+                          const chargeable = Math.max(0, m - FREE_MINUTES);
+                          const customerCharge = chargeable * CUSTOMER_RATE;
+                          const driverCharge = chargeable * DRIVER_RATE;
                           setEditWaitingTimeCharge(customerCharge > 0 ? customerCharge.toFixed(2) : '');
                           const base = parseFloat(editBaseDriverPrice) || 0;
                           setEditDriverPrice((base + driverCharge).toFixed(2));
@@ -3341,7 +3343,7 @@ export default function SupervisorJobs() {
                         placeholder="0"
                         data-testid="input-edit-waiting-time-minutes"
                       />
-                      <p className="text-xs text-muted-foreground">Customer: £0.50/min · Driver: £0.20/min (max 50 min)</p>
+                      <p className="text-xs text-muted-foreground">First 10 min free · Customer: £0.50/min · Driver: £0.20/min (max 60 min)</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-waiting-time-charge">Waiting Time Charge (£)</Label>
