@@ -2136,17 +2136,33 @@ export default function SupervisorJobs() {
                   </DialogDescription>
                 </div>
                 {selectedJob && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 gap-1.5"
-                    onClick={() => window.open(`/track/${selectedJob.trackingNumber}`, '_blank')}
-                    data-testid="button-live-tracking"
-                  >
-                    <Radio className="h-3.5 w-3.5 text-green-500" />
-                    Live Tracking
-                    <ExternalLink className="h-3 w-3 opacity-60" />
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        const job = selectedJob;
+                        setSelectedJob(null);
+                        setTimeout(() => openEditDialog(job), 50);
+                      }}
+                      data-testid="button-edit-job-from-detail"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      Edit Job
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => window.open(`/track/${selectedJob.trackingNumber}`, '_blank')}
+                      data-testid="button-live-tracking"
+                    >
+                      <Radio className="h-3.5 w-3.5 text-green-500" />
+                      Live Tracking
+                      <ExternalLink className="h-3 w-3 opacity-60" />
+                    </Button>
+                  </div>
                 )}
               </div>
             </DialogHeader>
