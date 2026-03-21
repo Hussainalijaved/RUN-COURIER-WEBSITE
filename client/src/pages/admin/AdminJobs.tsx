@@ -1080,13 +1080,15 @@ export default function AdminJobs() {
     setEditStatus(job.status);
     setEditDriverId(job.driverId || 'unassigned');
     // Show base delivery price (total minus any existing waiting time charge so it isn't double-counted on save)
+    const existingWtMinutes = Number((job as any).waitingTimeMinutes) || 0;
     const existingWtCharge = (job as any).waitingTimeCharge > 0 ? parseFloat(String((job as any).waitingTimeCharge)) : 0;
+    const existingDriverWtPay = Math.max(0, existingWtMinutes - 10) * 0.20;
     const basePrice = Math.max(0, (job.totalPrice || 0) - existingWtCharge);
     setEditTotalPrice(basePrice.toFixed(2));
-    const baseDriverPrice = Math.max(0, (job.driverPrice || 0) - existingWtCharge);
+    const baseDriverPrice = Math.max(0, (job.driverPrice || 0) - existingDriverWtPay);
     setEditDriverPrice(job.driverPrice?.toString() || '');
     setEditBaseDriverPrice(baseDriverPrice.toFixed(2));
-    setEditWaitingTimeMinutes((job as any).waitingTimeMinutes > 0 ? (job as any).waitingTimeMinutes.toString() : '');
+    setEditWaitingTimeMinutes(existingWtMinutes > 0 ? existingWtMinutes.toString() : '');
     setEditWaitingTimeCharge(existingWtCharge > 0 ? existingWtCharge.toFixed(2) : '');
     // Extended fields
     setEditPickupAddress(job.pickupAddress || '');

@@ -1139,12 +1139,11 @@ export class SupabaseStorage implements IStorage {
     if (data.distance !== undefined) dbData.distance = data.distance;
     if (data.isMultiDrop !== undefined) dbData.is_multi_drop = data.isMultiDrop;
     if (data.isReturnTrip !== undefined) dbData.is_return_trip = data.isReturnTrip;
-    // waiting_time_charge goes through normal Supabase JS client (column pre-exists)
+    // waiting_time_charge goes through normal Supabase JS client
     if (data.waitingTimeCharge !== undefined) dbData.waiting_time_charge = data.waitingTimeCharge;
+    // waiting_time_minutes also goes through Supabase JS client
+    if (data.waitingTimeMinutes !== undefined) dbData.waiting_time_minutes = data.waitingTimeMinutes;
 
-    // waiting_time_minutes is handled separately via direct SQL to avoid PostgREST schema cache issues
-    const waitingTimeMinutes = data.waitingTimeMinutes;
-    
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
     const { data: updated, error } = await supabase
@@ -1156,23 +1155,29 @@ export class SupabaseStorage implements IStorage {
     
     if (error) {
       console.error(`[SupabaseStorage] updateJob error:`, error);
+      // If main update fails due to schema cache (waiting_time_minutes not cached), retry without it
+      if (data.waitingTimeMinutes !== undefined && error.message?.includes('waiting_time_minutes')) {
+        console.warn(`[SupabaseStorage] waiting_time_minutes not in schema cache, retrying without it`);
+        delete dbData.waiting_time_minutes;
+        const { data: retried, error: retryErr } = await supabase
+          .from('jobs')
+          .update(dbData)
+          .eq('id', id)
+          .select()
+          .single();
+        if (retryErr || !retried) {
+          console.error(`[SupabaseStorage] updateJob retry error:`, retryErr);
+          return undefined;
+        }
+        retried.waiting_time_minutes = data.waitingTimeMinutes;
+        console.log(`[SupabaseStorage] updateJob ${id} success (retry without waiting_time_minutes)`);
+        return mapDbToJob(retried);
+      }
       return undefined;
     }
     if (!updated) {
       console.warn(`[SupabaseStorage] updateJob ${id} returned no data`);
       return undefined;
-    }
-
-    // Apply waiting_time_minutes via direct SQL (bypasses PostgREST schema cache)
-    if (waitingTimeMinutes !== undefined) {
-      try {
-        const { db: directDb } = await import('./db');
-        const { sql: rawSql } = await import('drizzle-orm');
-        await directDb.execute(rawSql`UPDATE jobs SET waiting_time_minutes = ${waitingTimeMinutes} WHERE id = ${String(id)}`);
-        updated.waiting_time_minutes = waitingTimeMinutes;
-      } catch (sqlErr: any) {
-        console.warn(`[SupabaseStorage] waiting_time_minutes direct SQL update failed:`, sqlErr?.message);
-      }
     }
 
     console.log(`[SupabaseStorage] updateJob ${id} success, pickup coords: ${updated.pickup_latitude}, ${updated.pickup_longitude}`);

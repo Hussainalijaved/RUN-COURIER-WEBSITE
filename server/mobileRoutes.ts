@@ -3870,11 +3870,12 @@ export function registerMobileRoutes(app: Express): void {
       const currentDriverPrice = parseFloat(String(job.driver_price || 0));
       const newDriverPrice = parseFloat((currentDriverPrice - oldDriverWaitPay + newDriverWaitPay).toFixed(2));
 
-      // Update waiting_time_charge (customer-facing) and driver_price
+      // Update waiting_time_charge (customer-facing), driver_price, and waiting_time_minutes
       const { error: updateError } = await supabaseAdmin!
         .from('jobs')
         .update({
           waiting_time_charge: String(newCustomerCharge),
+          waiting_time_minutes: totalMinutes,
           driver_price: String(newDriverPrice),
           updated_at: new Date().toISOString(),
         })
@@ -3883,15 +3884,6 @@ export function registerMobileRoutes(app: Express): void {
       if (updateError) {
         console.error('[WaitingTime] Failed to update job:', updateError);
         return res.status(500).json({ error: 'Failed to save waiting time' });
-      }
-
-      // Update waiting_time_minutes via direct SQL (NOT in PostgREST schema cache)
-      try {
-        const { db: directDb } = await import('./db');
-        const { sql: rawSql } = await import('drizzle-orm');
-        await directDb.execute(rawSql`UPDATE jobs SET waiting_time_minutes = ${totalMinutes} WHERE id = ${String(jobId)}`);
-      } catch (sqlErr) {
-        console.warn('[WaitingTime] Could not update waiting_time_minutes (non-critical):', sqlErr);
       }
 
       console.log(`[WaitingTime] Job ${jobId}: ${totalMinutes} min, customer charge £${newCustomerCharge}, driver pay +£${newDriverWaitPay}, new driver_price £${newDriverPrice}`);

@@ -11227,28 +11227,12 @@ export async function registerRoutes(
     let jobDetails: any[] = [];
     if (data.jobIds && data.jobIds.length > 0 && supabaseAdmin) {
       // Handle both numeric and UUID job IDs
-      // Note: waiting_time_minutes excluded from select because it may not be in PostgREST schema cache yet
       // Note: id column is character varying in DB — keep IDs as strings for Supabase queries
-      const numericJobIds = data.jobIds.map(id => parseInt(id)).filter(n => !isNaN(n));
       const stringJobIds = data.jobIds.map(String);
       const { data: jobs, error } = await supabaseAdmin
         .from('jobs')
-        .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
+        .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge, waiting_time_minutes')
         .in('id', stringJobIds);
-
-      // Fetch waiting_time_minutes separately via direct SQL to bypass schema cache
-      let wtMinutesMap: Record<number, number> = {};
-      try {
-        const { db: directDb } = await import('./db');
-        const { sql: rawSql } = await import('drizzle-orm');
-        if (numericJobIds.length > 0) {
-          const strJobIds = data.jobIds.map(String);
-          const wtRows = await directDb.execute(rawSql`SELECT id, waiting_time_minutes FROM jobs WHERE id = ANY(ARRAY[${rawSql.raw(strJobIds.map(id => `'${id.replace(/'/g, "''")}'`).join(','))}]::text[])`);
-          for (const row of (wtRows as any).rows || wtRows as any) {
-            wtMinutesMap[Number(row.id)] = Number(row.waiting_time_minutes) || 0;
-          }
-        }
-      } catch (_) {}
 
       if (!error && jobs) {
         // Fetch multi-drop stops for all jobs that are multi-drop
@@ -11311,7 +11295,7 @@ export async function registerRoutes(
             price: Math.max(0, (parseFloat(job.total_price) || 0) - (parseFloat((job as any).waiting_time_charge) || 0)),
             isMultiDrop: job.is_multi_drop || false,
             multiDropStops: stops,
-            waitingTimeMinutes: wtMinutesMap[Number(job.id)] || 0,
+            waitingTimeMinutes: Number((job as any).waiting_time_minutes) || 0,
             waitingTimeCharge: parseFloat((job as any).waiting_time_charge) || 0,
             _v: 2,
           };
