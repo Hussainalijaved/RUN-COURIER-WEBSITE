@@ -10763,80 +10763,90 @@ export async function registerRoutes(
       created_at: token.created_at,
     }));
     
-    // Also get jobs that don't have invoices yet and create virtual invoices for them
-    // This ensures older orders also appear in the invoice list
-    const authHeader = req.headers.authorization;
-    let customerEmail: string | null = null;
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      const { verifyAccessToken } = await import("./supabaseAdmin");
-      const user = await verifyAccessToken(token);
-      customerEmail = user?.email || null;
-    }
-    
-    // Get customer profile for business details
-    let customerProfile: any = null;
+    // Virtual job invoices are only generated for the customer view (when customerId is supplied).
+    // For the admin/general view (no customerId) we return only real stored invoices to avoid
+    // duplicating every card-paid job as an extra "virtual" invoice entry.
+    let jobInvoices: any[] = [];
     if (customerId) {
+      const authHeader = req.headers.authorization;
+      let customerEmail: string | null = null;
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const { verifyAccessToken } = await import("./supabaseAdmin");
+        const user = await verifyAccessToken(token);
+        customerEmail = user?.email || null;
+      }
+
+      // Get customer profile for business details
+      let customerProfile: any = null;
       const { data: profile } = await supabaseAdmin
         .from('users')
         .select('full_name, company_name, business_address, vat_number, user_type')
         .eq('id', customerId)
         .single();
       customerProfile = profile;
+
+      // Get jobs for this specific customer only
+      let jobsQuery = supabaseAdmin
+        .from('jobs')
+        .select('id, tracking_number, customer_email, total_price, payment_intent_id, created_at, pickup_contact_name, status, customer_id')
+        .order('created_at', { ascending: false });
+
+      if (customerEmail) {
+        jobsQuery = jobsQuery.eq('customer_email', customerEmail);
+      } else {
+        jobsQuery = jobsQuery.eq('customer_id', customerId);
+      }
+
+      const { data: jobs } = await jobsQuery;
+      console.log('[Invoices] Found', jobs?.length || 0, 'jobs for customer', customerId);
+
+      // Build set of job IDs already covered by a real invoice token
+      const existingJobIds = new Set(
+        invoicesFromTokens
+          .filter((inv: any) => inv.job_ids)
+          .flatMap((inv: any) => inv.job_ids.map(String))
+      );
+
+      jobInvoices = (jobs || [])
+        .filter((job: any) => !existingJobIds.has(String(job.id)))
+        .map((job: any) => {
+          const isPaid = !!job.payment_intent_id;
+          const isBusiness = customerProfile?.user_type === 'business';
+          return {
+            id: `job-${job.id}`,
+            invoice_number: `INV-${job.tracking_number || job.id}`,
+            customer_id: job.customer_id || null,
+            customer_name: isBusiness ? (customerProfile?.company_name || job.pickup_contact_name || 'Customer') : (job.pickup_contact_name || customerProfile?.full_name || 'Customer'),
+            customer_email: job.customer_email || '',
+            company_name: isBusiness ? customerProfile?.company_name : null,
+            business_address: isBusiness ? customerProfile?.business_address : null,
+            vat_number: isBusiness ? customerProfile?.vat_number : null,
+            subtotal: String(job.total_price || 0),
+            vat: '0',
+            total: String(job.total_price || 0),
+            status: isPaid ? 'paid' : 'pending',
+            due_date: job.created_at,
+            period_start: job.created_at,
+            period_end: job.created_at,
+            job_ids: [String(job.id)],
+            notes: isPaid ? 'Card payment' : 'Pay Later',
+            payment_token: null,
+            job_details: null,
+            created_at: job.created_at,
+          };
+        });
     }
-    
-    // Get jobs for this customer
-    let jobsQuery = supabaseAdmin
-      .from('jobs')
-      .select('id, tracking_number, customer_email, total_price, payment_intent_id, created_at, pickup_contact_name, status, customer_id')
-      .order('created_at', { ascending: false });
-    
-    if (customerEmail && customerId) {
-      jobsQuery = jobsQuery.eq('customer_email', customerEmail);
-    }
-    
-    const { data: jobs } = await jobsQuery;
-    console.log('[Invoices] Found', jobs?.length || 0, 'jobs for customer');
-    
-    // Create virtual invoices for jobs that don't have a matching invoice
-    const existingJobIds = new Set(
-      invoicesFromTokens
-        .filter((inv: any) => inv.job_ids)
-        .flatMap((inv: any) => inv.job_ids)
-    );
-    
-    const jobInvoices = (jobs || [])
-      .filter((job: any) => !existingJobIds.has(job.id))
-      .map((job: any) => {
-        const isPaid = !!job.payment_intent_id;
-        // Use company info from profile for business accounts
-        const isBusiness = customerProfile?.user_type === 'business';
-        return {
-          id: `job-${job.id}`,
-          invoice_number: `INV-${job.tracking_number || job.id}`,
-          customer_id: job.customer_id || null,
-          customer_name: isBusiness ? (customerProfile?.company_name || job.pickup_contact_name || 'Customer') : (job.pickup_contact_name || customerProfile?.full_name || 'Customer'),
-          customer_email: job.customer_email || '',
-          company_name: isBusiness ? customerProfile?.company_name : null,
-          business_address: isBusiness ? customerProfile?.business_address : null,
-          vat_number: isBusiness ? customerProfile?.vat_number : null,
-          subtotal: String(job.total_price || 0),
-          vat: '0',
-          total: String(job.total_price || 0),
-          status: isPaid ? 'paid' : 'pending',
-          due_date: job.created_at,
-          period_start: job.created_at,
-          period_end: job.created_at,
-          job_ids: [job.id],
-          notes: isPaid ? 'Card payment' : 'Pay Later',
-          payment_token: null,
-          job_details: null,
-          created_at: job.created_at,
-        };
-      });
-    
-    // Combine and sort by date
+
+    // Combine, deduplicate by id, and sort by date
+    const seen = new Set<string>();
     const allInvoices = [...invoicesFromTokens, ...jobInvoices]
+      .filter((inv: any) => {
+        const key = String(inv.id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     
     // Re-fetch multi-drop stops from database for all invoices with multi-drop jobs
