@@ -438,9 +438,9 @@ function getMinDriverPrice(vehicleType: string | null | undefined): number {
     case 'car':       return 12;
     case 'small_van': return 15;
     case 'medium_van': return 17;
-    case 'lwb_van':    return 17;
+    case 'lwb_van':    return 20;
     case 'large_van':  return 17;
-    case 'luton_van':  return 17;
+    case 'luton_van':  return 20;
     case 'flatbed':    return 17;
     default:           return 12;
   }
