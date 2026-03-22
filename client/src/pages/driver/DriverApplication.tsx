@@ -127,7 +127,7 @@ export default function DriverApplication() {
       isBritish: false,
       nationalInsuranceNumber: "",
       rightToWorkShareCode: "",
-      vehicleType: "car",
+      vehicleType: "" as any,
       vehicleRegistration: "",
       vehicleMake: "",
       vehicleModel: "",
@@ -1040,7 +1040,7 @@ export default function DriverApplication() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Vehicle Type *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger data-testid="select-vehicle-type">
                               <SelectValue placeholder="Select your vehicle type" />
@@ -1302,7 +1302,7 @@ export default function DriverApplication() {
                         <dl className="space-y-1 text-sm">
                           <div className="flex justify-between">
                             <dt className="text-muted-foreground">Type:</dt>
-                            <dd className="font-medium capitalize" data-testid="text-review-vehicle">{form.getValues("vehicleType").replace("_", " ")}</dd>
+                            <dd className="font-medium capitalize" data-testid="text-review-vehicle">{(form.getValues("vehicleType") || '').replace(/_/g, " ")}</dd>
                           </div>
                           <div className="flex justify-between">
                             <dt className="text-muted-foreground">Registration:</dt>

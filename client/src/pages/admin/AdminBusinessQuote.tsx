@@ -60,7 +60,7 @@ export default function AdminBusinessQuote() {
   const [drops, setDrops] = useState<DropPoint[]>([
     { id: '1', postcode: '', address: '' }
   ]);
-  const [vehicleType, setVehicleType] = useState<VehicleType>('small_van');
+  const [vehicleType, setVehicleType] = useState<VehicleType | ''>('');
   const [weight, setWeight] = useState('10');
   const [pickupDate, setPickupDate] = useState('');
   const [pickupTime, setPickupTime] = useState('');
@@ -101,6 +101,11 @@ export default function AdminBusinessQuote() {
     const validDrops = drops.filter(d => d.postcode.trim());
     if (validDrops.length === 0) {
       toast({ title: 'Please enter at least one delivery postcode', variant: 'destructive' });
+      return;
+    }
+
+    if (!vehicleType) {
+      toast({ title: 'Please select a vehicle type', variant: 'destructive' });
       return;
     }
 
@@ -482,7 +487,7 @@ export default function AdminBusinessQuote() {
                   <Label>Vehicle Type</Label>
                   <Select value={vehicleType} onValueChange={(v) => setVehicleType(v as VehicleType)}>
                     <SelectTrigger data-testid="select-vehicle-type">
-                      <SelectValue />
+                      <SelectValue placeholder="Select vehicle type" />
                     </SelectTrigger>
                     <SelectContent>
                       {vehicleOptions.map(opt => (

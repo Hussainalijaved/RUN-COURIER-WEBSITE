@@ -191,7 +191,7 @@ export default function AdminCreateJob() {
       recipientName: '',
       recipientPhone: '',
       weight: 1,
-      vehicleType: 'car',
+      vehicleType: '' as any,
       isMultiDrop: false,
       isReturnTrip: false,
       driverId: '',
@@ -1202,10 +1202,10 @@ export default function AdminCreateJob() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Vehicle Type *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value || ''}>
                               <FormControl>
                                 <SelectTrigger data-testid="select-vehicle-type">
-                                  <SelectValue placeholder="Select vehicle" />
+                                  <SelectValue placeholder="Select vehicle type" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
