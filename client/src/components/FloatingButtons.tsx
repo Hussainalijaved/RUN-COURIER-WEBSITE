@@ -1,5 +1,6 @@
 import { MessageCircle } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
+import { useLocation } from "wouter";
 
 declare global {
   interface Window {
@@ -10,6 +11,10 @@ declare global {
 }
 
 export function FloatingButtons() {
+  const [location] = useLocation();
+
+  if (location === "/") return null;
+
   const handleChatClick = () => {
     if (window.Tawk_API && typeof window.Tawk_API.toggle === "function") {
       window.Tawk_API.toggle();
