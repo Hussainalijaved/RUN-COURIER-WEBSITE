@@ -1041,127 +1041,156 @@ export default function AdminMap() {
                 )}
               </div>
               <ScrollArea className="flex-1">
-                <div className="p-4 space-y-3">
+                <div className="p-4 space-y-1">
                   {driversLoading ? (
                     [1, 2, 3].map(i => (
                       <Skeleton key={i} className="h-20 w-full" />
                     ))
-                  ) : filteredDrivers.length > 0 ? (
-                    filteredDrivers.map((driver) => {
-                      const currentJob = getDriverCurrentJob(driver.id);
-                      const isLive = isDriverLiveGps(driver);
-                      const driverLoc = getDriverLocation(driver);
-                      const hasGpsLocation = driverLoc.source === 'gps';
-                      const hasPostcodeLocation = driverLoc.source === 'postcode';
-                      const isStaleGpsCard = hasGpsLocation && !isLive;
-                      const isOnlineNoGps = driver.isAvailable && !hasGpsLocation;
-                      
-                      return (
-                        <button
-                          key={driver.id}
-                          onClick={() => handleDriverClick(driver)}
-                          className={`w-full p-3 rounded-lg border text-left transition-colors ${
-                            selectedDriver?.id === driver.id
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border hover-elevate'
-                          }`}
-                          data-testid={`driver-card-${driver.id}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="relative">
-                              <Avatar className="h-10 w-10">
-                                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                                  {(driver.fullName || driver.vehicleRegistration || 'DR')
-                                    .split(' ')
-                                    .map(n => n[0])
-                                    .join('')
-                                    .slice(0, 2)
-                                    .toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              {isLive && (
-                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
-                              )}
-                              {isStaleGpsCard && (
-                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-purple-400 rounded-full border-2 border-background" />
-                              )}
-                              {isOnlineNoGps && (
-                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-orange-500 rounded-full border-2 border-background" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">
-                                {driver.driverCode && (
-                                  <span className="font-mono font-bold text-blue-600 mr-1">{driver.driverCode}</span>
-                                )}
-                                <span className="text-muted-foreground">·</span>{' '}
-                                {driver.fullName || driver.vehicleRegistration || 'Driver'}
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Truck className="h-3 w-3" />
-                                <span className="capitalize">{driver.vehicleType?.replace('_', ' ')}</span>
-                                {driver.postcode && (
-                                  <>
-                                    <span className="text-muted-foreground/50">|</span>
-                                    <MapPin className="h-3 w-3" />
-                                    <span>{driver.postcode}</span>
-                                  </>
-                                )}
-                              </div>
-                              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                {getStatusBadge(driver)}
-                                {isLive && (
-                                  <span className="text-[10px] text-green-600 font-medium">LIVE GPS</span>
-                                )}
-                                {!isLive && hasGpsLocation && driver.lastLocationUpdate && (
-                                  <span className="text-[10px] text-yellow-600 font-medium">
-                                    GPS {(() => {
-                                      const diff = Date.now() - new Date(driver.lastLocationUpdate).getTime();
-                                      const mins = Math.floor(diff / 60000);
-                                      if (mins < 60) return `${mins}m ago`;
-                                      const hrs = Math.floor(mins / 60);
-                                      if (hrs < 24) return `${hrs}h ago`;
-                                      return `${Math.floor(hrs / 24)}d ago`;
-                                    })()}
-                                  </span>
-                                )}
-                                {isOnlineNoGps && !hasPostcodeLocation && (
-                                  <span className="text-[10px] text-orange-600 font-medium">NO GPS</span>
-                                )}
-                                {hasPostcodeLocation && (
-                                  <span className="text-[10px] text-orange-500 font-medium">POSTCODE ONLY</span>
-                                )}
-                                {!driver.isVerified && (
-                                  <span className="text-[10px] text-red-600 font-medium">NOT VERIFIED</span>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant={driver.isAvailable ? "outline" : "default"}
-                                  className="h-5 px-2 text-[10px]"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleAvailabilityMutation.mutate({
-                                      driverId: driver.id,
-                                      isAvailable: !driver.isAvailable
-                                    });
-                                  }}
-                                  disabled={toggleAvailabilityMutation.isPending}
-                                  data-testid={`toggle-availability-${driver.id}`}
-                                >
-                                  {driver.isAvailable ? 'Set Offline' : 'Set Online'}
-                                </Button>
-                              </div>
-                              {currentJob && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Job: {currentJob.trackingNumber}
+                  ) : filteredDrivers.length > 0 ? (() => {
+                    const VEHICLE_ORDER = ['motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van'];
+                    const VEHICLE_LABELS: Record<string, string> = {
+                      motorbike: 'Motorbike',
+                      car: 'Car',
+                      small_van: 'Small Van',
+                      medium_van: 'Medium Van',
+                      lwb_van: 'LWB Van',
+                      luton_van: 'Luton Van',
+                    };
+                    const grouped: Record<string, typeof filteredDrivers> = {};
+                    filteredDrivers.forEach(d => {
+                      const vt = d.vehicleType || 'car';
+                      if (!grouped[vt]) grouped[vt] = [];
+                      grouped[vt].push(d);
+                    });
+                    const orderedKeys = [
+                      ...VEHICLE_ORDER.filter(k => grouped[k]),
+                      ...Object.keys(grouped).filter(k => !VEHICLE_ORDER.includes(k)),
+                    ];
+                    return orderedKeys.map(vehicleKey => (
+                      <div key={vehicleKey} className="mb-2">
+                        <div className="flex items-center gap-2 px-1 pt-2 pb-1.5">
+                          <Truck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            {VEHICLE_LABELS[vehicleKey] || vehicleKey.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-xs text-muted-foreground/60">({grouped[vehicleKey].length})</span>
+                          <div className="flex-1 border-t border-border/50 ml-1" />
+                        </div>
+                        <div className="space-y-2">
+                          {grouped[vehicleKey].map((driver) => {
+                            const currentJob = getDriverCurrentJob(driver.id);
+                            const isLive = isDriverLiveGps(driver);
+                            const driverLoc = getDriverLocation(driver);
+                            const hasGpsLocation = driverLoc.source === 'gps';
+                            const hasPostcodeLocation = driverLoc.source === 'postcode';
+                            const isStaleGpsCard = hasGpsLocation && !isLive;
+                            const isOnlineNoGps = driver.isAvailable && !hasGpsLocation;
+                            return (
+                              <button
+                                key={driver.id}
+                                onClick={() => handleDriverClick(driver)}
+                                className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                                  selectedDriver?.id === driver.id
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-border hover-elevate'
+                                }`}
+                                data-testid={`driver-card-${driver.id}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="relative">
+                                    <Avatar className="h-10 w-10">
+                                      <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                                        {(driver.fullName || driver.vehicleRegistration || 'DR')
+                                          .split(' ')
+                                          .map(n => n[0])
+                                          .join('')
+                                          .slice(0, 2)
+                                          .toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    {isLive && (
+                                      <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+                                    )}
+                                    {isStaleGpsCard && (
+                                      <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-purple-400 rounded-full border-2 border-background" />
+                                    )}
+                                    {isOnlineNoGps && (
+                                      <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-orange-500 rounded-full border-2 border-background" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm truncate">
+                                      {driver.driverCode && (
+                                        <span className="font-mono font-bold text-blue-600 mr-1">{driver.driverCode}</span>
+                                      )}
+                                      <span className="text-muted-foreground">·</span>{' '}
+                                      {driver.fullName || driver.vehicleRegistration || 'Driver'}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      {driver.postcode && (
+                                        <>
+                                          <MapPin className="h-3 w-3" />
+                                          <span>{driver.postcode}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                      {getStatusBadge(driver)}
+                                      {isLive && (
+                                        <span className="text-[10px] text-green-600 font-medium">LIVE GPS</span>
+                                      )}
+                                      {!isLive && hasGpsLocation && driver.lastLocationUpdate && (
+                                        <span className="text-[10px] text-yellow-600 font-medium">
+                                          GPS {(() => {
+                                            const diff = Date.now() - new Date(driver.lastLocationUpdate).getTime();
+                                            const mins = Math.floor(diff / 60000);
+                                            if (mins < 60) return `${mins}m ago`;
+                                            const hrs = Math.floor(mins / 60);
+                                            if (hrs < 24) return `${hrs}h ago`;
+                                            return `${Math.floor(hrs / 24)}d ago`;
+                                          })()}
+                                        </span>
+                                      )}
+                                      {isOnlineNoGps && !hasPostcodeLocation && (
+                                        <span className="text-[10px] text-orange-600 font-medium">NO GPS</span>
+                                      )}
+                                      {hasPostcodeLocation && (
+                                        <span className="text-[10px] text-orange-500 font-medium">POSTCODE ONLY</span>
+                                      )}
+                                      {!driver.isVerified && (
+                                        <span className="text-[10px] text-red-600 font-medium">NOT VERIFIED</span>
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        variant={driver.isAvailable ? "outline" : "default"}
+                                        className="h-5 px-2 text-[10px]"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleAvailabilityMutation.mutate({
+                                            driverId: driver.id,
+                                            isAvailable: !driver.isAvailable
+                                          });
+                                        }}
+                                        disabled={toggleAvailabilityMutation.isPending}
+                                        data-testid={`toggle-availability-${driver.id}`}
+                                      >
+                                        {driver.isAvailable ? 'Set Offline' : 'Set Online'}
+                                      </Button>
+                                    </div>
+                                    {currentJob && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        Job: {currentJob.trackingNumber}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })
-                  ) : (
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })() : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Truck className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">{driverSearchQuery ? 'No drivers match your search' : 'No active drivers'}</p>
