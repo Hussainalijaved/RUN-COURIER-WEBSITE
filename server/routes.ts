@@ -5803,7 +5803,7 @@ export async function registerRoutes(
         if (localDriver.isActive === false) {
           continue;
         }
-        // Add local-only driver
+        // Add local-only driver - same shape as Supabase-matched drivers
         driverUsers.push({
           id: localDriver.id,
           email: localDriver.email || null,
@@ -5814,9 +5814,18 @@ export async function registerRoutes(
           vehicleType: localDriver.vehicleType || 'car',
           isVerified: localDriver.isVerified ?? false,
           isAvailable: localDriver.isAvailable ?? false,
-          vehicle_registration: localDriver.vehicleRegistration || null,
-          is_active: localDriver.isActive ?? true,
           createdAt: null,
+          driving_licence_front_url: (localDriver as any).drivingLicenceFrontUrl || null,
+          driving_licence_back_url: (localDriver as any).drivingLicenceBackUrl || null,
+          dbs_certificate_url: (localDriver as any).dbsCertificateUrl || null,
+          goods_in_transit_insurance_url: (localDriver as any).goodsInTransitInsuranceUrl || null,
+          hire_reward_insurance_url: (localDriver as any).hireRewardInsuranceUrl || null,
+          profile_picture_url: (localDriver as any).profilePictureUrl || null,
+          vehicle_registration: localDriver.vehicleRegistration || null,
+          vehicle_make: (localDriver as any).vehicleMake || null,
+          vehicle_model: (localDriver as any).vehicleModel || null,
+          vehicle_color: (localDriver as any).vehicleColor || null,
+          is_active: localDriver.isActive ?? true,
         });
       }
 

@@ -217,12 +217,18 @@ export default function AdminCreateJob() {
     vehicleType?: string;
     isVerified?: boolean;
     isAvailable?: boolean;
-    createdAt: string;
+    vehicle_registration?: string | null;
+    vehicle_make?: string | null;
+    vehicle_model?: string | null;
+    vehicle_color?: string | null;
+    profile_picture_url?: string | null;
+    is_active?: boolean;
+    createdAt: string | null;
   }
   
   const { data: supabaseDrivers, isError: supabaseDriversError } = useQuery<SupabaseDriver[]>({
     queryKey: ['/api/supabase-drivers'],
-    retry: false, // Don't retry on Supabase schema errors
+    retry: false,
   });
 
   // Admin can assign to ANY driver (verified or not) - they have full control
@@ -240,16 +246,19 @@ export default function AdminCreateJob() {
         isAvailable: d.isAvailable ?? false,
       }));
     }
-    // Use Supabase drivers merged with local data
-    return supabaseDrivers.map(sd => ({
-      id: sd.id,
-      fullName: sd.fullName,
-      driverCode: sd.driverCode,
-      vehicleType: sd.vehicleType || 'car',
-      vehicleRegistration: drivers?.find(d => d.id === sd.id)?.vehicleRegistration || '',
-      isVerified: sd.isVerified ?? false,
-      isAvailable: sd.isAvailable ?? false,
-    }));
+    // Use Supabase drivers - vehicle_registration now returned directly from API for all drivers
+    return supabaseDrivers.map(sd => {
+      const localDriver = drivers?.find(d => d.id === sd.id || d.userId === sd.id);
+      return {
+        id: sd.id,
+        fullName: sd.fullName,
+        driverCode: sd.driverCode,
+        vehicleType: sd.vehicleType || localDriver?.vehicleType || 'car',
+        vehicleRegistration: sd.vehicle_registration || localDriver?.vehicleRegistration || '',
+        isVerified: sd.isVerified ?? localDriver?.isVerified ?? false,
+        isAvailable: sd.isAvailable ?? localDriver?.isAvailable ?? false,
+      };
+    });
   }, [supabaseDrivers, supabaseDriversError, drivers]);
 
   const pickupPostcode = form.watch('pickupPostcode');
