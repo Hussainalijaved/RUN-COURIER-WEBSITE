@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { MessageCircle } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { useLocation } from "wouter";
@@ -6,14 +7,54 @@ declare global {
   interface Window {
     Tawk_API?: {
       toggle: () => void;
+      hideWidget: () => void;
+      showWidget: () => void;
+      onLoad?: () => void;
     };
   }
 }
 
+function useTawkVisibility(hidden: boolean) {
+  useEffect(() => {
+    const applyVisibility = () => {
+      if (!window.Tawk_API) return;
+      if (hidden) {
+        if (typeof window.Tawk_API.hideWidget === "function") {
+          window.Tawk_API.hideWidget();
+        }
+      } else {
+        if (typeof window.Tawk_API.showWidget === "function") {
+          window.Tawk_API.showWidget();
+        }
+      }
+    };
+
+    if (window.Tawk_API && typeof window.Tawk_API.hideWidget === "function") {
+      applyVisibility();
+    } else {
+      const prev = window.Tawk_API?.onLoad;
+      window.Tawk_API = window.Tawk_API || {};
+      window.Tawk_API.onLoad = () => {
+        applyVisibility();
+        if (prev) prev();
+      };
+    }
+
+    return () => {
+      if (window.Tawk_API && typeof window.Tawk_API.showWidget === "function") {
+        window.Tawk_API.showWidget();
+      }
+    };
+  }, [hidden]);
+}
+
 export function FloatingButtons() {
   const [location] = useLocation();
+  const isHome = location === "/";
 
-  if (location === "/") return null;
+  useTawkVisibility(isHome);
+
+  if (isHome) return null;
 
   const handleChatClick = () => {
     if (window.Tawk_API && typeof window.Tawk_API.toggle === "function") {
