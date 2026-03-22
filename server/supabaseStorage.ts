@@ -59,7 +59,7 @@ function mapDbToDriver(dbDriver: any): Driver {
   return {
     id: dbDriver.id,
     userId: dbDriver.user_id || dbDriver.id,
-    driverCode: (dbDriver.driver_code && /^RC\d{2}[A-Z]$/.test(dbDriver.driver_code)) ? dbDriver.driver_code : (dbDriver.driver_id && /^RC\d{2}[A-Z]$/.test(dbDriver.driver_id)) ? dbDriver.driver_id : dbDriver.driver_code || null,
+    driverCode: (dbDriver.driver_code && /^RC\d{2}[A-Z]$/.test(dbDriver.driver_code)) ? dbDriver.driver_code : (dbDriver.driver_id && /^RC\d{2}[A-Z]$/.test(dbDriver.driver_id)) ? dbDriver.driver_id : null,
     fullName: dbDriver.full_name,
     email: dbDriver.email,
     phone: dbDriver.phone,

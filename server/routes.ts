@@ -41,6 +41,30 @@ function generateReadableTempPassword(): string {
   return `${word1}${word2}${word3}${num}`;
 }
 
+async function generateUniqueDriverCode(supabaseAdmin: any): Promise<string> {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const { data: existingDrivers } = await supabaseAdmin
+    .from('drivers')
+    .select('driver_code')
+    .not('driver_code', 'is', null);
+  const usedCodes = new Set<string>(
+    (existingDrivers || [])
+      .map((d: any) => d.driver_code)
+      .filter((c: any) => typeof c === 'string' && /^RC\d{2}[A-Z]$/.test(c))
+  );
+  let attempts = 0;
+  while (attempts < 1000) {
+    const n1 = Math.floor(Math.random() * 10);
+    const n2 = Math.floor(Math.random() * 10);
+    const letter = letters[Math.floor(Math.random() * letters.length)];
+    const code = `RC${n1}${n2}${letter}`;
+    if (!usedCodes.has(code)) return code;
+    attempts++;
+  }
+  const ts = Date.now().toString().slice(-3);
+  return `RC${ts[0]}${ts[1]}${letters[parseInt(ts[2]) % 26]}`;
+}
+
 let pgPool: Pool | null = null;
 function getPgPool(): Pool {
   if (!pgPool) {
@@ -4501,6 +4525,11 @@ export async function registerRoutes(
         }
       }
       
+      const { supabaseAdmin: supabaseAdminForCode } = await import("./supabaseAdmin");
+      let autoDriverCode: string | undefined;
+      if (supabaseAdminForCode) {
+        try { autoDriverCode = await generateUniqueDriverCode(supabaseAdminForCode); } catch {}
+      }
       driver = await storage.createDriver({
         userId: userId,
         fullName,
@@ -4517,6 +4546,7 @@ export async function registerRoutes(
         currentLongitude: null,
         rating: "5.00",
         totalJobs: 0,
+        driverCode: autoDriverCode,
       });
       
       // Save new driver to PostgreSQL with permanent driverCode
@@ -7905,6 +7935,41 @@ export async function registerRoutes(
     }
   }));
 
+  app.post("/api/admin/driver-codes/repair", asyncHandler(async (req, res) => {
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.status(500).json({ error: "Storage unavailable" });
+
+    const { data: allDrivers, error } = await supabaseAdmin
+      .from('drivers')
+      .select('id, driver_code, full_name, email');
+
+    if (error || !allDrivers) return res.status(500).json({ error: "Failed to fetch drivers" });
+
+    const validCodeRx = /^RC\d{2}[A-Z]$/;
+    const invalidDrivers = allDrivers.filter((d: any) => !d.driver_code || !validCodeRx.test(d.driver_code));
+
+    if (invalidDrivers.length === 0) {
+      return res.json({ message: "All drivers already have valid codes", repaired: 0, checked: allDrivers.length });
+    }
+
+    let repaired = 0;
+    const results: { id: string; name: string; oldCode: string | null; newCode: string }[] = [];
+
+    for (const driver of invalidDrivers) {
+      try {
+        const newCode = await generateUniqueDriverCode(supabaseAdmin);
+        await supabaseAdmin.from('drivers').update({ driver_code: newCode }).eq('id', driver.id);
+        results.push({ id: driver.id, name: driver.full_name || 'Unknown', oldCode: driver.driver_code, newCode });
+        repaired++;
+      } catch (e: any) {
+        console.error(`[RepairDriverCodes] Failed to repair driver ${driver.id}:`, e.message);
+      }
+    }
+
+    console.log(`[RepairDriverCodes] Repaired ${repaired}/${invalidDrivers.length} invalid driver codes`);
+    res.json({ message: `Repaired ${repaired} driver codes`, repaired, checked: allDrivers.length, results });
+  }));
+
   app.post("/api/admin/documents/repair", asyncHandler(async (req, res) => {
     const { supabaseAdmin } = await import('./supabaseAdmin');
     if (!supabaseAdmin) return res.status(500).json({ error: "Storage unavailable" });
@@ -10195,10 +10260,11 @@ export async function registerRoutes(
                 ]);
 
                 const existingCode = existingDriverResult.data?.driver_code;
-                let driverCode = existingCode;
-                if (!driverCode || !/^RC\d{2}[A-Z]$/.test(driverCode)) {
-                  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                  driverCode = `RC${Math.floor(Math.random() * 10)}${Math.floor(Math.random() * 10)}${letters[Math.floor(Math.random() * letters.length)]}`;
+                let driverCode: string;
+                if (existingCode && /^RC\d{2}[A-Z]$/.test(existingCode)) {
+                  driverCode = existingCode;
+                } else {
+                  driverCode = await generateUniqueDriverCode(supabaseAdmin);
                 }
 
                 const driverData: Record<string, any> = {
@@ -10340,8 +10406,7 @@ export async function registerRoutes(
         }
 
         const userId = authUserResult.user.id;
-        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        const driverCode = `RC${Math.floor(Math.random() * 10)}${Math.floor(Math.random() * 10)}${letters[Math.floor(Math.random() * letters.length)]}`;
+        const driverCode = await generateUniqueDriverCode(supabaseAdmin!);
 
         const driverData: Record<string, any> = {
           id: userId, user_id: userId, driver_code: driverCode,
