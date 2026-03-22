@@ -130,15 +130,32 @@ const DRIVER_MIN_PRICES: Record<string, number> = {
   car: 12,
   small_van: 15,
   medium_van: 17,
-  lwb_van: 17,
+  lwb_van: 20,
   large_van: 17,
-  luton_van: 17,
+  luton_van: 20,
   flatbed: 17,
 };
 
 function getMinDriverPrice(vehicleType: string | null | undefined): number {
   const vt = String(vehicleType || 'car').toLowerCase().split('|')[0];
   return DRIVER_MIN_PRICES[vt] ?? 12;
+}
+
+// Per-mile driver rate per vehicle type used when auto-calculating suggested driver price
+const DRIVER_MILE_RATES: Record<string, number> = {
+  motorbike: 0.80,
+  car: 1.00,
+  small_van: 1.00,
+  medium_van: 1.00,
+  lwb_van: 1.10,
+  large_van: 1.00,
+  luton_van: 1.20,
+  flatbed: 1.00,
+};
+
+function getDriverMileRate(vehicleType: string | null | undefined): number {
+  const vt = String(vehicleType || 'car').toLowerCase().split('|')[0];
+  return DRIVER_MILE_RATES[vt] ?? 1.00;
 }
 
 const getStatusBadge = (status: JobStatus) => {
@@ -1991,7 +2008,7 @@ export default function AdminJobs() {
                               <DropdownMenuItem 
                                 onClick={() => {
                                   const dist = parseFloat(String(job.distance || '0'));
-                                  const auto = Math.max(dist > 0 ? dist * 1.00 : 0, getMinDriverPrice(job.vehicleType));
+                                  const auto = Math.max(dist > 0 ? dist * getDriverMileRate(job.vehicleType) : 0, getMinDriverPrice(job.vehicleType));
                                   setJobToAssign(job);
                                   setAssignDriverPrice(auto.toFixed(2));
                                   setAssignDialogOpen(true);
@@ -2006,7 +2023,7 @@ export default function AdminJobs() {
                               <DropdownMenuItem 
                                 onClick={() => {
                                   const dist = parseFloat(String(job.distance || '0'));
-                                  const auto = Math.max(dist > 0 ? dist * 1.00 : 0, getMinDriverPrice(job.vehicleType));
+                                  const auto = Math.max(dist > 0 ? dist * getDriverMileRate(job.vehicleType) : 0, getMinDriverPrice(job.vehicleType));
                                   setJobToAssign(job);
                                   setAssignDriverPrice(auto.toFixed(2));
                                   setAssignDialogOpen(true);
@@ -2389,7 +2406,7 @@ export default function AdminJobs() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           Min. for {selectedJob.vehicleType || 'car'}: <span className="font-semibold">£{getMinDriverPrice(selectedJob.vehicleType).toFixed(2)}</span>
-                          {selectedJob.distance ? ` · Auto (£1/mile): £${(parseFloat(String(selectedJob.distance)) * 1.00).toFixed(2)}` : ''}
+                          {selectedJob.distance ? ` · Auto (£${getDriverMileRate(selectedJob.vehicleType).toFixed(2)}/mile): £${(parseFloat(String(selectedJob.distance)) * getDriverMileRate(selectedJob.vehicleType)).toFixed(2)}` : ''}
                         </p>
                       </div>
                     ) : (
@@ -2829,7 +2846,7 @@ export default function AdminJobs() {
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Auto-calculated at £1.00/mile
+                      Auto-calculated at £{getDriverMileRate(jobToAssign?.vehicleType).toFixed(2)}/mile
                       {jobToAssign?.distance ? ` (${jobToAssign.distance} miles)` : ''}
                       . Edit as needed — minimum applies per vehicle type.
                     </p>
