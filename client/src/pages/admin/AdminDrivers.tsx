@@ -297,10 +297,6 @@ export default function AdminDrivers() {
   const updateDriverMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Driver> }) => {
       const response = await apiRequest('PATCH', `/api/drivers/${id}`, data);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw Object.assign(new Error(errorData.error || 'Failed to update driver'), { code: errorData.code });
-      }
       return response.json();
     },
     onSuccess: (updatedDriver: any) => {

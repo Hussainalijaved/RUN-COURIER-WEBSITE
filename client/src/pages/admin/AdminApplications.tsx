@@ -107,10 +107,6 @@ export default function AdminApplications() {
         rejectionReason,
         documentStatuses,
       });
-      if (!response.ok) {
-        const err = await response.json();
-        throw Object.assign(new Error(err.error || 'Failed to review'), { code: err.code });
-      }
       return response.json();
     },
     onSuccess: (_, variables) => {
@@ -249,10 +245,6 @@ export default function AdminApplications() {
   const updateVehicleMutation = useMutation({
     mutationFn: async ({ id, vehicleType, vehicleRegistration }: { id: string; vehicleType: string; vehicleRegistration?: string }) => {
       const response = await apiRequest("PATCH", `/api/driver-applications/${id}`, { vehicleType, vehicleRegistration });
-      if (!response.ok) {
-        const err = await response.json();
-        throw Object.assign(new Error(err.error || 'Failed to update'), { code: err.code });
-      }
       return response.json();
     },
     onSuccess: (data) => {

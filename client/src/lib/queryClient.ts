@@ -4,7 +4,11 @@ import { supabase } from "./supabase";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+    const err = new Error(parsed?.error || `${res.status}: ${text}`);
+    if (parsed?.code) (err as any).code = parsed.code;
+    throw err;
   }
 }
 
