@@ -5811,6 +5811,11 @@ export async function registerRoutes(
           phone: localDriver.phone || null,
           role: 'driver',
           driverCode: localDriver.driverCode || null,
+          vehicleType: localDriver.vehicleType || 'car',
+          isVerified: localDriver.isVerified ?? false,
+          isAvailable: localDriver.isAvailable ?? false,
+          vehicle_registration: localDriver.vehicleRegistration || null,
+          is_active: localDriver.isActive ?? true,
           createdAt: null,
         });
       }
