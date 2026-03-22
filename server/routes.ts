@@ -8044,7 +8044,7 @@ export async function registerRoutes(
     if (!pickupPostcode || !deliveryPostcode || !vehicleType || typeof totalPrice !== 'number' || typeof distance !== 'number') {
       return res.status(400).json({ error: "Missing or invalid fields" });
     }
-    const validVehicles = ['motorbike', 'car', 'small_van', 'medium_van'];
+    const validVehicles = ['motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van'];
     if (!validVehicles.includes(vehicleType)) {
       return res.status(400).json({ error: "Invalid vehicle type" });
     }

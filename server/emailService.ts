@@ -214,6 +214,8 @@ export async function sendQuoteNotification(data: {
     car: 'Car',
     small_van: 'Small Van',
     medium_van: 'Medium Van',
+    lwb_van: 'LWB Van',
+    luton_van: 'Luton Van',
   };
   const vehicle = vehicleNames[data.vehicleType] || data.vehicleType;
   const dateStr = data.pickupDate ? new Date(data.pickupDate).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Not specified';
@@ -2008,6 +2010,8 @@ export async function sendBusinessQuoteEmail(
     car: 'Car',
     small_van: 'Small Van',
     medium_van: 'Medium Van',
+    lwb_van: 'LWB Van',
+    luton_van: 'Luton Van',
   };
 
   // Show both postcode and full address in the email
