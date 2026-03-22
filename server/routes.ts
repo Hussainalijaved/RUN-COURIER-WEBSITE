@@ -4645,7 +4645,19 @@ export async function registerRoutes(
     // Remove immutable fields from request body before processing
     const { id: _id, userId: _userId, driverCode: _driverCode, ...safeBody } = req.body;
     
-    const driver = await storage.updateDriver(req.params.id, safeBody);
+    let driver: any;
+    try {
+      driver = await storage.updateDriver(req.params.id, safeBody);
+    } catch (err: any) {
+      if (err.code === 'VEHICLE_TYPE_CONSTRAINT') {
+        return res.status(422).json({
+          error: `Vehicle type "${err.vehicleType}" is not yet supported in the database. Run the migration SQL first.`,
+          code: 'VEHICLE_TYPE_CONSTRAINT',
+          migrationSqlUrl: '/api/admin/vehicle-migration-sql',
+        });
+      }
+      throw err;
+    }
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
     }
@@ -9534,11 +9546,22 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/driver-applications/:id", asyncHandler(async (req, res) => {
-    const application = await storage.updateDriverApplication(req.params.id, req.body);
-    if (!application) {
-      return res.status(404).json({ error: "Application not found" });
+    try {
+      const application = await storage.updateDriverApplication(req.params.id, req.body);
+      if (!application) {
+        return res.status(404).json({ error: "Application not found" });
+      }
+      res.json(application);
+    } catch (err: any) {
+      if (err.code === 'VEHICLE_TYPE_CONSTRAINT') {
+        return res.status(422).json({
+          error: `Vehicle type "${err.vehicleType}" is not yet supported in the database. A one-time SQL migration is required.`,
+          code: 'VEHICLE_TYPE_CONSTRAINT',
+          migrationSqlUrl: '/api/admin/vehicle-migration-sql',
+        });
+      }
+      throw err;
     }
-    res.json(application);
   }));
 
   let supabaseFileCache: { files: Set<string>; timestamp: number } | null = null;
@@ -9933,13 +9956,25 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Status and reviewedBy are required" });
     }
 
-    const application = await storage.reviewDriverApplication(
-      req.params.id,
-      status as DriverApplicationStatus,
-      reviewedBy,
-      reviewNotes,
-      rejectionReason
-    );
+    let application: any;
+    try {
+      application = await storage.reviewDriverApplication(
+        req.params.id,
+        status as DriverApplicationStatus,
+        reviewedBy,
+        reviewNotes,
+        rejectionReason
+      );
+    } catch (err: any) {
+      if (err.code === 'VEHICLE_TYPE_CONSTRAINT') {
+        return res.status(422).json({
+          error: `Vehicle type not yet supported in database. Run the migration SQL first.`,
+          code: 'VEHICLE_TYPE_CONSTRAINT',
+          migrationSqlUrl: '/api/admin/vehicle-migration-sql',
+        });
+      }
+      throw err;
+    }
 
     if (!application) {
       return res.status(404).json({ error: "Application not found" });
@@ -15301,6 +15336,33 @@ export async function registerRoutes(
     const { id } = req.params;
     await getPgPool().query('DELETE FROM contacts WHERE id=$1', [id]);
     res.json({ success: true });
+  }));
+
+  // Vehicle type migration SQL — returns the SQL to run in Supabase SQL Editor
+  app.get('/api/admin/vehicle-migration-sql', asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
+    const sql = `-- Run this once in your Supabase SQL Editor to enable LWB Van & Luton Van vehicle types
+-- Step 1: Update CHECK constraints on all affected tables
+ALTER TABLE vehicles          DROP CONSTRAINT IF EXISTS vehicles_vehicle_type_check;
+ALTER TABLE vehicles          DROP CONSTRAINT IF EXISTS vehicles_type_check;
+ALTER TABLE drivers           DROP CONSTRAINT IF EXISTS drivers_vehicle_type_check;
+ALTER TABLE driver_applications DROP CONSTRAINT IF EXISTS driver_applications_vehicle_type_check;
+
+ALTER TABLE vehicles ADD CONSTRAINT vehicles_type_check
+  CHECK (type IN ('motorbike','car','small_van','medium_van','lwb_van','luton_van','large_van','flatbed'));
+ALTER TABLE drivers ADD CONSTRAINT drivers_vehicle_type_check
+  CHECK (vehicle_type IN ('motorbike','car','small_van','medium_van','lwb_van','luton_van','large_van','flatbed'));
+ALTER TABLE driver_applications ADD CONSTRAINT driver_applications_vehicle_type_check
+  CHECK (vehicle_type IN ('motorbike','car','small_van','medium_van','lwb_van','luton_van','large_van','flatbed'));
+
+-- Step 2: Insert the new vehicle types into the vehicles table
+INSERT INTO vehicles (id, type, name, description, max_weight, base_charge, per_mile_rate, rush_hour_rate)
+VALUES
+  (gen_random_uuid(), 'lwb_van',   'LWB Van',   'Extra-long deliveries up to 1000kg', 1000, 35.00, 1.60, 1.80),
+  (gen_random_uuid(), 'luton_van', 'Luton Van',  'Large volume deliveries up to 1200kg', 1200, 40.00, 1.70, 2.00)
+ON CONFLICT (type) DO NOTHING;
+`;
+    res.type('text/plain').send(sql);
   }));
 
   return httpServer;

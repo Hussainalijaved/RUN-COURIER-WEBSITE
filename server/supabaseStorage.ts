@@ -850,6 +850,9 @@ export class SupabaseStorage implements IStorage {
       error = retry.error;
     }
 
+    if (error?.code === '23514' && error.message?.includes('vehicle_type_check')) {
+      throw Object.assign(new Error('VEHICLE_TYPE_CONSTRAINT'), { code: 'VEHICLE_TYPE_CONSTRAINT', vehicleType: dbData.vehicle_type });
+    }
     if (error) {
       console.error('[SupabaseStorage] Error updating driver:', id, error);
       return undefined;
@@ -2021,6 +2024,9 @@ export class SupabaseStorage implements IStorage {
       const retry = await supabase.from('driver_applications').update(dbData).eq('id', id).select().single();
       updated = retry.data;
       error = retry.error;
+    }
+    if (error?.code === '23514' && error.message?.includes('vehicle_type_check')) {
+      throw Object.assign(new Error('VEHICLE_TYPE_CONSTRAINT'), { code: 'VEHICLE_TYPE_CONSTRAINT', vehicleType: dbData.vehicle_type });
     }
     if (error || !updated) {
       console.error('[Storage] updateDriverApplication error:', error, 'data:', updated);

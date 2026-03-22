@@ -77,6 +77,8 @@ export default function AdminApplications() {
   const [emailMessage, setEmailMessage] = useState('');
   const [emailTarget, setEmailTarget] = useState<DriverApplication | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [migrationSqlOpen, setMigrationSqlOpen] = useState(false);
+  const [migrationSql, setMigrationSql] = useState('');
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -105,6 +107,10 @@ export default function AdminApplications() {
         rejectionReason,
         documentStatuses,
       });
+      if (!response.ok) {
+        const err = await response.json();
+        throw Object.assign(new Error(err.error || 'Failed to review'), { code: err.code });
+      }
       return response.json();
     },
     onSuccess: (_, variables) => {
@@ -124,8 +130,12 @@ export default function AdminApplications() {
       setRejectionReason('');
       setDocumentStatuses({});
     },
-    onError: () => {
-      toast({ title: 'Failed to update application', variant: 'destructive' });
+    onError: (err: any) => {
+      if (err.code === 'VEHICLE_TYPE_CONSTRAINT') {
+        showMigrationSql();
+      } else {
+        toast({ title: 'Failed to update application', variant: 'destructive' });
+      }
     },
   });
 
@@ -226,9 +236,23 @@ export default function AdminApplications() {
     },
   });
 
+  const showMigrationSql = async () => {
+    try {
+      const res = await apiRequest('GET', '/api/admin/vehicle-migration-sql');
+      setMigrationSql(await res.text());
+    } catch {
+      setMigrationSql('-- Could not load SQL. Please visit /api/admin/vehicle-migration-sql directly.');
+    }
+    setMigrationSqlOpen(true);
+  };
+
   const updateVehicleMutation = useMutation({
     mutationFn: async ({ id, vehicleType, vehicleRegistration }: { id: string; vehicleType: string; vehicleRegistration?: string }) => {
       const response = await apiRequest("PATCH", `/api/driver-applications/${id}`, { vehicleType, vehicleRegistration });
+      if (!response.ok) {
+        const err = await response.json();
+        throw Object.assign(new Error(err.error || 'Failed to update'), { code: err.code });
+      }
       return response.json();
     },
     onSuccess: (data) => {
@@ -238,8 +262,12 @@ export default function AdminApplications() {
         setSelectedApplication({ ...selectedApplication, vehicleType: data.vehicleType, vehicleRegistration: data.vehicleRegistration });
       }
     },
-    onError: () => {
-      toast({ title: 'Failed to update vehicle type', variant: 'destructive' });
+    onError: (err: any) => {
+      if (err.code === 'VEHICLE_TYPE_CONSTRAINT') {
+        showMigrationSql();
+      } else {
+        toast({ title: 'Failed to update vehicle type', variant: 'destructive' });
+      }
     },
   });
 
@@ -1216,6 +1244,38 @@ export default function AdminApplications() {
                 <Mail className="h-4 w-4 mr-2" />
               )}
               Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vehicle Type Migration SQL Dialog */}
+      <Dialog open={migrationSqlOpen} onOpenChange={setMigrationSqlOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Database Migration Required
+            </DialogTitle>
+            <DialogDescription>
+              LWB Van and Luton Van vehicle types need a one-time update in your Supabase database.
+              Copy the SQL below and run it in your <strong>Supabase SQL Editor</strong>, then try again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative">
+            <pre className="text-xs bg-muted rounded-md p-4 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto font-mono">
+              {migrationSql}
+            </pre>
+          </div>
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setMigrationSqlOpen(false)}>Close</Button>
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(migrationSql);
+                toast({ title: 'SQL copied to clipboard' });
+              }}
+            >
+              Copy SQL
             </Button>
           </DialogFooter>
         </DialogContent>

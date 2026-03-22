@@ -154,8 +154,20 @@ export default function AdminDrivers() {
   const [resetPasswordResult, setResetPasswordResult] = useState<{tempPassword: string; driverEmail: string; driverName: string; driverCode: string} | null>(null);
   const [driverToResetPassword, setDriverToResetPassword] = useState<Driver | null>(null);
   const [showInactive, setShowInactive] = useState(true);
+  const [migrationSqlOpen, setMigrationSqlOpen] = useState(false);
+  const [migrationSql, setMigrationSql] = useState('');
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const showMigrationSql = async () => {
+    try {
+      const res = await apiRequest('GET', '/api/admin/vehicle-migration-sql');
+      setMigrationSql(await res.text());
+    } catch {
+      setMigrationSql('-- Visit /api/admin/vehicle-migration-sql to get the SQL.');
+    }
+    setMigrationSqlOpen(true);
+  };
 
   useRealtimeDrivers();
 
@@ -284,11 +296,10 @@ export default function AdminDrivers() {
 
   const updateDriverMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Driver> }) => {
-      // Use backend API for driver updates - more reliable than Edge Functions
       const response = await apiRequest('PATCH', `/api/drivers/${id}`, data);
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update driver');
+        throw Object.assign(new Error(errorData.error || 'Failed to update driver'), { code: errorData.code });
       }
       return response.json();
     },
@@ -303,8 +314,12 @@ export default function AdminDrivers() {
       toast({ title: 'Driver updated successfully' });
       setEditMode(false);
     },
-    onError: (error: Error) => {
-      toast({ title: error.message || 'Failed to update driver', variant: 'destructive' });
+    onError: (error: any) => {
+      if (error.code === 'VEHICLE_TYPE_CONSTRAINT' || error.message?.includes('VEHICLE_TYPE_CONSTRAINT')) {
+        showMigrationSql();
+      } else {
+        toast({ title: error.message || 'Failed to update driver', variant: 'destructive' });
+      }
     },
   });
 
@@ -2052,6 +2067,36 @@ export default function AdminDrivers() {
                   Reset Password
                 </Button>
               )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Vehicle Type Migration SQL Dialog */}
+        <Dialog open={migrationSqlOpen} onOpenChange={setMigrationSqlOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                Database Migration Required
+              </DialogTitle>
+              <DialogDescription>
+                LWB Van and Luton Van vehicle types need a one-time update in your Supabase database.
+                Copy the SQL below and run it in your <strong>Supabase SQL Editor</strong>, then try again.
+              </DialogDescription>
+            </DialogHeader>
+            <pre className="text-xs bg-muted rounded-md p-4 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto font-mono">
+              {migrationSql}
+            </pre>
+            <DialogFooter className="gap-2 flex-wrap">
+              <Button variant="outline" onClick={() => setMigrationSqlOpen(false)}>Close</Button>
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(migrationSql);
+                  toast({ title: 'SQL copied to clipboard' });
+                }}
+              >
+                Copy SQL
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
