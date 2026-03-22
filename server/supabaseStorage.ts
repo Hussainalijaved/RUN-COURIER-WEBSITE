@@ -411,6 +411,28 @@ export class SupabaseStorage implements IStorage {
         rushHourRate: "1.70",
         iconUrl: null,
       }],
+      ["lwb_van", {
+        id: "5",
+        type: "lwb_van" as VehicleType,
+        name: "LWB Van",
+        description: "Extra-long deliveries up to 1000kg",
+        maxWeight: 1000,
+        baseCharge: "35.00",
+        perMileRate: "1.60",
+        rushHourRate: "1.80",
+        iconUrl: null,
+      }],
+      ["luton_van", {
+        id: "6",
+        type: "luton_van" as VehicleType,
+        name: "Luton Van",
+        description: "Large volume deliveries up to 1200kg",
+        maxWeight: 1200,
+        baseCharge: "40.00",
+        perMileRate: "1.70",
+        rushHourRate: "2.00",
+        iconUrl: null,
+      }],
     ]);
   }
 
@@ -1534,6 +1556,17 @@ export class SupabaseStorage implements IStorage {
           if (existing) {
             existing.baseCharge = "10.00";
           }
+        }
+
+        // Sync any vehicle types that exist in defaults but not yet in the Supabase database.
+        // Note: Supabase vehicles table has a CHECK constraint on type — new types require a manual
+        // one-time SQL migration in the Supabase SQL editor (see /api/admin/vehicle-migration-sql).
+        // The in-memory map (this.vehicles) already has all types, so the app functions correctly
+        // even if the Supabase table only has the original 4 types.
+        const dbTypes = new Set(data.map((v: any) => v.type));
+        const missingTypes = Array.from(this.vehicles.values()).filter(v => !dbTypes.has(v.type));
+        if (missingTypes.length > 0) {
+          console.log(`[SupabaseStorage] ${missingTypes.length} vehicle type(s) not yet in Supabase DB (${missingTypes.map(v => v.type).join(', ')}). In-memory data is complete — app fully functional. Run migration via /api/admin/vehicle-migration-sql to persist.`);
         }
       } else {
         console.log('[SupabaseStorage] No vehicles found in database, inserting defaults');

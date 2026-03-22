@@ -61,7 +61,7 @@ const driverApplicationFormSchema = z.object({
   isBritish: z.boolean().default(false),
   nationalInsuranceNumber: z.string().min(9, "Valid National Insurance number is required"),
   rightToWorkShareCode: z.string().optional(),
-  vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van"]),
+  vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van", "lwb_van", "luton_van"]),
   vehicleRegistration: z.string().min(2, "Vehicle registration number is required"),
   vehicleMake: z.string().min(1, "Vehicle make is required"),
   vehicleModel: z.string().min(1, "Vehicle model is required"),
@@ -1051,6 +1051,8 @@ export default function DriverApplication() {
                             <SelectItem value="car">Car (up to 50kg)</SelectItem>
                             <SelectItem value="small_van">Small Van (up to 400kg)</SelectItem>
                             <SelectItem value="medium_van">Medium Van (up to 750kg)</SelectItem>
+                            <SelectItem value="lwb_van">LWB Van (up to 1000kg)</SelectItem>
+                            <SelectItem value="luton_van">Luton Van (up to 1200kg)</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>

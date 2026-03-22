@@ -9,7 +9,7 @@ export type CustomerType = "individual" | "business";
 // Flow: pending -> assigned/offered -> accepted -> arrived_pickup -> picked_up -> on_the_way -> delivered
 // Legacy: on_the_way_pickup, collected, on_the_way_delivery (kept for backward compatibility)
 export type JobStatus = "pending" | "assigned" | "offered" | "accepted" | "arrived_pickup" | "picked_up" | "on_the_way" | "delivered" | "cancelled" | "on_the_way_pickup" | "collected" | "on_the_way_delivery" | "failed";
-export type VehicleType = "motorbike" | "car" | "small_van" | "medium_van";
+export type VehicleType = "motorbike" | "car" | "small_van" | "medium_van" | "lwb_van" | "luton_van";
 export type DocumentType = 
   | "id_passport" | "driving_licence" | "right_to_work" | "vehicle_photo" | "insurance" | "goods_in_transit" | "hire_reward"
   | "driving_license" | "hire_and_reward_insurance" | "goods_in_transit_insurance" | "proof_of_identity" | "proof_of_address"
@@ -483,7 +483,7 @@ export const bookingQuoteSchema = z.object({
   pickupPostcode: z.string().min(3, "Valid postcode required"),
   deliveryPostcode: z.string().min(3, "Valid postcode required"),
   weight: z.number().min(0.1, "Weight must be greater than 0"),
-  vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van"]),
+  vehicleType: z.enum(["motorbike", "car", "small_van", "medium_van", "lwb_van", "luton_van"]),
   isMultiDrop: z.boolean().default(false),
   multiDropStops: z.array(z.object({
     postcode: z.string(),

@@ -146,7 +146,7 @@ export default function AdminPricing() {
       });
 
       // Save vehicle pricing for each vehicle
-      const vehicleTypes: VehicleType[] = ['motorbike', 'car', 'small_van', 'medium_van'];
+      const vehicleTypes: VehicleType[] = ['motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van'];
       for (const type of vehicleTypes) {
         const vehicle = config.vehicles[type];
         await vehicleMutation.mutateAsync({
@@ -195,6 +195,8 @@ export default function AdminPricing() {
     car: Car,
     small_van: Truck,
     medium_van: Package,
+    lwb_van: Truck,
+    luton_van: Truck,
   };
 
   const isLoading = pricingLoading || vehiclesLoading;

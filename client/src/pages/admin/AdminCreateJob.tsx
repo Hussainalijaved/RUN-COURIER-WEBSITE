@@ -91,7 +91,7 @@ const createJobSchema = z.object({
   senderPhone: z.string().optional(),
   companyName: z.string().optional(),
   weight: z.coerce.number().optional().default(1),
-  vehicleType: z.enum(['motorbike', 'car', 'small_van', 'medium_van']),
+  vehicleType: z.enum(['motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van']),
   isMultiDrop: z.boolean().default(false),
   isReturnTrip: z.boolean().default(false),
   driverId: z.string().optional(),
@@ -106,6 +106,7 @@ const DRIVER_MIN_PRICES: Record<string, number> = {
   car: 12,
   small_van: 15,
   medium_van: 17,
+  lwb_van: 17,
   large_van: 17,
   luton_van: 17,
   flatbed: 17,
@@ -1201,6 +1202,8 @@ export default function AdminCreateJob() {
                                 <SelectItem value="car">Car (up to 50kg)</SelectItem>
                                 <SelectItem value="small_van">Small Van (up to 400kg)</SelectItem>
                                 <SelectItem value="medium_van">Medium Van (up to 750kg)</SelectItem>
+                                <SelectItem value="lwb_van">LWB Van (up to 1000kg)</SelectItem>
+                                <SelectItem value="luton_van">Luton Van (up to 1200kg)</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -1375,7 +1378,7 @@ export default function AdminCreateJob() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">
-                              Distance Charge ({distance.toFixed(1)} mi × £{quote.rushHourApplied ? '1.50' : (vehicleType === 'motorbike' ? '1.30' : vehicleType === 'car' ? '1.20' : vehicleType === 'small_van' ? '1.30' : '1.40')}/mi)
+                              Distance Charge ({distance.toFixed(1)} mi × £{quote.rushHourApplied ? (vehicleType === 'luton_van' ? '2.00' : vehicleType === 'lwb_van' ? '1.80' : vehicleType === 'medium_van' ? '1.60' : vehicleType === 'small_van' ? '1.50' : vehicleType === 'car' ? '1.40' : '1.50') : (vehicleType === 'luton_van' ? '1.70' : vehicleType === 'lwb_van' ? '1.60' : vehicleType === 'medium_van' ? '1.40' : vehicleType === 'small_van' ? '1.30' : vehicleType === 'car' ? '1.20' : '1.30')}/mi)
                             </span>
                             <span data-testid="text-distance-charge">{formatPrice(quote.distanceCharge)}</span>
                           </div>

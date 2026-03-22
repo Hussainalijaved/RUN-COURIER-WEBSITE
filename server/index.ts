@@ -504,6 +504,23 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Migrate vehicles table to support new vehicle types (lwb_van, luton_van)
+  (async () => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      // Drop the old restrictive type check and add a new one covering all vehicle types
+      await db.execute(sql`ALTER TABLE vehicles DROP CONSTRAINT IF EXISTS vehicles_type_check`);
+      await db.execute(sql`
+        ALTER TABLE vehicles ADD CONSTRAINT vehicles_type_check
+        CHECK (type IN ('motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van', 'large_van', 'flatbed'))
+      `);
+      console.log("[MIGRATION] Vehicles type constraint updated successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Vehicles type constraint migration error:", e?.message);
+    }
+  })();
+
   (async () => {
     try {
       const { db } = await import('./db');

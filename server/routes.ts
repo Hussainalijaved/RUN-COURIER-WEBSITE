@@ -400,6 +400,8 @@ const PRICING_CONFIG = {
     car: { name: "Car", baseCharge: 19, perMileRate: 1.2 },
     small_van: { name: "Small Van", baseCharge: 25, perMileRate: 1.3 },
     medium_van: { name: "Medium Van", baseCharge: 30, perMileRate: 1.4 },
+    lwb_van: { name: "LWB Van", baseCharge: 35, perMileRate: 1.6 },
+    luton_van: { name: "Luton Van", baseCharge: 40, perMileRate: 1.7 },
   }
 } as const;
 
@@ -436,6 +438,7 @@ function getMinDriverPrice(vehicleType: string | null | undefined): number {
     case 'car':       return 12;
     case 'small_van': return 15;
     case 'medium_van': return 17;
+    case 'lwb_van':    return 17;
     case 'large_van':  return 17;
     case 'luton_van':  return 17;
     case 'flatbed':    return 17;

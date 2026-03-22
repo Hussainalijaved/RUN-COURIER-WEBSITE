@@ -67,6 +67,8 @@ const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: n
   { type: 'car', icon: Car, name: 'Car', maxWeight: 50 },
   { type: 'small_van', icon: Truck, name: 'Small Van', maxWeight: 400 },
   { type: 'medium_van', icon: Package, name: 'Medium Van', maxWeight: 750 },
+  { type: 'lwb_van', icon: Truck, name: 'LWB Van', maxWeight: 1000 },
+  { type: 'luton_van', icon: Truck, name: 'Luton Van', maxWeight: 1200 },
 ];
 
 export default function Quote() {

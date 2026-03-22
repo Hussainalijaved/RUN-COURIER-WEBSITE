@@ -366,6 +366,8 @@ export default function AdminBusinessQuote() {
     { value: 'car', label: 'Car (up to 50kg)' },
     { value: 'small_van', label: 'Small Van (up to 400kg)' },
     { value: 'medium_van', label: 'Medium Van (up to 750kg)' },
+    { value: 'lwb_van', label: 'LWB Van (up to 1000kg)' },
+    { value: 'luton_van', label: 'Luton Van (up to 1200kg)' },
   ];
 
   return (

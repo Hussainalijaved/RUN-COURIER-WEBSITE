@@ -966,13 +966,12 @@ export default function AdminApplications() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="motorbike">Motorbike</SelectItem>
                             <SelectItem value="car">Car</SelectItem>
                             <SelectItem value="small_van">Small Van</SelectItem>
                             <SelectItem value="medium_van">Medium Van</SelectItem>
-                            <SelectItem value="large_van">Large Van</SelectItem>
+                            <SelectItem value="lwb_van">LWB Van</SelectItem>
                             <SelectItem value="luton_van">Luton Van</SelectItem>
-                            <SelectItem value="xlwb_van">XLWB Van</SelectItem>
-                            <SelectItem value="motorcycle">Motorcycle</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

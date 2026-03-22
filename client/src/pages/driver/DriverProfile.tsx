@@ -61,6 +61,8 @@ const vehicleTypes: { value: VehicleType; label: string }[] = [
   { value: 'car', label: 'Car' },
   { value: 'small_van', label: 'Small Van' },
   { value: 'medium_van', label: 'Medium Van' },
+  { value: 'lwb_van', label: 'LWB Van' },
+  { value: 'luton_van', label: 'Luton Van' },
 ];
 
 export default function DriverProfile() {

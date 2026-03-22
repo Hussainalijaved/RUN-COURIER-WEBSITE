@@ -129,6 +129,7 @@ const DRIVER_MIN_PRICES: Record<string, number> = {
   car: 12,
   small_van: 15,
   medium_van: 17,
+  lwb_van: 17,
   large_van: 17,
   luton_van: 17,
   flatbed: 17,
@@ -1386,12 +1387,13 @@ export default function SupervisorJobs() {
     });
   }, [supabaseDrivers, supabaseDriversError, drivers]);
 
-  const vehicleTypeOrder = ['motorbike', 'car', 'small_van', 'medium_van', 'large_van', 'luton_van', 'flatbed'];
+  const vehicleTypeOrder = ['motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'large_van', 'luton_van', 'flatbed'];
   const vehicleTypeLabels: Record<string, string> = {
     motorbike: 'Motorbike',
     car: 'Car',
     small_van: 'Small Van',
     medium_van: 'Medium Van',
+    lwb_van: 'LWB Van',
     large_van: 'Large Van',
     luton_van: 'Luton Van',
     flatbed: 'Flatbed',
@@ -3051,6 +3053,8 @@ export default function SupervisorJobs() {
                           <SelectItem value="car">Car</SelectItem>
                           <SelectItem value="small_van">Small Van</SelectItem>
                           <SelectItem value="medium_van">Medium Van</SelectItem>
+                          <SelectItem value="lwb_van">LWB Van</SelectItem>
+                          <SelectItem value="luton_van">Luton Van</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

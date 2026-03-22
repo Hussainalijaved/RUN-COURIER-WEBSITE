@@ -506,6 +506,8 @@ export default function SupervisorDrivers() {
       'car': ['vehicle_photo_front', 'vehicle_photo_back'],
       'small_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
       'medium_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+      'lwb_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
+      'luton_van': ['vehicle_photo_front', 'vehicle_photo_back', 'vehicle_photo_left', 'vehicle_photo_right', 'vehicle_photo_load_space'],
     };
 
     const requiredPhotos = vehiclePhotoRequirements[vehicleType] || ['vehicle_photo_front', 'vehicle_photo_back'];
@@ -1077,6 +1079,8 @@ export default function SupervisorDrivers() {
                                 <SelectItem value="car">Car</SelectItem>
                                 <SelectItem value="small_van">Small Van</SelectItem>
                                 <SelectItem value="medium_van">Medium Van</SelectItem>
+                                <SelectItem value="lwb_van">LWB Van</SelectItem>
+                                <SelectItem value="luton_van">Luton Van</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

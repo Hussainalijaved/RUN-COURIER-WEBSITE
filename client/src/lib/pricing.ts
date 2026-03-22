@@ -68,6 +68,20 @@ export const defaultPricingConfig: PricingConfig = {
       rushHourRate: 1.60,
       maxWeight: 750,
     },
+    lwb_van: {
+      name: "LWB Van",
+      baseCharge: 35,
+      perMileRate: 1.60,
+      rushHourRate: 1.80,
+      maxWeight: 1000,
+    },
+    luton_van: {
+      name: "Luton Van",
+      baseCharge: 40,
+      perMileRate: 1.70,
+      rushHourRate: 2.00,
+      maxWeight: 1200,
+    },
   },
   weightSurcharges: [
     { min: 10, max: 20, charge: 10 },
@@ -254,7 +268,9 @@ export function getVehicleForWeight(weight: number): VehicleType {
   if (weight <= vehicles.motorbike.maxWeight) return "motorbike";
   if (weight <= vehicles.car.maxWeight) return "car";
   if (weight <= vehicles.small_van.maxWeight) return "small_van";
-  return "medium_van";
+  if (weight <= vehicles.medium_van.maxWeight) return "medium_van";
+  if (weight <= vehicles.lwb_van.maxWeight) return "lwb_van";
+  return "luton_van";
 }
 
 export function getVehicleForWeightAndDistance(weight: number, distance: number): VehicleType {
@@ -268,7 +284,9 @@ export function getVehicleForWeightAndDistance(weight: number, distance: number)
   }
   if (weight <= vehicles.car.maxWeight) return "car";
   if (weight <= vehicles.small_van.maxWeight) return "small_van";
-  return "medium_van";
+  if (weight <= vehicles.medium_van.maxWeight) return "medium_van";
+  if (weight <= vehicles.lwb_van.maxWeight) return "lwb_van";
+  return "luton_van";
 }
 
 export function shouldSwitchVehicle(vehicleType: VehicleType, distance: number): VehicleType | null {

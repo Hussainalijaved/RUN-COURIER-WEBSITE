@@ -1,0 +1,251 @@
+Update the Run Courier system to fully add 2 new vehicle types everywhere in the platform:
+
+1. LWB Van
+2. Luton Van
+
+IMPORTANT RULES:
+- Do not break any existing features
+- Do not remove or change existing vehicle types
+- Do not change current prices for Motorbike, Car, Small Van, or Medium Van
+- Only extend the system carefully
+- Keep the same design style, same layout, same logic, and same database pattern already used in the project
+- Make sure all existing pages continue working
+
+==================================================
+EXISTING VEHICLES
+==================================================
+Current vehicle types already in system:
+- motorbike
+- car
+- small_van
+- medium_van
+
+Add these new vehicle types:
+- lwb_van
+- luton_van
+
+==================================================
+NEW VEHICLE SETTINGS
+==================================================
+Add the following pricing and weight settings:
+
+LWB Van:
+- label: LWB Van
+- vehicleType: lwb_van
+- maxWeight: 1000
+- baseCharge: 35
+- perMile: 1.6
+- rushHour: 1.8
+
+Luton Van:
+- label: Luton Van
+- vehicleType: luton_van
+- maxWeight: 1200
+- baseCharge: 40
+- perMile: 1.7
+- rushHour: 2.0
+
+==================================================
+ADMIN PRICING PAGE
+==================================================
+Update the admin pricing/settings page to display the 2 new vehicles using the same card style as existing vehicles.
+
+Each new card must include:
+- vehicle name
+- max weight
+- base charge input
+- per mile input
+- rush hour input
+
+Use the same UI design and spacing as the current cards for:
+- Motorbike
+- Car
+- Small Van
+- Medium Van
+
+Place the new vehicles in correct order:
+1. Motorbike
+2. Car
+3. Small Van
+4. Medium Van
+5. LWB Van
+6. Luton Van
+
+==================================================
+DATABASE / SUPABASE
+==================================================
+Update the Supabase data structure only if needed, and only using the same pattern already used by current vehicles.
+
+Requirements:
+- Store LWB Van and Luton Van in the same pricing/settings source as the other vehicles
+- Keep naming consistent with the current schema
+- Do not duplicate unnecessary tables
+- If vehicles are stored as JSON/object fields, extend that object
+- If vehicles are stored as rows, add the two new rows
+- Make sure the system can read and save both new vehicles exactly like the existing ones
+
+Vehicle keys must be:
+- motorbike
+- car
+- small_van
+- medium_van
+- lwb_van
+- luton_van
+
+==================================================
+PRICE CALCULATOR
+==================================================
+Update the delivery price calculator so it supports:
+- lwb_van
+- luton_van
+
+The calculator must use:
+- base charge
+- per mile
+- rush hour price
+- weight logic
+- all existing surcharge rules already in the system
+
+Do not change the existing pricing logic for:
+- weight surcharges
+- rush hour time windows
+- waiting time
+- multi-drop
+- central London surcharge
+- return trip
+unless already built to work automatically for all vehicle types
+
+Make sure selecting:
+- LWB Van uses base 35, per mile 1.6, rush 1.8
+- Luton Van uses base 40, per mile 1.7, rush 2.0
+
+==================================================
+BOOKING SYSTEM
+==================================================
+Update the booking flow so customers and admins can choose:
+- LWB Van
+- Luton Van
+
+Requirements:
+- Show both in vehicle selection lists
+- Keep same style as other vehicle options
+- Make sure selected vehicle saves correctly to database
+- Make sure booking summary shows correct vehicle name
+- Make sure final quote uses the correct pricing
+- Make sure jobs created with these vehicles work exactly like other jobs
+
+==================================================
+ADMIN JOB MANAGEMENT
+==================================================
+Update admin panel jobs/order management so the new vehicle types:
+- display correctly in job cards
+- display correctly in job details
+- can be filtered if filters exist
+- can be assigned like existing vehicle types
+- can be edited like existing vehicle types
+
+==================================================
+DRIVER SYSTEM
+==================================================
+Update the driver system to support the 2 new vehicle types:
+- lwb_van
+- luton_van
+
+Requirements:
+- driver profile can save one of these vehicle types
+- admin can assign LWB jobs to LWB drivers
+- admin can assign Luton jobs to Luton drivers
+- matching logic must include the new types
+- driver job list must show the correct vehicle type
+- dispatch/assignment flow must not break
+
+If there is vehicle matching logic, update it safely to include:
+- motorbike
+- car
+- small_van
+- medium_van
+- lwb_van
+- luton_van
+
+==================================================
+TRACKING / JOB STATUS
+==================================================
+If the system displays vehicle type in tracking or status pages, ensure:
+- LWB Van displays properly
+- Luton Van displays properly
+
+Do not change any existing tracking behavior unless needed for compatibility.
+
+==================================================
+FORMS / DROPDOWNS / LABELS
+==================================================
+Search the whole project and update every relevant dropdown, select input, filter, badge, label, and summary component that currently uses vehicle types.
+
+Add:
+- LWB Van
+- Luton Van
+
+Make sure user-facing labels are:
+- LWB Van
+- Luton Van
+
+Make sure internal values are:
+- lwb_van
+- luton_van
+
+==================================================
+BACKEND VALIDATION
+==================================================
+Update all backend validation, enums, schema definitions, TypeScript types, constants, and helper functions so the new vehicle types are accepted everywhere.
+
+This includes:
+- API validation
+- form validation
+- Supabase insert/update logic
+- quote calculation logic
+- job creation logic
+- assignment logic
+- admin update logic
+
+Prevent any “invalid vehicle type” errors.
+
+==================================================
+FRONTEND CONSISTENCY
+==================================================
+Keep the same visual design.
+Do not redesign the page.
+Do not move unrelated sections.
+Do not change colors or branding.
+Do not change the existing customer experience except to add the two new vehicle options.
+
+==================================================
+TESTING REQUIREMENTS
+==================================================
+After implementation, test these scenarios:
+
+1. Admin pricing page loads and shows:
+- Motorbike
+- Car
+- Small Van
+- Medium Van
+- LWB Van
+- Luton Van
+
+2. LWB pricing saves and reloads correctly
+3. Luton pricing saves and reloads correctly
+4. Customer can choose LWB and get correct quote
+5. Customer can choose Luton and get correct quote
+6. Booking creates correct vehicleType in database
+7. Admin sees correct vehicle type in jobs page
+8. Driver with LWB profile can receive LWB jobs
+9. Driver with Luton profile can receive Luton jobs
+10. No existing vehicle logic breaks
+
+==================================================
+OUTPUT
+==================================================
+Implement the code changes directly in the project.
+Show all updated files.
+Explain any schema changes clearly.
+Keep the solution clean, minimal, and production-safe.
+Do not touch unrelated logic.

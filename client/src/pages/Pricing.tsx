@@ -51,6 +51,22 @@ const vehicleDetails = [
     features: ['Up to 750 kg', 'Furniture & equipment', 'Large orders'],
     popular: false,
   },
+  {
+    type: 'lwb_van',
+    icon: Truck,
+    name: 'LWB Van',
+    description: 'Long wheelbase van for larger loads',
+    features: ['Up to 1000 kg', 'Extended load space', 'Heavy cargo'],
+    popular: false,
+  },
+  {
+    type: 'luton_van',
+    icon: Truck,
+    name: 'Luton Van',
+    description: 'Maximum capacity for large volume deliveries',
+    features: ['Up to 1200 kg', 'Box body', 'Tail-lift available'],
+    popular: false,
+  },
 ];
 
 const additionalCharges = [
