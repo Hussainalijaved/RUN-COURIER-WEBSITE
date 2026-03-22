@@ -27,7 +27,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -1567,21 +1569,41 @@ export default function AdminCreateJob() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="none">No driver (pending assignment)</SelectItem>
-                              {availableDrivers.map((driver) => (
-                                <SelectItem key={driver.id} value={driver.id}>
-                                  <div className="flex items-center gap-2">
-                                    {driver.driverCode && (
-                                      <Badge variant="secondary" className="text-xs font-mono">
-                                        {driver.driverCode}
-                                      </Badge>
-                                    )}
-                                    <span>{driver.fullName || driver.vehicleRegistration}</span>
-                                    <Badge variant="outline" className="text-xs">
-                                      {driver.vehicleType}
-                                    </Badge>
-                                  </div>
-                                </SelectItem>
-                              ))}
+                              {(() => {
+                                const VEHICLE_ORDER: { key: string; label: string }[] = [
+                                  { key: 'motorbike', label: 'Motorbike' },
+                                  { key: 'car', label: 'Car' },
+                                  { key: 'small_van', label: 'Small Van' },
+                                  { key: 'medium_van', label: 'Medium Van' },
+                                  { key: 'lwb_van', label: 'LWB Van' },
+                                  { key: 'luton_van', label: 'Luton Van' },
+                                ];
+                                return VEHICLE_ORDER.map(({ key, label }) => {
+                                  const group = availableDrivers.filter(
+                                    d => (d.vehicleType || 'car').toLowerCase() === key
+                                  );
+                                  if (group.length === 0) return null;
+                                  return (
+                                    <SelectGroup key={key}>
+                                      <SelectLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-2 py-1">
+                                        {label} ({group.length})
+                                      </SelectLabel>
+                                      {group.map((driver) => (
+                                        <SelectItem key={driver.id} value={driver.id}>
+                                          <div className="flex items-center gap-2">
+                                            {driver.driverCode && (
+                                              <Badge variant="secondary" className="text-xs font-mono">
+                                                {driver.driverCode}
+                                              </Badge>
+                                            )}
+                                            <span>{driver.fullName || driver.vehicleRegistration}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  );
+                                });
+                              })()}
                             </SelectContent>
                           </Select>
                           <FormDescription>
