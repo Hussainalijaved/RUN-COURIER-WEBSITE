@@ -354,18 +354,19 @@
 
 /* Smooth page transitions - opt-in only */
 .page-transition {
-  animation: pageSlideIn 200ms ease-out forwards;
+  animation: pageFadeIn 180ms ease-out forwards;
 }
 
-@keyframes pageSlideIn {
-  from { 
-    opacity: 0; 
-    transform: translateX(-8px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateX(0); 
-  }
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Page loader progress bar animation */
+@keyframes progress {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0); }
+  100% { transform: translateX(100%); }
 }
 
 /* Fast badge/status updates - opt-in utility */

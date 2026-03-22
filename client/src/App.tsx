@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation, Redirect } from "wouter";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, lazy, Suspense, startTransition } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,8 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
 import { BookingProvider } from "@/context/BookingContext";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
-import { Loader2 } from "lucide-react";
 import { FloatingButtons } from "@/components/FloatingButtons";
+import { NavigationProgress } from "@/components/NavigationProgress";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -30,10 +30,57 @@ function ScrollToTop() {
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-screen" data-testid="page-loader">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex items-center justify-center min-h-[50vh]" data-testid="page-loader">
+      <div className="w-40 h-0.5 bg-muted rounded-full overflow-hidden">
+        <div className="h-full w-1/2 bg-primary rounded-full origin-left" style={{ animation: 'progress 1.2s ease-in-out infinite' }} />
+      </div>
     </div>
   );
+}
+
+function usePrefetchAllRoutes() {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startTransition(() => {
+        import("@/pages/admin/AdminDashboard");
+        import("@/pages/admin/AdminJobs");
+        import("@/pages/admin/AdminDrivers");
+        import("@/pages/admin/AdminApplications");
+        import("@/pages/admin/AdminMap");
+        import("@/pages/admin/AdminCreateJob");
+        import("@/pages/admin/AdminCustomers");
+        import("@/pages/admin/AdminDocuments");
+        import("@/pages/admin/AdminDriverPayments");
+        import("@/pages/admin/AdminInvoices");
+        import("@/pages/admin/AdminPricing");
+        import("@/pages/admin/AdminContracts");
+        import("@/pages/admin/AdminNotices");
+        import("@/pages/admin/AdminSupervisors");
+        import("@/pages/admin/AdminProfile");
+        import("@/pages/admin/AdminContacts");
+        import("@/pages/supervisor/SupervisorDashboard");
+        import("@/pages/supervisor/SupervisorJobs");
+        import("@/pages/supervisor/SupervisorMap");
+        import("@/pages/supervisor/SupervisorDrivers");
+        import("@/pages/supervisor/SupervisorCustomers");
+        import("@/pages/supervisor/SupervisorInvoices");
+        import("@/pages/supervisor/SupervisorHistory");
+        import("@/pages/supervisor/SupervisorProfile");
+        import("@/pages/customer/CustomerDashboard");
+        import("@/pages/customer/CustomerOrders");
+        import("@/pages/customer/CustomerProfile");
+        import("@/pages/customer/CustomerInvoices");
+        import("@/pages/driver/DriverDashboard");
+        import("@/pages/driver/DriverJobs");
+        import("@/pages/driver/DriverHistory");
+        import("@/pages/driver/DriverDocuments");
+        import("@/pages/driver/DriverProfile");
+        import("@/pages/driver/DriverPayments");
+        import("@/pages/driver/DriverNotices");
+      });
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 }
 
 import NotFound from "@/pages/not-found";
@@ -512,16 +559,26 @@ function Router() {
   );
 }
 
+function AppContent() {
+  usePrefetchAllRoutes();
+  return (
+    <>
+      <NavigationProgress />
+      <ScrollToTop />
+      <Toaster />
+      <FloatingButtons />
+      <Router />
+    </>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
           <BookingProvider>
-            <ScrollToTop />
-            <Toaster />
-            <FloatingButtons />
-            <Router />
+            <AppContent />
           </BookingProvider>
         </AuthProvider>
       </TooltipProvider>

@@ -1,5 +1,6 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, Suspense, useTransition } from 'react';
 import { useLocation } from 'wouter';
+import { NavigationProgress } from '@/components/NavigationProgress';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -132,9 +133,29 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
   ],
 };
 
+function ContentSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse" aria-hidden="true">
+      <div className="h-8 w-48 rounded-md bg-muted" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-28 rounded-md bg-muted" />
+        ))}
+      </div>
+      <div className="h-64 rounded-md bg-muted" />
+      <div className="h-48 rounded-md bg-muted" />
+    </div>
+  );
+}
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, signOut } = useAuth();
+  const [isPending, startTransition] = useTransition();
+
+  const navigate = (href: string) => {
+    startTransition(() => setLocation(href));
+  };
 
   if (!user) {
     return <div className="p-8">Loading...</div>;
@@ -153,7 +174,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex h-screen w-full">
         <Sidebar>
           <SidebarHeader className="border-b border-sidebar-border p-4">
-            <a href="/" className="flex items-center gap-2 cursor-pointer" data-testid="sidebar-logo-link" onClick={(e) => { e.preventDefault(); setLocation('/'); }}>
+            <a href="/" className="flex items-center gap-2 cursor-pointer" data-testid="sidebar-logo-link" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
@@ -184,7 +205,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       >
                         <a
                           href={item.href}
-                          onClick={(e) => { e.preventDefault(); setLocation(item.href); }}
+                          onClick={(e) => { e.preventDefault(); navigate(item.href); }}
                         >
                           <item.icon className="h-4 w-4" />
                           <span>{item.label}</span>
@@ -203,7 +224,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <SidebarMenuItem>
                     <SidebarMenuButton 
                       tooltip="Home"
-                      onClick={(e) => { e.preventDefault(); setLocation('/'); }}
+                      onClick={(e) => { e.preventDefault(); navigate('/'); }}
                       className="cursor-pointer"
                       data-testid="nav-home"
                     >
@@ -249,7 +270,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         href={`/${user.role}/profile`} 
                         className="cursor-pointer flex items-center" 
                         data-testid="menu-profile-settings"
-                        onClick={(e) => { e.preventDefault(); setLocation(`/${user.role}/profile`); }}
+                        onClick={(e) => { e.preventDefault(); navigate(`/${user.role}/profile`); }}
                       >
                         <Settings className="mr-2 h-4 w-4" />
                         Profile Settings
@@ -272,6 +293,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </Sidebar>
 
         <div className="flex flex-col flex-1 overflow-hidden">
+          <NavigationProgress />
           <header className="flex h-12 sm:h-14 items-center gap-2 sm:gap-4 border-b border-border bg-background px-3 sm:px-4">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex-1" />
@@ -281,7 +303,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </header>
 
           <main className="flex-1 overflow-auto bg-background p-3 sm:p-4 lg:p-6" data-scroll-container>
-            {children}
+            <Suspense fallback={<ContentSkeleton />}>
+              <div
+                className="page-transition"
+                style={{ opacity: isPending ? 0.5 : 1, transition: 'opacity 150ms ease-out', pointerEvents: isPending ? 'none' : 'auto' }}
+              >
+                {children}
+              </div>
+            </Suspense>
           </main>
         </div>
       </div>
