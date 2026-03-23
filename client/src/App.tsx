@@ -58,6 +58,7 @@ function usePrefetchAllRoutes() {
         import("@/pages/admin/AdminSupervisors");
         import("@/pages/admin/AdminProfile");
         import("@/pages/admin/AdminContacts");
+        import("@/pages/admin/AdminRoutePlanner");
         import("@/pages/supervisor/SupervisorDashboard");
         import("@/pages/supervisor/SupervisorJobs");
         import("@/pages/supervisor/SupervisorMap");
@@ -133,6 +134,7 @@ const AdminSupervisors = lazy(() => import("@/pages/admin/AdminSupervisors"));
 const AdminProfile = lazy(() => import("@/pages/admin/AdminProfile"));
 const AdminContacts = lazy(() => import("@/pages/admin/AdminContacts"));
 const PostcodeMap = lazy(() => import("@/pages/admin/PostcodeMap"));
+const AdminRoutePlanner = lazy(() => import("@/pages/admin/AdminRoutePlanner"));
 
 const SupervisorLogin = lazy(() => import("@/pages/supervisor/SupervisorLogin"));
 const SupervisorRegister = lazy(() => import("@/pages/supervisor/SupervisorRegister"));
@@ -339,6 +341,11 @@ function Router() {
         <Route path="/admin/contacts">
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminContacts />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/route-planner">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminRoutePlanner />
           </ProtectedRoute>
         </Route>
         <Route path="/admin/profile">

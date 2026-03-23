@@ -77,6 +77,9 @@ The web admin dashboard and Expo mobile app share a unified backend. This includ
 ### Job Geocoding
 Jobs are automatically geocoded using Google Maps API to obtain coordinates, which are synced to Supabase for display on the driver mobile app's map.
 
+### Route Planner
+Admins can plan multi-stop delivery routes at `/admin/route-planner`. Features include: adding multiple postcodes/addresses as stops, reordering stops with up/down controls, configuring custom start/end points (first stop, last stop, or custom postcode), auto-optimization toggle, interactive Google Maps route display using the Directions API, per-leg breakdown (distance and time), copy-to-clipboard, open in Google Maps link, and sending the route to a driver via email (using Resend) or via WhatsApp (`wa.me` deep link). Backend email endpoint: `POST /api/route-planner/send-email`. Reuses existing `/api/maps/optimized-route` for distance/time calculations.
+
 ### Driver Payment System
 Admins can pay drivers via bank transfer from the admin panel. The multi-step flow shows driver bank details, accepts an amount, confirms the payment, and records it. Email confirmation is sent to the driver upon success. Payment history includes delete functionality.
 

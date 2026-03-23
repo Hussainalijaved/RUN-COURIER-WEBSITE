@@ -53,6 +53,7 @@ import {
   Search,
   BookUser,
   Layers,
+  Route,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -77,6 +78,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/business-quote', label: 'Business Quote', icon: Calculator },
     { href: '/admin/map', label: 'Live Map', icon: MapPin },
     { href: '/admin/postcode-map', label: 'Postcode Map', icon: Layers },
+    { href: '/admin/route-planner', label: 'Route Planner', icon: Route },
     { href: '/admin/documents', label: 'Documents', icon: FileText },
     { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
     { href: '/admin/contracts', label: 'Contracts', icon: FileSignature },

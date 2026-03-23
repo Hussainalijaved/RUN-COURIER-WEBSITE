@@ -11918,6 +11918,104 @@ export async function registerRoutes(
     }
   }));
 
+  // ============= ROUTE PLANNER =============
+
+  app.post("/api/route-planner/send-email", asyncHandler(async (req, res) => {
+    const { to, driverName, routeText, mapsLink, legs, stops, totalDistance, totalDuration } = req.body;
+
+    if (!to) return res.status(400).json({ error: "Recipient email is required" });
+
+    const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const formatDist = (m: number) => `${m.toFixed(1)} mi`;
+    const formatTime = (min: number) => {
+      if (min < 60) return `${min} min`;
+      const h = Math.floor(min / 60);
+      const m2 = min % 60;
+      return m2 > 0 ? `${h}h ${m2}min` : `${h}h`;
+    };
+
+    const stopsHtml = (stops || []).map((s: any, i: number) => `
+      <tr>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${i === 0 ? '#16a34a' : i === (stops.length - 1) ? '#dc2626' : '#2563eb'};color:#fff;font-size:11px;font-weight:700;">${ALPHA[i] || (i + 1)}</span>
+        </td>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee;">${s.postcode}</td>
+      </tr>`).join('');
+
+    const legsHtml = (legs || []).map((leg: any, i: number) => `
+      <tr>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee; font-size:12px;">${ALPHA[i] || (i + 1)} → ${ALPHA[i + 1] || (i + 2)}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee; font-size:12px;">${leg.from} → ${leg.to}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee; font-size:12px; text-align:right;">${formatDist(leg.distance)}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee; font-size:12px; text-align:right;">${formatTime(leg.duration)}</td>
+      </tr>`).join('');
+
+    const html = `
+<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1a1a1a;background:#f9f9f9;margin:0;padding:20px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+  <div style="background:#2563eb;padding:20px 24px;">
+    <h1 style="color:#fff;margin:0;font-size:20px;">Route Plan</h1>
+    <p style="color:#bfdbfe;margin:4px 0 0;font-size:14px;">Run Courier Logistics</p>
+  </div>
+  <div style="padding:24px;">
+    <p style="margin:0 0 16px;">Hi ${driverName || 'there'},</p>
+    <p style="margin:0 0 20px;color:#555;">Your route plan is ready. Here are the details:</p>
+
+    <div style="display:flex;gap:16px;margin-bottom:20px;">
+      <div style="flex:1;background:#f0f9ff;border-radius:6px;padding:12px;text-align:center;">
+        <div style="font-size:11px;color:#666;margin-bottom:4px;text-transform:uppercase;">Total Distance</div>
+        <div style="font-size:20px;font-weight:700;color:#2563eb;">${formatDist(totalDistance || 0)}</div>
+      </div>
+      <div style="flex:1;background:#f0fdf4;border-radius:6px;padding:12px;text-align:center;">
+        <div style="font-size:11px;color:#666;margin-bottom:4px;text-transform:uppercase;">Estimated Time</div>
+        <div style="font-size:20px;font-weight:700;color:#16a34a;">${formatTime(totalDuration || 0)}</div>
+      </div>
+    </div>
+
+    <h3 style="font-size:14px;font-weight:600;margin:0 0 8px;color:#374151;">Stops</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <tbody>${stopsHtml}</tbody>
+    </table>
+
+    ${legs && legs.length > 0 ? `
+    <h3 style="font-size:14px;font-weight:600;margin:0 0 8px;color:#374151;">Leg Breakdown</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:#6b7280;">Leg</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:#6b7280;">Route</th>
+          <th style="padding:6px 8px;text-align:right;font-size:11px;color:#6b7280;">Distance</th>
+          <th style="padding:6px 8px;text-align:right;font-size:11px;color:#6b7280;">Time</th>
+        </tr>
+      </thead>
+      <tbody>${legsHtml}</tbody>
+    </table>` : ''}
+
+    ${mapsLink ? `
+    <a href="${mapsLink}" style="display:block;background:#2563eb;color:#fff;text-decoration:none;text-align:center;padding:12px 20px;border-radius:6px;font-weight:600;margin-bottom:16px;">
+      Open in Google Maps
+    </a>` : ''}
+
+    <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">Sent by Run Courier · runcourier.co.uk</p>
+  </div>
+</div>
+</body></html>`;
+
+    const { sendEmailNotification } = await import("./emailService");
+    const success = await sendEmailNotification(
+      to,
+      `Route Plan – ${stops?.length || 0} stops · ${formatDist(totalDistance || 0)}`,
+      html,
+      `Route Plan\n\n${routeText || ''}`
+    );
+
+    if (success) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ error: "Failed to send email" });
+    }
+  }));
+
   // ============= INVOICE PAYMENT WITH EMBEDDED STRIPE =============
 
   // Public endpoint: Get invoice payment details by token
