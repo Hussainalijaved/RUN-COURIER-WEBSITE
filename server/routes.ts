@@ -509,7 +509,8 @@ function normalizeDocumentUrl(url: string | null | undefined): string | null | u
 
 function extractStoragePath(fileUrl: string): string | null {
   if (!fileUrl) return null;
-  const supabaseMatch = fileUrl.match(/\/storage\/v1\/object\/(?:public\/)?(?:driver-documents|DRIVER-DOCUMENTS)\/(.+?)(?:\?.*)?$/i);
+  // Handle /public/, /sign/, /authenticated/, and bare bucket paths
+  const supabaseMatch = fileUrl.match(/\/storage\/v1\/object\/(?:public\/|sign\/|authenticated\/)?(?:driver-documents|DRIVER-DOCUMENTS)\/(.+?)(?:\?.*)?$/i);
   if (supabaseMatch) return decodeURIComponent(supabaseMatch[1]);
   const proxyMatch = fileUrl.match(/^\/api\/uploads\/documents\/(.+)$/);
   if (proxyMatch) return proxyMatch[1];
@@ -7835,6 +7836,7 @@ export async function registerRoutes(
 
   app.get("/api/documents/:id/view", asyncHandler(async (req, res) => {
     const docId = req.params.id;
+    console.log(`[DocView] Request for doc: ${docId}`);
     try {
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (!supabaseAdmin) return res.status(500).send("Storage service unavailable");
@@ -7924,6 +7926,7 @@ export async function registerRoutes(
 
       const buckets = [doc.bucket || 'driver-documents', 'DRIVER-DOCUMENTS'];
       const storagePath = (doc.storage_path) || extractStoragePath(fileUrl) || doc.file_url;
+      console.log(`[DocView] fileUrl=${fileUrl.substring(0,100)} storagePath=${String(storagePath).substring(0,100)} bucket=${doc.bucket}`);
 
       if (storagePath) {
         const pathsToTry = buildPathsToTry(storagePath);
@@ -7940,16 +7943,58 @@ export async function registerRoutes(
                     .eq('id', doc.id).catch(() => {});
                 }
                 const fileName = tryPath.split('/').pop() || 'document';
+                console.log(`[DocView] Streaming from bucket=${bucket} path=${tryPath} file=${fileName}`);
                 const streamed = await streamInline(signedData.signedUrl, fileName);
                 if (streamed) return;
-                // Fallback: redirect if streaming failed
+                console.log(`[DocView] streamInline failed for ${fileName}, redirecting`);
                 return res.redirect(signedData.signedUrl);
+              } else if (signError) {
+                console.log(`[DocView] createSignedUrl failed for ${bucket}/${tryPath}: ${signError.message}`);
               }
             } catch (_) {}
           }
         }
       }
 
+      // Final fallback: if fileUrl is a direct HTTP URL, stream it directly
+      if (fileUrl.startsWith('http')) {
+        console.log(`[DocView] Falling back to direct stream of original URL`);
+        const fileName = fileUrl.split('/').pop()?.split('?')[0] || 'document';
+        const streamed = await streamInline(fileUrl, fileName);
+        if (streamed) return;
+        // Last resort: redirect
+        return res.redirect(fileUrl);
+      }
+
+      // Local file fallback: serve from uploads directory on disk
+      if (fileUrl.startsWith('/api/uploads/') || fileUrl.startsWith('/uploads/')) {
+        const cleanPath = fileUrl.replace(/^\/api\/uploads\//, '').replace(/^\/uploads\//, '');
+        const localPath = path.join(process.cwd(), 'uploads', cleanPath);
+        const localDocsPath = path.join(process.cwd(), 'uploads', 'documents', cleanPath.replace(/^documents\//, ''));
+        console.log(`[DocView] Trying local paths: ${localPath} | ${localDocsPath}`);
+        if (fs.existsSync(localPath)) {
+          const ext = (localPath.split('.').pop() || '').toLowerCase();
+          const mimeMap: Record<string, string> = {
+            pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+          };
+          res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
+          res.setHeader('Content-Disposition', `inline; filename="${path.basename(localPath)}"`);
+          return res.sendFile(localPath);
+        }
+        if (fs.existsSync(localDocsPath)) {
+          const ext = (localDocsPath.split('.').pop() || '').toLowerCase();
+          const mimeMap: Record<string, string> = {
+            pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+          };
+          res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
+          res.setHeader('Content-Disposition', `inline; filename="${path.basename(localDocsPath)}"`);
+          return res.sendFile(localDocsPath);
+        }
+      }
+
+      console.log(`[DocView] Could not locate file for doc ${docId}, fileUrl=${fileUrl.substring(0,100)}`);
       return res.status(404).send("Could not locate document file");
     } catch (e) {
       console.error('[Documents] View redirect error:', e);
