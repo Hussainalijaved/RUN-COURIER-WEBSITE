@@ -557,12 +557,15 @@ export default function AdminDocuments() {
                     </div>
                   ) : previewUrl ? (
                     (() => {
-                      const isPdf = previewUrl.toLowerCase().match(/\.pdf/i) || (selectedDoc.fileName || '').toLowerCase().endsWith('.pdf');
+                      const fileName = selectedDoc.fileName || selectedDoc.fileUrl || previewUrl;
+                      const isPdf = /\.pdf(\?|$)/i.test(previewUrl) || /\.pdf$/i.test(fileName);
+                      // Always stream PDFs through our backend proxy so Content-Disposition: inline is set
+                      const iframeSrc = `/api/documents/${selectedDoc.id}/view`;
                       return (
                         <div className="space-y-3">
                           <div className="flex justify-center">
                             <a
-                              href={previewUrl}
+                              href={iframeSrc}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-2 text-sm text-primary underline"
@@ -574,7 +577,7 @@ export default function AdminDocuments() {
                           </div>
                           {isPdf ? (
                             <iframe
-                              src={previewUrl}
+                              src={iframeSrc}
                               className="w-full h-[500px] rounded border"
                               title={selectedDoc.fileName || 'PDF Document'}
                               data-testid="iframe-pdf-preview"

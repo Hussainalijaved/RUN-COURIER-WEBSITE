@@ -7880,33 +7880,53 @@ export async function registerRoutes(
       const fileUrl = doc.file_url || '';
       if (fileUrl.startsWith('text:')) return res.status(400).send("Text-only document");
 
-      if (doc.storage_path && doc.bucket) {
-        const { data: signedData } = await supabaseAdmin.storage
-          .from(doc.bucket)
-          .createSignedUrl(doc.storage_path, 600);
-        if (signedData?.signedUrl) return res.redirect(signedData.signedUrl);
-      }
+      // Helper: download from Supabase and stream inline so browsers can display PDFs
+      const streamInline = async (signedUrl: string, fileName: string) => {
+        try {
+          const fetchRes = await fetch(signedUrl);
+          if (!fetchRes.ok) return false;
+          const ext = (fileName.split('.').pop() || '').toLowerCase();
+          const mimeMap: Record<string, string> = {
+            pdf: 'application/pdf',
+            jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+          };
+          const contentType = mimeMap[ext] || fetchRes.headers.get('content-type') || 'application/octet-stream';
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+          res.setHeader('Cache-Control', 'private, max-age=300');
+          const buf = await fetchRes.arrayBuffer();
+          res.send(Buffer.from(buf));
+          return true;
+        } catch { return false; }
+      };
 
-      const storagePath = extractStoragePath(fileUrl) || doc.file_url;
-      if (storagePath) {
-        const buckets = [doc.bucket || 'driver-documents', 'DRIVER-DOCUMENTS'];
+      const buildPathsToTry = (storagePath: string) => {
         const pathsToTry = [storagePath];
         if (!storagePath.startsWith('drivers/')) pathsToTry.push(`drivers/${storagePath}`);
         if (doc.driver_id) {
-          const fileName = storagePath.split('/').pop();
-          if (fileName) {
-            pathsToTry.push(`${doc.driver_id}/${fileName}`);
-            pathsToTry.push(`drivers/${doc.driver_id}/${doc.doc_type}/${fileName}`);
-            pathsToTry.push(`drivers/pending/${doc.doc_type}/${fileName}`);
+          const fn = storagePath.split('/').pop();
+          if (fn) {
+            pathsToTry.push(`${doc.driver_id}/${fn}`);
+            pathsToTry.push(`drivers/${doc.driver_id}/${doc.doc_type}/${fn}`);
+            pathsToTry.push(`drivers/pending/${doc.doc_type}/${fn}`);
           }
         }
         if (doc.auth_user_id && doc.auth_user_id !== doc.driver_id) {
-          const fileName = storagePath.split('/').pop();
-          if (fileName) {
-            pathsToTry.push(`${doc.auth_user_id}/${fileName}`);
-            pathsToTry.push(`drivers/${doc.auth_user_id}/${doc.doc_type}/${fileName}`);
+          const fn = storagePath.split('/').pop();
+          if (fn) {
+            pathsToTry.push(`${doc.auth_user_id}/${fn}`);
+            pathsToTry.push(`drivers/${doc.auth_user_id}/${doc.doc_type}/${fn}`);
           }
         }
+        return pathsToTry;
+      };
+
+      const buckets = [doc.bucket || 'driver-documents', 'DRIVER-DOCUMENTS'];
+      const storagePath = (doc.storage_path) || extractStoragePath(fileUrl) || doc.file_url;
+
+      if (storagePath) {
+        const pathsToTry = buildPathsToTry(storagePath);
         for (const bucket of buckets) {
           for (const tryPath of pathsToTry) {
             try {
@@ -7917,8 +7937,12 @@ export async function registerRoutes(
                 if (tryPath !== doc.storage_path || bucket !== doc.bucket) {
                   await supabaseAdmin.from('driver_documents')
                     .update({ storage_path: tryPath, bucket, file_url: tryPath })
-                    .eq('id', doc.id);
+                    .eq('id', doc.id).catch(() => {});
                 }
+                const fileName = tryPath.split('/').pop() || 'document';
+                const streamed = await streamInline(signedData.signedUrl, fileName);
+                if (streamed) return;
+                // Fallback: redirect if streaming failed
                 return res.redirect(signedData.signedUrl);
               }
             } catch (_) {}
@@ -7926,8 +7950,6 @@ export async function registerRoutes(
         }
       }
 
-      const normalizedUrl = normalizeDocumentUrl(fileUrl);
-      if (normalizedUrl) return res.redirect(normalizedUrl);
       return res.status(404).send("Could not locate document file");
     } catch (e) {
       console.error('[Documents] View redirect error:', e);
@@ -9860,6 +9882,27 @@ export async function registerRoutes(
       possiblePaths.push(`drivers/${getDriverId}/${getFileName}`);
     }
 
+    // Helper: stream file content inline so browsers display PDFs properly
+    const streamFileInline = async (signedUrl: string, fileName: string): Promise<boolean> => {
+      try {
+        const fetchRes = await fetch(signedUrl);
+        if (!fetchRes.ok) return false;
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
+        const mimeMap: Record<string, string> = {
+          pdf: 'application/pdf',
+          jpg: 'image/jpeg', jpeg: 'image/jpeg',
+          png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+        };
+        const contentType = mimeMap[ext] || fetchRes.headers.get('content-type') || 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        const buf = await fetchRes.arrayBuffer();
+        res.send(Buffer.from(buf));
+        return true;
+      } catch { return false; }
+    };
+
     for (const bucket of BUCKETS) {
       for (const storagePath of possiblePaths) {
         try {
@@ -9868,6 +9911,9 @@ export async function registerRoutes(
             .createSignedUrl(storagePath, 600);
           
           if (!signError && signedData?.signedUrl) {
+            const uploadFileName = path.basename(storagePath);
+            const streamed = await streamFileInline(signedData.signedUrl, uploadFileName);
+            if (streamed) return;
             return res.redirect(signedData.signedUrl);
           }
         } catch (_) {}

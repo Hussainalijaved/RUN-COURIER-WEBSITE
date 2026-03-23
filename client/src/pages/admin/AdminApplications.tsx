@@ -483,8 +483,9 @@ export default function AdminApplications() {
     }
 
     const resolvedUrl = resolveDocUrl(url);
-    const isPdf = url.toLowerCase().endsWith('.pdf');
-    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+    // Match .pdf before end-of-string or before a query string
+    const isPdf = /\.pdf(\?|$)/i.test(url) || /\.pdf(\?|$)/i.test(resolvedUrl);
+    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
 
     return (
       <div className="flex flex-col gap-1">
