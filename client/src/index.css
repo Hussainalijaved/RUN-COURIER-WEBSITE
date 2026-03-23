@@ -203,6 +203,14 @@
   input, textarea, select, button {
     @apply text-base;
   }
+
+  /* Prevent text selection on interactive elements when clicking */
+  button, a, label, [role="button"],
+  [data-testid*="button"], [data-testid*="nav-"],
+  .sidebar-menu-button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 /**
@@ -257,6 +265,8 @@
   .toggle-elevate-2::before {
     content: "";
     pointer-events: none;
+    -webkit-user-select: none;
+    user-select: none;
     position: absolute;
     inset: 0px;
     /*border-radius: inherit;   match rounded corners */
@@ -289,6 +299,8 @@
   .active-elevate-2:not(.no-default-active-elevate)::after {
     content: "";
     pointer-events: none;
+    -webkit-user-select: none;
+    user-select: none;
     position: absolute;
     inset: 0px;
     /*border-radius: inherit;   match rounded corners */
