@@ -14968,7 +14968,7 @@ export async function registerRoutes(
     const { verifyAccessToken } = await import("./supabaseAdmin");
     const user = await verifyAccessToken(token);
     
-    if (!user || (user.role !== 'admin' && user.role !== 'dispatcher')) {
+    if (!user || (user.role !== 'admin' && user.role !== 'dispatcher' && user.role !== 'supervisor')) {
       return res.status(403).json({ error: "Admin access required" });
     }
 

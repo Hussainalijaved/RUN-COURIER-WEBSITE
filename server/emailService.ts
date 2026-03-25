@@ -2094,8 +2094,41 @@ export async function sendBusinessQuoteEmail(
       </div>
     </div>
     
+    <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e0e0e0;">
+      <h3 style="color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Price Breakdown</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #555; border-bottom: 1px solid #f0f0f0;">Base Charge</td>
+          <td style="padding: 8px 0; text-align: right; color: #333; font-weight: 500; border-bottom: 1px solid #f0f0f0;">&pound;${data.quote.breakdown.baseCharge.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555; border-bottom: 1px solid #f0f0f0;">Distance (${data.quote.totalDistance.toFixed(1)} miles)</td>
+          <td style="padding: 8px 0; text-align: right; color: #333; font-weight: 500; border-bottom: 1px solid #f0f0f0;">&pound;${data.quote.breakdown.distanceCharge.toFixed(2)}</td>
+        </tr>
+        ${data.quote.breakdown.multiDropDistanceCharge > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #555; border-bottom: 1px solid #f0f0f0;">Multi-Drop Distance</td>
+          <td style="padding: 8px 0; text-align: right; color: #333; font-weight: 500; border-bottom: 1px solid #f0f0f0;">&pound;${data.quote.breakdown.multiDropDistanceCharge.toFixed(2)}</td>
+        </tr>` : ''}
+        ${data.quote.breakdown.weightSurcharge > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #555; border-bottom: 1px solid #f0f0f0;">Weight Surcharge</td>
+          <td style="padding: 8px 0; text-align: right; color: #333; font-weight: 500; border-bottom: 1px solid #f0f0f0;">&pound;${data.quote.breakdown.weightSurcharge.toFixed(2)}</td>
+        </tr>` : ''}
+        ${(data.quote.breakdown.centralLondonCharge ?? (data.quote.breakdown as any).congestionZoneCharge ?? 0) > 0 ? `
+        <tr>
+          <td style="padding: 8px 0; color: #555; border-bottom: 1px solid #f0f0f0;">Congestion Zone Charge</td>
+          <td style="padding: 8px 0; text-align: right; color: #333; font-weight: 500; border-bottom: 1px solid #f0f0f0;">&pound;${((data.quote.breakdown.centralLondonCharge ?? (data.quote.breakdown as any).congestionZoneCharge ?? 0)).toFixed(2)}</td>
+        </tr>` : ''}
+        ${data.quote.breakdown.rushHourApplied ? `
+        <tr>
+          <td style="padding: 8px 0; color: #b45309; border-bottom: 1px solid #f0f0f0;">Rush Hour Rate Applied</td>
+          <td style="padding: 8px 0; text-align: right; color: #b45309; font-weight: 500; border-bottom: 1px solid #f0f0f0;">Yes</td>
+        </tr>` : ''}
+      </table>
+    </div>
+
     <div style="background-color: #007BFF; color: white; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">
-      ${data.serviceType && data.serviceType !== 'flexible' ? `<p style="font-size: 13px; margin: 0 0 6px 0; opacity: 0.85;">Service Level: ${{ flexible: 'Flexible', urgent: 'Urgent' }[data.serviceType] || data.serviceType}</p>` : ''}
       <p style="font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">TOTAL QUOTE</p>
       <p style="font-size: 36px; font-weight: bold; margin: 0;">&pound;${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}</p>
     </div>
@@ -2151,7 +2184,11 @@ Estimated Duration: ${data.quote.totalDuration} mins
 Vehicle Type: ${vehicleNames[data.vehicleType] || data.vehicleType}
 Number of Drops: ${data.drops.length}
 
-${data.serviceType && data.serviceType !== 'flexible' ? `Service Level: ${{ flexible: 'Flexible', urgent: 'Urgent' }[data.serviceType] || data.serviceType}\n` : ''}TOTAL QUOTE: £${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}
+PRICE BREAKDOWN
+Base Charge: £${data.quote.breakdown.baseCharge.toFixed(2)}
+Distance: £${data.quote.breakdown.distanceCharge.toFixed(2)}${data.quote.breakdown.multiDropDistanceCharge > 0 ? `\nMulti-Drop Distance: £${data.quote.breakdown.multiDropDistanceCharge.toFixed(2)}` : ''}${data.quote.breakdown.weightSurcharge > 0 ? `\nWeight Surcharge: £${data.quote.breakdown.weightSurcharge.toFixed(2)}` : ''}${(data.quote.breakdown.centralLondonCharge ?? (data.quote.breakdown as any).congestionZoneCharge ?? 0) > 0 ? `\nCongestion Zone: £${((data.quote.breakdown.centralLondonCharge ?? (data.quote.breakdown as any).congestionZoneCharge ?? 0)).toFixed(2)}` : ''}${data.quote.breakdown.rushHourApplied ? `\nRush Hour Rate: Applied` : ''}
+
+TOTAL QUOTE: £${(data.finalTotal ?? data.quote.breakdown.totalPrice).toFixed(2)}
 
 ${data.notes ? `NOTES: ${data.notes}` : ''}
 
