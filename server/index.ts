@@ -492,7 +492,7 @@ async function runBackgroundTasks() {
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT DEFAULT 'flexible'`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_percent DECIMAL(5,2) DEFAULT 0`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_amount DECIMAL(10,2) DEFAULT 0`);
-      await db.execute(sql`ALTER TABLE pricing_settings ADD COLUMN IF NOT EXISTS service_type_pricing JSONB DEFAULT '{"flexible":0,"urgent":25}'::jsonb`);
+      await db.execute(sql`ALTER TABLE pricing_settings ADD COLUMN IF NOT EXISTS service_type_pricing JSONB DEFAULT '{"flexible":0,"urgent":15}'::jsonb`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by TEXT`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS admin_notes TEXT`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS waiting_time_minutes INTEGER DEFAULT 0`);
@@ -501,6 +501,27 @@ async function runBackgroundTasks() {
       console.log("[MIGRATION] Service type columns created/verified successfully");
     } catch (e: any) {
       console.warn("[MIGRATION] Service type columns migration error:", e?.message);
+    }
+  })();
+
+  // Update Urgent service type from 25% to 15% in live pricing_settings
+  (async () => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`
+        UPDATE pricing_settings
+        SET service_type_pricing = jsonb_set(
+          COALESCE(service_type_pricing, '{}'),
+          '{urgent}',
+          '15'
+        )
+        WHERE (service_type_pricing->>'urgent')::numeric = 25
+           OR service_type_pricing IS NULL
+      `);
+      console.log("[MIGRATION] Urgent service type updated to 15%");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Urgent service type update error:", e?.message);
     }
   })();
 

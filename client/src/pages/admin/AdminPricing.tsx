@@ -21,7 +21,7 @@ export default function AdminPricing() {
   const [config, setConfig] = useState<PricingConfig>(defaultPricingConfig);
   const [serviceTypePricing, setServiceTypePricing] = useState<Record<string, number>>({
     flexible: 0,
-    urgent: 25,
+    urgent: 15,
   });
 
   // Fetch pricing settings from API
@@ -91,7 +91,7 @@ export default function AdminPricing() {
         const stp = pricingSettings.serviceTypePricing as Record<string, number>;
         setServiceTypePricing({
           flexible: stp.flexible ?? 0,
-          urgent: stp.urgent ?? 25,
+          urgent: stp.urgent ?? 15,
         });
       }
     }

@@ -5,7 +5,7 @@ export type ServiceType = 'flexible' | 'urgent';
 
 export const SERVICE_TYPE_CONFIG: Record<ServiceType, { label: string; percent: number; description: string }> = {
   flexible: { label: 'Flexible', percent: 0,  description: 'Best value, flexible timing' },
-  urgent:   { label: 'Urgent',   percent: 25, description: 'Priority same-day delivery' },
+  urgent:   { label: 'Urgent',   percent: 15, description: 'Priority same-day delivery' },
 };
 
 export function applyServiceTypeAdjustment(

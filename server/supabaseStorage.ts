@@ -361,7 +361,7 @@ export class SupabaseStorage implements IStorage {
       },
       serviceTypePricing: {
         "flexible": 0,
-        "urgent": 25
+        "urgent": 15
       },
       updatedAt: new Date(),
     };
