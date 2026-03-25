@@ -7841,8 +7841,45 @@ export async function registerRoutes(
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (!supabaseAdmin) return res.status(500).send("Storage service unavailable");
 
+      // ── helpers ──────────────────────────────────────────────────────────
+      const MIME: Record<string, string> = {
+        pdf: 'application/pdf',
+        jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+        svg: 'image/svg+xml',
+      };
+
+      const sendFile = (filePath: string): boolean => {
+        if (!fs.existsSync(filePath)) return false;
+        const ext = (filePath.split('.').pop() || '').toLowerCase();
+        res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `inline; filename="${path.basename(filePath)}"`);
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        res.sendFile(filePath);
+        return true;
+      };
+
+      const streamUrl = async (url: string, fileName: string): Promise<boolean> => {
+        try {
+          const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+          if (!r.ok) { console.log(`[DocView] fetch ${url.substring(0,80)} -> ${r.status}`); return false; }
+          const ext = (fileName.split('.').pop() || '').toLowerCase();
+          const ct = MIME[ext] || r.headers.get('content-type') || 'application/octet-stream';
+          res.setHeader('Content-Type', ct);
+          res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+          res.setHeader('Cache-Control', 'private, max-age=300');
+          const buf = await r.arrayBuffer();
+          res.send(Buffer.from(buf));
+          return true;
+        } catch (e: any) {
+          console.log(`[DocView] streamUrl error: ${e?.message}`);
+          return false;
+        }
+      };
+
+      // ── resolve document record ───────────────────────────────────────────
       let doc: any = null;
-      
+
       if (docId.startsWith('col-')) {
         const parts = docId.replace('col-', '').split('-');
         const docType = parts.pop();
@@ -7860,144 +7897,105 @@ export async function registerRoutes(
           if (col) {
             const { data: driverRow } = await supabaseAdmin.from('drivers').select(col).eq('id', dId).maybeSingle();
             if (driverRow && (driverRow as any)[col]) {
-              const url = (driverRow as any)[col];
-              const storagePath = url.startsWith('http') ? (extractStoragePath(url) || url) : url;
-              doc = { id: docId, driver_id: dId, file_url: storagePath, storage_path: storagePath, bucket: 'DRIVER-DOCUMENTS', doc_type: docType };
+              const rawUrl: string = (driverRow as any)[col];
+              const storagePath = extractStoragePath(rawUrl) || rawUrl;
+              doc = { id: docId, driver_id: dId, file_url: rawUrl, storage_path: storagePath, bucket: 'DRIVER-DOCUMENTS', doc_type: docType };
             }
           }
         }
       }
 
       if (!doc) {
-        const { data: dbDoc, error } = await supabaseAdmin
-          .from('driver_documents')
-          .select('*')
-          .eq('id', docId)
-          .single();
-        if (!error && dbDoc) doc = dbDoc;
+        const { data: dbDoc } = await supabaseAdmin.from('driver_documents').select('*').eq('id', docId).single();
+        if (dbDoc) doc = dbDoc;
       }
 
-      if (!doc) return res.status(404).send("Document not found");
+      if (!doc) {
+        console.log(`[DocView] Doc not found: ${docId}`);
+        return res.status(404).send("Document not found");
+      }
 
-      const fileUrl = doc.file_url || '';
+      const fileUrl: string = doc.file_url || '';
       if (fileUrl.startsWith('text:')) return res.status(400).send("Text-only document");
 
-      // Helper: download from Supabase and stream inline so browsers can display PDFs
-      const streamInline = async (signedUrl: string, fileName: string) => {
-        try {
-          const fetchRes = await fetch(signedUrl);
-          if (!fetchRes.ok) return false;
-          const ext = (fileName.split('.').pop() || '').toLowerCase();
-          const mimeMap: Record<string, string> = {
-            pdf: 'application/pdf',
-            jpg: 'image/jpeg', jpeg: 'image/jpeg',
-            png: 'image/png', gif: 'image/gif', webp: 'image/webp',
-          };
-          const contentType = mimeMap[ext] || fetchRes.headers.get('content-type') || 'application/octet-stream';
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-          res.setHeader('Cache-Control', 'private, max-age=300');
-          const buf = await fetchRes.arrayBuffer();
-          res.send(Buffer.from(buf));
-          return true;
-        } catch { return false; }
-      };
+      console.log(`[DocView] file_url=${fileUrl.substring(0,120)} storage_path=${String(doc.storage_path||'').substring(0,80)} bucket=${doc.bucket}`);
 
-      const buildPathsToTry = (storagePath: string) => {
-        const pathsToTry = [storagePath];
-        if (!storagePath.startsWith('drivers/')) pathsToTry.push(`drivers/${storagePath}`);
-        if (doc.driver_id) {
-          const fn = storagePath.split('/').pop();
-          if (fn) {
-            pathsToTry.push(`${doc.driver_id}/${fn}`);
-            pathsToTry.push(`drivers/${doc.driver_id}/${doc.doc_type}/${fn}`);
-            pathsToTry.push(`drivers/pending/${doc.doc_type}/${fn}`);
-          }
-        }
-        if (doc.auth_user_id && doc.auth_user_id !== doc.driver_id) {
-          const fn = storagePath.split('/').pop();
-          if (fn) {
-            pathsToTry.push(`${doc.auth_user_id}/${fn}`);
-            pathsToTry.push(`drivers/${doc.auth_user_id}/${doc.doc_type}/${fn}`);
-          }
-        }
-        return pathsToTry;
-      };
+      // ── 1. Try local disk first (fastest, most reliable for web-uploaded docs) ──
+      const localCandidates: string[] = [];
+      const addLocal = (p: string) => { if (p) localCandidates.push(p); };
 
-      const buckets = [doc.bucket || 'driver-documents', 'DRIVER-DOCUMENTS'];
-      const storagePath = (doc.storage_path) || extractStoragePath(fileUrl) || doc.file_url;
-      console.log(`[DocView] fileUrl=${fileUrl.substring(0,100)} storagePath=${String(storagePath).substring(0,100)} bucket=${doc.bucket}`);
-
-      if (storagePath) {
-        const pathsToTry = buildPathsToTry(storagePath);
-        for (const bucket of buckets) {
-          for (const tryPath of pathsToTry) {
-            try {
-              const { data: signedData, error: signError } = await supabaseAdmin.storage
-                .from(bucket)
-                .createSignedUrl(tryPath, 600);
-              if (!signError && signedData?.signedUrl) {
-                if (tryPath !== doc.storage_path || bucket !== doc.bucket) {
-                  await supabaseAdmin.from('driver_documents')
-                    .update({ storage_path: tryPath, bucket, file_url: tryPath })
-                    .eq('id', doc.id).catch(() => {});
-                }
-                const fileName = tryPath.split('/').pop() || 'document';
-                console.log(`[DocView] Streaming from bucket=${bucket} path=${tryPath} file=${fileName}`);
-                const streamed = await streamInline(signedData.signedUrl, fileName);
-                if (streamed) return;
-                console.log(`[DocView] streamInline failed for ${fileName}, redirecting`);
-                return res.redirect(signedData.signedUrl);
-              } else if (signError) {
-                console.log(`[DocView] createSignedUrl failed for ${bucket}/${tryPath}: ${signError.message}`);
-              }
-            } catch (_) {}
-          }
-        }
-      }
-
-      // Final fallback: if fileUrl is a direct HTTP URL, stream it directly
-      if (fileUrl.startsWith('http')) {
-        console.log(`[DocView] Falling back to direct stream of original URL`);
-        const fileName = fileUrl.split('/').pop()?.split('?')[0] || 'document';
-        const streamed = await streamInline(fileUrl, fileName);
-        if (streamed) return;
-        // Last resort: redirect
-        return res.redirect(fileUrl);
-      }
-
-      // Local file fallback: serve from uploads directory on disk
       if (fileUrl.startsWith('/api/uploads/') || fileUrl.startsWith('/uploads/')) {
-        const cleanPath = fileUrl.replace(/^\/api\/uploads\//, '').replace(/^\/uploads\//, '');
-        const localPath = path.join(process.cwd(), 'uploads', cleanPath);
-        const localDocsPath = path.join(process.cwd(), 'uploads', 'documents', cleanPath.replace(/^documents\//, ''));
-        console.log(`[DocView] Trying local paths: ${localPath} | ${localDocsPath}`);
-        if (fs.existsSync(localPath)) {
-          const ext = (localPath.split('.').pop() || '').toLowerCase();
-          const mimeMap: Record<string, string> = {
-            pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-            png: 'image/png', gif: 'image/gif', webp: 'image/webp',
-          };
-          res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
-          res.setHeader('Content-Disposition', `inline; filename="${path.basename(localPath)}"`);
-          return res.sendFile(localPath);
+        const clean = fileUrl.replace(/^\/api\/uploads\//, '').replace(/^\/uploads\//, '');
+        addLocal(path.join(process.cwd(), 'uploads', clean));
+        addLocal(path.join(process.cwd(), 'uploads', 'documents', clean.replace(/^documents\//, '')));
+      }
+      // Also try extracting filename and searching under uploads/documents/{driverId}/
+      const rawFileName = fileUrl.split('/').pop()?.split('?')[0];
+      if (rawFileName && doc.driver_id) {
+        addLocal(path.join(process.cwd(), 'uploads', 'documents', doc.driver_id, rawFileName));
+        addLocal(path.join(process.cwd(), 'uploads', 'documents', 'application-pending', rawFileName));
+      }
+
+      for (const lp of localCandidates) {
+        if (sendFile(lp)) { console.log(`[DocView] Served from disk: ${lp}`); return; }
+      }
+
+      // ── 2. Try Supabase Storage (try ALL paths, don't redirect on first hit) ──
+      const rawStoragePath = doc.storage_path || extractStoragePath(fileUrl) || '';
+      const storagePathsToTry: string[] = [];
+
+      if (rawStoragePath && !rawStoragePath.startsWith('http')) {
+        storagePathsToTry.push(rawStoragePath);
+        if (!rawStoragePath.startsWith('drivers/')) storagePathsToTry.push(`drivers/${rawStoragePath}`);
+        const fn = rawStoragePath.split('/').pop();
+        if (fn && doc.driver_id) {
+          storagePathsToTry.push(`${doc.driver_id}/${fn}`);
+          storagePathsToTry.push(`drivers/${doc.driver_id}/${doc.doc_type || ''}/${fn}`);
+          storagePathsToTry.push(`drivers/pending/${doc.doc_type || ''}/${fn}`);
         }
-        if (fs.existsSync(localDocsPath)) {
-          const ext = (localDocsPath.split('.').pop() || '').toLowerCase();
-          const mimeMap: Record<string, string> = {
-            pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-            png: 'image/png', gif: 'image/gif', webp: 'image/webp',
-          };
-          res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
-          res.setHeader('Content-Disposition', `inline; filename="${path.basename(localDocsPath)}"`);
-          return res.sendFile(localDocsPath);
+        if (fn && doc.auth_user_id && doc.auth_user_id !== doc.driver_id) {
+          storagePathsToTry.push(`${doc.auth_user_id}/${fn}`);
         }
       }
 
-      console.log(`[DocView] Could not locate file for doc ${docId}, fileUrl=${fileUrl.substring(0,100)}`);
-      return res.status(404).send("Could not locate document file");
-    } catch (e) {
-      console.error('[Documents] View redirect error:', e);
+      const buckets = ['DRIVER-DOCUMENTS', 'driver-documents'];
+      if (doc.bucket && !buckets.includes(doc.bucket)) buckets.unshift(doc.bucket);
+
+      for (const bucket of buckets) {
+        for (const tryPath of storagePathsToTry) {
+          try {
+            const { data: sd, error: se } = await supabaseAdmin.storage.from(bucket).createSignedUrl(tryPath, 600);
+            if (se || !sd?.signedUrl) continue;
+            const fn = tryPath.split('/').pop() || 'document';
+            const ok = await streamUrl(sd.signedUrl, fn);
+            if (ok) {
+              console.log(`[DocView] Streamed from Supabase bucket=${bucket} path=${tryPath}`);
+              // Persist the correct path so future requests are faster
+              if (doc.id && !doc.id.startsWith('col-')) {
+                await supabaseAdmin.from('driver_documents')
+                  .update({ storage_path: tryPath, bucket, file_url: tryPath })
+                  .eq('id', doc.id).catch(() => {});
+              }
+              return;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // ── 3. If fileUrl is a direct http URL, stream it directly ──────────────
+      if (fileUrl.startsWith('http')) {
+        const fn = fileUrl.split('/').pop()?.split('?')[0] || 'document';
+        console.log(`[DocView] Trying direct URL stream: ${fileUrl.substring(0,80)}`);
+        const ok = await streamUrl(fileUrl, fn);
+        if (ok) return;
+      }
+
+      // ── 4. Nothing worked ────────────────────────────────────────────────────
+      console.log(`[DocView] All strategies failed for ${docId}. fileUrl=${fileUrl.substring(0,120)}`);
+      return res.status(404).send(`Document file not found. (id=${docId})`);
+
+    } catch (e: any) {
+      console.error('[DocView] Unexpected error:', e?.message);
       return res.status(500).send("Failed to load document");
     }
   }));

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState, LoadingTimeout } from '@/components/ErrorState';
-import { normalizeDocUrl } from '@/lib/utils';
+
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -49,57 +49,14 @@ export default function AdminDocuments() {
   const queryClient = useQueryClient();
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [iframeError, setIframeError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openDriverIds, setOpenDriverIds] = useState<Set<string>>(new Set());
 
   useRealtimeDocuments();
 
   useEffect(() => {
-    if (!selectedDoc || !viewDialogOpen) {
-      setPreviewUrl(null);
-      setPreviewError(null);
-      return;
-    }
-    
-    const resolvePreview = async () => {
-      setPreviewLoading(true);
-      setPreviewError(null);
-      try {
-        const docAny = selectedDoc as any;
-        if (docAny.signedUrl) {
-          setPreviewUrl(docAny.signedUrl);
-          setPreviewLoading(false);
-          return;
-        }
-        if (selectedDoc.fileUrl?.startsWith('http')) {
-          setPreviewUrl(selectedDoc.fileUrl);
-          setPreviewLoading(false);
-          return;
-        }
-        const response = await fetch(`/api/documents/${selectedDoc.id}/signed-url`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.isText) {
-            setPreviewUrl(null);
-          } else {
-            setPreviewUrl(data.signedUrl);
-          }
-        } else {
-          setPreviewUrl(normalizeDocUrl(selectedDoc.fileUrl));
-        }
-      } catch (err) {
-        console.error('Failed to get signed URL:', err);
-        setPreviewUrl(normalizeDocUrl(selectedDoc.fileUrl));
-        setPreviewError('Could not load document preview. The file may be missing or inaccessible.');
-      } finally {
-        setPreviewLoading(false);
-      }
-    };
-    
-    resolvePreview();
+    setIframeError(false);
   }, [selectedDoc, viewDialogOpen]);
 
   const { data: documents, isLoading: docsLoading, isError: docsError, refetch: refetchDocs } = useQuery<Document[]>({
@@ -544,68 +501,64 @@ export default function AdminDocuments() {
                       <p className="font-semibold text-destructive">File Not Available</p>
                       <p className="text-sm text-muted-foreground mt-2">This document file is missing from storage. The driver needs to re-upload this document.</p>
                     </div>
-                  ) : previewLoading ? (
-                    <div className="flex items-center justify-center h-64">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    </div>
-                  ) : previewError ? (
-                    <div className="flex items-center justify-center h-64 text-muted-foreground">
-                      <div className="text-center">
-                        <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>{previewError}</p>
-                      </div>
-                    </div>
-                  ) : previewUrl ? (
-                    (() => {
-                      const fileName = selectedDoc.fileName || selectedDoc.fileUrl || previewUrl;
-                      const isPdf = /\.pdf(\?|$)/i.test(previewUrl) || /\.pdf$/i.test(fileName);
-                      // Always stream PDFs through our backend proxy so Content-Disposition: inline is set
-                      const iframeSrc = `/api/documents/${selectedDoc.id}/view`;
-                      return (
-                        <div className="space-y-3">
-                          <div className="flex justify-center">
-                            <a
-                              href={iframeSrc}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-sm text-primary underline"
-                              data-testid="link-open-document"
-                            >
-                              <Eye className="h-4 w-4" />
-                              Open in new tab
-                            </a>
-                          </div>
-                          {isPdf ? (
-                            <iframe
-                              src={iframeSrc}
-                              className="w-full h-[500px] rounded border"
-                              title={selectedDoc.fileName || 'PDF Document'}
-                              data-testid="iframe-pdf-preview"
-                            />
-                          ) : (
-                            <img
-                              src={previewUrl}
-                              alt={selectedDoc.fileName || 'Document'}
-                              className="max-w-full max-h-96 mx-auto rounded"
-                              data-testid="img-document-preview"
-                              onError={() => {
-                                setPreviewError('Failed to load image. The file may be missing or inaccessible.');
-                              }}
-                            />
-                          )}
-                        </div>
-                      );
-                    })()
                   ) : selectedDoc.fileUrl?.startsWith('text:') ? (
                     <div className="p-4 bg-muted rounded text-center">
                       <p className="font-mono text-lg">{selectedDoc.fileUrl.replace('text:', '')}</p>
                       <p className="text-sm text-muted-foreground mt-2">Text/Code Value</p>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-64 text-muted-foreground">
-                      <p>No preview available</p>
-                    </div>
-                  )}
+                  ) : (() => {
+                    const viewSrc = `/api/documents/${selectedDoc.id}/view`;
+                    const fileName = selectedDoc.fileName || selectedDoc.fileUrl || '';
+                    const isImage = /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(fileName);
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex justify-center">
+                          <a
+                            href={viewSrc}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-primary underline"
+                            data-testid="link-open-document"
+                          >
+                            <Eye className="h-4 w-4" />
+                            Open in new tab
+                          </a>
+                        </div>
+                        {iframeError ? (
+                          <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
+                            <AlertTriangle className="h-10 w-10 text-destructive" />
+                            <p className="text-sm text-muted-foreground">Could not display the document inline.</p>
+                            <a
+                              href={viewSrc}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-primary underline"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Open document directly
+                            </a>
+                          </div>
+                        ) : isImage ? (
+                          <img
+                            src={viewSrc}
+                            alt={fileName || 'Document'}
+                            className="max-w-full max-h-[500px] mx-auto rounded"
+                            data-testid="img-document-preview"
+                            onError={() => setIframeError(true)}
+                          />
+                        ) : (
+                          <iframe
+                            key={selectedDoc.id}
+                            src={viewSrc}
+                            className="w-full h-[500px] rounded border"
+                            title={fileName || 'Document'}
+                            data-testid="iframe-pdf-preview"
+                            onError={() => setIframeError(true)}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
