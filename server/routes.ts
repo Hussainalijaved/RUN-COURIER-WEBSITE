@@ -11993,27 +11993,26 @@ export async function registerRoutes(
         <td style="padding:6px 8px; border-bottom:1px solid #eee; font-size:12px; text-align:right;">${formatTime(leg.duration)}</td>
       </tr>`).join('');
 
-    const html = `
-<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1a1a1a;background:#f9f9f9;margin:0;padding:20px;">
-<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
-  <div style="background:#2563eb;padding:20px 24px;">
-    <h1 style="color:#fff;margin:0;font-size:20px;">Route Plan</h1>
-    <p style="color:#bfdbfe;margin:4px 0 0;font-size:14px;">Run Courier Logistics</p>
-  </div>
-  <div style="padding:24px;">
-    <p style="margin:0 0 16px;">Hi ${driverName || 'there'},</p>
-    <p style="margin:0 0 20px;color:#555;">Your route plan is ready. Here are the details:</p>
+    const routePlanContent = `
+    <p style="color:#333;margin:0 0 16px;">Hi ${driverName || 'there'},</p>
+    <p style="color:#555;margin:0 0 20px;">Your route plan is ready. Here are the details:</p>
 
-    <div style="display:flex;gap:16px;margin-bottom:20px;">
-      <div style="flex:1;background:#f0f9ff;border-radius:6px;padding:12px;text-align:center;">
-        <div style="font-size:11px;color:#666;margin-bottom:4px;text-transform:uppercase;">Total Distance</div>
-        <div style="font-size:20px;font-weight:700;color:#2563eb;">${formatDist(totalDistance || 0)}</div>
-      </div>
-      <div style="flex:1;background:#f0fdf4;border-radius:6px;padding:12px;text-align:center;">
-        <div style="font-size:11px;color:#666;margin-bottom:4px;text-transform:uppercase;">Estimated Time</div>
-        <div style="font-size:20px;font-weight:700;color:#16a34a;">${formatTime(totalDuration || 0)}</div>
-      </div>
-    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <tr>
+        <td style="width:50%;padding-right:8px;">
+          <div style="background:#f0f9ff;border-radius:6px;padding:12px;text-align:center;">
+            <div style="font-size:11px;color:#666;margin-bottom:4px;text-transform:uppercase;">Total Distance</div>
+            <div style="font-size:20px;font-weight:700;color:#2563eb;">${formatDist(totalDistance || 0)}</div>
+          </div>
+        </td>
+        <td style="width:50%;padding-left:8px;">
+          <div style="background:#f0fdf4;border-radius:6px;padding:12px;text-align:center;">
+            <div style="font-size:11px;color:#666;margin-bottom:4px;text-transform:uppercase;">Estimated Time</div>
+            <div style="font-size:20px;font-weight:700;color:#16a34a;">${formatTime(totalDuration || 0)}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
 
     <h3 style="font-size:14px;font-weight:600;margin:0 0 8px;color:#374151;">Stops</h3>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
@@ -12035,16 +12034,15 @@ export async function registerRoutes(
     </table>` : ''}
 
     ${mapsLink ? `
-    <a href="${mapsLink}" style="display:block;background:#2563eb;color:#fff;text-decoration:none;text-align:center;padding:12px 20px;border-radius:6px;font-weight:600;margin-bottom:16px;">
-      Open in Google Maps
-    </a>` : ''}
+    <div style="text-align:center;margin-bottom:16px;">
+      <a href="${mapsLink}" style="display:inline-block;background:#007BFF;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">
+        Open in Google Maps
+      </a>
+    </div>` : ''}
+  `;
 
-    <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">Sent by Run Courier · runcourier.co.uk</p>
-  </div>
-</div>
-</body></html>`;
-
-    const { sendEmailNotification } = await import("./emailService");
+    const { sendEmailNotification, wrapEmailContent } = await import("./emailService");
+    const html = wrapEmailContent(routePlanContent, 'Route Plan');
     const success = await sendEmailNotification(
       to,
       `Route Plan – ${stops?.length || 0} stops · ${formatDist(totalDistance || 0)}`,
