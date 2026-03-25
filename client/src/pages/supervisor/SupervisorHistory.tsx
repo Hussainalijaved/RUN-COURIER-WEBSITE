@@ -2228,7 +2228,7 @@ export default function SupervisorJobHistory() {
                     if (selectedJob.podPhotoUrl && !allPhotos.includes(selectedJob.podPhotoUrl)) {
                       allPhotos.push(selectedJob.podPhotoUrl);
                     }
-                    const hasContent = allPhotos.length > 0 || selectedJob.podSignatureUrl || selectedJob.podRecipientName;
+                    const hasContent = allPhotos.length > 0 || selectedJob.podSignatureUrl || selectedJob.podRecipientName || selectedJob.recipientName;
                     
                     if (!hasContent) {
                       return (

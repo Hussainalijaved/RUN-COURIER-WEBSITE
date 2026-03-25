@@ -83,11 +83,21 @@ interface OrderWithDriver extends Job {
 }
 
 function PODSection({ job }: { job: Job }) {
-  const hasPODPhoto = job.podPhotoUrl && job.podPhotoUrl.length > 0;
-  const hasPODSignature = job.podSignatureUrl && job.podSignatureUrl.length > 0;
-  const hasDeliveryInstructions = job.deliveryInstructions && job.deliveryInstructions.length > 0;
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
 
-  if (!hasPODPhoto && !hasPODSignature && !hasDeliveryInstructions) {
+  const allPhotos: string[] = [];
+  if ((job as any).podPhotos?.length) allPhotos.push(...(job as any).podPhotos);
+  if (job.podPhotoUrl && !allPhotos.includes(job.podPhotoUrl)) allPhotos.push(job.podPhotoUrl);
+
+  const hasPODPhotos = allPhotos.length > 0;
+  const hasPODSignature = !!(job.podSignatureUrl);
+  const signedBy = (job as any).podRecipientName || job.recipientName;
+  const podNotes = (job as any).podNotes;
+  const hasDeliveryInstructions = !!(job.deliveryInstructions);
+
+  const hasAnything = hasPODPhotos || hasPODSignature || signedBy || podNotes || hasDeliveryInstructions;
+
+  if (!hasAnything) {
     return (
       <div className="text-center py-6 text-muted-foreground">
         <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -98,65 +108,70 @@ function PODSection({ job }: { job: Job }) {
 
   return (
     <div className="space-y-4">
-      {hasPODPhoto && (
-        <div>
-          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-            <Camera className="h-4 w-4 text-green-600" />
-            Delivery Photo
-          </h4>
-          <Dialog>
-            <DialogTrigger asChild>
-              <div 
-                className="relative cursor-pointer rounded-lg overflow-hidden border hover:border-primary transition-colors group"
-                data-testid="pod-photo-container"
-              >
-                <img 
-                  src={job.podPhotoUrl || ''} 
-                  alt="Proof of delivery" 
-                  className="w-full h-48 object-cover"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <ExternalLink className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Camera className="h-5 w-5" />
-                  Delivery Photo
-                </DialogTitle>
-              </DialogHeader>
-              <img 
-                src={job.podPhotoUrl || ''} 
-                alt="Proof of delivery" 
-                className="w-full rounded-lg"
-                data-testid="pod-photo-full"
-              />
-            </DialogContent>
-          </Dialog>
+      {/* Signed-by confirmation banner */}
+      {(signedBy || hasPODSignature) && (
+        <div className="flex items-center gap-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3">
+          <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Received &amp; signed by</p>
+            <p className="font-semibold text-green-700 dark:text-green-400 truncate" data-testid="pod-signed-by">
+              {signedBy || 'Recipient'}
+            </p>
+          </div>
         </div>
       )}
 
+      {/* Delivery photos */}
+      {hasPODPhotos && (
+        <div>
+          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <Camera className="h-4 w-4 text-green-600" />
+            Delivery {allPhotos.length === 1 ? 'Photo' : `Photos (${allPhotos.length})`}
+          </h4>
+          <div className={`grid gap-2 ${allPhotos.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {allPhotos.map((photoUrl, index) => (
+              <button
+                key={photoUrl}
+                type="button"
+                className="relative rounded-lg overflow-hidden border hover:border-primary transition-colors group focus:outline-none"
+                onClick={() => setLightboxPhoto(photoUrl)}
+                data-testid={`pod-photo-thumb-${index}`}
+              >
+                <img
+                  src={photoUrl}
+                  alt={`Delivery photo ${index + 1}`}
+                  className="w-full h-40 object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).closest('button')?.remove(); }}
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <ExternalLink className="h-6 w-6 text-white" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Signature */}
       {hasPODSignature && (
         <div>
           <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
             <Signature className="h-4 w-4 text-blue-600" />
-            Customer Signature
+            Signature
           </h4>
           <Dialog>
             <DialogTrigger asChild>
-              <div 
-                className="relative cursor-pointer rounded-lg overflow-hidden border bg-white hover:border-primary transition-colors group p-4"
+              <div
+                className="relative cursor-pointer rounded-lg overflow-hidden border bg-white hover:border-primary transition-colors group p-3 inline-block"
                 data-testid="pod-signature-container"
               >
-                <img 
-                  src={job.podSignatureUrl || ''} 
-                  alt="Customer signature" 
-                  className="w-full h-24 object-contain"
+                <img
+                  src={job.podSignatureUrl || ''}
+                  alt="Recipient signature"
+                  className="h-20 max-w-full object-contain"
                 />
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <ExternalLink className="h-6 w-6 text-black/60" />
+                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <ExternalLink className="h-5 w-5 text-black/60" />
                 </div>
               </div>
             </DialogTrigger>
@@ -164,13 +179,13 @@ function PODSection({ job }: { job: Job }) {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Signature className="h-5 w-5" />
-                  Customer Signature
+                  Recipient Signature{signedBy ? ` — ${signedBy}` : ''}
                 </DialogTitle>
               </DialogHeader>
               <div className="bg-white rounded-lg p-4 border">
-                <img 
-                  src={job.podSignatureUrl || ''} 
-                  alt="Customer signature" 
+                <img
+                  src={job.podSignatureUrl || ''}
+                  alt="Recipient signature"
                   className="w-full"
                   data-testid="pod-signature-full"
                 />
@@ -180,17 +195,51 @@ function PODSection({ job }: { job: Job }) {
         </div>
       )}
 
-      {hasDeliveryInstructions && (
+      {/* Driver notes from mobile */}
+      {podNotes && (
         <div>
           <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
             <FileText className="h-4 w-4 text-orange-600" />
-            Delivery Notes
+            Driver Notes
           </h4>
-          <div className="bg-muted/50 rounded-lg p-3 text-sm" data-testid="pod-notes">
+          <div className="bg-muted/50 rounded-lg p-3 text-sm" data-testid="pod-driver-notes">
+            {podNotes}
+          </div>
+        </div>
+      )}
+
+      {/* Delivery instructions (pre-booked) */}
+      {hasDeliveryInstructions && (
+        <div>
+          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            Delivery Instructions
+          </h4>
+          <div className="bg-muted/50 rounded-lg p-3 text-sm" data-testid="pod-instructions">
             {job.deliveryInstructions}
           </div>
         </div>
       )}
+
+      {/* Photo lightbox */}
+      <Dialog open={!!lightboxPhoto} onOpenChange={(open) => { if (!open) setLightboxPhoto(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" />
+              Delivery Photo
+            </DialogTitle>
+          </DialogHeader>
+          {lightboxPhoto && (
+            <img
+              src={lightboxPhoto}
+              alt="Delivery proof"
+              className="w-full rounded-lg"
+              data-testid="pod-photo-full"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
