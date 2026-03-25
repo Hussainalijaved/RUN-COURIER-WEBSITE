@@ -549,6 +549,11 @@ function Router() {
             <Track />
           </ProtectedRoute>
         </Route>
+        <Route path="/supervisor/route-planner">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <AdminRoutePlanner />
+          </ProtectedRoute>
+        </Route>
         <Route path="/supervisor/profile">
           <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
             <SupervisorProfile />

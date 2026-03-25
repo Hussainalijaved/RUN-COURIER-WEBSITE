@@ -127,6 +127,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/supervisor/quote', label: 'Get Quote', icon: Calculator },
     { href: '/supervisor/map', label: 'Live Map', icon: MapPin },
     { href: '/supervisor/postcode-map', label: 'Postcode Map', icon: Layers },
+    { href: '/supervisor/route-planner', label: 'Route Planner', icon: Route },
     { href: '/supervisor/drivers', label: 'Drivers', icon: Users },
     { href: '/supervisor/customers', label: 'Customers', icon: Users },
     { href: '/supervisor/invoices', label: 'Invoices', icon: Receipt },
