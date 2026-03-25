@@ -1990,11 +1990,11 @@ export default function AdminDrivers() {
                 <div className="flex items-center gap-3">
                   <Avatar>
                     <AvatarFallback>
-                      {(driverToResetPassword.fullName || driverToResetPassword.full_name || 'D')?.split(' ').map((n: string) => n[0]).join('') || 'D'}
+                      {(driverToResetPassword.fullName || 'D')?.split(' ').map((n: string) => n[0]).join('') || 'D'}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium" data-testid="text-reset-driver-name">{driverToResetPassword.fullName || driverToResetPassword.full_name}</p>
+                    <p className="font-medium" data-testid="text-reset-driver-name">{driverToResetPassword.fullName}</p>
                     <p className="text-sm text-muted-foreground" data-testid="text-reset-driver-email">{driverToResetPassword.email}</p>
                   </div>
                 </div>

@@ -262,9 +262,9 @@ export default function AdminContracts() {
         latestByDriver.set(c.driver_id, c);
       }
     }
-    for (const [driverId, c] of latestByDriver) {
+    Array.from(latestByDriver.entries()).forEach(([driverId, c]) => {
       statusMap.set(driverId, c.status === 'signed' ? 'signed' : 'sent');
-    }
+    });
     return statusMap;
   }, [contracts]);
 
@@ -415,12 +415,12 @@ export default function AdminContracts() {
                 </div>
                 <div className="flex items-center gap-1.5 text-sm">
                   <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
-                  <span className="font-medium">{[...driverContractStatus.values()].filter(s => s === 'sent').length}</span>
+                  <span className="font-medium">{Array.from(driverContractStatus.values()).filter(s => s === 'sent').length}</span>
                   <span className="text-muted-foreground">awaiting signature</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm">
                   <span className="w-2.5 h-2.5 rounded-full bg-green-600 inline-block" />
-                  <span className="font-medium">{[...driverContractStatus.values()].filter(s => s === 'signed').length}</span>
+                  <span className="font-medium">{Array.from(driverContractStatus.values()).filter(s => s === 'signed').length}</span>
                   <span className="text-muted-foreground">signed</span>
                 </div>
               </div>

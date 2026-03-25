@@ -32,6 +32,7 @@ const dashboardRoutes: Record<UserRole, string> = {
   driver: '/driver',
   dispatcher: '/dispatcher',
   vendor: '/vendor',
+  supervisor: '/supervisor',
 };
 
 export default function Login({ role = 'customer' }: LoginProps) {

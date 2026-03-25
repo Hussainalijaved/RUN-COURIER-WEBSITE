@@ -172,8 +172,8 @@ async function requireAdminAccessStrict(req: Request, res: Response, next: NextF
     
     if (supabaseAdmin) {
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && user) {
-        authUser = user;
+      if (!error && user && user.email) {
+        authUser = user as typeof authUser;
       }
     }
     
@@ -268,7 +268,7 @@ async function requireAdminOrSupervisorStrict(req: Request, res: Response, next:
 
     if (supabaseAdmin) {
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && user) authUser = user;
+      if (!error && user && user.email) authUser = user as typeof authUser;
     }
     if (!authUser && payload?.email && payload?.sub) {
       authUser = { id: payload.sub, email: payload.email, user_metadata: payload.user_metadata || {} };
@@ -362,7 +362,7 @@ async function requireAdminAccess(req: Request, res: Response, next: NextFunctio
     
     if (supabaseAdmin) {
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && user) authUser = user;
+      if (!error && user && user.email) authUser = user as typeof authUser;
     }
     
     if (!authUser && payload?.email && payload?.sub) {
@@ -3264,7 +3264,7 @@ export async function registerRoutes(
       broadcastJobAssigned({
         id: freshCreatedJob.id,
         trackingNumber: freshCreatedJob.trackingNumber,
-        jobNumber: freshCreatedJob.jobNumber,
+        jobNumber: (freshCreatedJob as any).jobNumber,
         status: freshCreatedJob.status,
         driverId: supabaseDriverId,
         pickupAddress: freshCreatedJob.pickupAddress,
@@ -3320,8 +3320,8 @@ export async function registerRoutes(
           deliveryPostcode: freshCreatedJob.deliveryPostcode,
           deliveryLatitude: freshCreatedJob.deliveryLatitude,
           deliveryLongitude: freshCreatedJob.deliveryLongitude,
-          recipientName: freshCreatedJob.recipientName,
-          recipientPhone: freshCreatedJob.recipientPhone,
+          recipientName: freshCreatedJob.recipientName ?? undefined,
+          recipientPhone: freshCreatedJob.recipientPhone ?? undefined,
           distance: freshCreatedJob.distance,
           driverPrice: freshCreatedJob.driverPrice || '0',
           vehicleType: freshCreatedJob.vehicleType,
@@ -3566,7 +3566,7 @@ export async function registerRoutes(
     
     // If cancelling, update the job with the cancellation reason
     if (status === "cancelled" && cancellationReason) {
-      await storage.updateJob(req.params.id, { cancellationReason });
+      await storage.updateJob(req.params.id, { cancellationReason } as any);
     }
     
     const job = await storage.updateJobStatus(req.params.id, status, rejectionReason);
@@ -3578,7 +3578,7 @@ export async function registerRoutes(
     if (status === "cancelled") {
       try {
         // Get customer email
-        let customerEmail = job.customerEmail;
+        let customerEmail = (job as any).customerEmail as string | undefined;
         if (!customerEmail && job.customerId) {
           const customer = await storage.getUser(job.customerId);
           customerEmail = customer?.email;
@@ -3586,7 +3586,7 @@ export async function registerRoutes(
         
         if (customerEmail) {
           await sendJobCancellationEmail(customerEmail, {
-            customerName: job.customerName || job.pickupContactName,
+            customerName: (job as any).customerName || job.pickupContactName,
             trackingNumber: job.trackingNumber || job.id,
             pickupPostcode: job.pickupPostcode,
             deliveryPostcode: job.deliveryPostcode,
@@ -3754,7 +3754,7 @@ export async function registerRoutes(
           const result = await sendPriceUpdateNotification(job.driverId!, {
             jobId,
             trackingNumber: job.trackingNumber || '',
-            jobNumber: job.jobNumber,
+            jobNumber: (job as any).jobNumber,
             newPrice: finalPrice,
             pickupPostcode: job.pickupPostcode,
             deliveryPostcode: job.deliveryPostcode,
@@ -3773,7 +3773,16 @@ export async function registerRoutes(
     // 4. Broadcast WebSocket update
     try {
       const { broadcastJobUpdate } = await import('./realtime');
-      broadcastJobUpdate(jobId, { driverPrice: finalPrice });
+      if (updatedJob) {
+        broadcastJobUpdate({
+          id: updatedJob.id,
+          trackingNumber: updatedJob.trackingNumber || '',
+          status: updatedJob.status,
+          customerId: updatedJob.customerId || '',
+          driverId: updatedJob.driverId,
+          updatedAt: updatedJob.updatedAt,
+        });
+      }
     } catch (err: any) {
       console.error('[DriverPrice] WebSocket broadcast failed:', err.message);
     }
@@ -6389,7 +6398,7 @@ export async function registerRoutes(
 
       const keepIds = new Set<string>();
       const noDedupDocs: any[] = [];
-      for (const [, docs] of dedupMap) {
+      for (const [, docs] of Array.from(dedupMap)) {
         if (docs.length === 1) {
           keepIds.add(docs[0].id);
         } else {
@@ -6794,7 +6803,7 @@ export async function registerRoutes(
               const key = `${dp.type}::${dp.name}`;
               if (!dedupPaths.has(key)) dedupPaths.set(key, dp);
             }
-            const uniquePaths = [...dedupPaths.values()];
+            const uniquePaths = Array.from(dedupPaths.values());
 
             const byBucket = new Map<string, typeof uniquePaths>();
             for (const dp of uniquePaths) {
@@ -6802,7 +6811,7 @@ export async function registerRoutes(
               byBucket.get(dp.bucket)!.push(dp);
             }
 
-            await Promise.all([...byBucket.entries()].map(async ([bucket, paths]) => {
+            await Promise.all(Array.from(byBucket.entries()).map(async ([bucket, paths]) => {
               try {
                 const { data } = await sbAdmin.storage.from(bucket).createSignedUrls(
                   paths.map(p => p.path), 3600
@@ -8628,7 +8637,7 @@ export async function registerRoutes(
     const drivers = await storage.getDrivers();
     const enrichedRecipients = recipients.map((r: any) => {
       const driver = drivers.find((d: any) => d.id === r.driver_id);
-      return { ...r, driver_name: driver ? `${driver.firstName} ${driver.lastName}` : r.driver_id, driver_code: driver?.driverCode || '' };
+      return { ...r, driver_name: driver ? (driver.fullName || `${(driver as any).firstName || ''} ${(driver as any).lastName || ''}`.trim() || r.driver_id) : r.driver_id, driver_code: driver?.driverCode || '' };
     });
     res.json({ ...notice, recipients: enrichedRecipients });
   }));
@@ -9726,10 +9735,10 @@ export async function registerRoutes(
   }));
 
   let supabaseFileCache: { files: Set<string>; timestamp: number } | null = null;
-  const CACHE_TTL = 60000;
+  const SUPABASE_FILE_CACHE_TTL = 60000;
 
   async function getSupabaseFileSet(): Promise<Set<string>> {
-    if (supabaseFileCache && Date.now() - supabaseFileCache.timestamp < CACHE_TTL) {
+    if (supabaseFileCache && Date.now() - supabaseFileCache.timestamp < SUPABASE_FILE_CACHE_TTL) {
       return supabaseFileCache.files;
     }
     const fileSet = new Set<string>();

@@ -228,7 +228,7 @@ export default function AdminRoutePlanner() {
   const mapsReadyRef = useRef(false);
 
   const { data: drivers } = useQuery<Driver[]>({ queryKey: ['/api/drivers'] });
-  const activeDrivers = drivers?.filter(d => d.status === 'verified' || d.status === 'approved' || d.status === 'active') || [];
+  const activeDrivers = drivers?.filter(d => (d as any).status === 'verified' || (d as any).status === 'approved' || (d as any).status === 'active' || d.isVerified || d.isActive !== false) || [];
 
   // ── Load Google Maps ────────────────────────────────────────────────────────
   const initMap = useCallback(() => {

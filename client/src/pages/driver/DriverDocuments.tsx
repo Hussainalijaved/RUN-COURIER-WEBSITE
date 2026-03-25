@@ -447,7 +447,7 @@ export default function DriverDocuments() {
 
               {documentTypes.map((docType) => {
                 const dbStatus = getDocumentStatus(docType.type);
-                const status = dbStatus || (justUploaded.has(docType.type) ? 'pending' : null);
+                const status: string | undefined = dbStatus || (justUploaded.has(docType.type) ? 'pending' : undefined);
                 const doc = getDocument(docType.type);
                 const Icon = docType.icon;
                 const hasPendingFile = !!pendingFiles[docType.type];

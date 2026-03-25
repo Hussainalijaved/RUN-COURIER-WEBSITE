@@ -1115,9 +1115,9 @@ export default function AdminJobs() {
     const existingWtMinutes = Number((job as any).waitingTimeMinutes) || 0;
     const existingWtCharge = (job as any).waitingTimeCharge > 0 ? parseFloat(String((job as any).waitingTimeCharge)) : 0;
     const existingDriverWtPay = Math.max(0, existingWtMinutes - 10) * 0.20;
-    const basePrice = Math.max(0, (job.totalPrice || 0) - existingWtCharge);
+    const basePrice = Math.max(0, Number(job.totalPrice || 0) - existingWtCharge);
     setEditTotalPrice(basePrice.toFixed(2));
-    const baseDriverPrice = Math.max(0, (job.driverPrice || 0) - existingDriverWtPay);
+    const baseDriverPrice = Math.max(0, Number(job.driverPrice || 0) - existingDriverWtPay);
     setEditDriverPrice(job.driverPrice?.toString() || '');
     setEditBaseDriverPrice(baseDriverPrice.toFixed(2));
     setEditWaitingTimeMinutes(existingWtMinutes > 0 ? existingWtMinutes.toString() : '');
@@ -2507,10 +2507,10 @@ export default function AdminJobs() {
                       Office: {selectedJob.officeCity}
                     </Badge>
                   )}
-                  {selectedJob.createdBy && (
+                  {(selectedJob as any).createdBy && (
                     <Badge variant="outline" className="gap-1">
                       <User className="h-3 w-3" />
-                      {selectedJob.createdBy}
+                      {(selectedJob as any).createdBy}
                     </Badge>
                   )}
                   {selectedJob.isCentralLondon && (

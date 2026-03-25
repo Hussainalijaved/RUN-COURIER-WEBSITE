@@ -313,7 +313,7 @@ export default function PostcodeMap() {
   if (loadError || mapError) {
     return (
       <DashboardLayout>
-        <MapFallback message={loadError || mapError || 'Map failed to load'} />
+        <MapFallback status="error" error={loadError || mapError || 'Map failed to load'} />
       </DashboardLayout>
     );
   }
