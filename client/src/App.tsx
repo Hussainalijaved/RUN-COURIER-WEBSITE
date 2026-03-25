@@ -79,7 +79,7 @@ function usePrefetchAllRoutes() {
         import("@/pages/driver/DriverPayments");
         import("@/pages/driver/DriverNotices");
       });
-    }, 2500);
+    }, 100);
     return () => clearTimeout(timer);
   }, []);
 }

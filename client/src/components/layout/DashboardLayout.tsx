@@ -1,4 +1,4 @@
-import { type ReactNode, Suspense, useTransition } from 'react';
+import { type ReactNode, Suspense } from 'react';
 import { useLocation } from 'wouter';
 import { NavigationProgress } from '@/components/NavigationProgress';
 import { useAuth } from '@/context/AuthContext';
@@ -154,10 +154,9 @@ function ContentSkeleton() {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, signOut } = useAuth();
-  const [isPending, startTransition] = useTransition();
 
   const navigate = (href: string) => {
-    startTransition(() => setLocation(href));
+    setLocation(href);
   };
 
   if (!user) {
@@ -307,12 +306,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <main className="flex-1 overflow-auto bg-background p-3 sm:p-4 lg:p-6" data-scroll-container>
             <Suspense fallback={<ContentSkeleton />}>
-              <div
-                className="page-transition"
-                style={{ opacity: isPending ? 0.5 : 1, transition: 'opacity 150ms ease-out', pointerEvents: isPending ? 'none' : 'auto' }}
-              >
-                {children}
-              </div>
+              {children}
             </Suspense>
           </main>
         </div>
