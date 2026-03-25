@@ -204,13 +204,54 @@
     @apply text-base;
   }
 
-  /* Prevent text selection on interactive elements when clicking */
-  button, a, label, [role="button"],
-  [data-testid*="button"], [data-testid*="nav-"],
-  .sidebar-menu-button {
-    -webkit-user-select: none;
-    user-select: none;
-  }
+}
+
+/* ============================================================
+   GLOBAL: Prevent text selection and image dragging site-wide
+   ============================================================ */
+
+/* Disable selection everywhere */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable selection only inside form fields */
+input,
+textarea,
+select,
+[contenteditable="true"],
+input *,
+textarea * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Prevent native image drag-and-drop */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -khtml-user-drag: none;
+  pointer-events: none;
+}
+
+/* Restore pointer events for Google Maps tiles and controls */
+.gm-style img,
+.gm-style canvas,
+.gm-style * {
+  pointer-events: auto;
+}
+
+/* Restore pointer events for everything else that needs clicks */
+a img,
+button img,
+[role="button"] img,
+.pac-container img {
+  pointer-events: auto;
 }
 
 /**
