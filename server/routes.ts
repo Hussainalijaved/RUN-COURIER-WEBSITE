@@ -7880,26 +7880,43 @@ export async function registerRoutes(
       // ── resolve document record ───────────────────────────────────────────
       let doc: any = null;
 
+      const COL_MAP: Record<string, string> = {
+        drivingLicenceFront: 'driving_licence_front_url',
+        drivingLicenceBack: 'driving_licence_back_url',
+        dbsCertificate: 'dbs_certificate_url',
+        goodsInTransitInsurance: 'goods_in_transit_insurance_url',
+        hireAndReward: 'hire_reward_insurance_url',
+        profilePicture: 'profile_picture_url',
+      };
+
+      const resolveColDoc = async (dId: string, docType: string): Promise<any | null> => {
+        const col = COL_MAP[docType];
+        if (!col || !dId) return null;
+        const { data: driverRow } = await supabaseAdmin.from('drivers').select(col).eq('id', dId).maybeSingle();
+        if (driverRow && (driverRow as any)[col]) {
+          const rawUrl: string = (driverRow as any)[col];
+          const storagePath = extractStoragePath(rawUrl) || rawUrl;
+          return { id: docId, driver_id: dId, file_url: rawUrl, storage_path: storagePath, bucket: 'DRIVER-DOCUMENTS', doc_type: docType };
+        }
+        return null;
+      };
+
       if (docId.startsWith('col-')) {
         const parts = docId.replace('col-', '').split('-');
-        const docType = parts.pop();
+        const docType = parts.pop()!;
         const dId = parts.join('-');
-        if (dId && docType) {
-          const colMap: Record<string, string> = {
-            drivingLicenceFront: 'driving_licence_front_url',
-            drivingLicenceBack: 'driving_licence_back_url',
-            dbsCertificate: 'dbs_certificate_url',
-            goodsInTransitInsurance: 'goods_in_transit_insurance_url',
-            hireAndReward: 'hire_reward_insurance_url',
-            profilePicture: 'profile_picture_url',
-          };
-          const col = colMap[docType];
-          if (col) {
-            const { data: driverRow } = await supabaseAdmin.from('drivers').select(col).eq('id', dId).maybeSingle();
-            if (driverRow && (driverRow as any)[col]) {
-              const rawUrl: string = (driverRow as any)[col];
-              const storagePath = extractStoragePath(rawUrl) || rawUrl;
-              doc = { id: docId, driver_id: dId, file_url: rawUrl, storage_path: storagePath, bucket: 'DRIVER-DOCUMENTS', doc_type: docType };
+        doc = await resolveColDoc(dId, docType);
+      }
+
+      // Fallback: handle old-format IDs like "${uuid}-${docType}" without col- prefix
+      if (!doc) {
+        const knownTypes = Object.keys(COL_MAP);
+        for (const t of knownTypes) {
+          if (docId.endsWith(`-${t}`)) {
+            const dId = docId.slice(0, docId.length - t.length - 1);
+            if (dId.match(/^[0-9a-f-]{36}$/i)) {
+              doc = await resolveColDoc(dId, t);
+              if (doc) break;
             }
           }
         }

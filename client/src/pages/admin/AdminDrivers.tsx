@@ -457,12 +457,12 @@ export default function AdminDrivers() {
         const url = raw[m.col];
         if (url) {
           fallbackDocs.push({
-            id: `${driverId}-${m.type}`,
+            id: `col-${driverId}-${m.type}`,
             driverId,
             type: m.type,
             fileName: m.label,
-            fileUrl: normalizeDocUrl(url),
-            signedUrl: normalizeDocUrl(url),
+            fileUrl: url,
+            signedUrl: null,
             status: 'approved',
             uploadedAt: raw.created_at ? new Date(raw.created_at) : new Date(),
             expiryDate: null,
@@ -767,8 +767,9 @@ export default function AdminDrivers() {
 
   const getDocumentViewUrl = (doc: any) => {
     if (doc.fileUrl?.startsWith('text:')) return null;
-    if (doc.signedUrl) return doc.signedUrl;
-    if (doc.fileUrl?.startsWith('http')) return doc.fileUrl;
+    if (String(doc.id || '').startsWith('col-')) return `/api/documents/${doc.id}/view`;
+    if (doc.signedUrl && !doc.signedUrl.startsWith('text:')) return doc.signedUrl;
+    if (doc.fileUrl?.startsWith('http')) return `/api/documents/${doc.id}/view`;
     return `/api/documents/${doc.id}/view`;
   };
 
