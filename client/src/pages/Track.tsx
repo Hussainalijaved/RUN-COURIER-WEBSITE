@@ -118,6 +118,7 @@ interface MockJob {
   createdAt: string;
   podPhotoUrl?: string;
   podRecipientName?: string;
+  recipientName?: string;
   deliveredAt?: string;
 }
 
@@ -181,6 +182,7 @@ export default function Track() {
           createdAt: data.createdAt,
           podPhotoUrl: data.podPhotoUrl || undefined,
           podRecipientName: data.podRecipientName || undefined,
+          recipientName: data.recipientName || undefined,
           deliveredAt: data.deliveredAt || undefined,
         });
         setLastUpdate(new Date());
@@ -371,7 +373,7 @@ export default function Track() {
               </Card>
 
               {/* Proof of Delivery — shown when delivered */}
-              {job.status === 'delivered' && (job.podPhotoUrl || job.podRecipientName) && (
+              {job.status === 'delivered' && (job.podPhotoUrl || job.podRecipientName || job.recipientName) && (
                 <Card className="mb-8 border-green-200 dark:border-green-800">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2 text-green-700 dark:text-green-400">
@@ -388,14 +390,14 @@ export default function Track() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {job.podRecipientName && (
+                    {(job.podRecipientName || job.recipientName) && (
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
                           <UserCheck className="h-4 w-4 text-green-700 dark:text-green-400" />
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Received by</p>
-                          <p className="font-semibold" data-testid="text-pod-recipient">{job.podRecipientName}</p>
+                          <p className="font-semibold" data-testid="text-pod-recipient">{job.podRecipientName || job.recipientName}</p>
                         </div>
                       </div>
                     )}
