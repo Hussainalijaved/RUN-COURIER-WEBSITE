@@ -764,6 +764,123 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Reconcile approved applications that are missing driver accounts (e.g. from server crash during approval)
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+
+      const { data: approvedApps, error: appsErr } = await supabaseAdmin
+        .from('driver_applications')
+        .select('id, full_name, email, phone, postcode, full_address, vehicle_type, bank_name, account_holder_name, sort_code, account_number, nationality, is_british, national_insurance_number, profile_picture_url, driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_and_reward_url')
+        .eq('status', 'approved');
+      if (appsErr) { console.warn("[BACKGROUND] Reconcile: approved apps query error:", appsErr.message); return; }
+
+      if (!approvedApps || approvedApps.length === 0) return;
+
+      const { data: existingDrivers } = await supabaseAdmin.from('drivers').select('email');
+      const driverEmailSet = new Set<string>(
+        (existingDrivers || []).map((d: any) => d.email?.toLowerCase()).filter(Boolean)
+      );
+
+      const missing = approvedApps.filter((a: any) => !driverEmailSet.has(a.email?.toLowerCase()));
+      if (missing.length === 0) {
+        console.log("[BACKGROUND] All approved applications have driver accounts");
+        return;
+      }
+
+      console.log(`[BACKGROUND] Found ${missing.length} approved application(s) without driver accounts - reconciling...`);
+
+      const { sendDriverApprovalEmail } = await import('./emailService');
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+      async function genCode(): Promise<string> {
+        const { data: allCodes } = await supabaseAdmin!.from('drivers').select('driver_code').not('driver_code', 'is', null);
+        const used = new Set<string>((allCodes || []).map((d: any) => d.driver_code).filter((c: any) => /^RC\d{2}[A-Z]$/.test(c)));
+        for (let i = 0; i < 500; i++) {
+          const code = `RC${Math.floor(Math.random()*10)}${Math.floor(Math.random()*10)}${letters[Math.floor(Math.random()*26)]}`;
+          if (!used.has(code)) return code;
+        }
+        return `RC${Date.now() % 100}A`;
+      }
+
+      function genPassword(): string {
+        const words = ['Run','Fast','Drive','Go','Ace','Top','Jet','Max','Pro','Key'];
+        const pick = () => words[Math.floor(Math.random() * words.length)];
+        return `${pick()}${pick()}${pick()}${100 + Math.floor(Math.random()*900)}`;
+      }
+
+      for (const app of missing) {
+        try {
+          // Clean up any orphaned auth user
+          const { data: allUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000, page: 1 });
+          const oldUser = allUsers?.users?.find((u: any) => u.email?.toLowerCase() === app.email?.toLowerCase());
+          if (oldUser) {
+            const { data: oldDriver } = await supabaseAdmin.from('drivers').select('id, is_active').eq('id', oldUser.id).maybeSingle();
+            if (!oldDriver || oldDriver.is_active === false) {
+              if (oldDriver) await supabaseAdmin.from('drivers').delete().eq('id', oldUser.id);
+              await supabaseAdmin.auth.admin.deleteUser(oldUser.id);
+            }
+          }
+
+          const tempPassword = genPassword();
+          const { data: authResult, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+            email: app.email, password: tempPassword, email_confirm: true,
+            user_metadata: { fullName: app.full_name, role: 'driver', phone: app.phone }
+          });
+          if (authErr || !authResult?.user) {
+            console.error(`[BACKGROUND] Reconcile: failed to create auth for ${app.email}:`, authErr?.message);
+            continue;
+          }
+
+          const userId = authResult.user.id;
+          const driverCode = await genCode();
+
+          const driverData: Record<string, any> = {
+            id: userId, user_id: userId, driver_code: driverCode,
+            full_name: app.full_name, email: app.email, phone: app.phone,
+            postcode: app.postcode || null, address: app.full_address || null,
+            nationality: app.nationality || null,
+            is_british: app.is_british ?? true,
+            national_insurance_number: app.national_insurance_number || null,
+            vehicle_type: app.vehicle_type || 'car',
+            online_status: 'offline', status: 'approved', is_active: true,
+            bank_name: app.bank_name || null, account_holder_name: app.account_holder_name || null,
+            sort_code: app.sort_code || null, account_number: app.account_number || null,
+          };
+
+          let { error: insertErr } = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
+          if (insertErr) {
+            console.warn(`[BACKGROUND] Reconcile: insert warning for ${app.email}: ${insertErr.message}`);
+            const retry = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
+            insertErr = retry.error;
+          }
+
+          if (insertErr) {
+            console.error(`[BACKGROUND] Reconcile: failed to create driver record for ${app.email}:`, insertErr.message);
+            continue;
+          }
+
+          // Set must_change_password
+          try { await supabaseAdmin.from('drivers').update({ must_change_password: true }).eq('id', userId); } catch {}
+
+          // Send approval email
+          try {
+            await sendDriverApprovalEmail(app.email, app.full_name, driverCode, tempPassword);
+          } catch (emailErr) {
+            console.error(`[BACKGROUND] Reconcile: email failed for ${app.email}:`, emailErr);
+          }
+
+          console.log(`[BACKGROUND] Reconcile: created driver ${driverCode} for ${app.full_name} (${app.email})`);
+        } catch (err: any) {
+          console.error(`[BACKGROUND] Reconcile error for ${app.email}:`, err?.message);
+        }
+      }
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Approved-applications reconciliation error:", e?.message);
+    }
+  })();
+
   (async () => {
     try {
       const { getStripeSync } = await import('./stripeClient');
