@@ -8671,8 +8671,22 @@ export async function registerRoutes(
     res.json({ ...notice, recipients: enrichedRecipients });
   }));
 
+  app.post("/api/admin/notices/upload-image", uploadDocument.single('file'), asyncHandler(async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: "Only image files are allowed (JPEG, PNG, GIF, WebP)" });
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.status(500).json({ error: "Storage unavailable" });
+    const storagePath = `notice-attachments/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { error: upErr } = await supabaseAdmin.storage.from('DRIVER-DOCUMENTS').upload(storagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+    if (upErr) { console.error('[NoticeImage] Upload error:', upErr.message); return res.status(500).json({ error: "Failed to upload image" }); }
+    const { data: signed } = await supabaseAdmin.storage.from('DRIVER-DOCUMENTS').createSignedUrl(storagePath, 315360000);
+    if (!signed?.signedUrl) return res.status(500).json({ error: "Failed to create image URL" });
+    res.json({ url: signed.signedUrl });
+  }));
+
   app.post("/api/admin/notices/send", asyncHandler(async (req, res) => {
-    const { title, subject, message, category, requires_acknowledgement, target_type, driver_ids, template_id, send_email } = req.body;
+    const { title, subject, message, category, requires_acknowledgement, target_type, driver_ids, template_id, send_email, image_url } = req.body;
     if (!title || !message) return res.status(400).json({ error: "Title and message are required" });
 
     const allDrivers = await storage.getDrivers();
@@ -8723,6 +8737,7 @@ export async function registerRoutes(
                   <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;">
                     ${message.replace(/\n/g, '<br>')}
                   </div>
+                  ${image_url ? `<div style="margin: 20px 0; text-align: center;"><img src="${image_url}" alt="Notice attachment" style="max-width: 100%; max-height: 500px; border-radius: 6px; border: 1px solid #e0e0e0;" /></div>` : ''}
                   ${requires_acknowledgement ? '<p style="color: #e55; font-weight: bold;">This notice requires your acknowledgement. Please log in to your driver account to acknowledge.</p>' : ''}
                   <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
                 </div>`,

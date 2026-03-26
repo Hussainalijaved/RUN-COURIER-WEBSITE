@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Megaphone, Plus, Send, Eye, Edit, Trash2, Copy, Archive,
   Search, FileText, CheckCircle, Clock, AlertTriangle, Mail,
-  Users, Bell, ChevronLeft, RotateCw,
+  Users, Bell, ChevronLeft, RotateCw, ImagePlus, X,
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -63,6 +63,11 @@ export default function AdminNotices() {
 
   const [detailNotice, setDetailNotice] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  const [noticeImageFile, setNoticeImageFile] = useState<File | null>(null);
+  const [noticeImagePreview, setNoticeImagePreview] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery<any[]>({ queryKey: ['/api/notice-templates'] });
   const { data: sentNotices = [], isLoading: noticesLoading } = useQuery<any[]>({ queryKey: ['/api/admin/notices'] });
@@ -174,6 +179,9 @@ export default function AdminNotices() {
     setNoticeForm({ title: '', subject: '', message: '', category: 'general', requires_acknowledgement: false, target_type: 'all', send_email: false, template_id: '' });
     setSelectedDriverIds([]);
     setDriverSearchQuery('');
+    setNoticeImageFile(null);
+    setNoticeImagePreview('');
+    if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
   function openEditTemplate(t: any) {
@@ -204,8 +212,26 @@ export default function AdminNotices() {
     }
   }
 
-  function handleSendNotice() {
+  async function handleSendNotice() {
+    let imageUrl = '';
+    if (noticeImageFile && noticeForm.send_email) {
+      setIsUploadingImage(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', noticeImageFile);
+        const r = await fetch('/api/admin/notices/upload-image', { method: 'POST', body: formData });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Upload failed');
+        imageUrl = data.url || '';
+      } catch (e: any) {
+        toast({ title: 'Image upload failed', description: e.message, variant: 'destructive' });
+        setIsUploadingImage(false);
+        return;
+      }
+      setIsUploadingImage(false);
+    }
     const payload: any = { ...noticeForm };
+    if (imageUrl) payload.image_url = imageUrl;
     if (noticeForm.target_type === 'selected') {
       payload.driver_ids = selectedDriverIds;
     }
@@ -578,12 +604,58 @@ export default function AdminNotices() {
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={noticeForm.send_email}
-                      onCheckedChange={(val) => setNoticeForm(f => ({ ...f, send_email: val }))}
+                      onCheckedChange={(val) => {
+                        setNoticeForm(f => ({ ...f, send_email: val }));
+                        if (!val) { setNoticeImageFile(null); setNoticeImagePreview(''); if (imageInputRef.current) imageInputRef.current.value = ''; }
+                      }}
                       data-testid="switch-send-email"
                     />
                     <Label className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Send Email</Label>
                   </div>
                 </div>
+
+                {noticeForm.send_email && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5"><ImagePlus className="w-3.5 h-3.5" /> Email Image Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      className="hidden"
+                      data-testid="input-notice-image"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setNoticeImageFile(file);
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => setNoticeImagePreview(ev.target?.result as string || '');
+                          reader.readAsDataURL(file);
+                        } else {
+                          setNoticeImagePreview('');
+                        }
+                      }}
+                    />
+                    {noticeImagePreview ? (
+                      <div className="relative inline-block">
+                        <img src={noticeImagePreview} alt="Preview" className="max-h-48 max-w-full rounded-md border object-contain" />
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => { setNoticeImageFile(null); setNoticeImagePreview(''); if (imageInputRef.current) imageInputRef.current.value = ''; }}
+                          data-testid="button-remove-notice-image"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => imageInputRef.current?.click()} data-testid="button-select-notice-image">
+                        <ImagePlus className="w-4 h-4 mr-1.5" /> Select Image
+                      </Button>
+                    )}
+                    <p className="text-xs text-muted-foreground">JPEG, PNG, GIF or WebP. Image will be embedded in the email body.</p>
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-2 flex-wrap">
                   <Button variant="outline" onClick={() => setPreviewOpen(true)} disabled={!noticeForm.title || !noticeForm.message} data-testid="button-preview-notice">
@@ -657,6 +729,12 @@ export default function AdminNotices() {
             <h3 className="text-lg font-semibold">{noticeForm.title}</h3>
             {noticeForm.subject && <p className="text-muted-foreground">{noticeForm.subject}</p>}
             <div className="rounded-md border p-4 whitespace-pre-wrap text-sm">{noticeForm.message}</div>
+            {noticeImagePreview && noticeForm.send_email && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Email image attachment:</p>
+                <img src={noticeImagePreview} alt="Attachment preview" className="max-h-40 max-w-full rounded-md border object-contain" />
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Will be sent to {recipientCount} driver{recipientCount !== 1 ? 's' : ''}
               {noticeForm.send_email && ' (including email notification)'}
@@ -678,8 +756,8 @@ export default function AdminNotices() {
           {noticeForm.send_email && <p className="text-sm text-muted-foreground">Email notifications will also be sent.</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmSendOpen(false)}>Cancel</Button>
-            <Button onClick={handleSendNotice} disabled={sendNoticeMutation.isPending} data-testid="button-confirm-send">
-              {sendNoticeMutation.isPending ? 'Sending...' : 'Send Notice'}
+            <Button onClick={handleSendNotice} disabled={sendNoticeMutation.isPending || isUploadingImage} data-testid="button-confirm-send">
+              {isUploadingImage ? 'Uploading image...' : sendNoticeMutation.isPending ? 'Sending...' : 'Send Notice'}
             </Button>
           </DialogFooter>
         </DialogContent>
