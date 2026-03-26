@@ -144,6 +144,9 @@ function mapDbToJob(dbJob: any): Job {
     centralLondonCharge: dbJob.central_london_charge,
     waitingTimeMinutes: dbJob.waiting_time_minutes ?? 0,
     waitingTimeCharge: dbJob.waiting_time_charge,
+    serviceType: dbJob.service_type || null,
+    serviceTypePercent: dbJob.service_type_percent != null ? Number(dbJob.service_type_percent) : null,
+    serviceTypeAmount: dbJob.service_type_amount || null,
     totalPrice: dbJob.total_price,
     driverPrice: dbJob.driver_price,
     paymentStatus: dbJob.payment_status,
@@ -1042,6 +1045,9 @@ export class SupabaseStorage implements IStorage {
       return_trip_charge: insertJob.returnTripCharge || '0',
       central_london_charge: insertJob.centralLondonCharge || '0',
       waiting_time_charge: insertJob.waitingTimeCharge || '0',
+      service_type: (insertJob as any).serviceType || 'flexible',
+      service_type_percent: (insertJob as any).serviceTypePercent ?? 0,
+      service_type_amount: (insertJob as any).serviceTypeAmount || '0',
       total_price: insertJob.totalPrice,
       price_customer: insertJob.totalPrice || '0',
       driver_price: insertJob.driverPrice || null,
@@ -1077,6 +1083,13 @@ export class SupabaseStorage implements IStorage {
         delete (dbJob as any).customer_type;
         needsRetry = true;
       }
+      if (error.message?.includes('service_type')) {
+        console.warn('[SupabaseStorage] service_type columns not found, retrying without them');
+        delete (dbJob as any).service_type;
+        delete (dbJob as any).service_type_percent;
+        delete (dbJob as any).service_type_amount;
+        needsRetry = true;
+      }
       if (needsRetry) {
         const { data: retryData, error: retryError } = await supabase
           .from('jobs')
@@ -1084,12 +1097,17 @@ export class SupabaseStorage implements IStorage {
           .select()
           .single();
         if (retryError) {
-          // One more pass — strip both problematic columns
+          // One more pass — strip any remaining problematic columns
           if (retryError.message?.includes('customer_type')) {
             delete (dbJob as any).customer_type;
           }
           if (retryError.message?.includes('customer_email')) {
             delete (dbJob as any).customer_email;
+          }
+          if (retryError.message?.includes('service_type')) {
+            delete (dbJob as any).service_type;
+            delete (dbJob as any).service_type_percent;
+            delete (dbJob as any).service_type_amount;
           }
           const { data: finalData, error: finalError } = await supabase
             .from('jobs')
@@ -1168,6 +1186,9 @@ export class SupabaseStorage implements IStorage {
     if (data.waitingTimeCharge !== undefined) dbData.waiting_time_charge = data.waitingTimeCharge;
     // waiting_time_minutes also goes through Supabase JS client
     if (data.waitingTimeMinutes !== undefined) dbData.waiting_time_minutes = data.waitingTimeMinutes;
+    if ((data as any).serviceType !== undefined) dbData.service_type = (data as any).serviceType;
+    if ((data as any).serviceTypePercent !== undefined) dbData.service_type_percent = (data as any).serviceTypePercent;
+    if ((data as any).serviceTypeAmount !== undefined) dbData.service_type_amount = (data as any).serviceTypeAmount;
 
     console.log(`[SupabaseStorage] updateJob ${id} with data:`, JSON.stringify(dbData));
     
@@ -1180,6 +1201,20 @@ export class SupabaseStorage implements IStorage {
     
     if (error) {
       console.error(`[SupabaseStorage] updateJob error:`, error);
+      // Strip service_type columns if they don't exist yet in the DB
+      if (error.message?.includes('service_type')) {
+        console.warn(`[SupabaseStorage] service_type columns not in DB yet, retrying without them`);
+        delete dbData.service_type;
+        delete dbData.service_type_percent;
+        delete dbData.service_type_amount;
+        const { data: stRetried, error: stErr } = await supabase
+          .from('jobs').update(dbData).eq('id', id).select().single();
+        if (stErr || !stRetried) {
+          console.error(`[SupabaseStorage] updateJob service_type retry error:`, stErr);
+          throw stErr || new Error('updateJob service_type retry returned no data');
+        }
+        return mapDbToJob(stRetried);
+      }
       // If main update fails due to schema cache (waiting_time_minutes not cached), retry without it
       if (data.waitingTimeMinutes !== undefined && error.message?.includes('waiting_time_minutes')) {
         console.warn(`[SupabaseStorage] waiting_time_minutes not in schema cache, retrying without it`);
