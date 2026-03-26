@@ -87,6 +87,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ShippingLabel } from '@/components/ShippingLabel';
 import { MultiDropShippingLabels } from '@/components/MultiDropShippingLabels';
+import { CopyButton } from '@/components/ui/copy-button';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useAuth } from '@/context/AuthContext';
@@ -1859,8 +1860,24 @@ export default function AdminJobs() {
                           data-testid={`checkbox-job-${job.id}`}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm font-semibold">{(job as any).jobNumber || '—'}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{job.trackingNumber}</TableCell>
+                      <TableCell className="font-mono text-sm font-semibold">
+                        <span className="flex items-center gap-1 group/copy">
+                          <span>{(job as any).jobNumber || '—'}</span>
+                          {(job as any).jobNumber && (
+                            <span className="invisible group-hover/copy:visible">
+                              <CopyButton value={(job as any).jobNumber} data-testid={`button-copy-jobnumber-${job.id}`} />
+                            </span>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1 group/copy">
+                          <span>{job.trackingNumber}</span>
+                          <span className="invisible group-hover/copy:visible">
+                            <CopyButton value={job.trackingNumber} data-testid={`button-copy-tracking-${job.id}`} />
+                          </span>
+                        </span>
+                      </TableCell>
                       <TableCell>
                         {(job as any).customerType === 'business' ? (
                           <Badge variant="outline" className="gap-1">
@@ -2170,9 +2187,33 @@ export default function AdminJobs() {
             <DialogHeader className="flex-shrink-0">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
-                  <DialogTitle>Job Details - {(selectedJob as any)?.jobNumber || selectedJob?.trackingNumber}</DialogTitle>
-                  <DialogDescription>
-                    Created on {selectedJob && formatDate(selectedJob.createdAt)}
+                  <DialogTitle>Job Details</DialogTitle>
+                  <DialogDescription asChild>
+                    <div className="flex flex-col gap-1 mt-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">Job No.</span>
+                        <span className="font-mono font-semibold text-foreground text-sm flex items-center gap-1">
+                          {(selectedJob as any)?.jobNumber || '—'}
+                          {(selectedJob as any)?.jobNumber && <CopyButton value={(selectedJob as any).jobNumber} data-testid="button-copy-detail-jobnumber" />}
+                        </span>
+                        <span className="text-muted-foreground/40">·</span>
+                        <span className="text-xs text-muted-foreground">Tracking</span>
+                        <span className="font-mono text-xs text-muted-foreground flex items-center gap-1">
+                          {selectedJob?.trackingNumber}
+                          {selectedJob?.trackingNumber && <CopyButton value={selectedJob.trackingNumber} data-testid="button-copy-detail-tracking" />}
+                        </span>
+                      </div>
+                      {(selectedJob as any)?.customerEmail && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Email</span>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            {(selectedJob as any).customerEmail}
+                            <CopyButton value={(selectedJob as any).customerEmail} data-testid="button-copy-detail-email" />
+                          </span>
+                        </div>
+                      )}
+                      <span className="text-xs">Created on {selectedJob && formatDate(selectedJob.createdAt)}</span>
+                    </div>
                   </DialogDescription>
                 </div>
                 {selectedJob && (
