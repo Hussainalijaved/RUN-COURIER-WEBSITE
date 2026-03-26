@@ -497,7 +497,7 @@ export default function AdminApplications() {
         <div className="flex items-center gap-3">
           <Avatar>
             {application.profilePictureUrl ? (
-              <AvatarImage src={resolveDocUrl(application.profilePictureUrl)} alt={application.fullName} />
+              <AvatarImage src={`/api/application-document/${application.id}/profilePicture`} alt={application.fullName} />
             ) : null}
             <AvatarFallback>
               {application.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
