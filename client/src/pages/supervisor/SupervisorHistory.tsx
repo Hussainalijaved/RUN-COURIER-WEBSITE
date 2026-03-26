@@ -76,6 +76,7 @@ import {
   Smartphone,
   PoundSterling,
   FileText,
+  PenLine,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -2314,6 +2315,31 @@ export default function SupervisorJobHistory() {
                           </div>
                         )}
 
+                        {selectedJob.podSignatureUrl && (
+                          <div className="mt-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                              <PenLine className="h-3 w-3" />
+                              Recipient Signature
+                            </p>
+                            <a
+                              href={selectedJob.podSignatureUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block rounded-lg border bg-white dark:bg-white overflow-hidden hover:opacity-90 transition-opacity cursor-pointer"
+                              data-testid="link-pod-signature"
+                            >
+                              <img
+                                src={selectedJob.podSignatureUrl}
+                                alt="Recipient Signature"
+                                className="w-full object-contain"
+                                style={{ maxHeight: '180px', minHeight: '80px' }}
+                                data-testid="img-pod-signature"
+                              />
+                            </a>
+                            <p className="text-xs text-muted-foreground mt-1">Click to view full size</p>
+                          </div>
+                        )}
+
                         <div className="flex items-start gap-4 mt-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                           <div className="flex-1 space-y-2">
                             <div>
@@ -2335,25 +2361,6 @@ export default function SupervisorJobHistory() {
                               </div>
                             )}
                           </div>
-                          {selectedJob.podSignatureUrl && (
-                            <div className="flex-shrink-0">
-                              <p className="text-xs text-muted-foreground mb-1">Signature</p>
-                              <a
-                                href={selectedJob.podSignatureUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block"
-                              >
-                                <img
-                                  src={selectedJob.podSignatureUrl}
-                                  alt="Recipient Signature"
-                                  className="rounded-md border bg-white p-1 h-16 w-28 object-contain hover:opacity-90 transition-opacity cursor-pointer"
-                                  data-testid="img-pod-signature"
-                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                />
-                              </a>
-                            </div>
-                          )}
                         </div>
                       </>
                     );
