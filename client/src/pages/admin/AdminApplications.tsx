@@ -420,60 +420,24 @@ export default function AdminApplications() {
     }
   };
 
-  const resolveDocUrl = (url: string): string => {
-    if (!url || url.startsWith('text:')) return url;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    if (url.startsWith('/api/uploads/')) return url;
-    if (url.startsWith('/uploads/')) return '/api' + url;
-    if (!url.startsWith('/')) {
-      return `/api/uploads/documents/${url}`;
-    }
-    return url;
-  };
-
   const documentFields = [
-    { key: 'profilePictureUrl', label: 'Profile Picture' },
-    { key: 'drivingLicenceFrontUrl', label: 'Driving Licence (Front)' },
-    { key: 'drivingLicenceBackUrl', label: 'Driving Licence (Back)' },
-    { key: 'dbsCertificateUrl', label: 'DBS Certificate' },
-    { key: 'goodsInTransitInsuranceUrl', label: 'Goods in Transit Insurance' },
-    { key: 'hireAndRewardUrl', label: 'Hire & Reward Insurance' },
+    { key: 'profilePictureUrl', fieldKey: 'profilePicture', label: 'Profile Picture' },
+    { key: 'drivingLicenceFrontUrl', fieldKey: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
+    { key: 'drivingLicenceBackUrl', fieldKey: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
+    { key: 'dbsCertificateUrl', fieldKey: 'dbsCertificate', label: 'DBS Certificate' },
+    { key: 'goodsInTransitInsuranceUrl', fieldKey: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
+    { key: 'hireAndRewardUrl', fieldKey: 'hireAndReward', label: 'Hire & Reward Insurance' },
   ];
 
   useEffect(() => {
     if (!selectedApplication || !isReviewDialogOpen) return;
-    setFileCheckDone(false);
+    // Documents are served via proxy endpoint — no local file check needed
     setFileAvailability({});
-
-    const urls = documentFields
-      .map(d => (selectedApplication as any)[d.key] as string | null)
-      .filter((u): u is string => !!u);
-
-    if (urls.length === 0) {
-      setFileCheckDone(true);
-      return;
-    }
-
-    fetch('/api/check-files', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        setFileAvailability(data);
-        setFileCheckDone(true);
-      })
-      .catch(() => {
-        const fallback: Record<string, boolean> = {};
-        urls.forEach(u => { fallback[u] = false; });
-        setFileAvailability(fallback);
-        setFileCheckDone(true);
-      });
+    setFileCheckDone(true);
   }, [selectedApplication, isReviewDialogOpen]);
 
-  const renderDocumentLink = (url: string | null, label: string) => {
-    if (!url) {
+  const renderDocumentLink = (appId: string, fieldKey: string, rawStoragePath: string | null, label: string) => {
+    if (!rawStoragePath) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={`doc-status-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}>
           <AlertCircle className="h-4 w-4" />
@@ -482,15 +446,17 @@ export default function AdminApplications() {
       );
     }
 
-    const resolvedUrl = resolveDocUrl(url);
-    // Match .pdf before end-of-string or before a query string
-    const isPdf = /\.pdf(\?|$)/i.test(url) || /\.pdf(\?|$)/i.test(resolvedUrl);
-    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+    // All documents route through the proxy endpoint which signs + streams from Supabase
+    const proxyUrl = `/api/application-document/${appId}/${fieldKey}`;
+
+    // Detect type from the raw storage path / original filename
+    const isPdf = /\.pdf(\?|$)/i.test(rawStoragePath);
+    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(rawStoragePath);
 
     return (
       <div className="flex flex-col gap-1">
         <a 
-          href={resolvedUrl} 
+          href={proxyUrl} 
           target="_blank" 
           rel="noopener noreferrer"
           className="flex items-center gap-2 text-sm text-primary hover:underline"
@@ -502,21 +468,24 @@ export default function AdminApplications() {
         </a>
         {isImage && (
           <img 
-            src={resolvedUrl} 
+            src={proxyUrl} 
             alt={label} 
             className="mt-1 max-h-32 max-w-48 rounded-md border object-cover cursor-pointer"
-            onClick={() => window.open(resolvedUrl, '_blank')}
+            onClick={() => window.open(proxyUrl, '_blank')}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
           />
         )}
         {isPdf && (
           <iframe
-            src={resolvedUrl}
+            src={proxyUrl}
             className="mt-1 w-full h-48 rounded border"
             title={label}
             data-testid={`iframe-pdf-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
           />
+        )}
+        {!isImage && !isPdf && (
+          <span className="text-xs text-muted-foreground">Click link above to view</span>
         )}
       </div>
     );
@@ -888,7 +857,7 @@ export default function AdminApplications() {
                         return (
                           <div key={doc.key} className="flex items-center gap-2">
                             <div className="flex-1 min-w-0">
-                              {renderDocumentLink(url, doc.label)}
+                              {renderDocumentLink(selectedApplication.id, doc.fieldKey, url, doc.label)}
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {isPending && url && (

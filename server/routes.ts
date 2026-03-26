@@ -10095,6 +10095,103 @@ export async function registerRoutes(
     return res.status(404).json({ error: "File not found in storage" });
   }));
 
+  // ── Application document viewer ──────────────────────────────────────────
+  // Serves application-uploaded docs (images/PDFs) via signed URL from
+  // the 'driver-documents' Supabase bucket, falling back to local disk.
+  const APPLICATION_FIELD_MAP: Record<string, string> = {
+    profilePicture: 'profile_picture_url',
+    drivingLicenceFront: 'driving_licence_front_url',
+    drivingLicenceBack: 'driving_licence_back_url',
+    dbsCertificate: 'dbs_certificate_url',
+    goodsInTransitInsurance: 'goods_in_transit_insurance_url',
+    hireAndReward: 'hire_and_reward_url',
+  };
+
+  app.get("/api/application-document/:appId/:field", asyncHandler(async (req, res) => {
+    const { appId, field } = req.params;
+    const col = APPLICATION_FIELD_MAP[field];
+    if (!col) return res.status(400).json({ error: 'Unknown document field' });
+
+    const { supabaseAdmin: sb } = await import('./supabaseAdmin');
+    if (!sb) return res.status(500).json({ error: 'Storage service unavailable' });
+
+    const { data: appRow, error: appErr } = await sb
+      .from('driver_applications')
+      .select(`id, ${col}`)
+      .eq('id', appId)
+      .single();
+
+    if (appErr || !appRow) return res.status(404).json({ error: 'Application not found' });
+
+    const storagePath: string | null = (appRow as any)[col];
+    if (!storagePath) return res.status(404).json({ error: 'Document not uploaded' });
+
+    // Detect content-type from extension
+    const ext = (storagePath.split('.').pop() || '').toLowerCase().split('?')[0];
+    const MIME: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+      gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+    };
+    const contentType = MIME[ext] || 'application/octet-stream';
+
+    // 1. Try Supabase 'driver-documents' bucket (lowercase) — where the mobile app stores them
+    const { data: signed } = await sb.storage
+      .from('driver-documents')
+      .createSignedUrl(storagePath, 300);
+
+    if (signed?.signedUrl) {
+      try {
+        const remote = await fetch(signed.signedUrl);
+        if (remote.ok) {
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'private, max-age=120');
+          const { Readable } = await import('stream');
+          const readable = Readable.fromWeb(remote.body as any);
+          return readable.pipe(res);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Try DRIVER-DOCUMENTS (uppercase) bucket
+    const { data: signed2 } = await sb.storage
+      .from('DRIVER-DOCUMENTS')
+      .createSignedUrl(storagePath, 300);
+
+    if (signed2?.signedUrl) {
+      try {
+        const remote2 = await fetch(signed2.signedUrl);
+        if (remote2.ok) {
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'private, max-age=120');
+          const { Readable } = await import('stream');
+          const readable2 = Readable.fromWeb(remote2.body as any);
+          return readable2.pipe(res);
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback: local disk (older applications stored locally before Supabase migration)
+    // Handle paths like '/uploads/documents/application-pending/filename.jpg'
+    const cleanPath = storagePath.startsWith('/') ? storagePath.slice(1) : storagePath;
+    const localExact = path.join(process.cwd(), cleanPath);
+    if (fs.existsSync(localExact)) {
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${path.basename(localExact)}"`);
+      return res.sendFile(localExact);
+    }
+
+    // 4. Try just the filename in application-pending directory
+    const localName = storagePath.split('/').pop() || storagePath;
+    const localFallback = path.join(process.cwd(), 'uploads', 'documents', 'application-pending', localName);
+    if (fs.existsSync(localFallback)) {
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${localName}"`);
+      return res.sendFile(localFallback);
+    }
+
+    return res.status(404).json({ error: 'Document not found in any storage location' });
+  }));
+
   app.post("/api/driver-applications/:id/upload-document", requireAdminAccessStrict, (req, res, next) => {
     uploadDocument.single('file')(req, res, (err) => {
       if (err) {
