@@ -47,6 +47,8 @@ import {
   ShieldCheck,
   Upload,
   Mail,
+  ZoomIn,
+  X,
 } from 'lucide-react';
 import {
   Select,
@@ -73,6 +75,7 @@ export default function AdminApplications() {
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [fileAvailability, setFileAvailability] = useState<Record<string, boolean>>({});
   const [fileCheckDone, setFileCheckDone] = useState(false);
+  const [lightbox, setLightbox] = useState<{ open: boolean; url: string; label: string; isPdf: boolean }>({ open: false, url: '', label: '', isPdf: false });
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState('');
   const [emailTarget, setEmailTarget] = useState<DriverApplication | null>(null);
@@ -453,36 +456,70 @@ export default function AdminApplications() {
     const isPdf = /\.pdf(\?|$)/i.test(rawStoragePath);
     const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(rawStoragePath);
 
+    const openLightbox = () => setLightbox({ open: true, url: proxyUrl, label, isPdf });
+
     return (
-      <div className="flex flex-col gap-1">
-        <a 
-          href={proxyUrl} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 text-sm text-primary hover:underline"
-          data-testid={`link-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
-        >
-          <FileText className="h-4 w-4" />
-          {label}
-          <ExternalLink className="h-3 w-3" />
-        </a>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <a 
+            href={proxyUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-primary hover:underline"
+            data-testid={`link-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+          >
+            <FileText className="h-4 w-4" />
+            {label}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+          {(isImage || isPdf) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={openLightbox}
+              data-testid={`button-view-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+            >
+              <ZoomIn className="h-3 w-3" />
+              View
+            </Button>
+          )}
+        </div>
         {isImage && (
-          <img 
-            src={proxyUrl} 
-            alt={label} 
-            className="mt-1 max-h-32 max-w-48 rounded-md border object-cover cursor-pointer"
-            onClick={() => window.open(proxyUrl, '_blank')}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          <div
+            className="relative group cursor-pointer w-fit"
+            onClick={openLightbox}
             data-testid={`img-document-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
-          />
+          >
+            <img 
+              src={proxyUrl} 
+              alt={label} 
+              className="max-h-40 max-w-56 rounded-md border object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 rounded-md transition-colors flex items-center justify-center">
+              <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </div>
         )}
         {isPdf && (
-          <iframe
-            src={proxyUrl}
-            className="mt-1 w-full h-48 rounded border"
-            title={label}
+          <div
+            className="relative group cursor-pointer"
+            onClick={openLightbox}
             data-testid={`iframe-pdf-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
-          />
+          >
+            <iframe
+              src={proxyUrl}
+              className="w-full h-48 rounded border pointer-events-none"
+              title={label}
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded border transition-colors flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                <ZoomIn className="h-3 w-3" />
+                Click to view full size
+              </div>
+            </div>
+          </div>
         )}
         {!isImage && !isPdf && (
           <span className="text-xs text-muted-foreground">Click link above to view</span>
@@ -1242,6 +1279,64 @@ export default function AdminApplications() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Lightbox ──────────────────────────────────────────────────────── */}
+      {lightbox.open && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex flex-col"
+          onClick={() => setLightbox(l => ({ ...l, open: false }))}
+        >
+          {/* Header bar */}
+          <div
+            className="flex items-center justify-between px-4 py-3 bg-black/60 shrink-0"
+            onClick={e => e.stopPropagation()}
+          >
+            <span className="text-white font-medium text-sm">{lightbox.label}</span>
+            <div className="flex items-center gap-2">
+              <a
+                href={lightbox.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/70 hover:text-white text-xs flex items-center gap-1 px-3 py-1.5 rounded-md border border-white/20 hover:border-white/40 transition-colors"
+                onClick={e => e.stopPropagation()}
+              >
+                <ExternalLink className="h-3 w-3" />
+                Open in new tab
+              </a>
+              <button
+                className="text-white/70 hover:text-white p-1.5 rounded-md border border-white/20 hover:border-white/40 transition-colors"
+                onClick={() => setLightbox(l => ({ ...l, open: false }))}
+                data-testid="button-close-lightbox"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div
+            className="flex-1 flex items-center justify-center p-4 overflow-auto"
+            onClick={() => setLightbox(l => ({ ...l, open: false }))}
+          >
+            {lightbox.isPdf ? (
+              <iframe
+                src={lightbox.url}
+                className="w-full max-w-4xl h-full min-h-[70vh] rounded-md bg-white"
+                title={lightbox.label}
+                onClick={e => e.stopPropagation()}
+              />
+            ) : (
+              <img
+                src={lightbox.url}
+                alt={lightbox.label}
+                className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
+                style={{ maxHeight: 'calc(100vh - 80px)' }}
+                onClick={e => e.stopPropagation()}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
