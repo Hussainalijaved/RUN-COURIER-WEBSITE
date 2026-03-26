@@ -16,6 +16,8 @@ import {
   Phone,
   Loader2,
   Radio,
+  ImageIcon,
+  UserCheck,
 } from 'lucide-react';
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept.png';
@@ -114,6 +116,9 @@ interface MockJob {
   vehicleType: string;
   estimatedDelivery?: string;
   createdAt: string;
+  podPhotoUrl?: string;
+  podRecipientName?: string;
+  deliveredAt?: string;
 }
 
 const REFRESH_INTERVAL = 10000; // Refresh every 10 seconds for live updates
@@ -174,6 +179,9 @@ export default function Track() {
           vehicleType: data.vehicleType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Standard',
           estimatedDelivery: data.estimatedDeliveryTime ? new Date(data.estimatedDeliveryTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined,
           createdAt: data.createdAt,
+          podPhotoUrl: data.podPhotoUrl || undefined,
+          podRecipientName: data.podRecipientName || undefined,
+          deliveredAt: data.deliveredAt || undefined,
         });
         setLastUpdate(new Date());
         setError(null);
@@ -361,6 +369,56 @@ export default function Track() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Proof of Delivery — shown when delivered */}
+              {job.status === 'delivered' && (job.podPhotoUrl || job.podRecipientName) && (
+                <Card className="mb-8 border-green-200 dark:border-green-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2 text-green-700 dark:text-green-400">
+                      <CheckCircle className="h-4 w-4" />
+                      Proof of Delivery
+                      {job.deliveredAt && (
+                        <span className="ml-auto text-xs font-normal text-muted-foreground">
+                          {new Date(job.deliveredAt).toLocaleString('en-GB', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {job.podRecipientName && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
+                          <UserCheck className="h-4 w-4 text-green-700 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Received by</p>
+                          <p className="font-semibold" data-testid="text-pod-recipient">{job.podRecipientName}</p>
+                        </div>
+                      </div>
+                    )}
+                    {job.podPhotoUrl && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                          <ImageIcon className="h-3 w-3" />
+                          Delivery photo
+                        </p>
+                        <a href={job.podPhotoUrl} target="_blank" rel="noopener noreferrer" className="block" data-testid="link-pod-photo">
+                          <img
+                            src={job.podPhotoUrl}
+                            alt="Proof of delivery photo"
+                            className="rounded-md max-h-64 w-auto object-cover border border-border cursor-zoom-in"
+                            data-testid="img-pod-photo"
+                          />
+                        </a>
+                        <p className="text-xs text-muted-foreground mt-1">Click to view full size</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Live tracking map — added between status steps and details cards */}
               <TrackingLiveMap

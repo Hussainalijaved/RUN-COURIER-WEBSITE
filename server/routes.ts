@@ -1893,7 +1893,9 @@ export async function registerRoutes(
           is_multi_drop,
           pod_photo_url,
           pod_photos,
-          pod_signature_url
+          pod_signature_url,
+          pod_recipient_name,
+          delivered_at
         `)
         .eq('tracking_number', trackingNumber)
         .single();
@@ -1976,6 +1978,8 @@ export async function registerRoutes(
         podPhotoUrl: (job as any).pod_photo_url || null,
         podPhotos: (job as any).pod_photos || [],
         podSignatureUrl: (job as any).pod_signature_url || null,
+        podRecipientName: (job as any).pod_recipient_name || null,
+        deliveredAt: (job as any).delivered_at || null,
       };
       const resolvedTrackResult = await resolveSingleJobPodUrls(trackResult);
       return res.json(ensureJobNumber(resolvedTrackResult));
