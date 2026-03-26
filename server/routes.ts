@@ -3524,7 +3524,7 @@ export async function registerRoutes(
   ];
 
   app.patch("/api/jobs/:id/status", asyncHandler(async (req, res) => {
-    const { status, rejectionReason, cancellationReason } = req.body;
+    const { status, rejectionReason, cancellationReason, podPhotoUrl, podSignatureUrl, podRecipientName, podNotes } = req.body;
     const previousJob = await storage.getJob(req.params.id);
     
     if (!previousJob) {
@@ -3552,11 +3552,27 @@ export async function registerRoutes(
         }
       }
     }
+
+    // If POD data is included with the status update (mobile app sends them together),
+    // save it now so the POD-required check below can see the new data.
+    if (status === "delivered" && (podPhotoUrl || podSignatureUrl || podRecipientName || podNotes)) {
+      await storage.updateJobPOD(
+        req.params.id,
+        podPhotoUrl || undefined,
+        podSignatureUrl || undefined,
+        podRecipientName || undefined,
+        undefined,
+        podNotes || undefined
+      );
+      console.log(`[Status] Saved POD data with status update for job ${req.params.id}: photo=${!!podPhotoUrl} sig=${!!podSignatureUrl} recipient=${!!podRecipientName}`);
+    }
     
     // Require POD (photo or signature) before marking as delivered
     // For multi-drop jobs, POD is collected per stop, so skip this check
     if (status === "delivered" && !previousJob.isMultiDrop) {
-      if (!previousJob.podPhotoUrl && !previousJob.podSignatureUrl) {
+      const hasExistingPod = previousJob.podPhotoUrl || previousJob.podSignatureUrl;
+      const hasIncomingPod = podPhotoUrl || podSignatureUrl;
+      if (!hasExistingPod && !hasIncomingPod) {
         return res.status(400).json({ 
           error: "Proof of Delivery (photo or signature) is required before marking as delivered. POD must be submitted from the mobile app.",
           code: "POD_REQUIRED"
@@ -4152,8 +4168,8 @@ export async function registerRoutes(
   }));
 
   app.patch("/api/jobs/:id/pod", asyncHandler(async (req, res) => {
-    const { podPhotoUrl, podSignatureUrl } = req.body;
-    const job = await storage.updateJobPOD(req.params.id, podPhotoUrl, podSignatureUrl);
+    const { podPhotoUrl, podSignatureUrl, podRecipientName, podNotes } = req.body;
+    const job = await storage.updateJobPOD(req.params.id, podPhotoUrl, podSignatureUrl, podRecipientName, undefined, podNotes);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
