@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -217,10 +217,15 @@ export default function AdminNotices() {
     if (noticeImageFiles.length > 0 && noticeForm.send_email) {
       setIsUploadingImage(true);
       try {
+        const authHeaders = await getAuthHeaders();
         for (const file of noticeImageFiles) {
           const formData = new FormData();
           formData.append('file', file);
-          const r = await fetch('/api/admin/notices/upload-image', { method: 'POST', body: formData });
+          const r = await fetch('/api/admin/notices/upload-image', {
+            method: 'POST',
+            headers: authHeaders,
+            body: formData,
+          });
           const data = await r.json();
           if (!r.ok) throw new Error(data.error || 'Upload failed');
           if (data.url) imageUrls.push(data.url);

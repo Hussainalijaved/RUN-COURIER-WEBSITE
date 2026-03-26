@@ -25,7 +25,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
   }
 });
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+export async function getAuthHeaders(): Promise<Record<string, string>> {
   if (cachedToken && Date.now() < tokenExpiry - 30000) {
     return { "Authorization": `Bearer ${cachedToken}` };
   }
