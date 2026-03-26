@@ -7987,7 +7987,10 @@ export async function registerRoutes(
       }
 
       // ── 2. Try Supabase Storage (try ALL paths, don't redirect on first hit) ──
-      const rawStoragePath = doc.storage_path || extractStoragePath(fileUrl) || '';
+      // Always extract the bare Supabase storage key from doc.storage_path (it may be an API URL)
+      const rawStoragePath = (doc.storage_path
+        ? (extractStoragePath(doc.storage_path) || (doc.storage_path.startsWith('http') ? null : doc.storage_path))
+        : null) || extractStoragePath(fileUrl) || '';
       const storagePathsToTry: string[] = [];
 
       if (rawStoragePath && !rawStoragePath.startsWith('http')) {
@@ -8002,6 +8005,12 @@ export async function registerRoutes(
         if (fn && doc.auth_user_id && doc.auth_user_id !== doc.driver_id) {
           storagePathsToTry.push(`${doc.auth_user_id}/${fn}`);
         }
+      }
+
+      // Also always try {driver_id}/{filename} directly (covers cases where storage_path was wrong)
+      const rawFn = (fileUrl || '').split('/').pop()?.split('?')[0];
+      if (rawFn && doc.driver_id && !storagePathsToTry.includes(`${doc.driver_id}/${rawFn}`)) {
+        storagePathsToTry.push(`${doc.driver_id}/${rawFn}`);
       }
 
       const buckets = ['DRIVER-DOCUMENTS', 'driver-documents'];
