@@ -64,8 +64,8 @@ export default function AdminNotices() {
   const [detailNotice, setDetailNotice] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const [noticeImageFile, setNoticeImageFile] = useState<File | null>(null);
-  const [noticeImagePreview, setNoticeImagePreview] = useState('');
+  const [noticeImageFiles, setNoticeImageFiles] = useState<File[]>([]);
+  const [noticeImagePreviews, setNoticeImagePreviews] = useState<string[]>([]);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -179,8 +179,8 @@ export default function AdminNotices() {
     setNoticeForm({ title: '', subject: '', message: '', category: 'general', requires_acknowledgement: false, target_type: 'all', send_email: false, template_id: '' });
     setSelectedDriverIds([]);
     setDriverSearchQuery('');
-    setNoticeImageFile(null);
-    setNoticeImagePreview('');
+    setNoticeImageFiles([]);
+    setNoticeImagePreviews([]);
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
@@ -213,16 +213,18 @@ export default function AdminNotices() {
   }
 
   async function handleSendNotice() {
-    let imageUrl = '';
-    if (noticeImageFile && noticeForm.send_email) {
+    const imageUrls: string[] = [];
+    if (noticeImageFiles.length > 0 && noticeForm.send_email) {
       setIsUploadingImage(true);
       try {
-        const formData = new FormData();
-        formData.append('file', noticeImageFile);
-        const r = await fetch('/api/admin/notices/upload-image', { method: 'POST', body: formData });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Upload failed');
-        imageUrl = data.url || '';
+        for (const file of noticeImageFiles) {
+          const formData = new FormData();
+          formData.append('file', file);
+          const r = await fetch('/api/admin/notices/upload-image', { method: 'POST', body: formData });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Upload failed');
+          if (data.url) imageUrls.push(data.url);
+        }
       } catch (e: any) {
         toast({ title: 'Image upload failed', description: e.message, variant: 'destructive' });
         setIsUploadingImage(false);
@@ -231,7 +233,7 @@ export default function AdminNotices() {
       setIsUploadingImage(false);
     }
     const payload: any = { ...noticeForm };
-    if (imageUrl) payload.image_url = imageUrl;
+    if (imageUrls.length > 0) payload.image_urls = imageUrls;
     if (noticeForm.target_type === 'selected') {
       payload.driver_ids = selectedDriverIds;
     }
@@ -606,7 +608,7 @@ export default function AdminNotices() {
                       checked={noticeForm.send_email}
                       onCheckedChange={(val) => {
                         setNoticeForm(f => ({ ...f, send_email: val }));
-                        if (!val) { setNoticeImageFile(null); setNoticeImagePreview(''); if (imageInputRef.current) imageInputRef.current.value = ''; }
+                        if (!val) { setNoticeImageFiles([]); setNoticeImagePreviews([]); if (imageInputRef.current) imageInputRef.current.value = ''; }
                       }}
                       data-testid="switch-send-email"
                     />
@@ -616,44 +618,66 @@ export default function AdminNotices() {
 
                 {noticeForm.send_email && (
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5"><ImagePlus className="w-3.5 h-3.5" /> Email Image Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Label className="flex items-center gap-1.5">
+                      <ImagePlus className="w-3.5 h-3.5" /> Email Image Attachments
+                      {noticeImageFiles.length > 0 && <span className="text-muted-foreground font-normal">({noticeImageFiles.length} selected)</span>}
+                      <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
                     <input
                       ref={imageInputRef}
                       type="file"
                       accept="image/jpeg,image/png,image/gif,image/webp"
+                      multiple
                       className="hidden"
                       data-testid="input-notice-image"
                       onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        setNoticeImageFile(file);
-                        if (file) {
+                        const newFiles = Array.from(e.target.files || []);
+                        if (!newFiles.length) return;
+                        setNoticeImageFiles(prev => [...prev, ...newFiles]);
+                        newFiles.forEach(file => {
                           const reader = new FileReader();
-                          reader.onload = (ev) => setNoticeImagePreview(ev.target?.result as string || '');
+                          reader.onload = (ev) => setNoticeImagePreviews(prev => [...prev, ev.target?.result as string || '']);
                           reader.readAsDataURL(file);
-                        } else {
-                          setNoticeImagePreview('');
-                        }
+                        });
+                        if (imageInputRef.current) imageInputRef.current.value = '';
                       }}
                     />
-                    {noticeImagePreview ? (
-                      <div className="relative inline-block">
-                        <img src={noticeImagePreview} alt="Preview" className="max-h-48 max-w-full rounded-md border object-contain" />
-                        <Button
-                          size="icon"
-                          variant="destructive"
-                          className="absolute top-1 right-1 h-6 w-6"
-                          onClick={() => { setNoticeImageFile(null); setNoticeImagePreview(''); if (imageInputRef.current) imageInputRef.current.value = ''; }}
-                          data-testid="button-remove-notice-image"
+                    {noticeImagePreviews.length > 0 && (
+                      <div className="flex flex-wrap gap-3">
+                        {noticeImagePreviews.map((preview, idx) => (
+                          <div key={idx} className="relative inline-block" data-testid={`notice-image-preview-${idx}`}>
+                            <img src={preview} alt={`Attachment ${idx + 1}`} className="h-32 w-32 rounded-md border object-cover" />
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              className="absolute top-1 right-1 h-6 w-6"
+                              onClick={() => {
+                                setNoticeImageFiles(prev => prev.filter((_, i) => i !== idx));
+                                setNoticeImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                              }}
+                              data-testid={`button-remove-notice-image-${idx}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => imageInputRef.current?.click()}
+                          className="h-32 w-32 rounded-md border-2 border-dashed border-muted-foreground/40 flex flex-col items-center justify-center gap-1 text-muted-foreground hover-elevate"
+                          data-testid="button-add-more-images"
                         >
-                          <X className="w-3 h-3" />
-                        </Button>
+                          <ImagePlus className="w-5 h-5" />
+                          <span className="text-xs">Add more</span>
+                        </button>
                       </div>
-                    ) : (
+                    )}
+                    {noticeImagePreviews.length === 0 && (
                       <Button variant="outline" size="sm" onClick={() => imageInputRef.current?.click()} data-testid="button-select-notice-image">
-                        <ImagePlus className="w-4 h-4 mr-1.5" /> Select Image
+                        <ImagePlus className="w-4 h-4 mr-1.5" /> Select Images
                       </Button>
                     )}
-                    <p className="text-xs text-muted-foreground">JPEG, PNG, GIF or WebP. Image will be embedded in the email body.</p>
+                    <p className="text-xs text-muted-foreground">JPEG, PNG, GIF or WebP. Images will be embedded in the email body.</p>
                   </div>
                 )}
 
@@ -729,10 +753,14 @@ export default function AdminNotices() {
             <h3 className="text-lg font-semibold">{noticeForm.title}</h3>
             {noticeForm.subject && <p className="text-muted-foreground">{noticeForm.subject}</p>}
             <div className="rounded-md border p-4 whitespace-pre-wrap text-sm">{noticeForm.message}</div>
-            {noticeImagePreview && noticeForm.send_email && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1.5">Email image attachment:</p>
-                <img src={noticeImagePreview} alt="Attachment preview" className="max-h-40 max-w-full rounded-md border object-contain" />
+            {noticeImagePreviews.length > 0 && noticeForm.send_email && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">Email image attachments ({noticeImagePreviews.length}):</p>
+                <div className="flex flex-wrap gap-2">
+                  {noticeImagePreviews.map((preview, idx) => (
+                    <img key={idx} src={preview} alt={`Attachment ${idx + 1}`} className="h-24 w-24 rounded-md border object-cover" />
+                  ))}
+                </div>
               </div>
             )}
             <p className="text-xs text-muted-foreground">

@@ -8686,7 +8686,8 @@ export async function registerRoutes(
   }));
 
   app.post("/api/admin/notices/send", asyncHandler(async (req, res) => {
-    const { title, subject, message, category, requires_acknowledgement, target_type, driver_ids, template_id, send_email, image_url } = req.body;
+    const { title, subject, message, category, requires_acknowledgement, target_type, driver_ids, template_id, send_email, image_url, image_urls } = req.body;
+    const allImageUrls: string[] = image_urls?.length ? image_urls : (image_url ? [image_url] : []);
     if (!title || !message) return res.status(400).json({ error: "Title and message are required" });
 
     const allDrivers = await storage.getDrivers();
@@ -8737,7 +8738,7 @@ export async function registerRoutes(
                   <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;">
                     ${message.replace(/\n/g, '<br>')}
                   </div>
-                  ${image_url ? `<div style="margin: 20px 0; text-align: center;"><img src="${image_url}" alt="Notice attachment" style="max-width: 100%; max-height: 500px; border-radius: 6px; border: 1px solid #e0e0e0;" /></div>` : ''}
+                  ${allImageUrls.length > 0 ? allImageUrls.map((url: string) => `<div style="margin: 16px 0; text-align: center;"><img src="${url}" alt="Notice attachment" style="max-width: 100%; max-height: 500px; border-radius: 6px; border: 1px solid #e0e0e0;" /></div>`).join('') : ''}
                   ${requires_acknowledgement ? '<p style="color: #e55; font-weight: bold;">This notice requires your acknowledgement. Please log in to your driver account to acknowledge.</p>' : ''}
                   <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
                 </div>`,
