@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 
+// Always show and play sound for ALL incoming notifications
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -22,13 +23,16 @@ export type NotificationData = {
   body?: string;
 };
 
+const PRODUCTION_API_URL = 'https://runcourier.co.uk';
+
 const getApiUrl = (): string => {
-  return (
+  const url =
     Constants.expoConfig?.extra?.apiUrl ||
     (Constants as any).manifest?.extra?.apiUrl ||
     process.env.EXPO_PUBLIC_API_URL ||
-    ''
-  );
+    PRODUCTION_API_URL;
+  console.log('[Push] Resolved API URL:', url);
+  return url;
 };
 
 class NotificationService {
@@ -92,46 +96,54 @@ class NotificationService {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('Push notification permission denied');
+      console.log('[Push] Permission denied — cannot get push token');
       return null;
     }
 
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    if (!projectId) {
-      console.log('No EAS project ID found');
-      return null;
-    }
+    // Try multiple paths for the project ID across expo-constants versions
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ||
+      (Constants as any).easConfig?.projectId ||
+      (Constants as any).manifest2?.extra?.eas?.projectId ||
+      'b47c7fde-4d57-42be-bfdf-4d6d73e12f46'; // hardcoded fallback
+
+    console.log('[Push] Using EAS project ID:', projectId);
 
     try {
       const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      console.log('[Push] Token obtained successfully:', tokenData.data.substring(0, 40) + '...');
       return tokenData.data;
     } catch (error) {
-      console.error('Failed to get push token:', error);
+      console.error('[Push] Failed to get push token:', error);
       return null;
     }
   }
 
-  async saveTokenToDatabase(_driverId: string): Promise<boolean> {
+  async saveTokenToDatabase(_driverId: string, retryCount = 0): Promise<boolean> {
     if (!this.expoPushToken) {
-      console.log('No push token available');
+      console.log('[Push] No push token available to save');
       return false;
     }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        console.log('No auth session available for push token registration');
+        console.log('[Push] No auth session — retrying in 3s (attempt', retryCount + 1, ')');
+        if (retryCount < 3) {
+          await new Promise(r => setTimeout(r, 3000));
+          return this.saveTokenToDatabase(_driverId, retryCount + 1);
+        }
+        console.error('[Push] No auth session after retries — token NOT registered');
         return false;
       }
 
       const apiUrl = getApiUrl();
-      if (!apiUrl) {
-        console.log('No API URL configured for push token registration');
-        return false;
-      }
-
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
       const appVersion = Constants.expoConfig?.version || undefined;
+
+      console.log('[Push] Registering token:', this.expoPushToken.substring(0, 30) + '...');
+      console.log('[Push] Platform:', platform, '| Version:', appVersion);
+      console.log('[Push] Endpoint:', `${apiUrl}/api/mobile/v1/driver/push-token`);
 
       const response = await fetch(`${apiUrl}/api/mobile/v1/driver/push-token`, {
         method: 'POST',
@@ -148,15 +160,25 @@ class NotificationService {
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => 'unknown error');
-        console.error('Failed to register push token via API:', response.status, errorBody);
+        console.error('[Push] Failed to register push token:', response.status, errorBody);
+        if (retryCount < 2) {
+          console.log('[Push] Retrying registration in 5s...');
+          await new Promise(r => setTimeout(r, 5000));
+          return this.saveTokenToDatabase(_driverId, retryCount + 1);
+        }
         return false;
       }
 
       const result = await response.json();
-      console.log('Push token registered successfully via API:', result.deviceId);
+      console.log('[Push] Token registered successfully — deviceId:', result.deviceId);
       return true;
     } catch (error) {
-      console.error('Error saving push token:', error);
+      console.error('[Push] Error saving push token:', error);
+      if (retryCount < 2) {
+        console.log('[Push] Retrying in 5s after error...');
+        await new Promise(r => setTimeout(r, 5000));
+        return this.saveTokenToDatabase(_driverId, retryCount + 1);
+      }
       return false;
     }
   }

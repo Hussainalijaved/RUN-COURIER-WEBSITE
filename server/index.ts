@@ -578,6 +578,34 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Auto-migrate driver_devices table (required for push notifications)
+  (async () => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS driver_devices (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          driver_id TEXT NOT NULL,
+          push_token TEXT NOT NULL,
+          platform TEXT NOT NULL DEFAULT 'android',
+          app_version TEXT,
+          device_info TEXT,
+          last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(driver_id, push_token)
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_devices_driver_id ON driver_devices(driver_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_devices_token ON driver_devices(push_token)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_devices_last_seen ON driver_devices(last_seen_at)`);
+      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
+      console.log("[MIGRATION] driver_devices table created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] driver_devices table migration error:", e?.message);
+    }
+  })();
+
   (async () => {
     try {
       const { Pool } = await import('pg');

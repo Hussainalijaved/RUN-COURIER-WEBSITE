@@ -474,6 +474,7 @@ export async function sendCustomNotificationToDrivers(
       body: message,
       data: { type: "custom_notification", title, message },
       priority: "high",
+      channelId: "job-alerts",
     }));
 
     const tickets = await sendExpoPushNotifications(messages);
