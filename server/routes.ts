@@ -1187,6 +1187,42 @@ export async function registerRoutes(
     });
   }));
 
+  // Admin: manually register a push token for any driver (useful for testing/setup)
+  app.post("/api/admin/driver/:driverId/push-token", asyncHandler(async (req, res) => {
+    if (!enforceAdminOrSupervisorAccess(req, res)) return;
+    const { driverId } = req.params;
+    const { pushToken, platform } = req.body as { pushToken: string; platform?: string };
+
+    if (!pushToken?.trim()) {
+      return res.status(400).json({ error: "Push token is required" });
+    }
+    if (!pushToken.startsWith('ExponentPushToken[') && !pushToken.startsWith('ExpoPushToken[')) {
+      return res.status(400).json({ error: "Invalid Expo push token format. Must start with ExponentPushToken[ or ExpoPushToken[" });
+    }
+
+    const { registerDriverDevice } = await import('./pushNotifications');
+    const normalizedPlatform = (platform || 'android').toLowerCase().startsWith('i') ? 'ios' as const : 'android' as const;
+    const result = await registerDriverDevice(driverId, pushToken.trim(), normalizedPlatform);
+
+    if (result.success) {
+      console.log(`[Admin] Manually registered push token for driver ${driverId}`);
+      return res.json({ success: true, deviceId: result.deviceId, message: "Push token registered successfully" });
+    } else {
+      return res.status(500).json({ success: false, error: result.error || "Failed to register push token" });
+    }
+  }));
+
+  // Admin: remove all registered push devices for a driver
+  app.delete("/api/admin/driver/:driverId/push-token", asyncHandler(async (req, res) => {
+    if (!enforceAdminOrSupervisorAccess(req, res)) return;
+    const { driverId } = req.params;
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.status(500).json({ error: "Not configured" });
+    const { error } = await supabaseAdmin.from('driver_devices').delete().eq('driver_id', driverId);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ success: true, message: "All devices cleared for driver" });
+  }));
+
   // Send custom push notification to one or all drivers (admin + supervisor)
   app.post("/api/admin/push-notification", asyncHandler(async (req, res) => {
     const { driverId, title, message } = req.body as {

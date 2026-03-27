@@ -518,36 +518,37 @@ export function registerMobileRoutes(app: Express): void {
       const driver = req.driver!;
       const { pushToken, platform, appVersion, deviceInfo } = req.body;
 
+      console.log(`[Push Token] Registration attempt — driver: ${driver.driverCode || driver.id}, platform: ${platform}, token prefix: ${pushToken?.substring(0, 40)}, body keys: ${Object.keys(req.body).join(',')}`);
+
       if (!pushToken || typeof pushToken !== 'string') {
+        console.log(`[Push Token] Rejected — missing pushToken field`);
         return res.status(400).json({ 
           error: "Push token is required",
           code: "INVALID_PUSH_TOKEN"
         });
       }
 
-      if (!platform || !['ios', 'android'].includes(platform)) {
-        return res.status(400).json({ 
-          error: "Platform must be 'ios' or 'android'",
-          code: "INVALID_PLATFORM"
-        });
-      }
+      // Accept ios/android case-insensitively; default to 'android' if missing
+      const normalizedPlatform = (platform || 'android').toString().toLowerCase().trim();
+      const validPlatform: "ios" | "android" = normalizedPlatform.startsWith('i') ? 'ios' : 'android';
 
       const result = await registerDriverDevice(
         driver.id,
         pushToken,
-        platform,
+        validPlatform,
         appVersion,
         deviceInfo
       );
 
       if (result.success) {
-        console.log(`[Push Token] Registered for driver ${driver.driverCode || driver.id}`);
+        console.log(`[Push Token] Registered successfully for driver ${driver.driverCode || driver.id} (${validPlatform})`);
         res.json({
           success: true,
           deviceId: result.deviceId,
           message: "Push token registered successfully"
         });
       } else {
+        console.log(`[Push Token] Registration FAILED for driver ${driver.driverCode || driver.id}: ${result.error}`);
         res.status(500).json({
           success: false,
           error: result.error || "Failed to register push token"

@@ -77,6 +77,7 @@ import {
   Bell,
   CheckCheck,
   EyeOff,
+  Smartphone,
 } from 'lucide-react';
 import { cn, normalizeDocUrl } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -158,6 +159,9 @@ export default function AdminDrivers() {
   const [pushNotifTarget, setPushNotifTarget] = useState<{ id?: string; name: string } | null>(null);
   const [pushNotifTitle, setPushNotifTitle] = useState('');
   const [pushNotifMessage, setPushNotifMessage] = useState('');
+  const [pushTokenRegOpen, setPushTokenRegOpen] = useState(false);
+  const [pushTokenRegDriver, setPushTokenRegDriver] = useState<{ id: string; name: string; code: string } | null>(null);
+  const [pushTokenInput, setPushTokenInput] = useState('');
   const [migrationSqlOpen, setMigrationSqlOpen] = useState(false);
   const [migrationSql, setMigrationSql] = useState('');
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
@@ -428,6 +432,22 @@ export default function AdminDrivers() {
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to send notification', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const registerPushTokenMutation = useMutation({
+    mutationFn: async ({ driverId, pushToken }: { driverId: string; pushToken: string }) => {
+      const res = await apiRequest('POST', `/api/admin/driver/${driverId}/push-token`, { pushToken, platform: 'android' });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to register'); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Push Token Registered', description: 'Driver will now receive push notifications on their mobile app.' });
+      setPushTokenRegOpen(false);
+      setPushTokenInput('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Registration Failed', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -1129,6 +1149,17 @@ export default function AdminDrivers() {
                               >
                                 <Bell className="mr-2 h-4 w-4" />
                                 Send Notification
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setPushTokenRegDriver({ id: driver.id, name: info.name, code: driver.driverCode || '' });
+                                  setPushTokenInput('');
+                                  setPushTokenRegOpen(true);
+                                }}
+                                data-testid={`menu-register-token-${driver.id}`}
+                              >
+                                <Smartphone className="mr-2 h-4 w-4" />
+                                Register Push Token
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-600"
@@ -2199,6 +2230,54 @@ export default function AdminDrivers() {
                 }}
               >
                 Copy SQL
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Register Push Token Dialog */}
+        <Dialog open={pushTokenRegOpen} onOpenChange={(open) => { if (!registerPushTokenMutation.isPending) setPushTokenRegOpen(open); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                Register Push Token — {pushTokenRegDriver?.name} ({pushTokenRegDriver?.code})
+              </DialogTitle>
+              <DialogDescription>
+                Paste the driver's Expo push token here to enable push notifications for their device. You can find this token in the Expo Developer Tools or the driver's app logs.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="push-token-input">Expo Push Token</Label>
+                <Input
+                  id="push-token-input"
+                  placeholder="ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+                  value={pushTokenInput}
+                  onChange={(e) => setPushTokenInput(e.target.value)}
+                  data-testid="input-push-token"
+                />
+                <p className="text-xs text-muted-foreground">Format: <code className="bg-muted px-1 rounded">ExponentPushToken[...]</code> or <code className="bg-muted px-1 rounded">ExpoPushToken[...]</code></p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 flex-wrap">
+              <Button variant="outline" onClick={() => setPushTokenRegOpen(false)} disabled={registerPushTokenMutation.isPending}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (pushTokenRegDriver) {
+                    registerPushTokenMutation.mutate({ driverId: pushTokenRegDriver.id, pushToken: pushTokenInput.trim() });
+                  }
+                }}
+                disabled={!pushTokenInput.trim() || registerPushTokenMutation.isPending}
+                data-testid="button-register-push-token"
+              >
+                {registerPushTokenMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Registering...</>
+                ) : (
+                  <><Smartphone className="mr-2 h-4 w-4" />Register Token</>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
