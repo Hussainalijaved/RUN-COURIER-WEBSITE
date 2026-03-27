@@ -402,7 +402,7 @@ export default function SupervisorDrivers() {
         setPushNotifTitle('');
         setPushNotifMessage('');
       } else {
-        toast({ title: 'No Device Registered', description: data.noDeviceCount > 0 ? 'This driver has not logged into the mobile app yet. They must open the app first to register their device.' : data.message, variant: 'destructive' });
+        toast({ title: 'Notification Not Delivered', description: data.message, variant: 'destructive' });
       }
     },
     onError: (error: Error) => {

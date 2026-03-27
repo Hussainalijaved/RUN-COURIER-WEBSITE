@@ -1203,14 +1203,19 @@ export async function registerRoutes(
     const target = driverId ? [driverId] : "all";
     const result = await sendCustomNotificationToDrivers(target, title.trim(), message.trim());
 
+    const parts: string[] = [];
+    if (result.sentCount > 0) parts.push(`${result.sentCount} push notification(s)`);
+    if (result.smsCount > 0) parts.push(`${result.smsCount} SMS`);
+    const successMsg = parts.length > 0 ? `Delivered via: ${parts.join(' + ')}` : 'Delivered successfully';
+    const failMsg = `Could not deliver: no app device or phone number found for this driver.`;
+
     return res.json({
       success: result.success,
       sentCount: result.sentCount,
+      smsCount: result.smsCount,
       failCount: result.failCount,
       noDeviceCount: result.noDeviceCount,
-      message: result.success
-        ? `Notification sent to ${result.sentCount} device(s)`
-        : `No devices received the notification. ${result.noDeviceCount} driver(s) have no registered devices.`,
+      message: result.success ? successMsg : failMsg,
     });
   }));
 

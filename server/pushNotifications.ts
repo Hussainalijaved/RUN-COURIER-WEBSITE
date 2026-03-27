@@ -430,10 +430,10 @@ export async function sendCustomNotificationToDrivers(
   driverIds: string[] | "all",
   title: string,
   message: string
-): Promise<{ success: boolean; sentCount: number; failCount: number; noDeviceCount: number }> {
+): Promise<{ success: boolean; sentCount: number; failCount: number; noDeviceCount: number; smsCount: number }> {
   if (!supabaseAdmin) {
     log("Supabase admin client not initialized", "push");
-    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: 0 };
+    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: 0, smsCount: 0 };
   }
 
   let targetDriverIds: string[];
@@ -450,7 +450,7 @@ export async function sendCustomNotificationToDrivers(
   }
 
   if (targetDriverIds.length === 0) {
-    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: 0 };
+    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: 0, smsCount: 0 };
   }
 
   const { data: allDevices } = await supabaseAdmin
@@ -459,26 +459,60 @@ export async function sendCustomNotificationToDrivers(
     .in("driver_id", targetDriverIds);
 
   const devices = allDevices || [];
-  const noDeviceCount = targetDriverIds.filter(id => !devices.find((d: any) => d.driver_id === id)).length;
+  const driversWithDevice = new Set(devices.map((d: any) => d.driver_id));
+  const driversWithoutDevice = targetDriverIds.filter(id => !driversWithDevice.has(id));
 
-  if (devices.length === 0) {
-    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: noDeviceCount };
+  // --- Push notifications for drivers with registered devices ---
+  let sentCount = 0;
+  let failCount = 0;
+
+  if (devices.length > 0) {
+    const messages: ExpoPushMessage[] = devices.map((device: any) => ({
+      to: device.push_token,
+      sound: "default",
+      title,
+      body: message,
+      data: { type: "custom_notification", title, message },
+      priority: "high",
+    }));
+
+    const tickets = await sendExpoPushNotifications(messages);
+    sentCount = tickets.filter(t => t.status === "ok").length;
+    failCount = tickets.filter(t => t.status === "error").length;
+    log(`Push notifications: ${sentCount} ok, ${failCount} failed`, "push");
   }
 
-  const messages: ExpoPushMessage[] = devices.map((device: any) => ({
-    to: device.push_token,
-    sound: "default",
-    title,
-    body: message,
-    data: { type: "custom_notification", title, message },
-    priority: "high",
-    channelId: "general",
-  }));
+  // --- SMS fallback for drivers without a registered device ---
+  let smsCount = 0;
 
-  const tickets = await sendExpoPushNotifications(messages);
-  const sentCount = tickets.filter(t => t.status === "ok").length;
-  const failCount = tickets.filter(t => t.status === "error").length;
+  if (driversWithoutDevice.length > 0) {
+    try {
+      const { data: driverRows } = await supabaseAdmin
+        .from("drivers")
+        .select("id, phone, full_name")
+        .in("id", driversWithoutDevice);
 
-  log(`Custom notification sent: ${sentCount} ok, ${failCount} failed, ${noDeviceCount} no device`, "push");
-  return { success: sentCount > 0, sentCount, failCount, noDeviceCount };
+      const { sendSMS } = await import("./twilioService");
+      const smsBody = `Run Courier - ${title}\n${message}`;
+
+      for (const driver of (driverRows || [])) {
+        if (driver.phone) {
+          const result = await sendSMS(driver.phone, smsBody);
+          if (result.success) {
+            smsCount++;
+            log(`SMS fallback sent to ${driver.full_name} (no push device)`, "push");
+          } else {
+            log(`SMS fallback failed for ${driver.full_name}: ${result.error}`, "push");
+          }
+        }
+      }
+    } catch (err: any) {
+      log(`SMS fallback error: ${err.message}`, "push");
+    }
+  }
+
+  const noDeviceCount = driversWithoutDevice.length;
+  const totalDelivered = sentCount + smsCount;
+  log(`Custom notification complete: ${sentCount} push, ${smsCount} SMS, ${failCount} failed, ${noDeviceCount} no device`, "push");
+  return { success: totalDelivered > 0, sentCount, failCount, noDeviceCount, smsCount };
 }
