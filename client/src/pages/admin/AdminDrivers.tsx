@@ -417,10 +417,14 @@ export default function AdminDrivers() {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: 'Notification Sent', description: data.message });
-      setPushNotifOpen(false);
-      setPushNotifTitle('');
-      setPushNotifMessage('');
+      if (data.success) {
+        toast({ title: 'Notification Sent', description: data.message });
+        setPushNotifOpen(false);
+        setPushNotifTitle('');
+        setPushNotifMessage('');
+      } else {
+        toast({ title: 'No Device Registered', description: data.noDeviceCount > 0 ? 'This driver has not logged into the mobile app yet. They must open the app first to register their device.' : data.message, variant: 'destructive' });
+      }
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to send notification', description: error.message, variant: 'destructive' });
