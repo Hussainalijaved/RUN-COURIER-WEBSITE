@@ -1187,6 +1187,33 @@ export async function registerRoutes(
     });
   }));
 
+  // Send custom push notification to one or all drivers (admin + supervisor)
+  app.post("/api/admin/push-notification", asyncHandler(async (req, res) => {
+    const { driverId, title, message } = req.body as {
+      driverId?: string;
+      title: string;
+      message: string;
+    };
+
+    if (!title?.trim() || !message?.trim()) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
+
+    const { sendCustomNotificationToDrivers } = await import('./pushNotifications');
+    const target = driverId ? [driverId] : "all";
+    const result = await sendCustomNotificationToDrivers(target, title.trim(), message.trim());
+
+    return res.json({
+      success: result.success,
+      sentCount: result.sentCount,
+      failCount: result.failCount,
+      noDeviceCount: result.noDeviceCount,
+      message: result.success
+        ? `Notification sent to ${result.sentCount} device(s)`
+        : `No devices received the notification. ${result.noDeviceCount} driver(s) have no registered devices.`,
+    });
+  }));
+
   // Diagnostic endpoint to list all driver devices (admin only)
   app.get("/api/debug/all-driver-devices", asyncHandler(async (req, res) => {
     // ADMIN REQUIRED

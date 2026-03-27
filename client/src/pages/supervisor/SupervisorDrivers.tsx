@@ -153,6 +153,10 @@ export default function SupervisorDrivers() {
   const [resetPasswordResult, setResetPasswordResult] = useState<{tempPassword: string; driverEmail: string; driverName: string; driverCode: string} | null>(null);
   const [driverToResetPassword, setDriverToResetPassword] = useState<Driver | null>(null);
   const [showInactive, setShowInactive] = useState(true);
+  const [pushNotifOpen, setPushNotifOpen] = useState(false);
+  const [pushNotifTarget, setPushNotifTarget] = useState<{ id?: string; name: string } | null>(null);
+  const [pushNotifTitle, setPushNotifTitle] = useState('');
+  const [pushNotifMessage, setPushNotifMessage] = useState('');
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -382,6 +386,23 @@ export default function SupervisorDrivers() {
     onError: (error: Error) => {
       toast({ title: error.message || 'Failed to reset password', variant: 'destructive' });
       setResetPasswordDialogOpen(false);
+    },
+  });
+
+  const sendPushNotifMutation = useMutation({
+    mutationFn: async ({ driverId, title, message }: { driverId?: string; title: string; message: string }) => {
+      const res = await apiRequest('POST', '/api/admin/push-notification', { driverId, title, message });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to send'); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: 'Notification Sent', description: data.message });
+      setPushNotifOpen(false);
+      setPushNotifTitle('');
+      setPushNotifMessage('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to send notification', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -785,6 +806,19 @@ export default function SupervisorDrivers() {
                   data-testid="input-search-drivers"
                 />
               </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPushNotifTarget(null);
+                  setPushNotifTitle('');
+                  setPushNotifMessage('');
+                  setPushNotifOpen(true);
+                }}
+                data-testid="button-notify-all-drivers"
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Notify All
+              </Button>
               {statusFilter !== 'all' && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="cursor-pointer" onClick={() => setStatusFilter('all')} data-testid="badge-active-filter">
@@ -956,6 +990,17 @@ export default function SupervisorDrivers() {
                                 data-testid={`menu-reset-password-${driver.id}`}
                               >
                                 <KeyRound className="mr-2 h-4 w-4" />Reset Password
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setPushNotifTarget({ id: driver.id, name: info.name });
+                                  setPushNotifTitle('');
+                                  setPushNotifMessage('');
+                                  setPushNotifOpen(true);
+                                }}
+                                data-testid={`menu-notify-${driver.id}`}
+                              >
+                                <Bell className="mr-2 h-4 w-4" />Send Notification
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-600"
@@ -1661,6 +1706,65 @@ export default function SupervisorDrivers() {
                   Reset Password
                 </Button>
               )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Push Notification Dialog */}
+        <Dialog open={pushNotifOpen} onOpenChange={(open) => { if (!sendPushNotifMutation.isPending) setPushNotifOpen(open); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                {pushNotifTarget ? `Notify ${pushNotifTarget.name}` : 'Notify All Drivers'}
+              </DialogTitle>
+              <DialogDescription>
+                {pushNotifTarget
+                  ? "Send a push notification directly to this driver's mobile app."
+                  : 'Send a push notification to all active approved drivers.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="push-title">Title</Label>
+                <Input
+                  id="push-title"
+                  placeholder="e.g. Urgent Update"
+                  value={pushNotifTitle}
+                  onChange={(e) => setPushNotifTitle(e.target.value)}
+                  maxLength={100}
+                  data-testid="input-push-title"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="push-message">Message</Label>
+                <Textarea
+                  id="push-message"
+                  placeholder="e.g. Please check the app for new job assignments."
+                  value={pushNotifMessage}
+                  onChange={(e) => setPushNotifMessage(e.target.value)}
+                  maxLength={300}
+                  rows={4}
+                  data-testid="input-push-message"
+                />
+                <p className="text-xs text-muted-foreground text-right">{pushNotifMessage.length}/300</p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 flex-wrap">
+              <Button variant="outline" onClick={() => setPushNotifOpen(false)} disabled={sendPushNotifMutation.isPending}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => sendPushNotifMutation.mutate({ driverId: pushNotifTarget?.id, title: pushNotifTitle, message: pushNotifMessage })}
+                disabled={!pushNotifTitle.trim() || !pushNotifMessage.trim() || sendPushNotifMutation.isPending}
+                data-testid="button-send-push-notification"
+              >
+                {sendPushNotifMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</>
+                ) : (
+                  <><Bell className="mr-2 h-4 w-4" />Send Notification</>
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

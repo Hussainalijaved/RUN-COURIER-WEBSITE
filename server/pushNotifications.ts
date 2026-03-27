@@ -425,3 +425,60 @@ export async function sendJobStatusNotification(
 
   return { success: successCount > 0, sentCount: successCount };
 }
+
+export async function sendCustomNotificationToDrivers(
+  driverIds: string[] | "all",
+  title: string,
+  message: string
+): Promise<{ success: boolean; sentCount: number; failCount: number; noDeviceCount: number }> {
+  if (!supabaseAdmin) {
+    log("Supabase admin client not initialized", "push");
+    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: 0 };
+  }
+
+  let targetDriverIds: string[];
+
+  if (driverIds === "all") {
+    const { data: allDrivers } = await supabaseAdmin
+      .from("drivers")
+      .select("id")
+      .eq("status", "approved")
+      .eq("is_active", true);
+    targetDriverIds = (allDrivers || []).map((d: any) => d.id);
+  } else {
+    targetDriverIds = driverIds;
+  }
+
+  if (targetDriverIds.length === 0) {
+    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: 0 };
+  }
+
+  const { data: allDevices } = await supabaseAdmin
+    .from("driver_devices")
+    .select("driver_id, push_token")
+    .in("driver_id", targetDriverIds);
+
+  const devices = allDevices || [];
+  const noDeviceCount = targetDriverIds.filter(id => !devices.find((d: any) => d.driver_id === id)).length;
+
+  if (devices.length === 0) {
+    return { success: false, sentCount: 0, failCount: 0, noDeviceCount: noDeviceCount };
+  }
+
+  const messages: ExpoPushMessage[] = devices.map((device: any) => ({
+    to: device.push_token,
+    sound: "default",
+    title,
+    body: message,
+    data: { type: "custom_notification", title, message },
+    priority: "high",
+    channelId: "general",
+  }));
+
+  const tickets = await sendExpoPushNotifications(messages);
+  const sentCount = tickets.filter(t => t.status === "ok").length;
+  const failCount = tickets.filter(t => t.status === "error").length;
+
+  log(`Custom notification sent: ${sentCount} ok, ${failCount} failed, ${noDeviceCount} no device`, "push");
+  return { success: sentCount > 0, sentCount, failCount, noDeviceCount };
+}
