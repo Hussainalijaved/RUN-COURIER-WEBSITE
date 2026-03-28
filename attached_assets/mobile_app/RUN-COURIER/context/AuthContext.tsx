@@ -134,28 +134,59 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ─── Push notification registration guard ────────────────────────────────────
+// Tracks the driver ID for which we have already registered this app session.
+// Prevents duplicate registrations when fetchUserProfile is called multiple times
+// (e.g., session restore + auth state change both firing on app start).
+let pushRegisteredForDriverId: string | null = null;
+let pushRegistrationInProgress = false;
+
 // Initialize push notifications for driver
+// File: context/AuthContext.tsx
+// Called after: successful login OR session restore (real driver profile only)
 const initializeDriverNotifications = async (driverId: string) => {
+  // Skip if we already registered for this driver in this session
+  if (pushRegisteredForDriverId === driverId) {
+    console.log('[Push] Already registered for driver', driverId, '— skipping duplicate init');
+    return;
+  }
+
+  // Skip if another registration is in progress
+  if (pushRegistrationInProgress) {
+    console.log('[Push] Registration already in progress — skipping');
+    return;
+  }
+
+  // Skip fallback/incomplete driver sessions that have no real profile
+  // These are created by fetchUserProfile when the network fails, using userId as driver.id
+  // but they have an empty driver_id (driverCode), which signals a fake/fallback session.
+  // We rely on the caller to only pass this when a real driver profile was loaded.
+
+  console.log('[Push] ▶ initializeDriverNotifications — driver:', driverId);
+  pushRegistrationInProgress = true;
+
   try {
-    console.log('Initializing push notifications for driver:', driverId);
     const token = await notificationService.initialize();
-    
+
     if (token) {
-      console.log('Push token obtained:', token.substring(0, 20) + '...');
       await notificationService.saveTokenToDatabase(driverId);
-      
-      // Only set up the received listener here — tap/response navigation
-      // is handled globally in App.tsx via addNotificationResponseReceivedListener
+
+      // Mark as registered so future calls in this session skip it
+      pushRegisteredForDriverId = driverId;
+
+      // Set up foreground notification listener
       notificationService.setupNotificationListeners(
         (notification) => {
-          console.log('[Push] Notification received in foreground:', notification.request.content.title);
+          console.log('[Push] 🔔 Foreground notification:', notification.request.content.title);
         }
       );
     } else {
-      console.log('No push token available (not a physical device or permission denied)');
+      console.log('[Push] No token — either simulator, permission denied, or FCM misconfigured');
     }
-  } catch (error) {
-    console.error('Failed to initialize driver notifications:', error);
+  } catch (error: any) {
+    console.error('[Push] initializeDriverNotifications failed:', error?.message || error);
+  } finally {
+    pushRegistrationInProgress = false;
   }
 };
 
@@ -297,12 +328,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Cache the successful role for offline resilience
         cacheUserRole('driver', driverData);
         
-        // Initialize push notifications in background - NEVER block UI
-        setTimeout(() => {
-          initializeDriverNotifications(driverData!.id).catch(err => 
-            console.warn('[AUTH] Background notification init failed:', err)
-          );
-        }, 100);
+        // Initialize push notifications in background - NEVER block UI.
+        // Only run for REAL driver profiles (driver_id is the RC*** code).
+        // Fallback sessions (from network failures) have driver_id='' and are skipped.
+        const isRealDriverProfile = !!(driverData.driver_id && driverData.driver_id.startsWith('RC'));
+        if (isRealDriverProfile) {
+          console.log('[AUTH] Real driver profile — scheduling push notification init');
+          setTimeout(() => {
+            initializeDriverNotifications(driverData!.id).catch(err => 
+              console.warn('[AUTH] Background notification init failed:', err)
+            );
+          }, 500);
+        } else {
+          console.log('[AUTH] Fallback/incomplete driver profile — skipping push init until real profile loads');
+        }
         return;
       }
       
@@ -702,6 +741,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Reset push notification guard so next login re-registers
+    pushRegisteredForDriverId = null;
+    pushRegistrationInProgress = false;
+
     // Clean up notifications before signing out
     if (driver?.id) {
       await notificationService.removeTokenFromDatabase(driver.id);

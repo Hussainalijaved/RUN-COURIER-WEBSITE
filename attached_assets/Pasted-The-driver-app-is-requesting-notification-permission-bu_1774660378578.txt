@@ -1,0 +1,45 @@
+The driver app is requesting notification permission, but the Expo push token is not being registered automatically after reinstall/login. I need you to debug and fix the automatic push token registration end-to-end in my Expo app and Supabase backend without changing unrelated features.
+
+Problem:
+- Driver reinstalls app
+- App asks for notification permission successfully
+- But token is still not saved automatically to Supabase
+- Admin popup “Register Push Token” remains empty/manual
+- I want fully automatic registration only
+
+Please do the following:
+
+1. Find where the app handles driver login/session restore.
+2. Ensure push token registration runs automatically:
+   - after successful login
+   - and when an existing session is restored on app start
+3. Add clear logs for each step:
+   - permission status
+   - Expo projectId found or missing
+   - push token generated or failed
+   - Supabase insert/upsert success or error
+4. Verify `Notifications.getExpoPushTokenAsync()` is using the correct Expo/EAS projectId.
+5. Make sure this only runs on a real device.
+6. Save token automatically into Supabase table `driver_devices`.
+7. Use upsert and prevent duplicates.
+8. If insert fails, log the full error.
+9. If the driver app currently saves token into another table/field, find it and fix the logic instead of duplicating broken code.
+10. Show me exactly which file handles token registration and which file handles the database save.
+
+Use this logic:
+- request permission
+- get token
+- upsert token into `driver_devices`
+- link it to the logged-in driver
+- mark active = true
+
+Also verify:
+- Supabase client is initialized correctly in the mobile app
+- the logged-in driver ID is available at the time token registration runs
+- token registration is not skipped because of a bad condition
+- any old manual token popup in admin remains fallback only, not the main flow
+
+After fixing, show me:
+1. what files you changed
+2. the exact logs I should expect in the mobile app console
+3. how to confirm the token saved in Supabase
