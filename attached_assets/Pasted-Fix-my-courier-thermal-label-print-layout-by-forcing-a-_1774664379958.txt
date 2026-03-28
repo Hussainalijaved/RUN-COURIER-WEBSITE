@@ -1,0 +1,91 @@
+Fix my courier thermal label print layout by forcing a 1 cm safe margin on all sides.
+
+IMPORTANT:
+The problem is not the on-screen design. The problem is the printed result.
+On screen the label looks fine, but when printed the content is too close to the edges and gets cut or looks bad.
+
+GOAL:
+Make the printed content stay inside a safe area with 1 cm margin from:
+- top
+- bottom
+- left
+- right
+
+I want the outer 1 cm border to stay empty, and all label content must print only inside the inner safe area.
+
+REQUIREMENTS:
+1. Keep the current label design and data
+2. Do NOT redesign the label
+3. Do NOT change screen layout
+4. ONLY fix print CSS / print rendering
+5. Add a print-only safe area with 1 cm padding on all sides
+6. Ensure no text, barcode, postcode, icons, or sections go near the edges
+7. Make the printed label centered and clean
+8. Make sure the barcode is fully inside the safe area
+9. Prevent browser print scaling issues
+10. Ensure only the label prints, not the whole page UI
+
+Use exact print logic like this:
+
+@page {
+  size: 100mm 150mm;
+  margin: 0;
+}
+
+@media print {
+  html, body {
+    width: 100mm;
+    height: 150mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white;
+    overflow: hidden;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .label-print, .label-print * {
+    visibility: visible;
+  }
+
+  .label-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100mm;
+    height: 150mm;
+    margin: 0 !important;
+    padding: 10mm !important; /* 1 cm safe margin all around */
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    background: white !important;
+    transform: none !important;
+    zoom: 1 !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .label-safe-area {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+}
+
+Also:
+- Wrap all actual label content inside a .label-safe-area container
+- Ensure responsive/flex/max-width/scale styles do not affect print
+- Override any screen styles that shrink or move print content
+- Remove any print scaling, auto-fit, or extra spacing issues
+- If needed, create a print-only wrapper that keeps everything inside the 1 cm border
+
+Do not make content touch the edges.
+I want the printed result to look slightly smaller but fully safe and clean inside the label.
+
+After fixing:
+- show me exactly what file you changed
+- show me the print CSS added
+- confirm that the outer 1 cm area is empty on all sides

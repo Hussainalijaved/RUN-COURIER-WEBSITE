@@ -1585,7 +1585,7 @@ export default function SupervisorJobs() {
                 width: 100mm !important;
                 height: 150mm !important;
                 margin: 0 !important;
-                padding: 0 !important;
+                padding: 10mm !important; /* 1 cm safe margin on all sides */
                 box-sizing: border-box !important;
                 transform: none !important;
                 zoom: 1 !important;
