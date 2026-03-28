@@ -493,37 +493,11 @@ export async function sendCustomNotificationToDrivers(
     log(`Push notifications: ${sentCount} ok, ${failCount} failed`, "push");
   }
 
-  // --- SMS fallback for drivers without a registered device ---
-  let smsCount = 0;
-
-  if (driversWithoutDevice.length > 0) {
-    try {
-      const { data: driverRows } = await supabaseAdmin
-        .from("drivers")
-        .select("id, phone, full_name")
-        .in("id", driversWithoutDevice);
-
-      const { sendSMS } = await import("./twilioService");
-      const smsBody = `Run Courier - ${title}\n${message}`;
-
-      for (const driver of (driverRows || [])) {
-        if (driver.phone) {
-          const result = await sendSMS(driver.phone, smsBody);
-          if (result.success) {
-            smsCount++;
-            log(`SMS fallback sent to ${driver.full_name} (no push device)`, "push");
-          } else {
-            log(`SMS fallback failed for ${driver.full_name}: ${result.error}`, "push");
-          }
-        }
-      }
-    } catch (err: any) {
-      log(`SMS fallback error: ${err.message}`, "push");
-    }
+  const noDeviceCount = driversWithoutDevice.length;
+  if (noDeviceCount > 0) {
+    log(`${noDeviceCount} driver(s) have no registered push device — skipped (no SMS fallback)`, "push");
   }
 
-  const noDeviceCount = driversWithoutDevice.length;
-  const totalDelivered = sentCount + smsCount;
-  log(`Custom notification complete: ${sentCount} push, ${smsCount} SMS, ${failCount} failed, ${noDeviceCount} no device`, "push");
-  return { success: totalDelivered > 0, sentCount, failCount, noDeviceCount, smsCount };
+  log(`Custom notification complete: ${sentCount} push sent, ${failCount} failed, ${noDeviceCount} no device`, "push");
+  return { success: sentCount > 0, sentCount, failCount, noDeviceCount, smsCount: 0 };
 }
