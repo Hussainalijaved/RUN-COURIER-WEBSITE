@@ -2846,6 +2846,17 @@ export function registerMobileRoutes(app: Express): void {
         });
       }
 
+      // Broadcast real-time status change to all connected clients (admin, dispatcher, customer)
+      broadcastJobUpdate({
+        id: updatedJob.id,
+        trackingNumber: updatedJob.trackingNumber,
+        status: updatedJob.status,
+        previousStatus: effectiveStatus,
+        customerId: updatedJob.customerId,
+        driverId: updatedJob.driverId || driver.id,
+        updatedAt: updatedJob.updatedAt,
+      });
+
       if (status === "delivered" && supabaseAdmin) {
         (async () => {
           try {
@@ -3642,6 +3653,7 @@ export function registerMobileRoutes(app: Express): void {
       // Update the job to assign this driver
       const job = await storage.getJob(assignment.jobId);
       if (job) {
+        const previousJobStatus = job.status;
         await storage.updateJob(assignment.jobId, { 
           driverId: driver.id,
           status: "accepted",
@@ -3649,6 +3661,17 @@ export function registerMobileRoutes(app: Express): void {
         });
         
         console.log(`[Mobile] Driver ${driver.driverCode} accepted job ${job.trackingNumber}`);
+
+        // Broadcast real-time status update — admin dashboard reflects acceptance instantly
+        broadcastJobUpdate({
+          id: job.id,
+          trackingNumber: job.trackingNumber,
+          status: "accepted",
+          previousStatus: previousJobStatus,
+          customerId: job.customerId,
+          driverId: driver.id,
+          updatedAt: new Date(),
+        });
       }
       
       res.json({
@@ -3703,7 +3726,7 @@ export function registerMobileRoutes(app: Express): void {
       if (supabaseAdmin) {
         const { data: job } = await supabaseAdmin
           .from('jobs')
-          .select('id, driver_id, status')
+          .select('id, tracking_number, driver_id, status, customer_id')
           .eq('id', assignment.jobId)
           .single();
         
@@ -3711,6 +3734,7 @@ export function registerMobileRoutes(app: Express): void {
           // Job was assigned to this driver - return to unassigned pool
           // Only if job status is still pending/assigned (not already picked up)
           if (['pending', 'assigned', 'offered'].includes(job.status)) {
+            const previousJobStatus = job.status;
             await supabaseAdmin
               .from('jobs')
               .update({ 
@@ -3720,6 +3744,17 @@ export function registerMobileRoutes(app: Express): void {
               })
               .eq('id', assignment.jobId);
             console.log(`[Mobile] Cleared driver_id from job ${assignment.jobId} after rejection`);
+
+            // Broadcast job returning to unassigned pool — admin sees it instantly
+            broadcastJobUpdate({
+              id: job.id,
+              trackingNumber: job.tracking_number || '',
+              status: 'pending',
+              previousStatus: previousJobStatus,
+              customerId: job.customer_id || '',
+              driverId: null,
+              updatedAt: new Date(),
+            });
           }
         }
       }
