@@ -66,15 +66,15 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
     const scheduledTime = formatTime(j.scheduledPickupTime);
 
     return (
+      /* ── OUTER LABEL: exact thermal size 100mm × 150mm, 6mm safe-zone on all sides ── */
       <div
         ref={ref}
         className="label-page"
         style={{
-          width: '4in',
-          height: '6in',
-          maxHeight: '6in',
+          width: '100mm',
+          height: '150mm',
           margin: 0,
-          padding: '38px 18px 16px 28px',
+          padding: '6mm',
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
@@ -85,11 +85,16 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
         }}
         data-testid="shipping-label"
       >
-        {/* labelInner: full-height flex column */}
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* ── Inner flex column — gap distributes space between all sections ── */}
+        <div style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2.5mm',
+        }}>
 
-          {/* ── HEADER (fixed) ── */}
-          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '4px' }}>
+          {/* ── HEADER ── */}
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <img src={runCourierLogo} alt="" style={{ width: '24px', height: '24px', borderRadius: '4px', display: 'block', flexShrink: 0 }} />
               <div style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3px', lineHeight: 1.1 }}>RUN COURIER<span style={{ fontSize: '8px', verticalAlign: 'super' }}>&trade;</span></div>
@@ -100,8 +105,8 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             </div>
           </div>
 
-          {/* ── JOB / BARCODE / DATE (fixed) ── */}
-          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: '5px', paddingBottom: '4px' }}>
+          {/* ── JOB / BARCODE / DATE ── */}
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
             {j.jobNumber && (
               <div style={{ flexShrink: 0, minWidth: '44px' }}>
                 <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>Job No.</div>
@@ -118,11 +123,13 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             </div>
           </div>
 
-          {/* ── FROM / PICKUP card ── */}
+          {/* ── FROM / PICKUP card — grows to fill space ── */}
           <div style={{
+            flex: '1 1 0',
             border: '1px solid #222',
             borderRadius: '10px',
             padding: '5px 8px',
+            overflow: 'hidden',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -156,8 +163,9 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             )}
           </div>
 
-          {/* ── TO / DELIVERY card ── */}
+          {/* ── TO / DELIVERY card — grows to fill space ── */}
           <div style={{
+            flex: '1 1 0',
             border: '1.5px solid #111',
             borderRadius: '10px',
             padding: '5px 8px',
@@ -189,10 +197,11 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
 
           {/* ── FOOTER STATS ── */}
           <div style={{
+            flex: '0 0 auto',
             display: 'grid',
             gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
             borderTop: '1px solid #ddd',
-            paddingTop: '3px',
+            paddingTop: '2px',
           }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Weight</div>

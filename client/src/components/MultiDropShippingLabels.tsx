@@ -131,16 +131,15 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
     }
 
     const renderLabel = (label: LabelData, index: number) => (
+      /* ── OUTER LABEL: exact thermal size 100mm × 150mm, 6mm safe-zone on all sides ── */
       <div
         key={index}
         className="label-page"
         style={{
-          width: '4in',
-          height: '6in',
-          maxHeight: '6in',
+          width: '100mm',
+          height: '150mm',
           margin: 0,
-          marginBottom: index < labels.length - 1 ? '16px' : 0,
-          padding: '38px 18px 16px 28px',
+          padding: '6mm',
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
@@ -152,11 +151,16 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
         }}
         data-testid={`shipping-label-stop-${label.stopNumber}`}
       >
-        {/* labelInner: full-height flex column */}
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* ── Inner flex column — gap distributes space between all sections ── */}
+        <div style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2.5mm',
+        }}>
 
-          {/* ── HEADER (fixed) ── */}
-          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '4px' }}>
+          {/* ── HEADER ── */}
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <img src={runCourierLogo} alt="" style={{ width: '24px', height: '24px', borderRadius: '3px', display: 'block', flexShrink: 0 }} />
               <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: 1.1 }}>RUN COURIER<span style={{ fontSize: '8px', verticalAlign: 'super' }}>&trade;</span></div>
@@ -170,8 +174,8 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             </div>
           </div>
 
-          {/* ── JOB / BARCODE / DATE (fixed) ── */}
-          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: '5px', paddingBottom: '4px' }}>
+          {/* ── JOB / BARCODE / DATE ── */}
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
             {j.jobNumber && (
               <div style={{ flexShrink: 0, minWidth: '42px' }}>
                 <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Job No.</div>
@@ -188,8 +192,14 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             </div>
           </div>
 
-          {/* ── FROM card ── */}
-          <div style={{ border: '1px solid #222', borderRadius: '8px', padding: '5px 7px' }}>
+          {/* ── FROM card — grows to fill space ── */}
+          <div style={{
+            flex: '1 1 0',
+            border: '1px solid #222',
+            borderRadius: '8px',
+            padding: '5px 7px',
+            overflow: 'hidden',
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 <IconPin />
@@ -222,8 +232,14 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             )}
           </div>
 
-          {/* ── TO card (same size as FROM) ── */}
-          <div style={{ border: '1.5px solid #111', borderRadius: '8px', padding: '5px 7px', overflow: 'hidden' }}>
+          {/* ── TO card — grows to fill space ── */}
+          <div style={{
+            flex: '1 1 0',
+            border: '1.5px solid #111',
+            borderRadius: '8px',
+            padding: '5px 7px',
+            overflow: 'hidden',
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
               <IconPin />
               <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
@@ -250,10 +266,11 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
 
           {/* ── FOOTER STATS ── */}
           <div style={{
+            flex: '0 0 auto',
             display: 'grid',
             gridTemplateColumns: driverCode ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
             borderTop: '1px solid #ddd',
-            paddingTop: '3px',
+            paddingTop: '2px',
           }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Weight</div>

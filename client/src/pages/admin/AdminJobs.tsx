@@ -1550,15 +1550,16 @@ export default function AdminJobs() {
         <head>
           <title>Shipping Label - ${jobForLabel?.trackingNumber}</title>
           <style>
+            /* ── Exact 4×6 thermal label: 100mm × 150mm ── */
             @page {
-              size: 4in 6in;
+              size: 100mm 150mm;
               margin: 0;
             }
             *, *::before, *::after {
               box-sizing: border-box;
             }
             html, body {
-              width: 4in;
+              width: 100mm;
               margin: 0 !important;
               padding: 0 !important;
               font-family: Arial, sans-serif;
@@ -1567,21 +1568,29 @@ export default function AdminJobs() {
               color-adjust: exact !important;
               background: white;
               color: black;
-              ${isMultiLabel ? '' : 'height: 6in; max-height: 6in; overflow: hidden !important;'}
+              ${isMultiLabel ? '' : 'height: 150mm; overflow: hidden;'}
+            }
+            .label-page {
+              width: 100mm;
+              height: 150mm;
+              margin: 0;
+              padding: 0;
+              overflow: hidden;
+              box-sizing: border-box;
             }
             @media print {
-              @page { size: 4in 6in; margin: 0; }
+              @page { size: 100mm 150mm; margin: 0; }
               html, body {
-                width: 4in !important;
+                width: 100mm !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                ${isMultiLabel ? '' : 'height: 6in !important; max-height: 6in !important; overflow: hidden !important;'}
+                ${isMultiLabel ? '' : 'height: 150mm !important; overflow: hidden !important;'}
               }
               .label-page {
-                width: 4in !important;
-                height: 6in !important;
-                max-height: 6in !important;
+                width: 100mm !important;
+                height: 150mm !important;
                 margin: 0 !important;
+                padding: 0 !important;
                 page-break-after: always !important;
                 break-after: page !important;
                 page-break-inside: avoid !important;
@@ -1589,21 +1598,6 @@ export default function AdminJobs() {
                 overflow: hidden !important;
               }
               .label-page:last-child {
-                page-break-after: auto !important;
-                break-after: auto !important;
-              }
-              body > div > div {
-                width: 4in !important;
-                height: 6in !important;
-                max-height: 6in !important;
-                margin: 0 !important;
-                page-break-after: always !important;
-                break-after: page !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                overflow: hidden !important;
-              }
-              body > div > div:last-child {
                 page-break-after: auto !important;
                 break-after: auto !important;
               }
@@ -1625,7 +1619,7 @@ export default function AdminJobs() {
               setTimeout(function() {
                 window.print();
                 window.close();
-              }, 100);
+              }, 300);
             };
           </script>
         </body>
@@ -3558,7 +3552,7 @@ export default function AdminJobs() {
                 </div>
               ) : jobForLabel && jobForLabel.isMultiDrop && multiDropStops.length > 0 ? (
                 <div className="flex justify-center">
-                  <div style={{ transform: 'scale(0.5)', transformOrigin: 'top center', width: '4in' }}>
+                  <div style={{ transform: 'scale(0.5)', transformOrigin: 'top center', width: '100mm' }}>
                     <MultiDropShippingLabels 
                       ref={labelRef} 
                       job={jobForLabel} 
