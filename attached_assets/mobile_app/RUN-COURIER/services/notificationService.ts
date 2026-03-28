@@ -151,9 +151,9 @@ class NotificationService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // PUBLIC: Save token to Supabase (direct upsert, no REST dependency)
-  // File: services/notificationService.ts
-  // Table: driver_devices
+  // PUBLIC: Save token to database
+  // PRIMARY PATH: REST API (uses service role, bypasses all RLS/constraint issues)
+  // FALLBACK: Direct Supabase upsert
   // ─────────────────────────────────────────────────────────────────────────
   async saveTokenToDatabase(driverId: string, retryCount = 0): Promise<boolean> {
     console.log('[Push] ──────────────────────────────────────');
@@ -181,7 +181,7 @@ class NotificationService {
 
     if (!session?.user) {
       if (retryCount < 4) {
-        const delay = (retryCount + 1) * 2000; // 2s, 4s, 6s, 8s
+        const delay = (retryCount + 1) * 2000;
         console.log(`[Push] ⏳ No session yet — retry ${retryCount + 1}/4 in ${delay}ms`);
         await new Promise(r => setTimeout(r, delay));
         return this.saveTokenToDatabase(driverId, retryCount + 1);
@@ -191,26 +191,23 @@ class NotificationService {
     }
 
     const authUserId = session.user.id;
-    console.log('[Push] ✅ STEP 4a: Session valid');
-    console.log('[Push] Auth user ID (auth.uid):', authUserId);
-    console.log('[Push] Driver ID (for driver_id column):', driverId);
+    console.log('[Push] ✅ STEP 4a: Session valid. Auth UID:', authUserId);
 
-    if (authUserId !== driverId) {
-      console.warn('[Push] ⚠️  Auth user ID and driver ID differ — using auth user ID for RLS compliance');
+    // ── Step 4b: REST API (PRIMARY PATH — service role, no RLS/constraint issues) ──
+    console.log('[Push] STEP 4b: Registering via REST API (primary path)...');
+    const restSuccess = await this.saveTokenViaRestApi(driverId, session.access_token, 0);
+    if (restSuccess) {
+      console.log('[Push] ✅ STEP 4 COMPLETE: Token registered via REST API');
+      console.log('[Push] ══════════════════════════════════════');
+      return true;
     }
 
-    // Use auth user ID to comply with RLS: driver_id = auth.uid()
-    const deviceDriverId = authUserId;
-
+    // ── Step 4c: Direct Supabase upsert (FALLBACK if REST fails) ──
+    console.log('[Push] ⚡ REST API failed — trying direct Supabase upsert as fallback...');
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     const appVersion = Constants.expoConfig?.version || undefined;
+    const deviceDriverId = authUserId;
 
-    console.log('[Push] STEP 4b: Upserting into driver_devices...');
-    console.log('[Push] driver_id:', deviceDriverId);
-    console.log('[Push] push_token (first 50):', this.expoPushToken.substring(0, 50) + '...');
-    console.log('[Push] platform:', platform, '| app_version:', appVersion);
-
-    // ── Step 4b: Direct Supabase upsert (PRIMARY PATH) ──
     try {
       const { data: upsertData, error: upsertError } = await supabase
         .from('driver_devices')
@@ -228,24 +225,17 @@ class NotificationService {
         .maybeSingle();
 
       if (upsertError) {
-        console.error('[Push] ❌ Supabase upsert error:');
-        console.error('[Push]    code:', upsertError.code);
-        console.error('[Push]    message:', upsertError.message);
-        console.error('[Push]    details:', upsertError.details);
-        console.error('[Push]    hint:', upsertError.hint);
-        console.log('[Push] ⚡ Falling back to REST API...');
-        return this.saveTokenViaRestApi(driverId, session.access_token, retryCount);
+        console.error('[Push] ❌ Supabase upsert error:', upsertError.code, upsertError.message);
+        return false;
       }
 
-      const deviceId = upsertData?.id || 'existing record updated';
-      console.log('[Push] ✅ STEP 4 COMPLETE: Token saved via Supabase upsert');
-      console.log('[Push] Device record ID:', deviceId);
+      console.log('[Push] ✅ STEP 4 COMPLETE: Token saved via Supabase upsert fallback');
+      console.log('[Push] Device ID:', upsertData?.id || 'updated existing');
       console.log('[Push] ══════════════════════════════════════');
       return true;
     } catch (err: any) {
-      console.error('[Push] ❌ Supabase upsert exception:', err?.message || err);
-      console.log('[Push] ⚡ Falling back to REST API...');
-      return this.saveTokenViaRestApi(driverId, session?.access_token, retryCount);
+      console.error('[Push] ❌ All registration paths failed:', err?.message || err);
+      return false;
     }
   }
 

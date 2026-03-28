@@ -453,14 +453,24 @@ export async function sendCustomNotificationToDrivers(
     return { success: false, sentCount: 0, failCount: 0, noDeviceCount: 0, smsCount: 0 };
   }
 
-  const { data: allDevices } = await supabaseAdmin
+  log(`Targeting ${targetDriverIds.length} driver(s) for custom notification`, "push");
+
+  const { data: allDevices, error: deviceError } = await supabaseAdmin
     .from("driver_devices")
     .select("driver_id, push_token")
     .in("driver_id", targetDriverIds);
 
+  if (deviceError) {
+    log(`Error fetching driver devices: ${deviceError.message}`, "push");
+  }
+
   const devices = allDevices || [];
   const driversWithDevice = new Set(devices.map((d: any) => d.driver_id));
   const driversWithoutDevice = targetDriverIds.filter(id => !driversWithDevice.has(id));
+
+  if (driversWithoutDevice.length > 0) {
+    log(`Drivers with no registered push device (will use SMS): [${driversWithoutDevice.join(', ')}]`, "push");
+  }
 
   // --- Push notifications for drivers with registered devices ---
   let sentCount = 0;

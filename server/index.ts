@@ -579,6 +579,7 @@ async function runBackgroundTasks() {
   })();
 
   // Auto-migrate driver_devices table (required for push notifications)
+  // Also runs against Supabase via exec_sql RPC to ensure it exists there too
   (async () => {
     try {
       const { db } = await import('./db');
@@ -603,6 +604,48 @@ async function runBackgroundTasks() {
       console.log("[MIGRATION] driver_devices table created/verified successfully");
     } catch (e: any) {
       console.warn("[MIGRATION] driver_devices table migration error:", e?.message);
+    }
+  })();
+
+  // Ensure driver_devices UNIQUE constraint exists in Supabase
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      const { error } = await supabaseAdmin.rpc('exec_sql', {
+        query: `
+          CREATE TABLE IF NOT EXISTS driver_devices (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            driver_id TEXT NOT NULL,
+            push_token TEXT NOT NULL,
+            platform TEXT NOT NULL DEFAULT 'android',
+            app_version TEXT,
+            device_info TEXT,
+            last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+            created_at TIMESTAMPTZ DEFAULT NOW()
+          );
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'driver_devices_driver_id_push_token_key'
+                AND conrelid = 'driver_devices'::regclass
+            ) THEN
+              ALTER TABLE driver_devices ADD CONSTRAINT driver_devices_driver_id_push_token_key UNIQUE (driver_id, push_token);
+            END IF;
+          END $$;
+          CREATE INDEX IF NOT EXISTS idx_driver_devices_driver_id ON driver_devices(driver_id);
+          CREATE INDEX IF NOT EXISTS idx_driver_devices_token ON driver_devices(push_token);
+          CREATE INDEX IF NOT EXISTS idx_driver_devices_last_seen ON driver_devices(last_seen_at);
+        `
+      });
+      if (error && !error.message?.includes('schema cache')) {
+        console.warn("[MIGRATION] Supabase driver_devices constraint migration failed:", error.message);
+      } else if (!error) {
+        console.log("[MIGRATION] Supabase driver_devices UNIQUE constraint ensured");
+      }
+    } catch (e: any) {
+      // Non-critical: table likely already exists in Supabase with correct structure
     }
   })();
 
