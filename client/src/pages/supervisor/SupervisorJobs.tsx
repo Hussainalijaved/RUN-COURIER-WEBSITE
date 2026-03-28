@@ -1540,10 +1540,16 @@ export default function SupervisorJobs() {
             *, *::before, *::after {
               box-sizing: border-box;
             }
-            html, body {
+            html {
               width: 100mm;
               margin: 0 !important;
               padding: 0 !important;
+            }
+            body {
+              width: 100mm;
+              margin: 0 !important;
+              padding: 0 !important;
+              position: relative;
               font-family: Arial, sans-serif;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
@@ -1559,13 +1565,20 @@ export default function SupervisorJobs() {
               padding: 0;
               overflow: hidden;
               box-sizing: border-box;
+              transform: none;
             }
             @media print {
               @page { size: 100mm 150mm; margin: 0; }
-              html, body {
+              html {
                 width: 100mm !important;
                 margin: 0 !important;
                 padding: 0 !important;
+              }
+              body {
+                width: 100mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                position: relative !important;
                 ${isMultiLabel ? '' : 'height: 150mm !important; overflow: hidden !important;'}
               }
               .label-page {
@@ -1573,11 +1586,20 @@ export default function SupervisorJobs() {
                 height: 150mm !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                box-sizing: border-box !important;
+                transform: none !important;
+                zoom: 1 !important;
+                overflow: hidden !important;
+                ${isMultiLabel ? `
                 page-break-after: always !important;
                 break-after: page !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
-                overflow: hidden !important;
+                ` : `
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                `}
               }
               .label-page:last-child {
                 page-break-after: auto !important;

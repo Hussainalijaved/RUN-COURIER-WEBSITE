@@ -1,0 +1,86 @@
+My courier label looks correct on screen but prints badly on the thermal printer. I need you to fix the PRINT OUTPUT only, not the screen design.
+
+PROBLEM:
+- In the system / browser preview the label looks great
+- But when printed, the label becomes too small, misaligned, and badly positioned
+- There is too much empty space
+- The print does not fill the 4x6 thermal label correctly
+- Print output is not matching the on-screen layout
+
+GOAL:
+Make the printed label match the screen design properly on a 4x6 thermal printer.
+
+IMPORTANT:
+- Do NOT redesign the screen layout
+- Do NOT change the label content
+- ONLY fix print-specific CSS and print rendering
+- Keep the same label design, structure, and data
+- Make the printed label use the label space properly and look professional
+
+REQUIREMENTS:
+1. Add dedicated print CSS using @media print
+2. Add correct @page rule for 4x6 thermal labels:
+   - size: 100mm 150mm
+   - margin: 0
+3. Ensure the printed label fills the usable area correctly
+4. Remove any extra browser margins, padding, scaling, or whitespace
+5. Prevent print shrinking
+6. Force the print container to exact width and height
+7. Use box-sizing: border-box
+8. Ensure barcode, postcode blocks, and sections keep proper spacing
+9. Make top content, barcode, and address sections align correctly when printed
+10. Ensure the print output is centered and not reduced in size
+
+Please implement proper print CSS like this idea:
+
+@page {
+  size: 100mm 150mm;
+  margin: 0;
+}
+
+@media print {
+  html, body {
+    width: 100mm;
+    height: 150mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+    background: white;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .label-print, .label-print * {
+    visibility: visible;
+  }
+
+  .label-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100mm;
+    height: 150mm;
+    margin: 0 !important;
+    padding: 4mm !important;
+    box-sizing: border-box;
+    transform: none !important;
+    zoom: 1 !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    overflow: hidden;
+    background: white;
+  }
+}
+
+Also:
+- Check if any scale(), zoom, max-width, responsive CSS, or flex layout is causing print shrinkage
+- Override those styles in print mode
+- Ensure only the label area prints, not the full page UI
+- If needed, create a separate print-only wrapper for the label
+
+After fixing:
+- Show me exactly which CSS and component/file you changed
+- Keep the screen view unchanged
+- Only improve the printed output
