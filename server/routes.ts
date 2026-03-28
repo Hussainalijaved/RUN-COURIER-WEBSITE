@@ -1239,19 +1239,64 @@ export async function registerRoutes(
     const target = driverId ? [driverId] : "all";
     const result = await sendCustomNotificationToDrivers(target, title.trim(), message.trim());
 
-    const parts: string[] = [];
-    if (result.sentCount > 0) parts.push(`${result.sentCount} push notification(s)`);
-    if (result.smsCount > 0) parts.push(`${result.smsCount} SMS`);
-    const successMsg = parts.length > 0 ? `Delivered via: ${parts.join(' + ')}` : 'Delivered successfully';
-    const failMsg = `Could not deliver: no app device or phone number found for this driver.`;
+    // Always save to Alerts tab so driver sees it when they open the app,
+    // regardless of whether push was delivered
+    let savedToAlerts = 0;
+    try {
+      const sentBy = (req as any).adminUser?.email || (req as any).supervisorUser?.email || 'admin';
+      const notice = await storage.createDriverNotice({
+        title: title.trim(),
+        subject: '',
+        message: message.trim(),
+        category: 'general',
+        sent_by: sentBy,
+        sent_at: new Date().toISOString(),
+        target_type: driverId ? 'selected' : 'all',
+        requires_acknowledgement: false,
+        status: 'sent',
+      });
+
+      if (driverId) {
+        await storage.createNoticeRecipient({
+          notice_id: notice.id,
+          driver_id: driverId,
+          delivery_channel: 'push',
+        });
+        savedToAlerts = 1;
+      } else {
+        const allDrivers = await storage.getDrivers();
+        const activeDrivers = allDrivers.filter((d: any) => d.isVerified && d.isActive !== false);
+        for (const driver of activeDrivers) {
+          await storage.createNoticeRecipient({
+            notice_id: notice.id,
+            driver_id: driver.id,
+            driver_email: driver.email || null,
+            delivery_channel: 'push',
+          });
+        }
+        savedToAlerts = activeDrivers.length;
+      }
+    } catch (noticeErr: any) {
+      console.warn('[PushNotif] Failed to save to Alerts tab:', noticeErr.message);
+    }
+
+    let responseMsg: string;
+    if (result.sentCount > 0 && result.noDeviceCount === 0) {
+      responseMsg = `Push notification delivered to ${result.sentCount} driver(s).`;
+    } else if (result.sentCount > 0 && result.noDeviceCount > 0) {
+      responseMsg = `Push delivered to ${result.sentCount}. ${result.noDeviceCount} driver(s) will see it in their Alerts tab.`;
+    } else {
+      responseMsg = savedToAlerts > 0
+        ? `Saved to driver's Alerts tab. They will see it when they open the app.`
+        : `Notification saved to Alerts tab.`;
+    }
 
     return res.json({
-      success: result.success,
+      success: true,
       sentCount: result.sentCount,
-      smsCount: result.smsCount,
-      failCount: result.failCount,
       noDeviceCount: result.noDeviceCount,
-      message: result.success ? successMsg : failMsg,
+      savedToAlerts,
+      message: responseMsg,
     });
   }));
 

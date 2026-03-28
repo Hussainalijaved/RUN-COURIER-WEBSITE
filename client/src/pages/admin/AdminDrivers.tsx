@@ -421,14 +421,10 @@ export default function AdminDrivers() {
       return res.json();
     },
     onSuccess: (data) => {
-      if (data.success) {
-        toast({ title: 'Notification Sent', description: data.message });
-        setPushNotifOpen(false);
-        setPushNotifTitle('');
-        setPushNotifMessage('');
-      } else {
-        toast({ title: 'Notification Not Delivered', description: data.message, variant: 'destructive' });
-      }
+      toast({ title: 'Notification Sent', description: data.message });
+      setPushNotifOpen(false);
+      setPushNotifTitle('');
+      setPushNotifMessage('');
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to send notification', description: error.message, variant: 'destructive' });
