@@ -2919,7 +2919,8 @@ export class SupabaseStorage implements IStorage {
   async getDriverNoticeRecipients(driverId: string): Promise<any[]> {
     try {
       return await this.pgQuery(
-        `SELECT r.*, n.title, n.subject, n.message, n.category, n.requires_acknowledgement, n.sent_at as notice_sent_at, n.status as notice_status
+        `SELECT r.*, n.title, n.subject, n.message, n.category, n.requires_acknowledgement,
+                n.sent_by, n.sent_at as notice_sent_at, n.status as notice_status
          FROM driver_notice_recipients r
          JOIN driver_notices n ON r.notice_id = n.id
          WHERE r.driver_id = $1 AND n.status != 'draft'

@@ -1276,8 +1276,9 @@ export async function registerRoutes(
         }
         savedToAlerts = activeDrivers.length;
       }
+      console.log(`[PushNotif] Saved notice "${title.trim()}" to Alerts tab for ${savedToAlerts} driver(s)`);
     } catch (noticeErr: any) {
-      console.warn('[PushNotif] Failed to save to Alerts tab:', noticeErr.message);
+      console.error('[PushNotif] Failed to save to Alerts tab:', noticeErr.message, noticeErr.stack);
     }
 
     let responseMsg: string;
@@ -8950,8 +8951,34 @@ export async function registerRoutes(
       if (!user) return res.status(401).json({ error: "Invalid token" });
       const driverId = user.id;
       console.log('[Driver Notices] Fetching notices for driver:', driverId);
-      const notices = await storage.getDriverNoticeRecipients(driverId);
-      console.log('[Driver Notices] Found', notices.length, 'notices');
+      const rows = await storage.getDriverNoticeRecipients(driverId);
+      console.log('[Driver Notices] Found', rows.length, 'notices for driver', driverId);
+
+      // Transform flat DB rows into the nested format the mobile app expects
+      const notices = rows.map((r: any) => ({
+        id: r.id,
+        notice_id: r.notice_id,
+        driver_id: r.driver_id,
+        driver_email: r.driver_email ?? null,
+        viewed_at: r.viewed_at ?? null,
+        acknowledged_at: r.acknowledged_at ?? null,
+        status: r.status,
+        delivery_channel: r.delivery_channel,
+        notice: {
+          id: r.notice_id,
+          title: r.title,
+          subject: r.subject || '',
+          message: r.message,
+          category: r.category || 'general',
+          requires_acknowledgement: r.requires_acknowledgement || false,
+          sent_by: r.sent_by || 'Operations Team',
+          sent_at: r.notice_sent_at || r.sent_at,
+          status: r.notice_status || r.status,
+          image_url: r.image_url ?? null,
+          image_urls: r.image_urls ?? null,
+        },
+      }));
+
       res.json(notices);
     } catch (e: any) {
       console.error('[Driver Notices] Error:', e.message);
