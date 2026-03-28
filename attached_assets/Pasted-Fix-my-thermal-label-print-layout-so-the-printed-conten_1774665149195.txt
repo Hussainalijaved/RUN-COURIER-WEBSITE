@@ -1,0 +1,83 @@
+Fix my thermal label print layout so the printed content stays FARTHER AWAY from all edges.
+
+Current problem:
+- In print preview and on printer, the whole label is still too close to the edges
+- Even after margin/padding changes, the outer content box still fills too much of the page
+- I want a clearly visible empty border all around the printed content
+
+IMPORTANT:
+Do NOT only add padding.
+Also reduce the actual print content width/height and center it inside the 4x6 page.
+
+GOAL:
+- Page size must remain 100mm x 150mm
+- Printed content must sit inside a centered safe box
+- Leave about 10mm empty space on left and right
+- Leave about 10mm empty space on top and bottom
+- Nothing should print near the physical edges
+
+IMPLEMENT THIS EXACTLY:
+
+@page {
+  size: 100mm 150mm;
+  margin: 0;
+}
+
+@media print {
+  html, body {
+    width: 100mm !important;
+    height: 150mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .label-print, .label-print * {
+    visibility: visible !important;
+  }
+
+  .label-print {
+    position: absolute !important;
+    left: 10mm !important;
+    top: 10mm !important;
+    width: 80mm !important;
+    height: 130mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    background: white !important;
+    transform: none !important;
+    zoom: 1 !important;
+  }
+
+  .label-safe-area {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 4mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+}
+
+Requirements:
+1. Keep page size 100mm x 150mm
+2. Reduce actual printed content area to 80mm x 130mm
+3. Center content with 10mm empty border around all sides
+4. Keep all text, barcode, and boxes inside .label-safe-area
+5. Do not let any section overflow
+6. Override any existing width: 100%, max-width, flex stretch, transform, scale, or responsive CSS in print mode
+7. Apply this only for printing, not screen layout
+8. Keep current design, only make it print inside a smaller centered box
+
+Also add a temporary visible print test border:
+.label-print { border: 1px solid red !important; }
+.label-safe-area { border: 1px solid blue !important; }
+
+This is only for testing so I can see the outer print box and inner safe area in print preview.
+Show me exactly which file you changed.

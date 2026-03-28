@@ -1434,31 +1434,45 @@ export default function SupervisorJobHistory() {
                 margin: 0 !important;
                 padding: 0 !important;
                 position: relative !important;
+                background: white !important;
                 ${isMultiLabel ? '' : 'height: 150mm !important; overflow: hidden !important;'}
               }
+              /* Content box: 80x130mm centered with 10mm empty border zone */
               .label-page {
-                width: 100mm !important;
-                height: 150mm !important;
+                width: 80mm !important;
+                height: 130mm !important;
                 margin: 0 !important;
-                padding: 10mm !important; /* 1 cm safe margin on all sides */
+                padding: 0 !important;
                 box-sizing: border-box !important;
                 transform: none !important;
                 zoom: 1 !important;
                 overflow: hidden !important;
+                border: 1px solid red !important; /* TEST: outer print box */
                 ${isMultiLabel ? `
+                display: block !important;
+                margin: 10mm auto !important;
                 page-break-after: always !important;
                 break-after: page !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
                 ` : `
                 position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
+                left: 10mm !important;
+                top: 10mm !important;
                 `}
               }
               .label-page:last-child {
                 page-break-after: auto !important;
                 break-after: auto !important;
+              }
+              /* Inner safe area: fills label box with 4mm inner breathing room */
+              .label-page > div {
+                width: 100% !important;
+                height: 100% !important;
+                padding: 4mm !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                border: 1px solid blue !important; /* TEST: inner safe area */
               }
             }
             img {
