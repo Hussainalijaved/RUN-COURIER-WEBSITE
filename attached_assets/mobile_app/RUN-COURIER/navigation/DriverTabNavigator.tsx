@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform } from 'react-native';
 import { Spacing } from '@/constants/theme';
 import { JobOffersScreen } from '@/screens/driver/JobOffersScreen';
 import { ActiveJobScreen } from '@/screens/driver/ActiveJobScreen';
 import { CompletedJobsScreen } from '@/screens/driver/CompletedJobsScreen';
+import { AlertsScreen } from '@/screens/driver/AlertsScreen';
 import { ProfileScreen } from '@/screens/driver/ProfileScreen';
 import { SettingsScreen } from '@/screens/driver/SettingsScreen';
 import { EditProfileScreen } from '@/screens/driver/EditProfileScreen';
@@ -19,6 +19,10 @@ import { useTheme } from '@/hooks/useTheme';
 import { usePendingJobs } from '@/context/PendingJobsContext';
 import { getCommonScreenOptions } from './screenOptions';
 import { HeaderTitle } from '@/components/HeaderTitle';
+import { supabase } from '@/lib/supabase';
+import Constants from 'expo-constants';
+
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || '';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -131,9 +135,47 @@ function CompletedStack() {
   );
 }
 
+function AlertsStack() {
+  const { theme, isDark } = useTheme();
+
+  return (
+    <Stack.Navigator screenOptions={getCommonScreenOptions({ theme, isDark })}>
+      <Stack.Screen
+        name="AlertsMain"
+        component={AlertsScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 export function DriverTabNavigator() {
   const { theme, isDark } = useTheme();
   const { pendingJobCount } = usePendingJobs();
+  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token || !API_URL) return;
+
+      const resp = await fetch(`${API_URL}/api/driver/notices`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      if (!resp.ok) return;
+      const data: any[] = await resp.json();
+      const unread = (data || []).filter((n: any) => !n.viewed_at).length;
+      setUnreadNoticeCount(unread);
+    } catch {
+      // Silent fail — badge is non-critical
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   return (
     <Tab.Navigator
@@ -195,6 +237,22 @@ export function DriverTabNavigator() {
           tabBarIcon: ({ color }) => (
             <Feather name="navigation" size={26} color={color} />
           ),
+        }}
+      />
+      <Tab.Screen
+        name="AlertsTab"
+        component={AlertsStack}
+        listeners={{
+          tabPress: () => {
+            setUnreadNoticeCount(0);
+          },
+        }}
+        options={{
+          title: 'Alerts',
+          tabBarIcon: ({ color }) => (
+            <Feather name="bell" size={26} color={color} />
+          ),
+          tabBarBadge: unreadNoticeCount > 0 ? unreadNoticeCount : undefined,
         }}
       />
       <Tab.Screen
