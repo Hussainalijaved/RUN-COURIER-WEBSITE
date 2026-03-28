@@ -1212,6 +1212,81 @@ export async function registerRoutes(
     }
   }));
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // MOBILE: Driver registers/updates their own push token (called on app startup)
+  // ─────────────────────────────────────────────────────────────────────────
+  app.post("/api/mobile/v1/driver/push-token", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const token = authHeader.replace('Bearer ', '');
+
+    let driverId: string;
+    try {
+      const { verifyAccessToken } = await import('./supabaseAdmin');
+      const user = await verifyAccessToken(token);
+      if (!user) return res.status(401).json({ error: "Invalid token" });
+      driverId = user.id;
+    } catch (e: any) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const { pushToken, platform, appVersion } = req.body as {
+      pushToken: string;
+      platform?: string;
+      appVersion?: string;
+    };
+
+    if (!pushToken?.trim()) {
+      return res.status(400).json({ error: "Push token is required" });
+    }
+
+    const { registerDriverDevice } = await import('./pushNotifications');
+    const normalizedPlatform = (platform || 'android').toLowerCase().startsWith('i') ? 'ios' as const : 'android' as const;
+    const result = await registerDriverDevice(driverId, pushToken.trim(), normalizedPlatform, appVersion);
+
+    if (result.success) {
+      console.log(`[Mobile] ✅ Push token registered for driver ${driverId} (${normalizedPlatform})`);
+      return res.json({ success: true, deviceId: result.deviceId });
+    } else {
+      console.error(`[Mobile] ❌ Push token registration failed for driver ${driverId}:`, result.error);
+      return res.status(500).json({ success: false, error: result.error || "Failed to register" });
+    }
+  }));
+
+  // MOBILE: Driver removes their push token on logout
+  app.delete("/api/mobile/v1/driver/push-token", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const token = authHeader.replace('Bearer ', '');
+
+    let driverId: string;
+    try {
+      const { verifyAccessToken } = await import('./supabaseAdmin');
+      const user = await verifyAccessToken(token);
+      if (!user) return res.status(401).json({ error: "Invalid token" });
+      driverId = user.id;
+    } catch (e: any) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const { pushToken } = req.body as { pushToken?: string };
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+
+    let deleteQuery = supabaseAdmin.from('driver_devices').delete().eq('driver_id', driverId);
+    if (pushToken?.trim()) {
+      deleteQuery = (deleteQuery as any).eq('push_token', pushToken.trim());
+    }
+    const { error } = await deleteQuery;
+
+    if (error) {
+      console.error(`[Mobile] Failed to remove push token for driver ${driverId}:`, error.message);
+      return res.status(500).json({ error: error.message });
+    }
+    console.log(`[Mobile] Push token removed for driver ${driverId}`);
+    return res.json({ success: true });
+  }));
+
   // Admin: remove all registered push devices for a driver
   app.delete("/api/admin/driver/:driverId/push-token", asyncHandler(async (req, res) => {
     if (!enforceAdminOrSupervisorAccess(req, res)) return;
