@@ -8824,20 +8824,27 @@ export async function registerRoutes(
     }
 
     // Send push notifications to all targeted drivers
-    let pushResult = { sentCount: 0, smsCount: 0 };
+    let pushResult = { sentCount: 0, smsCount: 0, noDeviceCount: 0, failCount: 0 };
     try {
       const { sendCustomNotificationToDrivers } = await import('./pushNotifications');
       const targetDriverIds = targetDrivers.map((d: any) => d.id);
       const shortMessage = message.length > 180 ? message.substring(0, 177) + '...' : message;
       const result = await sendCustomNotificationToDrivers(targetDriverIds, title, shortMessage);
       pushResult = result;
-      console.log(`[Notices] Push notifications: ${result.sentCount} sent, ${result.smsCount} SMS fallback, ${result.failCount} failed, ${result.noDeviceCount} no device`);
+      console.log(`[Notices] Push notifications: ${result.sentCount} sent, ${result.failCount} failed, ${result.noDeviceCount} no device (saved to Alerts tab)`);
     } catch (pushErr: any) {
       console.warn('[Notices] Push notification error:', pushErr.message);
     }
 
-    console.log(`[Notices] Notice "${title}" sent to ${targetDrivers.length} drivers by ${(req as any).adminUser?.email || 'admin'}`);
-    res.json({ success: true, notice, recipientCount: targetDrivers.length, pushSent: pushResult.sentCount, smsSent: pushResult.smsCount });
+    console.log(`[Notices] Notice "${title}" saved for ${targetDrivers.length} drivers. Push delivered: ${pushResult.sentCount}, Alerts tab only: ${pushResult.noDeviceCount}`);
+    res.json({
+      success: true,
+      notice,
+      recipientCount: targetDrivers.length,
+      pushSent: pushResult.sentCount,
+      noDeviceCount: pushResult.noDeviceCount,
+      smsSent: 0
+    });
   }));
 
   app.delete("/api/admin/notices/:id", asyncHandler(async (req, res) => {

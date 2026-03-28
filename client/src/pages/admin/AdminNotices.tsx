@@ -144,7 +144,17 @@ export default function AdminNotices() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notices'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notices/recipient-driver-ids'] });
-      toast({ title: 'Notice sent', description: `Sent to ${data.recipientCount} drivers` });
+      const pushSent = data.pushSent || 0;
+      const noDevice = data.noDeviceCount || 0;
+      let description = `Notice saved for ${data.recipientCount} driver(s).`;
+      if (pushSent > 0 && noDevice === 0) {
+        description += ` Push notification delivered to all ${pushSent}.`;
+      } else if (pushSent > 0 && noDevice > 0) {
+        description += ` Push delivered to ${pushSent}. ${noDevice} will see it in their Alerts tab.`;
+      } else if (noDevice > 0) {
+        description += ` Saved to Alerts tab — drivers will see it when they open the app.`;
+      }
+      toast({ title: 'Notice sent', description });
       setConfirmSendOpen(false);
       setCreateNoticeOpen(false);
       resetNoticeForm();
