@@ -12,6 +12,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { registerDriverDevice, unregisterDriverDevice, getDriverDevices } from "./pushNotifications";
 import { geocodeAddress } from "./geocoding";
 import { sendDeliveryConfirmationEmail } from "./emailService";
+import { ensureJobNumber } from "./jobNumbers";
 
 // Helper to map Supabase job to local Job format for mobile API response
 // CRITICAL: Only expose driver_price to drivers, NEVER total_price or customer pricing
@@ -1829,7 +1830,13 @@ export function registerMobileRoutes(app: Express): void {
           // Map jobs with their multi-drop stops
           mobileJobs = enrichedJobs.map(j => {
             const stops = multiDropStopsMap[String(j.id)] || [];
-            return mapSupabaseJobToMobileFormat(j, stops);
+            const mapped = mapSupabaseJobToMobileFormat(j, stops);
+            // Ensure job number is consistent with website (in-memory cache + Supabase persist)
+            if (!mapped.jobNumber) {
+              const numbered = ensureJobNumber({ id: j.id, jobNumber: j.job_number || null });
+              (mapped as any).jobNumber = numbered.jobNumber;
+            }
+            return mapped;
           });
           
           // Fetch route data for each job with coordinates
@@ -2635,7 +2642,7 @@ export function registerMobileRoutes(app: Express): void {
       // Build response from either source
       if (job) {
         const effectiveDriverPrice = job.driverPrice ?? assignmentDriverPrice;
-        const j = job as any;
+        const j = ensureJobNumber(job as any);
         res.json({
           id: job.id,
           trackingNumber: job.trackingNumber,
@@ -2687,10 +2694,11 @@ export function registerMobileRoutes(app: Express): void {
         });
       } else {
         const effectiveDriverPrice = supabaseJob.driver_price ?? assignmentDriverPrice;
+        const numberedSupabaseJob = ensureJobNumber({ id: supabaseJob.id, jobNumber: supabaseJob.job_number || null });
         res.json({
           id: String(supabaseJob.id),
           trackingNumber: supabaseJob.tracking_number,
-          jobNumber: supabaseJob.job_number || null,
+          jobNumber: numberedSupabaseJob.jobNumber || null,
           status: supabaseJob.status,
           pickupAddress: supabaseJob.pickup_address,
           pickupPostcode: supabaseJob.pickup_postcode || null,
@@ -3550,6 +3558,7 @@ export function registerMobileRoutes(app: Express): void {
             }
           }
 
+          const numberedJob = job ? ensureJobNumber(job) : null;
           return {
             id: assignment.id,
             jobId: assignment.jobId,
@@ -3559,6 +3568,7 @@ export function registerMobileRoutes(app: Express): void {
             createdAt: assignment.createdAt,
             job: job ? {
               id: job.id,
+              jobNumber: numberedJob?.jobNumber || null,
               trackingNumber: job.trackingNumber,
               vehicleType: job.vehicleType,
               pickupAddress: job.pickupAddress,

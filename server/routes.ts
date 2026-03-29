@@ -28,6 +28,7 @@ import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
 import { geocodeAddress } from "./geocoding";
+import { stableJobNumberCache, persistJobNumber, ensureJobNumber, assignStableJobNumbers, generateJobNumber } from "./jobNumbers";
 import { Pool } from "pg";
 
 function generateReadableTempPassword(): string {
@@ -676,84 +677,6 @@ async function geocodePostcodesBulk(postcodes: string[]): Promise<void> {
   }
 }
 
-const stableJobNumberCache = new Map<string, string>();
-let jobNumberCacheInitialized = false;
-const jobNumberPersistQueue = new Set<string>();
-
-async function persistJobNumber(jobId: string, jobNumber: string): Promise<void> {
-  if (jobNumberPersistQueue.has(jobId)) return;
-  jobNumberPersistQueue.add(jobId);
-  try {
-    const { supabaseAdmin } = await import("./supabaseAdmin");
-    if (supabaseAdmin) {
-      await supabaseAdmin.from('jobs').update({ job_number: jobNumber }).eq('id', parseInt(jobId) || jobId);
-    }
-  } catch (err) {
-    // Non-critical — number still works in-memory
-  } finally {
-    jobNumberPersistQueue.delete(jobId);
-  }
-}
-
-function ensureJobNumber(job: any): any {
-  if (!job) return job;
-  if (job.jobNumber) {
-    stableJobNumberCache.set(String(job.id), job.jobNumber);
-    return job;
-  }
-  const cached = stableJobNumberCache.get(String(job.id));
-  if (cached) return { ...job, jobNumber: cached };
-  let newJobNumber: string;
-  const usedNumbers = new Set(stableJobNumberCache.values());
-  do {
-    newJobNumber = String(Math.floor(100000 + Math.random() * 900000));
-  } while (usedNumbers.has(newJobNumber));
-  stableJobNumberCache.set(String(job.id), newJobNumber);
-  persistJobNumber(String(job.id), newJobNumber);
-  return { ...job, jobNumber: newJobNumber };
-}
-
-function assignStableJobNumbers(jobs: any[]): any[] {
-  if (!jobNumberCacheInitialized && jobs.length > 0) {
-    const sorted = [...jobs].sort((a, b) => Number(a.id) - Number(b.id));
-    const usedNumbers = new Set<string>();
-    sorted.forEach((job) => {
-      if (job.jobNumber) {
-        stableJobNumberCache.set(String(job.id), job.jobNumber);
-        usedNumbers.add(job.jobNumber);
-      }
-    });
-    sorted.forEach((job) => {
-      if (!job.jobNumber && !stableJobNumberCache.has(String(job.id))) {
-        let num: string;
-        do {
-          num = String(Math.floor(100000 + Math.random() * 900000));
-        } while (usedNumbers.has(num));
-        usedNumbers.add(num);
-        stableJobNumberCache.set(String(job.id), num);
-        persistJobNumber(String(job.id), num);
-      }
-    });
-    jobNumberCacheInitialized = true;
-  }
-  
-  return jobs.map(job => {
-    if (job.jobNumber) {
-      stableJobNumberCache.set(String(job.id), job.jobNumber);
-      return job;
-    }
-    const cached = stableJobNumberCache.get(String(job.id));
-    if (cached) return { ...job, jobNumber: cached };
-    let newJobNumber: string;
-    const usedNumbers = new Set(stableJobNumberCache.values());
-    do {
-      newJobNumber = String(Math.floor(100000 + Math.random() * 900000));
-    } while (usedNumbers.has(newJobNumber));
-    stableJobNumberCache.set(String(job.id), newJobNumber);
-    persistJobNumber(String(job.id), newJobNumber);
-    return { ...job, jobNumber: newJobNumber };
-  });
-}
 
 // Sequential counter for tracking numbers within each year
 let lastJobSequence = 0;
@@ -828,23 +751,6 @@ async function generateTrackingNumber(): Promise<string> {
   return `${prefix}${currentYear}${sequenceStr}${randomSuffix}`;
 }
 
-async function generateJobNumber(): Promise<string> {
-  const usedNumbers = new Set<string>();
-  for (const num of stableJobNumberCache.values()) {
-    usedNumbers.add(num);
-  }
-  
-  let jobNumber: string;
-  let attempts = 0;
-  do {
-    const num = Math.floor(100000 + Math.random() * 900000);
-    jobNumber = String(num);
-    attempts++;
-    if (attempts > 100) break;
-  } while (usedNumbers.has(jobNumber));
-  
-  return jobNumber;
-}
 
 const DOC_TYPE_GROUPS: string[][] = [
   ['driving_license', 'driving_licence_front', 'driving_license_front', 'drivingLicenceFront', 'drivingLicenseFront', 'driving_licence'],
@@ -3237,6 +3143,9 @@ export async function registerRoutes(
     const job = await storage.createJob(data);
     
     stableJobNumberCache.set(String(job.id), jobNumber);
+    
+    // Persist job_number to Supabase immediately (not in Drizzle schema, so must be done explicitly)
+    persistJobNumber(String(job.id), jobNumber);
     
     // Auto-geocode addresses for live map display
     const geocodeUpdates: any = {};
@@ -9453,6 +9362,7 @@ export async function registerRoutes(
       console.log('[Embedded Payment] Creating job with data:', JSON.stringify(jobData, null, 2));
       job = await storage.createJob(jobData);
       stableJobNumberCache.set(String(job.id), jobNumber);
+      persistJobNumber(String(job.id), jobNumber);
       console.log('[Embedded Payment] Job created successfully:', job.id);
     } catch (createError: any) {
       console.error('[Embedded Payment] Failed to create job:', createError);
@@ -9676,6 +9586,7 @@ export async function registerRoutes(
 
     const job = await storage.createJob(jobData);
     stableJobNumberCache.set(String(job.id), jobNumber);
+    persistJobNumber(String(job.id), jobNumber);
     
     await storage.incrementCompletedBookings(bookingData.customerId);
     console.log(`[Pay Later Booking] Created job ${trackingNumber} for customer ${bookingData.customerId} - payment to be invoiced weekly`);
@@ -9773,6 +9684,7 @@ export async function registerRoutes(
 
     const job = await storage.createJob(jobData);
     stableJobNumberCache.set(String(job.id), jobNumber);
+    persistJobNumber(String(job.id), jobNumber);
     
     if (metadata.customerId) {
       await storage.incrementCompletedBookings(metadata.customerId);
