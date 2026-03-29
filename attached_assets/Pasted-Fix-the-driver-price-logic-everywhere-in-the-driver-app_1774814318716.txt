@@ -1,0 +1,79 @@
+Fix the driver price logic everywhere in the driver app and notification system without changing the UI design, layout, styling, or unrelated code.
+
+CRITICAL BUSINESS RULE:
+The driver must always see ONLY the admin-assigned driver price.
+The driver must NEVER see the customer-paid price.
+
+REQUIRED FIX:
+
+1. Source of truth
+
+* In all driver-facing screens, use only the driver pay field set by admin.
+* Never use customer price as fallback in the driver app.
+* Never display total customer charge to drivers.
+
+2. £0.00 must be treated as valid
+
+* If admin sets driver price to £0.00, the driver app must show exactly £0.00
+* Do not replace £0.00 with customer price
+* Do not treat 0 as false, empty, null, or missing
+
+3. Fix fallback bug
+
+* Search the codebase for any logic like:
+  driverPrice || customerPrice
+  driverPrice ? driverPrice : customerPrice
+  if (!driverPrice) use customerPrice
+  price = assignedPrice || totalPrice
+* Remove this fallback for all driver-facing views
+* Replace with explicit null/undefined checks only
+
+4. Correct logic
+
+* Use admin-assigned driver price if:
+  driverPrice !== null && driverPrice !== undefined
+* This includes 0
+* Only show blank / placeholder if driverPrice is truly missing, not when it is 0
+
+5. Apply this everywhere in driver app
+
+* New offer card
+* Accept button text
+* Job list
+* Job details
+* Alerts / notifications
+* Active jobs
+* Done jobs
+* Any price chips / badges / summaries
+* Any API mapping / serializer / frontend formatter used by driver app
+
+6. New offer card specific fix
+   For the new offer card shown to drivers:
+
+* Main large price must use driverPrice only
+* Accept button label must use driverPrice only
+* If driverPrice = 0, display:
+  £0.00
+* Never show customer amount such as £179.08 to the driver
+
+7. Notification logic
+
+* Initial assignment: send only "New Job Assigned"
+* Do not send "Job Price Updated" on first assignment even if initial driver price is saved at same time
+* Send "Job Price Updated" only for later changes after the job is already assigned
+
+8. Testing required
+
+* Test 1: assign job with driverPrice = £0.00 → driver sees £0.00 everywhere
+* Test 2: assign job with driverPrice = £12.00 → driver sees £12.00 everywhere
+* Test 3: update driverPrice from £12.00 to £0.00 → driver receives price update notification and sees £0.00
+* Test 4: customer price = £179.08 and driverPrice = £0.00 → driver still sees only £0.00
+* Test 5: no duplicate notifications on first assignment
+* Test 6: no customer price visible anywhere in driver interface
+
+IMPORTANT:
+
+* Do not redesign the screen
+* Do not change button positions
+* Do not change colors or fonts
+* Fix only the data binding / logic / formatting so driver-facing price always comes from admin-assigned driver price only

@@ -105,7 +105,7 @@ function mapSupabaseJobToMobileFormat(job: any, multiDropStops?: any[]) {
     vehicleType: job.vehicle_type,
     distance: job.distance?.toString() || null,
     weight: job.weight?.toString() || null,
-    driverPrice: job.driver_price?.toString() || null,
+    driverPrice: job.driver_price !== null && job.driver_price !== undefined ? String(job.driver_price) : null,
     scheduledPickupTime: job.scheduled_pickup_time,
     isMultiDrop: job.is_multi_drop || false,
     isReturnTrip: job.is_return_trip || false,
@@ -1986,7 +1986,7 @@ export function registerMobileRoutes(app: Express): void {
           vehicleType: job.vehicleType,
           distance: job.distance?.toString() || null,
           weight: job.weight?.toString() || null,
-          driverPrice: job.driverPrice?.toString() || null,
+          driverPrice: job.driverPrice !== null && job.driverPrice !== undefined ? String(job.driverPrice) : null,
           scheduledPickupTime: job.scheduledPickupTime,
           isMultiDrop: job.isMultiDrop || false,
           is_multi_drop: (job as any).isMultiDrop || false,
@@ -2541,9 +2541,14 @@ export function registerMobileRoutes(app: Express): void {
           .limit(1)
           .single();
         
-        if (assignment?.driver_price) {
-          assignmentDriverPrice = assignment.driver_price;
-          console.log(`[Job Details] Found driver_price ${assignmentDriverPrice} from job_assignments`);
+        // CRITICAL: Use explicit null/undefined check — never treat 0 as missing
+        // driver_price of £0.00 is a valid admin-assigned price and must be preserved
+        if (assignment !== null && assignment !== undefined
+            && assignment.driver_price !== null && assignment.driver_price !== undefined) {
+          assignmentDriverPrice = typeof assignment.driver_price === 'number'
+            ? assignment.driver_price
+            : parseFloat(String(assignment.driver_price));
+          console.log(`[Job Details] Found driver_price ${assignmentDriverPrice} from job_assignments (raw: ${assignment.driver_price})`);
         }
       }
 
@@ -2671,7 +2676,7 @@ export function registerMobileRoutes(app: Express): void {
           vehicleType: job.vehicleType,
           distance: job.distance?.toString() || null,
           weight: job.weight?.toString() || null,
-          driverPrice: effectiveDriverPrice?.toString() || null,
+          driverPrice: effectiveDriverPrice !== null && effectiveDriverPrice !== undefined ? String(effectiveDriverPrice) : null,
           scheduledPickupTime: job.scheduledPickupTime,
           isMultiDrop: (job as any).isMultiDrop || false,
           isReturnTrip: job.isReturnTrip,
@@ -2724,7 +2729,7 @@ export function registerMobileRoutes(app: Express): void {
           vehicleType: supabaseJob.vehicle_type,
           distance: supabaseJob.distance?.toString() || null,
           weight: supabaseJob.weight?.toString() || null,
-          driverPrice: effectiveDriverPrice?.toString() || null,
+          driverPrice: effectiveDriverPrice !== null && effectiveDriverPrice !== undefined ? String(effectiveDriverPrice) : null,
           scheduledPickupTime: supabaseJob.scheduled_pickup_time,
           isMultiDrop: supabaseJob.is_multi_drop || false,
           isReturnTrip: supabaseJob.is_return_trip || false,
