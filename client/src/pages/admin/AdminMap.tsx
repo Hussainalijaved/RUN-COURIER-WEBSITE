@@ -993,7 +993,7 @@ export default function AdminMap() {
                 </TabsTrigger>
                 <TabsTrigger value="jobs" className="flex-1" data-testid="tab-jobs">
                   <Package className="h-4 w-4 mr-2" />
-                  Jobs ({pendingJobs.length})
+                  Jobs ({allActiveBookings.length})
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-2 pb-1 flex-wrap">
@@ -1312,94 +1312,182 @@ export default function AdminMap() {
             <TabsContent value="jobs" className="flex-1 flex flex-col mt-0 overflow-hidden">
               <ScrollArea className="flex-1">
                 <div className="p-4 space-y-3">
-                  {pendingJobs.length > 0 ? (
-                    pendingJobs.map((job) => (
-                      <div
-                        key={job.id}
-                        className={`p-3 rounded-lg border transition-colors ${
-                          selectedJob?.id === job.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border'
-                        }`}
-                        data-testid={`job-card-${job.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <button
-                            onClick={() => handleJobClick(job)}
-                            className="flex-1 text-left"
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <Package className="h-4 w-4 text-primary" />
-                              <span className="font-medium text-sm">{job.trackingNumber || `#${job.id}`}</span>
-                              {getJobStatusBadge(job)}
-                            </div>
-                            <div className="space-y-1 text-xs text-muted-foreground">
-                              <div className="flex items-center gap-2">
-                                <Navigation className="h-3 w-3 text-green-500" />
-                                <span>{job.pickupPostcode}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-3 w-3 text-red-500" />
-                                <span>{job.deliveryPostcode}</span>
-                              </div>
-                            </div>
-                          </button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAssignJob(job)}
-                            data-testid={`button-assign-job-${job.id}`}
-                          >
-                            <Send className="h-3 w-3 mr-1" />
-                            Assign
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
+                  {allActiveBookings.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No pending jobs</p>
+                      <p className="text-sm">No active jobs</p>
                     </div>
+                  ) : (
+                    <>
+                      {activeJobs.length > 0 && (
+                        <>
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
+                            In Progress ({activeJobs.length})
+                          </p>
+                          {activeJobs.map((job) => (
+                            <div
+                              key={job.id}
+                              className={`p-3 rounded-lg border cursor-pointer transition-colors hover-elevate ${
+                                selectedJob?.id === job.id
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-border'
+                              }`}
+                              onClick={() => handleJobClick(job)}
+                              data-testid={`job-card-${job.id}`}
+                            >
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <Package className="h-4 w-4 text-blue-500" />
+                                <span className="font-medium text-sm flex-1 truncate">{job.trackingNumber || `#${job.id}`}</span>
+                                {getJobStatusBadge(job)}
+                              </div>
+                              <div className="space-y-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1.5">
+                                  <Navigation className="h-3 w-3 text-green-500 shrink-0" />
+                                  <span className="truncate">{job.pickupPostcode}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <MapPin className="h-3 w-3 text-red-500 shrink-0" />
+                                  <span className="truncate">{job.deliveryPostcode}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      {pendingJobs.length > 0 && (
+                        <>
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 mt-2">
+                            Pending Assignment ({pendingJobs.length})
+                          </p>
+                          {pendingJobs.map((job) => (
+                            <div
+                              key={job.id}
+                              className={`p-3 rounded-lg border transition-colors ${
+                                selectedJob?.id === job.id
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-border'
+                              }`}
+                              data-testid={`job-card-${job.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => handleJobClick(job)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleJobClick(job)}
+                                  className="flex-1 text-left cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Package className="h-4 w-4 text-primary" />
+                                    <span className="font-medium text-sm">{job.trackingNumber || `#${job.id}`}</span>
+                                    {getJobStatusBadge(job)}
+                                  </div>
+                                  <div className="space-y-1 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-2">
+                                      <Navigation className="h-3 w-3 text-green-500" />
+                                      <span>{job.pickupPostcode}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-3 w-3 text-red-500" />
+                                      <span>{job.deliveryPostcode}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAssignJob(job)}
+                                  data-testid={`button-assign-job-${job.id}`}
+                                >
+                                  <Send className="h-3 w-3 mr-1" />
+                                  Assign
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               </ScrollArea>
 
-              {selectedJob && (
-                <div className="border-t p-4">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    {selectedJob.trackingNumber || `Job #${selectedJob.id}`}
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Navigation className="h-4 w-4 text-green-500" />
-                      <span>From: {selectedJob.pickupPostcode}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-red-500" />
-                      <span>To: {selectedJob.deliveryPostcode}</span>
-                    </div>
-                    {selectedJob.vehicleType && (
-                      <div className="flex items-center gap-2">
-                        <Truck className="h-4 w-4 text-muted-foreground" />
-                        <span className="capitalize">{selectedJob.vehicleType.replace('_', ' ')}</span>
+              {selectedJob && (() => {
+                const loc = jobLocations.get(String(selectedJob.id));
+                const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                const staticMapUrl = loc && apiKey
+                  ? (() => {
+                      const path = loc.multiDropStops && loc.multiDropStops.length > 0
+                        ? [
+                            `${loc.pickupLat},${loc.pickupLng}`,
+                            ...loc.multiDropStops
+                              .slice()
+                              .sort((a, b) => a.stopOrder - b.stopOrder)
+                              .map(s => `${s.lat},${s.lng}`),
+                            `${loc.deliveryLat},${loc.deliveryLng}`,
+                          ].join('|')
+                        : `${loc.pickupLat},${loc.pickupLng}|${loc.deliveryLat},${loc.deliveryLng}`;
+                      return (
+                        `https://maps.googleapis.com/maps/api/staticmap` +
+                        `?size=280x130&scale=2` +
+                        `&markers=color:green|label:A|${loc.pickupLat},${loc.pickupLng}` +
+                        `&markers=color:red|label:B|${loc.deliveryLat},${loc.deliveryLng}` +
+                        `&path=color:0x3B82F6CC|weight:4|${path}` +
+                        `&key=${apiKey}`
+                      );
+                    })()
+                  : null;
+
+                return (
+                  <div className="border-t">
+                    {staticMapUrl && (
+                      <div className="relative w-full overflow-hidden" style={{ height: '130px' }}>
+                        <img
+                          src={staticMapUrl}
+                          alt={`Route: ${selectedJob.pickupPostcode} → ${selectedJob.deliveryPostcode}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
                       </div>
                     )}
+                    <div className="p-4">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        {selectedJob.trackingNumber || `Job #${selectedJob.id}`}
+                        {getJobStatusBadge(selectedJob)}
+                      </h4>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Navigation className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                          <span className="truncate">From: {selectedJob.pickupPostcode}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                          <span className="truncate">To: {selectedJob.deliveryPostcode}</span>
+                        </div>
+                        {selectedJob.vehicleType && (
+                          <div className="flex items-center gap-2">
+                            <Truck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="capitalize">{selectedJob.vehicleType.replace('_', ' ')}</span>
+                          </div>
+                        )}
+                      </div>
+                      {!selectedJob.driverId && (
+                        <Button
+                          className="w-full mt-3"
+                          size="sm"
+                          onClick={() => handleAssignJob(selectedJob)}
+                          data-testid="button-assign-selected-job"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Assign to Driver
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  {!selectedJob.driverId && (
-                    <Button 
-                      className="w-full mt-4" 
-                      size="sm"
-                      onClick={() => handleAssignJob(selectedJob)}
-                      data-testid="button-assign-selected-job"
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      Assign to Driver
-                    </Button>
-                  )}
-                </div>
-              )}
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </Card>
