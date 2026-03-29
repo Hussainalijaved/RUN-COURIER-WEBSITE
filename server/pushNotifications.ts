@@ -234,7 +234,7 @@ export async function sendJobOfferNotification(
     return { success: false, sentCount: 0 };
   }
 
-  const priceText = jobDetails.driverPrice 
+  const priceText = (jobDetails.driverPrice !== null && jobDetails.driverPrice !== undefined && jobDetails.driverPrice !== '')
     ? `£${parseFloat(jobDetails.driverPrice).toFixed(2)}`
     : "Price TBD";
 

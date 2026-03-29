@@ -51,7 +51,7 @@ export default function DriverHistory() {
 
   // Drivers should ONLY see admin-set driver price, never the customer's total price
   const getDriverPayment = (job: { driverPrice?: string | null }): number => {
-    if (job.driverPrice) {
+    if (job.driverPrice !== null && job.driverPrice !== undefined) {
       return parseFloat(job.driverPrice);
     }
     // Return 0 if no driver price is set - drivers should not see customer pricing

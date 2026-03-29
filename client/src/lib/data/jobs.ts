@@ -213,7 +213,7 @@ export async function assignJobToDriver(
     updated_at: new Date().toISOString(),
   };
 
-  if (driverPrice) {
+  if (driverPrice !== undefined && driverPrice !== null) {
     updates.driver_price = driverPrice;
   }
 

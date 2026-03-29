@@ -2016,7 +2016,7 @@ export default function AdminJobs() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {job.driverPrice ? (
+                        {(job.driverPrice !== null && job.driverPrice !== undefined) ? (
                           <div className="flex flex-col items-end gap-1">
                             <span className="font-medium text-green-600">{formatPrice(job.driverPrice)}</span>
                             <Badge 
@@ -2437,7 +2437,7 @@ export default function AdminJobs() {
                     </div>
                   </div>
                 )}
-                {selectedJob.driverPrice && (
+                {(selectedJob.driverPrice !== null && selectedJob.driverPrice !== undefined) && (
                   <div className="p-3 bg-muted/50 rounded-md space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-1">
                       <p className="text-sm text-muted-foreground">Driver Payment</p>
@@ -2856,12 +2856,12 @@ export default function AdminJobs() {
 
             {jobToAssign && (
               <div className="space-y-4">
-                <div className={`grid gap-4 p-3 bg-muted/50 rounded-md ${jobToAssign.driverPrice ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <div className={`grid gap-4 p-3 bg-muted/50 rounded-md ${(jobToAssign.driverPrice !== null && jobToAssign.driverPrice !== undefined) ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <div>
                     <p className="text-xs text-muted-foreground">Customer Price</p>
                     <p className="font-semibold">{formatPrice(jobToAssign.totalPrice)}</p>
                   </div>
-                  {jobToAssign.driverPrice && (
+                  {(jobToAssign.driverPrice !== null && jobToAssign.driverPrice !== undefined) && (
                     <div>
                       <p className="text-xs text-muted-foreground">Current Driver Pay</p>
                       <p className="font-semibold text-green-600">{formatPrice(jobToAssign.driverPrice)}</p>

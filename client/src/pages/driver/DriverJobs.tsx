@@ -68,13 +68,13 @@ const formatPrice = (price: string | number | null | undefined) => {
 const formatDriverPaymentFromAssignment = (driverPrice: string | number | null | undefined) => {
   if (driverPrice === null || driverPrice === undefined) return '—';
   const num = typeof driverPrice === 'string' ? parseFloat(driverPrice) : driverPrice;
-  if (isNaN(num) || num <= 0) return '—';
+  if (isNaN(num) || num < 0) return '—';
   return `£${num.toFixed(2)}`;
 };
 
 // Drivers should ONLY see the admin-set driver price, never the customer's total price
 const getDriverPayment = (job: { driverPrice?: string | null }): number | null => {
-  if (job.driverPrice) {
+  if (job.driverPrice !== null && job.driverPrice !== undefined) {
     return parseFloat(job.driverPrice);
   }
   // Return null if no driver price is set - drivers should not see customer pricing

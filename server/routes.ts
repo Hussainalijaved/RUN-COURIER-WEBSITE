@@ -3956,8 +3956,13 @@ export async function registerRoutes(
       console.error('[DriverPrice] Failed to update job_assignments:', err.message);
     }
 
-    // 3. Send push notification to driver if assigned
-    if (job.driverId) {
+    // 3. Send push notification to driver if assigned AND price genuinely changed
+    const previousPrice = job.driverPrice !== null && job.driverPrice !== undefined && job.driverPrice !== ''
+      ? parseFloat(String(job.driverPrice))
+      : null;
+    const priceActuallyChanged = previousPrice === null || Math.abs(previousPrice - enforcedPrice) > 0.001;
+
+    if (job.driverId && priceActuallyChanged) {
       (async () => {
         try {
           const result = await sendPriceUpdateNotification(job.driverId!, {
@@ -3969,7 +3974,7 @@ export async function registerRoutes(
             deliveryPostcode: job.deliveryPostcode,
           });
           if (result.success) {
-            console.log(`[DriverPrice] Push notification sent to driver ${job.driverId} — new price £${finalPrice}`);
+            console.log(`[DriverPrice] Push notification sent to driver ${job.driverId} — new price £${finalPrice} (was £${previousPrice ?? 'none'})`);
           } else {
             console.log(`[DriverPrice] No push devices for driver ${job.driverId}`);
           }
@@ -3977,6 +3982,8 @@ export async function registerRoutes(
           console.error('[DriverPrice] Failed to send push notification:', err.message);
         }
       })();
+    } else if (job.driverId && !priceActuallyChanged) {
+      console.log(`[DriverPrice] Price unchanged at £${finalPrice} — skipping push notification`);
     }
 
     // 4. Broadcast WebSocket update
@@ -4158,7 +4165,7 @@ export async function registerRoutes(
     
     // CRITICAL: driverPrice is REQUIRED - reject assignments without it
     // Drivers must ONLY see admin-set prices, never customer pricing
-    if (!driverPrice || parseFloat(driverPrice) <= 0) {
+    if (driverPrice === undefined || driverPrice === null || driverPrice === '' || isNaN(parseFloat(String(driverPrice))) || parseFloat(String(driverPrice)) < 0) {
       return res.status(400).json({ 
         error: "Driver price is required. Please specify the amount the driver will be paid for this job." 
       });
@@ -13343,7 +13350,7 @@ export async function registerRoutes(
     console.log(`[Job Assignment API] POST /api/job-assignments called with body:`, JSON.stringify(req.body));
     const { jobId, driverId, assignedBy, driverPrice, expiresAt } = req.body;
     
-    if (!jobId || !driverId || !assignedBy || !driverPrice) {
+    if (!jobId || !driverId || !assignedBy || driverPrice === undefined || driverPrice === null) {
       console.log(`[Job Assignment API] Missing required fields - jobId: ${jobId}, driverId: ${driverId}, assignedBy: ${assignedBy}, driverPrice: ${driverPrice}`);
       return res.status(400).json({ error: "Missing required fields: jobId, driverId, assignedBy, driverPrice" });
     }
@@ -13597,7 +13604,7 @@ export async function registerRoutes(
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
       return res.status(400).json({ error: "At least one job is required" });
     }
-    if (!driverId || !assignedBy || !driverPrice) {
+    if (!driverId || !assignedBy || driverPrice === undefined || driverPrice === null) {
       return res.status(400).json({ error: "Driver ID, assigned by, and driver price are required" });
     }
 
