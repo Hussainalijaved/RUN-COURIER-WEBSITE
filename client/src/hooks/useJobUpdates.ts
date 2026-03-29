@@ -187,11 +187,12 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
                 onJobUpdateRef.current?.(update);
 
                 // Instantly patch the cached job list so the UI reflects the new
-                // status/driverId without waiting for a round-trip refetch
+                // status/driverId without waiting for a round-trip refetch.
+                // Normalise both IDs to strings to avoid number/string mismatch.
                 queryClient.setQueriesData({ queryKey: ['/api/jobs'] }, (old: any) => {
                   if (!old) return old;
                   const patch = (job: any) =>
-                    job.id === update.jobId
+                    String(job.id) === String(update.jobId)
                       ? {
                           ...job,
                           status: update.status,
@@ -204,6 +205,7 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
 
                 queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
                 queryClient.invalidateQueries({ queryKey: ['/api/jobs', update.jobId] });
+                queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
                 if (update.trackingNumber) {
                   queryClient.invalidateQueries({ queryKey: ['/api/jobs/track', update.trackingNumber] });
                 }

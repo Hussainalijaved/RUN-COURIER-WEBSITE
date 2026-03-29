@@ -592,6 +592,7 @@ export default function SupervisorJobs() {
     queryKey: ['/api/jobs'],
     retry: 2,
     retryDelay: 1000,
+    refetchInterval: 10000,
   });
   
   // POD upload state
@@ -615,11 +616,23 @@ export default function SupervisorJobs() {
   const { isConnected: wsConnected } = useJobUpdates({
     enabled: true,
     onJobUpdate: (update) => {
-      console.log('[AdminJobs] Real-time job update:', update);
-      // TanStack Query cache is auto-invalidated by the hook
+      console.log('[SupervisorJobs] Real-time job update:', update);
+      // Driver rejected the job → status flips back to pending
+      if (
+        update.status === 'pending' &&
+        update.previousStatus &&
+        ['assigned', 'offered', 'accepted'].includes(update.previousStatus)
+      ) {
+        playNotification();
+        toast({
+          title: 'Driver Rejected Job',
+          description: `Job ${update.trackingNumber} was rejected and is back in the unassigned pool.`,
+          variant: 'destructive',
+        });
+      }
     },
     onJobCreated: (job) => {
-      console.log('[AdminJobs] Real-time new job:', job);
+      console.log('[SupervisorJobs] Real-time new job:', job);
       playAlert();
       toast({
         title: 'New Job Received!',
@@ -668,6 +681,7 @@ export default function SupervisorJobs() {
   // Fetch all job assignments for managing them
   const { data: jobAssignments } = useQuery<JobAssignment[]>({
     queryKey: ['/api/job-assignments'],
+    refetchInterval: 10000,
   });
 
   // Helper to get active assignment for a job
