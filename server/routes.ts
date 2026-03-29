@@ -3835,9 +3835,10 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
 
-    // Enforce minimum based on vehicle type
+    // Enforce minimum based on vehicle type.
+    // IMPORTANT: £0.00 (exactly zero) is a valid admin-assigned price — bypass minimum.
     const minPrice = getMinDriverPrice(job.vehicleType);
-    const enforcedPrice = Math.max(requestedPrice, minPrice);
+    const enforcedPrice = (requestedPrice === 0) ? 0 : Math.max(requestedPrice, minPrice);
     const finalPrice = enforcedPrice.toFixed(2);
 
     // 1. Update the job's driver_price
@@ -4104,11 +4105,12 @@ export async function registerRoutes(
         error: "Driver price is required. Please specify the amount the driver will be paid for this job." 
       });
     }
-    // Enforce minimum driver price per vehicle type
+    // Enforce minimum driver price per vehicle type.
+    // IMPORTANT: £0.00 (exactly zero) is a valid admin-assigned price — bypass minimum.
     const jobVehicleType = previousJob?.vehicleType || 'car';
     const minPrice = getMinDriverPrice(jobVehicleType);
     const requestedPrice = parseFloat(driverPrice);
-    const enforcedPrice = Math.max(requestedPrice, minPrice);
+    const enforcedPrice = (requestedPrice === 0) ? 0 : Math.max(requestedPrice, minPrice);
     if (enforcedPrice !== requestedPrice) {
       console.log(`[Jobs] Driver price £${requestedPrice} below minimum £${minPrice} for ${jobVehicleType} — raised to £${enforcedPrice}`);
     }
@@ -13350,10 +13352,14 @@ export async function registerRoutes(
       }
     }
 
-    // Enforce minimum driver price per vehicle type
+    // Enforce minimum driver price per vehicle type.
+    // IMPORTANT: £0.00 (exactly zero) is a valid admin-assigned price and BYPASSES the minimum.
+    // Only enforce the minimum when the admin sets a non-zero price that is below the vehicle minimum.
     const assignMinPrice = getMinDriverPrice(job.vehicleType);
     const assignRequestedPrice = parseFloat(String(driverPrice));
-    const assignEnforcedPrice = Math.max(assignRequestedPrice, assignMinPrice);
+    const assignEnforcedPrice = (assignRequestedPrice === 0)
+      ? 0  // £0.00 is an intentional admin choice — preserve it exactly
+      : Math.max(assignRequestedPrice, assignMinPrice);
     const enforcedDriverPrice = assignEnforcedPrice.toFixed(2);
     if (assignEnforcedPrice !== assignRequestedPrice) {
       console.log(`[Job Assignment] Driver price £${assignRequestedPrice} below minimum £${assignMinPrice} for ${job.vehicleType} — raised to £${assignEnforcedPrice}`);
@@ -13373,12 +13379,13 @@ export async function registerRoutes(
     console.log(`[Job Assignment] Assignment created: id=${assignment.id}, status=${assignment.status}`);
 
     // Automatically update job status to "assigned" AND set the driverId when assignment is created
-    // This ensures the job appears in the driver's mobile app immediately
+    // CRITICAL: Use enforcedDriverPrice (same as assignment) — not the raw request driverPrice
+    // This ensures both the job and assignment tables always have the identical driver price
     console.log(`[Job Assignment] Updating job ${jobId} with driverId=${driverId} and status=assigned`);
     const updatedJob = await storage.updateJob(jobId, {
       status: "assigned" as any,
       driverId: driverId,
-      driverPrice: driverPrice
+      driverPrice: enforcedDriverPrice
     });
     console.log(`[Job Assignment] Job ${jobId} update result:`, updatedJob ? `success, driver_id=${updatedJob.driverId}` : 'FAILED - no job returned');
     
@@ -13545,7 +13552,7 @@ export async function registerRoutes(
           recipientName: freshAssignJob.recipientName,
           recipientPhone: freshAssignJob.recipientPhone,
           distance: freshAssignJob.distance,
-          driverPrice: driverPrice,
+          driverPrice: enforcedDriverPrice,
           vehicleType: freshAssignJob.vehicleType,
           isMultiDrop: freshAssignJob.isMultiDrop || false,
           multiDropStops,
@@ -13578,7 +13585,7 @@ export async function registerRoutes(
         recipientPhone: freshAssignJob.recipientPhone,
         distance: freshAssignJob.distance,
         vehicleType: freshAssignJob.vehicleType,
-        driverPrice: driverPrice,
+        driverPrice: enforcedDriverPrice,
       });
 
       broadcastJobUpdate({
@@ -13642,10 +13649,11 @@ export async function registerRoutes(
         continue;
       }
 
-      // Enforce minimum driver price per vehicle type for this job
+      // Enforce minimum driver price per vehicle type for this job.
+      // IMPORTANT: £0.00 (exactly zero) is a valid admin-assigned price — bypass minimum.
       const batchMinPrice = getMinDriverPrice(job.vehicleType);
       const batchRequestedPrice = parseFloat(String(driverPrice));
-      const batchEnforcedPrice = Math.max(batchRequestedPrice, batchMinPrice);
+      const batchEnforcedPrice = (batchRequestedPrice === 0) ? 0 : Math.max(batchRequestedPrice, batchMinPrice);
       const batchFinalPrice = batchEnforcedPrice.toFixed(2);
       if (batchEnforcedPrice !== batchRequestedPrice) {
         console.log(`[BatchAssign] Job ${jobId} (${job.vehicleType}): price raised from £${batchRequestedPrice} to minimum £${batchEnforcedPrice}`);
@@ -13735,7 +13743,7 @@ export async function registerRoutes(
               jobNumber: job.jobNumber,
               pickupAddress: job.pickupAddress,
               deliveryAddress: job.deliveryAddress,
-              driverPrice: driverPrice,
+              driverPrice: batchFinalPrice,
               vehicleType: job.vehicleType,
               isMultiDrop: job.isMultiDrop || false,
               multiDropStops,
