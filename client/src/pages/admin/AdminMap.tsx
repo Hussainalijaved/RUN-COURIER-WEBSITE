@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { MapFallback } from '@/components/ui/map-fallback';
 import { getMapCenter, geocodePostcode } from '@/lib/maps';
 import { useGoogleMaps } from '@/hooks/useGoogleMaps';
+import { RouteMapPreview } from '@/components/RouteMapPreview';
 import { Truck, MapPin, Clock, Phone, RefreshCw, AlertCircle, Loader2, Wifi, WifiOff, Package, Navigation, Send, User, Maximize2, Search, X } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useDriverLocations } from '@/hooks/useDriverLocations';
@@ -1412,82 +1413,51 @@ export default function AdminMap() {
                 </div>
               </ScrollArea>
 
-              {selectedJob && (() => {
-                const loc = jobLocations.get(String(selectedJob.id));
-                const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-                const staticMapUrl = loc && apiKey
-                  ? (() => {
-                      const path = loc.multiDropStops && loc.multiDropStops.length > 0
-                        ? [
-                            `${loc.pickupLat},${loc.pickupLng}`,
-                            ...loc.multiDropStops
-                              .slice()
-                              .sort((a, b) => a.stopOrder - b.stopOrder)
-                              .map(s => `${s.lat},${s.lng}`),
-                            `${loc.deliveryLat},${loc.deliveryLng}`,
-                          ].join('|')
-                        : `${loc.pickupLat},${loc.pickupLng}|${loc.deliveryLat},${loc.deliveryLng}`;
-                      return (
-                        `https://maps.googleapis.com/maps/api/staticmap` +
-                        `?size=280x130&scale=2` +
-                        `&markers=color:green|label:A|${loc.pickupLat},${loc.pickupLng}` +
-                        `&markers=color:red|label:B|${loc.deliveryLat},${loc.deliveryLng}` +
-                        `&path=color:0x3B82F6CC|weight:4|${path}` +
-                        `&key=${apiKey}`
-                      );
-                    })()
-                  : null;
-
-                return (
-                  <div className="border-t">
-                    {staticMapUrl && (
-                      <div className="relative w-full overflow-hidden" style={{ height: '130px' }}>
-                        <img
-                          src={staticMapUrl}
-                          alt={`Route: ${selectedJob.pickupPostcode} → ${selectedJob.deliveryPostcode}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
+              {selectedJob && (
+                <div className="border-t">
+                  <div style={{ height: '180px' }} className="px-3 pt-3">
+                    <RouteMapPreview
+                      pickupPostcode={selectedJob.pickupPostcode || ''}
+                      deliveryPostcode={selectedJob.deliveryPostcode || ''}
+                      isMultiDrop={false}
+                    />
+                  </div>
+                  <div className="p-3">
+                    <h4 className="font-semibold mb-2 flex items-center gap-2 flex-wrap">
+                      <Package className="h-4 w-4" />
+                      <span className="truncate">{selectedJob.trackingNumber || `Job #${selectedJob.id}`}</span>
+                      {getJobStatusBadge(selectedJob)}
+                    </h4>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Navigation className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                        <span className="truncate">From: {selectedJob.pickupPostcode}</span>
                       </div>
-                    )}
-                    <div className="p-4">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        {selectedJob.trackingNumber || `Job #${selectedJob.id}`}
-                        {getJobStatusBadge(selectedJob)}
-                      </h4>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Navigation className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                          <span className="truncate">From: {selectedJob.pickupPostcode}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                          <span className="truncate">To: {selectedJob.deliveryPostcode}</span>
-                        </div>
-                        {selectedJob.vehicleType && (
-                          <div className="flex items-center gap-2">
-                            <Truck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            <span className="capitalize">{selectedJob.vehicleType.replace('_', ' ')}</span>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                        <span className="truncate">To: {selectedJob.deliveryPostcode}</span>
                       </div>
-                      {!selectedJob.driverId && (
-                        <Button
-                          className="w-full mt-3"
-                          size="sm"
-                          onClick={() => handleAssignJob(selectedJob)}
-                          data-testid="button-assign-selected-job"
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          Assign to Driver
-                        </Button>
+                      {selectedJob.vehicleType && (
+                        <div className="flex items-center gap-2">
+                          <Truck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="capitalize">{selectedJob.vehicleType.replace('_', ' ')}</span>
+                        </div>
                       )}
                     </div>
+                    {!selectedJob.driverId && (
+                      <Button
+                        className="w-full mt-3"
+                        size="sm"
+                        onClick={() => handleAssignJob(selectedJob)}
+                        data-testid="button-assign-selected-job"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Assign to Driver
+                      </Button>
+                    )}
                   </div>
-                );
-              })()}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </Card>
