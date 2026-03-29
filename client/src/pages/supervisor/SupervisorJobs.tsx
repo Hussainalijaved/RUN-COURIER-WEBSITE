@@ -592,7 +592,9 @@ export default function SupervisorJobs() {
     queryKey: ['/api/jobs'],
     retry: 2,
     retryDelay: 1000,
-    refetchInterval: 10000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+    staleTime: 30000,
   });
   
   // POD upload state
@@ -681,7 +683,9 @@ export default function SupervisorJobs() {
   // Fetch all job assignments for managing them
   const { data: jobAssignments } = useQuery<JobAssignment[]>({
     queryKey: ['/api/job-assignments'],
-    refetchInterval: 10000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+    staleTime: 30000,
   });
 
   // Helper to get active assignment for a job
@@ -2022,6 +2026,26 @@ export default function SupervisorJobs() {
                         )}
                       </TableCell>
                       <TableCell>
+                        <div className="flex items-center gap-1">
+                        {!job.driverId && job.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-7 px-2 text-xs"
+                            data-testid={`button-quick-assign-${job.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const dist = parseFloat(String(job.distance || '0'));
+                              const auto = Math.max(dist > 0 ? dist * 1.00 : 0, getMinDriverPrice(job.vehicleType));
+                              setJobToAssign(job);
+                              setAssignDriverPrice(auto.toFixed(2));
+                              setAssignDialogOpen(true);
+                            }}
+                          >
+                            <UserPlus className="h-3 w-3 mr-1" />
+                            Assign
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" data-testid={`button-job-actions-${job.id}`}>
@@ -2192,6 +2216,7 @@ export default function SupervisorJobs() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                     );
