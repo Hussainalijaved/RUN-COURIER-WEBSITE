@@ -611,7 +611,24 @@ export default function AdminJobs() {
     retry: 2,
     retryDelay: 1000,
   });
-  
+
+  // Keep the detail panel in sync: whenever the jobs list re-fetches (after any
+  // mutation), pull the updated version of the currently-selected job so the panel
+  // reflects the latest data without requiring a full page refresh.
+  useEffect(() => {
+    if (!selectedJob || !jobs) return;
+    const fresh = jobs.find(j => j.id === selectedJob.id);
+    if (!fresh) {
+      // Job was deleted — close the panel
+      setSelectedJob(null);
+      return;
+    }
+    // Only update if something actually changed (avoid infinite loops)
+    if (JSON.stringify(fresh) !== JSON.stringify(selectedJob)) {
+      setSelectedJob(fresh);
+    }
+  }, [jobs]);
+
   // POD upload state
   const [uploadingPod, setUploadingPod] = useState(false);
   const [deletingPodUrl, setDeletingPodUrl] = useState<string | null>(null);

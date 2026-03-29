@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -235,6 +235,22 @@ export default function AdminDrivers() {
   }, [supabaseDrivers, localDrivers]);
 
   const driversLoading = localDriversLoading;
+
+  // Keep the driver detail panel in sync: whenever the driver list re-fetches
+  // (after any mutation), pull the updated version of the currently-selected driver.
+  useEffect(() => {
+    if (!selectedDriver || !drivers) return;
+    const fresh = drivers.find(d => d.id === selectedDriver.id);
+    if (!fresh) {
+      // Driver was deleted/deactivated — close the panel
+      setSelectedDriver(null);
+      setProfileDialogOpen(false);
+      return;
+    }
+    if (JSON.stringify(fresh) !== JSON.stringify(selectedDriver)) {
+      setSelectedDriver(fresh);
+    }
+  }, [drivers]);
 
   const { data: allJobs } = useQuery<any[]>({
     queryKey: ['/api/jobs'],

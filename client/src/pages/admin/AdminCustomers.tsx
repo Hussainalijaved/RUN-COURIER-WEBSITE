@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,6 +71,20 @@ export default function AdminCustomers() {
   const { data: customers, isLoading } = useQuery<UserType[]>({
     queryKey: ['/api/users', { role: 'customer' }],
   });
+
+  // Keep the customer detail panel in sync when the list re-fetches
+  useEffect(() => {
+    if (!selectedCustomer || !customers) return;
+    const fresh = customers.find(c => c.id === selectedCustomer.id);
+    if (!fresh) {
+      setSelectedCustomer(null);
+      setDetailsDialogOpen(false);
+      return;
+    }
+    if (JSON.stringify(fresh) !== JSON.stringify(selectedCustomer)) {
+      setSelectedCustomer(fresh);
+    }
+  }, [customers]);
 
   const updateCustomerMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<UserType> }) => {
