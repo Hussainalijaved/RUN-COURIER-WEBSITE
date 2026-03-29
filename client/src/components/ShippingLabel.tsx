@@ -78,10 +78,10 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
-          color: '#111',
+          color: '#000',
           backgroundColor: '#fff',
-          fontSize: '11px',
-          lineHeight: 1.3,
+          fontSize: '12px',
+          lineHeight: 1.4,
         }}
         data-testid="shipping-label"
       >
@@ -99,7 +99,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
               <img src={runCourierLogo} alt="" style={{ width: '24px', height: '24px', borderRadius: '4px', display: 'block', flexShrink: 0 }} />
               <div style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3px', lineHeight: 1.1 }}>RUN COURIER<span style={{ fontSize: '8px', verticalAlign: 'super' }}>&trade;</span></div>
             </div>
-            <div style={{ textAlign: 'right', fontSize: '7px', color: '#555', lineHeight: 1.4 }}>
+            <div style={{ textAlign: 'right', fontSize: '7px', color: '#000', lineHeight: 1.4 }}>
               <div>www.runcourier.co.uk</div>
               <div>020 4634 6100</div>
             </div>
@@ -109,17 +109,17 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
           <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
             {j.jobNumber && (
               <div style={{ flexShrink: 0, minWidth: '44px' }}>
-                <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>Job No.</div>
-                <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", whiteSpace: 'nowrap' }}>{j.jobNumber}</div>
+                <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700' }}>Job No.</div>
+                <div style={{ fontSize: '14px', fontWeight: '900', fontFamily: "'Courier New', monospace", whiteSpace: 'nowrap' }}>{j.jobNumber}</div>
               </div>
             )}
             <div style={{ flex: 1, textAlign: 'center', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100%', overflow: 'hidden' }}>{generateBarcode(job.trackingNumber)}</div>
-              <div style={{ fontFamily: "'Courier New', monospace", fontSize: '9px', fontWeight: 'bold', letterSpacing: '2px', paddingTop: '1px' }}>{job.trackingNumber}</div>
+              <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', fontWeight: '900', letterSpacing: '2px', paddingTop: '1px' }}>{job.trackingNumber}</div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right', minWidth: '48px' }}>
-              <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>Date</div>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatDate(job.createdAt)}</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700' }}>Date</div>
+              <div style={{ fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>{formatDate(job.createdAt)}</div>
             </div>
           </div>
 
@@ -134,7 +134,7 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 <IconPin />
-                <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#333' }}>From / Pickup</span>
+                <span style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#000' }}>From / Pickup</span>
               </div>
               {scheduledTime && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '8px', fontWeight: 'bold', color: '#1a73e8' }}>
@@ -144,19 +144,19 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
               )}
             </div>
             {j.pickupBuildingName && (
-              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.pickupBuildingName}</div>
+              <div style={{ fontSize: '10px', fontWeight: '700' }}>{j.pickupBuildingName}</div>
             )}
-            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.pickupAddress}</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{job.pickupPostcode}</div>
+            <div style={{ fontSize: '10px', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.pickupAddress}</div>
+            <div style={{ fontSize: '18px', fontWeight: '900', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px', color: '#000' }}>{job.pickupPostcode}</div>
             {(j.pickupContactName || j.senderName) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
                 <IconUser />
-                <span style={{ fontWeight: '600' }}>{j.pickupContactName || j.senderName}</span>
+                <span style={{ fontWeight: '700', color: '#000' }}>{j.pickupContactName || j.senderName}</span>
                 {(j.pickupContactPhone || j.senderPhone) && (
                   <>
-                    <span style={{ color: '#ccc' }}>|</span>
+                    <span style={{ color: '#000' }}>|</span>
                     <IconPhone />
-                    <span style={{ color: '#555' }}>{j.pickupContactPhone || j.senderPhone}</span>
+                    <span style={{ color: '#000' }}>{j.pickupContactPhone || j.senderPhone}</span>
                   </>
                 )}
               </div>
@@ -173,22 +173,22 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
               <IconPin />
-              <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#333' }}>To / Delivery</span>
+              <span style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#000' }}>To / Delivery</span>
             </div>
             {j.deliveryBuildingName && (
-              <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{j.deliveryBuildingName}</div>
+              <div style={{ fontSize: '10px', fontWeight: '700' }}>{j.deliveryBuildingName}</div>
             )}
-            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.deliveryAddress}</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{job.deliveryPostcode}</div>
+            <div style={{ fontSize: '10px', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{job.deliveryAddress}</div>
+            <div style={{ fontSize: '18px', fontWeight: '900', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px', color: '#000' }}>{job.deliveryPostcode}</div>
             {job.recipientName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
                 <IconUser />
-                <span style={{ fontWeight: '600' }}>{job.recipientName}</span>
+                <span style={{ fontWeight: '700', color: '#000' }}>{job.recipientName}</span>
                 {job.recipientPhone && (
                   <>
-                    <span style={{ color: '#ccc' }}>|</span>
+                    <span style={{ color: '#000' }}>|</span>
                     <IconPhone />
-                    <span style={{ color: '#555' }}>{job.recipientPhone}</span>
+                    <span style={{ color: '#000' }}>{job.recipientPhone}</span>
                   </>
                 )}
               </div>
@@ -204,25 +204,25 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
             paddingTop: '2px',
           }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Weight</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Weight</div>
+              <div style={{ fontSize: '9px', fontWeight: '700' }}>{job.weight || '—'} kg</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Vehicle</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Vehicle</div>
+              <div style={{ fontSize: '9px', fontWeight: '700', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Type</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Standard'}</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Type</div>
+              <div style={{ fontSize: '9px', fontWeight: '700' }}>{job.isMultiDrop ? 'Multi' : job.isReturnTrip ? 'Return' : 'Standard'}</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Distance</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Distance</div>
+              <div style={{ fontSize: '9px', fontWeight: '700' }}>{j.distance || j.distanceMiles || '—'} mi</div>
             </div>
             {driverCode && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.3px' }}>Driver</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
+                <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Driver</div>
+                <div style={{ fontSize: '9px', fontWeight: '700', fontFamily: 'monospace' }}>{driverCode}</div>
               </div>
             )}
           </div>

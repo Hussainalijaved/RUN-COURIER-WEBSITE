@@ -143,10 +143,10 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
           fontFamily: 'Arial, Helvetica, sans-serif',
           boxSizing: 'border-box',
           overflow: 'hidden',
-          color: '#111',
+          color: '#000',
           backgroundColor: '#fff',
-          fontSize: '10px',
-          lineHeight: 1.3,
+          fontSize: '12px',
+          lineHeight: 1.4,
           pageBreakAfter: index < labels.length - 1 ? 'always' : 'auto',
         }}
         data-testid={`shipping-label-stop-${label.stopNumber}`}
@@ -168,7 +168,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             <div style={{ backgroundColor: '#000', color: '#fff', padding: '3px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace', flexShrink: 0 }}>
               {label.stopNumber}/{label.totalStops}
             </div>
-            <div style={{ textAlign: 'right', fontSize: '7px', color: '#555', lineHeight: 1.4, flexShrink: 0 }}>
+            <div style={{ textAlign: 'right', fontSize: '7px', color: '#000', lineHeight: 1.4, flexShrink: 0 }}>
               <div>runcourier.co.uk</div>
               <div>020 4634 6100</div>
             </div>
@@ -178,17 +178,17 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
           <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
             {j.jobNumber && (
               <div style={{ flexShrink: 0, minWidth: '42px' }}>
-                <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Job No.</div>
-                <div style={{ fontSize: '11px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", whiteSpace: 'nowrap' }}>{j.jobNumber}</div>
+                <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700' }}>Job No.</div>
+                <div style={{ fontSize: '14px', fontWeight: '900', fontFamily: "'Courier New', monospace", whiteSpace: 'nowrap' }}>{j.jobNumber}</div>
               </div>
             )}
             <div style={{ flex: 1, textAlign: 'center', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100%', overflow: 'hidden' }}>{generateBarcode(`${job.trackingNumber}-${label.stopNumber}`)}</div>
-              <div style={{ fontFamily: "'Courier New', monospace", fontSize: '9px', fontWeight: 'bold', letterSpacing: '1.5px', paddingTop: '1px' }}>{job.trackingNumber}-{label.stopNumber}</div>
+              <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', fontWeight: '900', letterSpacing: '1.5px', paddingTop: '1px' }}>{job.trackingNumber}-{label.stopNumber}</div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right', minWidth: '46px' }}>
-              <div style={{ fontSize: '6px', color: '#888', textTransform: 'uppercase', fontWeight: '600' }}>Date</div>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatDate(job.createdAt)}</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700' }}>Date</div>
+              <div style={{ fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>{formatDate(job.createdAt)}</div>
             </div>
           </div>
 
@@ -203,7 +203,7 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 <IconPin />
-                <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
+                <span style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#000' }}>
                   {label.isPickup ? 'From / Pickup' : `From Stop ${label.stopNumber - 1}`}
                 </span>
               </div>
@@ -214,18 +214,18 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
                 </div>
               )}
             </div>
-            {label.fromBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.fromBuildingName}</div>}
-            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.fromAddress}</div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{label.fromPostcode}</div>
+            {label.fromBuildingName && <div style={{ fontSize: '10px', fontWeight: '700' }}>{label.fromBuildingName}</div>}
+            <div style={{ fontSize: '10px', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.fromAddress}</div>
+            <div style={{ fontSize: '16px', fontWeight: '900', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px', color: '#000' }}>{label.fromPostcode}</div>
             {label.fromContactName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
                 <IconUser />
-                <span style={{ fontWeight: '600' }}>{label.fromContactName}</span>
+                <span style={{ fontWeight: '700', color: '#000' }}>{label.fromContactName}</span>
                 {label.fromContactPhone && (
                   <>
-                    <span style={{ color: '#ccc' }}>|</span>
+                    <span style={{ color: '#000' }}>|</span>
                     <IconPhone />
-                    <span style={{ color: '#555' }}>{label.fromContactPhone}</span>
+                    <span style={{ color: '#000' }}>{label.fromContactPhone}</span>
                   </>
                 )}
               </div>
@@ -242,22 +242,22 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingBottom: '2px' }}>
               <IconPin />
-              <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#333' }}>
+              <span style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#000' }}>
                 {label.isFinalDelivery ? 'To / Final Delivery' : `To Stop ${label.stopNumber}`}
               </span>
             </div>
-            {label.toBuildingName && <div style={{ fontSize: '9px', fontWeight: 'bold' }}>{label.toBuildingName}</div>}
-            <div style={{ fontSize: '9px', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.toAddress}</div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px' }}>{label.toPostcode}</div>
+            {label.toBuildingName && <div style={{ fontSize: '10px', fontWeight: '700' }}>{label.toBuildingName}</div>}
+            <div style={{ fontSize: '10px', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{label.toAddress}</div>
+            <div style={{ fontSize: '16px', fontWeight: '900', fontFamily: "'Courier New', monospace", paddingTop: '2px', letterSpacing: '1.5px', color: '#000' }}>{label.toPostcode}</div>
             {label.recipientName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px', fontSize: '9px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as any}>
                 <IconUser />
-                <span style={{ fontWeight: '600' }}>{label.recipientName}</span>
+                <span style={{ fontWeight: '700', color: '#000' }}>{label.recipientName}</span>
                 {label.recipientPhone && (
                   <>
-                    <span style={{ color: '#ccc' }}>|</span>
+                    <span style={{ color: '#000' }}>|</span>
                     <IconPhone />
-                    <span style={{ color: '#555' }}>{label.recipientPhone}</span>
+                    <span style={{ color: '#000' }}>{label.recipientPhone}</span>
                   </>
                 )}
               </div>
@@ -273,25 +273,25 @@ export const MultiDropShippingLabels = forwardRef<HTMLDivElement, MultiDropShipp
             paddingTop: '2px',
           }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Weight</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{job.weight || '—'} kg</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700' }}>Weight</div>
+              <div style={{ fontSize: '9px', fontWeight: '700' }}>{job.weight || '—'} kg</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Vehicle</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700' }}>Vehicle</div>
+              <div style={{ fontSize: '9px', fontWeight: '700', textTransform: 'capitalize' }}>{job.vehicleType?.replace('_', ' ') || '—'}</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Type</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>Multi</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700' }}>Type</div>
+              <div style={{ fontSize: '9px', fontWeight: '700' }}>Multi</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Distance</div>
-              <div style={{ fontSize: '8px', fontWeight: 'bold' }}>{j.distance || j.distanceMiles || '—'} mi</div>
+              <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700' }}>Distance</div>
+              <div style={{ fontSize: '9px', fontWeight: '700' }}>{j.distance || j.distanceMiles || '—'} mi</div>
             </div>
             {driverCode && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '6px', color: '#999', textTransform: 'uppercase', fontWeight: '600' }}>Driver</div>
-                <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{driverCode}</div>
+                <div style={{ fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '700' }}>Driver</div>
+                <div style={{ fontSize: '9px', fontWeight: '700', fontFamily: 'monospace' }}>{driverCode}</div>
               </div>
             )}
           </div>
