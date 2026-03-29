@@ -27,6 +27,8 @@ export function RouteMapPreview({
   const markersRef = useRef<google.maps.Marker[]>([]);
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const initializedRef = useRef(false);
+  // Track the last geocoded key to avoid re-geocoding on every parent re-render
+  const lastGeocodedKeyRef = useRef<string>('');
 
   // Initialize map
   useEffect(() => {
@@ -121,6 +123,12 @@ export function RouteMapPreview({
   // Update markers when postcodes change
   useEffect(() => {
     if (!map) return;
+
+    // Build a stable key from the actual postcode values — skip if nothing changed
+    const dropsKey = isMultiDrop ? drops.map(d => d.postcode).join('|') : '';
+    const geocodeKey = [pickupPostcode, deliveryPostcode || '', dropsKey].join('::');
+    if (geocodeKey === lastGeocodedKeyRef.current) return;
+    lastGeocodedKeyRef.current = geocodeKey;
 
     // Collect all postcodes
     const allPostcodes: { postcode: string; isPickup: boolean }[] = [];

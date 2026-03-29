@@ -1415,7 +1415,7 @@ export default function AdminMap() {
 
               {selectedJob && (
                 <div className="border-t">
-                  <div style={{ height: '180px' }} className="px-3 pt-3">
+                  <div key={`route-preview-${selectedJob.id}`} style={{ height: '180px' }} className="px-3 pt-3">
                     <RouteMapPreview
                       pickupPostcode={selectedJob.pickupPostcode || ''}
                       deliveryPostcode={selectedJob.deliveryPostcode || ''}
