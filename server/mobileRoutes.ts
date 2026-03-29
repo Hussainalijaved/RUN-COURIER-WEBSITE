@@ -3564,11 +3564,17 @@ export function registerMobileRoutes(app: Express): void {
           }
 
           const numberedJob = job ? ensureJobNumber(job) : null;
+          // CRITICAL: Always format driverPrice as a decimal string ('0.00', '12.50', etc.)
+          // so that the mobile app can distinguish "zero pounds" from "no price set".
+          // Raw number 0 is falsy in JS; the string '0.00' is truthy and unambiguous.
+          const offerDriverPrice = assignment.driverPrice !== null && assignment.driverPrice !== undefined
+            ? parseFloat(String(assignment.driverPrice)).toFixed(2)
+            : null;
           return {
             id: assignment.id,
             jobId: assignment.jobId,
             status: assignment.status,
-            driverPrice: assignment.driverPrice,
+            driverPrice: offerDriverPrice,
             expiresAt: assignment.expiresAt,
             createdAt: assignment.createdAt,
             job: job ? {
@@ -3599,7 +3605,7 @@ export function registerMobileRoutes(app: Express): void {
               multiDropStops: offerStops,
               stops: offerStops,
               totalStops: offerStops.length,
-              driverPrice: assignment.driverPrice,
+              driverPrice: offerDriverPrice,
               pickupInstructions: job.pickupInstructions,
               deliveryInstructions: job.deliveryInstructions,
               scheduledPickupTime: job.scheduledPickupTime,
