@@ -13513,6 +13513,18 @@ export async function registerRoutes(
         vehicleType: freshAssignJob.vehicleType,
         driverPrice: driverPrice,
       });
+
+      // ALSO broadcast job:status_update so ALL admin sessions instantly reflect
+      // the new "assigned" status (job:assigned alone has no handler in some admin views)
+      broadcastJobUpdate({
+        id: freshAssignJob.id,
+        trackingNumber: freshAssignJob.trackingNumber || '',
+        status: 'assigned',
+        previousStatus: 'pending',
+        customerId: freshAssignJob.customerId || '',
+        driverId: freshAssignJob.driverId,
+        updatedAt: new Date(),
+      });
     }
 
     // Fetch multi-drop stops if this is a multi-drop job, then send push notification

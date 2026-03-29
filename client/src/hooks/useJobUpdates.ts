@@ -185,12 +185,46 @@ export function useJobUpdates(options: UseJobUpdatesOptions = {}): UseJobUpdates
                 const update = message.payload as JobStatusUpdate;
                 setLatestUpdate(update);
                 onJobUpdateRef.current?.(update);
-                
+
+                // Instantly patch the cached job list so the UI reflects the new
+                // status/driverId without waiting for a round-trip refetch
+                queryClient.setQueriesData({ queryKey: ['/api/jobs'] }, (old: any) => {
+                  if (!old) return old;
+                  const patch = (job: any) =>
+                    job.id === update.jobId
+                      ? {
+                          ...job,
+                          status: update.status,
+                          driverId: update.driverId !== undefined ? update.driverId : job.driverId,
+                        }
+                      : job;
+                  if (Array.isArray(old)) return old.map(patch);
+                  return old;
+                });
+
                 queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
                 queryClient.invalidateQueries({ queryKey: ['/api/jobs', update.jobId] });
                 if (update.trackingNumber) {
                   queryClient.invalidateQueries({ queryKey: ['/api/jobs/track', update.trackingNumber] });
                 }
+              }
+              break;
+
+            case 'job:assigned':
+              if (message.payload) {
+                const p = message.payload;
+                // Instantly patch status to "assigned" in the cache
+                queryClient.setQueriesData({ queryKey: ['/api/jobs'] }, (old: any) => {
+                  if (!old) return old;
+                  const patch = (job: any) =>
+                    job.id === p.id
+                      ? { ...job, status: p.status || 'assigned', driverId: p.driverId }
+                      : job;
+                  if (Array.isArray(old)) return old.map(patch);
+                  return old;
+                });
+                queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
               }
               break;
 

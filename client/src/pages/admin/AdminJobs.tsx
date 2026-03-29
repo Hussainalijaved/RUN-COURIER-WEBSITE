@@ -708,7 +708,17 @@ export default function AdminJobs() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      // Instantly patch the job status in the cache — no visible lag before refetch
+      queryClient.setQueriesData({ queryKey: ['/api/jobs'] }, (old: any) => {
+        if (!old) return old;
+        const patch = (job: any) =>
+          job.id === variables.jobId
+            ? { ...job, status: 'assigned', driverId: variables.driverId }
+            : job;
+        if (Array.isArray(old)) return old.map(patch);
+        return old;
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/job-assignments'] });
       toast({ title: 'Assignment sent to driver', description: 'The driver will receive a notification to accept or decline.' });
