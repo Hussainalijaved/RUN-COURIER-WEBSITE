@@ -3865,13 +3865,34 @@ export async function registerRoutes(
       console.error('[DriverPrice] Failed to update job_assignments:', err.message);
     }
 
-    // 3. Send push notification to driver if assigned AND price genuinely changed
+    // 3. Send push + in-app notification to driver only when:
+    //    a) Job is already assigned to a driver
+    //    b) A previous driver price existed (not first-time set)
+    //    c) The new price is genuinely different from the previous price
     const previousPrice = job.driverPrice !== null && job.driverPrice !== undefined && job.driverPrice !== ''
       ? parseFloat(String(job.driverPrice))
       : null;
-    const priceActuallyChanged = previousPrice === null || Math.abs(previousPrice - enforcedPrice) > 0.001;
+    // Do NOT notify if previousPrice is null — that means price is being set for the first time
+    // (first assignment price is handled by the assignment notification, not here)
+    const priceActuallyChanged = previousPrice !== null && Math.abs(previousPrice - enforcedPrice) > 0.001;
 
     if (job.driverId && priceActuallyChanged) {
+      // Create in-app notification for the driver
+      try {
+        const numberedJob = ensureJobNumber(job);
+        const jobRef = numberedJob.jobNumber || job.trackingNumber || jobId;
+        await storage.createNotification({
+          userId: job.driverId,
+          title: "Job Price Updated",
+          message: `Your pay for job #${jobRef} has been updated to £${parseFloat(finalPrice).toFixed(2)}`,
+          type: "price_update",
+          data: { jobId, newPrice: finalPrice },
+        });
+      } catch (err: any) {
+        console.error('[DriverPrice] Failed to create in-app notification:', err.message);
+      }
+
+      // Send push notification
       (async () => {
         try {
           const result = await sendPriceUpdateNotification(job.driverId!, {
@@ -3883,7 +3904,7 @@ export async function registerRoutes(
             deliveryPostcode: job.deliveryPostcode,
           });
           if (result.success) {
-            console.log(`[DriverPrice] Push notification sent to driver ${job.driverId} — new price £${finalPrice} (was £${previousPrice ?? 'none'})`);
+            console.log(`[DriverPrice] Push notification sent to driver ${job.driverId} — new price £${finalPrice} (was £${previousPrice})`);
           } else {
             console.log(`[DriverPrice] No push devices for driver ${job.driverId}`);
           }
@@ -3891,8 +3912,12 @@ export async function registerRoutes(
           console.error('[DriverPrice] Failed to send push notification:', err.message);
         }
       })();
-    } else if (job.driverId && !priceActuallyChanged) {
-      console.log(`[DriverPrice] Price unchanged at £${finalPrice} — skipping push notification`);
+    } else if (!priceActuallyChanged) {
+      if (previousPrice === null) {
+        console.log(`[DriverPrice] Skipping notification — price set for first time to £${finalPrice} (initial assignment price, not an update)`);
+      } else {
+        console.log(`[DriverPrice] Price unchanged at £${finalPrice} — skipping push notification`);
+      }
     }
 
     // 4. Broadcast WebSocket update
@@ -13273,6 +13298,12 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
 
+    // Capture previous assignment state BEFORE any changes (for notification logic)
+    const previousDriverId: string | null = job.driverId || null;
+    const previousDriverPrice: number | null = (job.driverPrice !== null && job.driverPrice !== undefined && job.driverPrice !== '')
+      ? parseFloat(String(job.driverPrice))
+      : null;
+
     // Check if driver exists - first in local storage, then in Supabase
     let driver = await storage.getDriver(driverId);
     let driverUserId = driver?.userId || driverId; // For Supabase drivers, the driverId IS the userId
@@ -13401,16 +13432,133 @@ export async function registerRoutes(
     // Re-fetch the job AFTER geocoding so we have updated coordinates for mobile map
     const freshAssignJob = await storage.getJob(jobId) || job;
 
-    // Create notification for driver
-    await storage.createNotification({
-      userId: driverUserId,
-      title: "New Job Assignment",
-      message: `You have been assigned a new job #${freshAssignJob.jobNumber || ''} (${freshAssignJob.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
-      type: "job_assigned",
-      data: { assignmentId: assignment.id, jobId },
-    });
+    // Determine notification type based on previous state:
+    //   - "New Job Assigned"  : driver changed from null/nobody to this driver, OR different driver
+    //   - "Job Price Updated" : same driver already assigned, price genuinely changed
+    //   - (no notification)   : same driver already assigned, price unchanged
+    const newDriverPrice = parseFloat(String(enforcedDriverPrice));
+    const isSameDriverReassignment = previousDriverId !== null && previousDriverId === driverId;
+    const wasPriceChanged = isSameDriverReassignment && previousDriverPrice !== null
+      && Math.abs(previousDriverPrice - newDriverPrice) > 0.001;
 
-    // Send WebSocket notification with full coordinates for map
+    if (isSameDriverReassignment && wasPriceChanged) {
+      // --- PRICE UPDATE SCENARIO ---
+      // Same driver already assigned; admin updated their pay via the assignment dialog
+      console.log(`[Job Assignment] Same driver ${driverId} re-assigned — price changed from £${previousDriverPrice} to £${newDriverPrice} → sending "Job Price Updated"`);
+
+      const jobRef = freshAssignJob.jobNumber || freshAssignJob.trackingNumber || jobId;
+
+      // In-app notification
+      try {
+        await storage.createNotification({
+          userId: driverUserId,
+          title: "Job Price Updated",
+          message: `Your pay for job #${jobRef} has been updated to £${newDriverPrice.toFixed(2)}`,
+          type: "price_update",
+          data: { assignmentId: assignment.id, jobId, newPrice: newDriverPrice.toFixed(2) },
+        });
+      } catch (err: any) {
+        console.error('[Job Assignment] Failed to create price-update in-app notification:', err.message);
+      }
+
+      // Push notification
+      (async () => {
+        try {
+          const result = await sendPriceUpdateNotification(driverId, {
+            jobId,
+            trackingNumber: freshAssignJob.trackingNumber || '',
+            jobNumber: freshAssignJob.jobNumber,
+            newPrice: newDriverPrice.toFixed(2),
+            pickupPostcode: freshAssignJob.pickupPostcode,
+            deliveryPostcode: freshAssignJob.deliveryPostcode,
+          });
+          if (result.success) {
+            console.log(`[Job Assignment] Price-update push sent to ${result.sentCount} device(s) for driver ${driverId}`);
+          } else {
+            console.log(`[Job Assignment] No push devices for driver ${driverId} (price update)`);
+          }
+        } catch (err: any) {
+          console.error('[Job Assignment] Failed to send price-update push:', err.message);
+        }
+      })().catch(err => console.error('[Job Assignment] Price-update push error:', err));
+
+    } else if (isSameDriverReassignment && !wasPriceChanged) {
+      // Same driver, same price — no notification needed (re-send without price change)
+      console.log(`[Job Assignment] Same driver ${driverId} re-assigned with same price £${newDriverPrice} — no notification sent`);
+
+    } else {
+      // --- NEW ASSIGNMENT SCENARIO ---
+      // Driver changed from null → new driver, or different driver
+      console.log(`[Job Assignment] New assignment for driver ${driverId} (previousDriver: ${previousDriverId ?? 'none'}) → sending "New Job Assigned"`);
+
+      // In-app notification
+      await storage.createNotification({
+        userId: driverUserId,
+        title: "New Job Assignment",
+        message: `You have been assigned a new job #${freshAssignJob.jobNumber || ''} (${freshAssignJob.trackingNumber}). Driver payment: £${driverPrice}. Please accept or decline.`,
+        type: "job_assigned",
+        data: { assignmentId: assignment.id, jobId },
+      });
+
+      // Push notification with multi-drop stops
+      (async () => {
+        let multiDropStops: any[] | undefined;
+        if (freshAssignJob.isMultiDrop) {
+          try {
+            const { supabaseAdmin: mdClient } = await import('./supabaseAdmin');
+            if (mdClient) {
+              const { data: stops } = await mdClient
+                .from('multi_drop_stops')
+                .select('stop_order, address, postcode, recipient_name, recipient_phone, instructions, latitude, longitude')
+                .eq('job_id', jobId)
+                .order('stop_order', { ascending: true });
+              if (stops && stops.length > 0) {
+                multiDropStops = stops.map(s => ({
+                  stopOrder: s.stop_order,
+                  address: s.address,
+                  postcode: s.postcode,
+                  recipientName: s.recipient_name,
+                  recipientPhone: s.recipient_phone,
+                  instructions: s.instructions,
+                  latitude: s.latitude,
+                  longitude: s.longitude,
+                }));
+              }
+            }
+          } catch (err: any) {
+            console.error('[Job Assignment] Failed to fetch multi-drop stops for push:', err.message);
+          }
+        }
+
+        const result = await sendJobOfferNotification(driverId, {
+          jobId,
+          trackingNumber: freshAssignJob.trackingNumber,
+          jobNumber: freshAssignJob.jobNumber,
+          pickupAddress: freshAssignJob.pickupAddress,
+          pickupPostcode: freshAssignJob.pickupPostcode,
+          pickupLatitude: freshAssignJob.pickupLatitude,
+          pickupLongitude: freshAssignJob.pickupLongitude,
+          deliveryAddress: freshAssignJob.deliveryAddress,
+          deliveryPostcode: freshAssignJob.deliveryPostcode,
+          deliveryLatitude: freshAssignJob.deliveryLatitude,
+          deliveryLongitude: freshAssignJob.deliveryLongitude,
+          recipientName: freshAssignJob.recipientName,
+          recipientPhone: freshAssignJob.recipientPhone,
+          distance: freshAssignJob.distance,
+          driverPrice: driverPrice,
+          vehicleType: freshAssignJob.vehicleType,
+          isMultiDrop: freshAssignJob.isMultiDrop || false,
+          multiDropStops,
+        });
+        if (result.success) {
+          console.log(`[Job Assignment] Push notification sent to ${result.sentCount} device(s) for driver ${driverId}`);
+        } else {
+          console.log(`[Job Assignment] No push devices registered for driver ${driverId}`);
+        }
+      })().catch(err => console.error('[Job Assignment] Failed to send push notification:', err));
+    }
+
+    // Broadcast WebSocket update so all admin sessions reflect the change
     if (freshAssignJob.driverId) {
       broadcastJobAssigned({
         id: freshAssignJob.id,
@@ -13433,8 +13581,6 @@ export async function registerRoutes(
         driverPrice: driverPrice,
       });
 
-      // ALSO broadcast job:status_update so ALL admin sessions instantly reflect
-      // the new "assigned" status (job:assigned alone has no handler in some admin views)
       broadcastJobUpdate({
         id: freshAssignJob.id,
         trackingNumber: freshAssignJob.trackingNumber || '',
@@ -13445,63 +13591,6 @@ export async function registerRoutes(
         updatedAt: new Date(),
       });
     }
-
-    // Fetch multi-drop stops if this is a multi-drop job, then send push notification
-    (async () => {
-      let multiDropStops: any[] | undefined;
-      if (freshAssignJob.isMultiDrop) {
-        try {
-          const { supabaseAdmin: mdClient } = await import('./supabaseAdmin');
-          if (mdClient) {
-            const { data: stops } = await mdClient
-              .from('multi_drop_stops')
-              .select('stop_order, address, postcode, recipient_name, recipient_phone, instructions, latitude, longitude')
-              .eq('job_id', jobId)
-              .order('stop_order', { ascending: true });
-            if (stops && stops.length > 0) {
-              multiDropStops = stops.map(s => ({
-                stopOrder: s.stop_order,
-                address: s.address,
-                postcode: s.postcode,
-                recipientName: s.recipient_name,
-                recipientPhone: s.recipient_phone,
-                instructions: s.instructions,
-                latitude: s.latitude,
-                longitude: s.longitude,
-              }));
-            }
-          }
-        } catch (err: any) {
-          console.error('[Job Assignment] Failed to fetch multi-drop stops for push:', err.message);
-        }
-      }
-
-      const result = await sendJobOfferNotification(driverId, {
-        jobId,
-        trackingNumber: freshAssignJob.trackingNumber,
-        jobNumber: freshAssignJob.jobNumber,
-        pickupAddress: freshAssignJob.pickupAddress,
-        pickupPostcode: freshAssignJob.pickupPostcode,
-        pickupLatitude: freshAssignJob.pickupLatitude,
-        pickupLongitude: freshAssignJob.pickupLongitude,
-        deliveryAddress: freshAssignJob.deliveryAddress,
-        deliveryPostcode: freshAssignJob.deliveryPostcode,
-        deliveryLatitude: freshAssignJob.deliveryLatitude,
-        deliveryLongitude: freshAssignJob.deliveryLongitude,
-        recipientName: freshAssignJob.recipientName,
-        recipientPhone: freshAssignJob.recipientPhone,
-        distance: freshAssignJob.distance,
-        driverPrice: driverPrice,
-        vehicleType: freshAssignJob.vehicleType,
-        isMultiDrop: freshAssignJob.isMultiDrop || false,
-        multiDropStops,
-      });
-      if (result.success) {
-        console.log(`[Job Assignment] Push notification sent to ${result.sentCount} device(s) for driver ${driverId}`);
-      } else {
-        console.log(`[Job Assignment] No push devices registered for driver ${driverId}`);
-      }
-    })().catch(err => console.error('[Job Assignment] Failed to send push notification:', err));
 
     // Note: SupabaseStorage already handles Supabase writes directly
     // No need for redundant sync here

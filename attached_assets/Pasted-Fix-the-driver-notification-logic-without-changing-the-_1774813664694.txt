@@ -1,0 +1,76 @@
+Fix the driver notification logic without changing the UI, layout, database structure, or any unrelated code.
+
+REQUIRED BEHAVIOUR:
+
+1. Initial job assignment:
+
+* When admin assigns a job to a driver for the first time, send ONLY one push notification:
+  "New Job Assigned"
+* If the admin sets or saves the driver pay at the same time as the first assignment, DO NOT send a separate "Job Price Updated" notification.
+* The first saved driver price is considered the initial assigned price, not an update.
+
+2. Price update after assignment:
+
+* If the job is already assigned to the driver and the driver has already received the initial job assignment, then any later change to the driver pay must trigger:
+
+  * push notification
+  * in-app notification
+    with type:
+    "Job Price Updated"
+
+3. Prevent duplicate alerts:
+
+* Do not send both "New Job Assigned" and "Job Price Updated" during the same first assignment flow.
+* Do not create duplicate notifications for the same event.
+* If assignment and initial price save happen in the same transaction / request / update cycle, treat it as ONE event only: new assignment.
+
+4. Required logic:
+
+* Detect whether this is:
+  a) first assignment to driver
+  b) later price change on already assigned job
+* Only trigger price update notification if:
+
+  * assignedDriverId already existed before this change
+  * previous driver price already existed
+  * new driver price is different from previous driver price
+  * and this is not the first assignment event
+
+5. Suggested implementation rule:
+
+* Compare previous job state vs new job state.
+* Send "New Job Assigned" only when driver changes from null / unassigned to a valid driver ID.
+* Send "Job Price Updated" only when:
+  previous assignedDriverId == current assignedDriverId
+  AND previous driverPrice exists
+  AND current driverPrice != previous driverPrice
+  AND job was already assigned before this update.
+
+6. Notification content:
+
+* Initial assignment:
+  title: "New Job Assigned"
+* Later price change:
+  title: "Job Price Updated"
+  body example: "Your pay for job #JOBNUMBER has been updated to £X.XX"
+
+7. Testing required:
+
+* Test case 1:
+  Create unassigned job → assign to driver with price → driver receives ONLY "New Job Assigned"
+* Test case 2:
+  Update same driver price later → driver receives "Job Price Updated"
+* Test case 3:
+  Re-save job without price change → no price notification
+* Test case 4:
+  Change unrelated fields only → no price notification
+* Test case 5:
+  Deallocate job → send only "Job No Longer Available"
+
+IMPORTANT:
+
+* Do not modify notification design
+* Do not change current screens
+* Do not change existing app styling
+* Change only the backend / event trigger logic for notifications
+* Keep Android and iOS behaviour consistent
