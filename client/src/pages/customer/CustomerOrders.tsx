@@ -22,6 +22,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Package,
   Clock,
   CheckCircle,
@@ -31,10 +41,13 @@ import {
   Truck,
   XCircle,
   Filter,
+  Trash2,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useLocation } from 'wouter';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { Job, JobStatus } from '@shared/schema';
 
 type FilterType = 'all' | 'active' | 'delivered' | 'cancelled';
@@ -79,9 +92,12 @@ const formatDate = (date: Date | string | null) => {
 export default function CustomerOrders() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const filterParam = params.get('filter') as FilterType || 'all';
+
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
 
   const { data: jobs, isLoading, isError, refetch } = useQuery<Job[]>({
     queryKey: ['/api/jobs', { customerId: user?.id }],
@@ -89,8 +105,7 @@ export default function CustomerOrders() {
     retry: 2,
     retryDelay: 1000,
   });
-  
-  // Loading timeout detection
+
   const [loadingTooLong, setLoadingTooLong] = useState(false);
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -101,6 +116,21 @@ export default function CustomerOrders() {
     }
     return () => clearTimeout(timer);
   }, [isLoading]);
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      await apiRequest('DELETE', `/api/jobs/${jobId}/remove-from-history`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs', { customerId: user?.id }] });
+      toast({ title: 'Booking removed', description: 'The booking has been removed from your history.' });
+      setJobToDelete(null);
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Could not remove this booking. Please try again.', variant: 'destructive' });
+      setJobToDelete(null);
+    },
+  });
 
   const filterJobs = (jobs: Job[], filter: FilterType): Job[] => {
     switch (filter) {
@@ -143,6 +173,8 @@ export default function CustomerOrders() {
     }
   };
 
+  const canDelete = (job: Job) => ['delivered', 'cancelled'].includes(job.status);
+
   return (
     <DashboardLayout>
       <div className="space-y-4 sm:space-y-6">
@@ -159,8 +191,8 @@ export default function CustomerOrders() {
                 {getFilterLabel(filterParam)}
               </h1>
               <p className="text-sm sm:text-base text-muted-foreground">
-                {filterParam === 'all' 
-                  ? 'View all your past and current deliveries' 
+                {filterParam === 'all'
+                  ? 'View all your past and current deliveries'
                   : `Showing ${filterParam} orders only`}
               </p>
             </div>
@@ -188,14 +220,14 @@ export default function CustomerOrders() {
               Orders ({filteredJobs.length})
             </CardTitle>
             <CardDescription>
-              {filterParam === 'all' 
-                ? 'Complete list of all your deliveries' 
+              {filterParam === 'all'
+                ? 'Complete list of all your deliveries'
                 : `Filtered to show ${filterParam} orders`}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {isError ? (
-              <ErrorState 
+              <ErrorState
                 title="Failed to load orders"
                 message="We couldn't fetch your orders. Please check your connection and try again."
                 onRetry={() => refetch()}
@@ -203,7 +235,7 @@ export default function CustomerOrders() {
             ) : isLoading ? (
               <div className="space-y-4">
                 {loadingTooLong && (
-                  <LoadingTimeout 
+                  <LoadingTimeout
                     message="Loading is taking longer than expected. Please wait or try refreshing."
                     onRetry={() => refetch()}
                   />
@@ -222,7 +254,7 @@ export default function CustomerOrders() {
                       <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead className="w-[80px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -247,11 +279,24 @@ export default function CustomerOrders() {
                         <TableCell>{getStatusBadge(job.status)}</TableCell>
                         <TableCell className="text-right font-medium">{formatPrice(job.totalPrice)}</TableCell>
                         <TableCell>
-                          <Link href={`/track?id=${job.trackingNumber}`}>
-                            <Button variant="ghost" size="icon" data-testid={`button-view-order-${job.id}`}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
+                          <div className="flex items-center gap-1 justify-end">
+                            <Link href={`/track?id=${job.trackingNumber}`}>
+                              <Button variant="ghost" size="icon" data-testid={`button-view-order-${job.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            {canDelete(job) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground"
+                                data-testid={`button-delete-order-${job.id}`}
+                                onClick={() => setJobToDelete(job)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -284,6 +329,32 @@ export default function CustomerOrders() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!jobToDelete} onOpenChange={(open) => !open && setJobToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from history?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove booking{' '}
+              <span className="font-mono font-medium">
+                {(jobToDelete as any)?.jobNumber || jobToDelete?.trackingNumber}
+              </span>{' '}
+              from your order history. The booking record is kept securely on our side. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => jobToDelete && deleteJobMutation.mutate(String(jobToDelete.id))}
+              disabled={deleteJobMutation.isPending}
+              data-testid="button-confirm-delete"
+              className="bg-destructive text-destructive-foreground"
+            >
+              {deleteJobMutation.isPending ? 'Removing…' : 'Remove'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

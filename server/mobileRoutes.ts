@@ -4061,4 +4061,160 @@ export function registerMobileRoutes(app: Express): void {
     })
   );
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // CUSTOMER MOBILE API  /api/mobile/v1/customer/*
+  // Allows individual & business customers to access their account from the
+  // mobile app using the same Supabase credentials as the website.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // GET /api/mobile/v1/customer/profile
+  app.get(
+    "/api/mobile/v1/customer/profile",
+    requireSupabaseAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.auth!.id;
+        let profile = await storage.getUser(userId);
+
+        // Auto-create user row from Supabase auth metadata if missing
+        if (!profile && supabaseAdmin) {
+          const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+          if (authUser) {
+            const meta = authUser.user_metadata || {};
+            profile = await storage.createUserWithId(userId, {
+              id: userId,
+              email: authUser.email || '',
+              fullName: meta.fullName || meta.full_name || '',
+              phone: meta.phone || null,
+              postcode: meta.postcode || null,
+              address: meta.address || null,
+              buildingName: meta.buildingName || null,
+              role: meta.role || 'customer',
+              userType: meta.userType || 'individual',
+              companyName: meta.companyName || null,
+              registrationNumber: meta.registrationNumber || null,
+              isActive: true,
+              payLaterEnabled: meta.payLaterEnabled || false,
+            });
+          }
+        }
+
+        if (!profile) return res.status(404).json({ error: "Profile not found" });
+        res.json(profile);
+      } catch (err: any) {
+        console.error("[Customer Mobile] profile GET error:", err?.message);
+        res.status(500).json({ error: "Failed to load profile" });
+      }
+    }
+  );
+
+  // PATCH /api/mobile/v1/customer/profile
+  app.patch(
+    "/api/mobile/v1/customer/profile",
+    requireSupabaseAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.auth!.id;
+        const allowed = [
+          'fullName', 'phone', 'postcode', 'address', 'buildingName',
+          'companyName', 'registrationNumber', 'businessAddress', 'vatNumber',
+        ];
+        const updates: Record<string, any> = {};
+        for (const key of allowed) {
+          if (req.body[key] !== undefined) updates[key] = req.body[key];
+        }
+
+        let profile = await storage.getUser(userId);
+        if (!profile) {
+          // Create row if it doesn't exist yet
+          profile = await storage.createUserWithId(userId, {
+            id: userId,
+            email: req.body.email || req.auth!.email || '',
+            fullName: updates.fullName || '',
+            phone: updates.phone || null,
+            postcode: updates.postcode || null,
+            address: updates.address || null,
+            buildingName: updates.buildingName || null,
+            role: 'customer',
+            userType: req.body.userType || 'individual',
+            isActive: true,
+            payLaterEnabled: false,
+          });
+        }
+
+        const updated = await storage.updateUser(userId, updates);
+        res.json(updated);
+      } catch (err: any) {
+        console.error("[Customer Mobile] profile PATCH error:", err?.message);
+        res.status(500).json({ error: "Failed to update profile" });
+      }
+    }
+  );
+
+  // GET /api/mobile/v1/customer/bookings
+  app.get(
+    "/api/mobile/v1/customer/bookings",
+    requireSupabaseAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.auth!.id;
+        const jobs = await storage.getJobs({ customerId: userId });
+
+        // Return customer-safe fields (no driver pricing)
+        const safe = jobs.map((j: any) => ({
+          id: j.id,
+          jobNumber: j.jobNumber,
+          trackingNumber: j.trackingNumber,
+          status: j.status,
+          pickupAddress: j.pickupAddress,
+          pickupPostcode: j.pickupPostcode,
+          deliveryAddress: j.deliveryAddress,
+          deliveryPostcode: j.deliveryPostcode,
+          totalPrice: j.totalPrice,
+          vehicleType: j.vehicleType,
+          parcelDescription: j.parcelDescription,
+          createdAt: j.createdAt,
+          scheduledPickupTime: j.scheduledPickupTime,
+          actualDeliveryTime: j.actualDeliveryTime,
+          isMultiDrop: j.isMultiDrop,
+          distance: j.distance,
+          serviceType: j.serviceType,
+        }));
+
+        res.json(safe);
+      } catch (err: any) {
+        console.error("[Customer Mobile] bookings GET error:", err?.message);
+        res.status(500).json({ error: "Failed to load bookings" });
+      }
+    }
+  );
+
+  // DELETE /api/mobile/v1/customer/bookings/:id
+  // Hides the booking from the customer's view (soft delete — admin still sees it)
+  app.delete(
+    "/api/mobile/v1/customer/bookings/:id",
+    requireSupabaseAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.auth!.id;
+        const jobId = req.params.id;
+
+        const job = await storage.getJob(jobId);
+        if (!job) return res.status(404).json({ error: "Booking not found" });
+        if (String(job.customerId) !== String(userId)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+
+        if (supabaseAdmin) {
+          await supabaseAdmin.from('jobs').update({ customer_hidden: true }).eq('id', jobId);
+        }
+
+        res.status(204).send();
+      } catch (err: any) {
+        console.error("[Customer Mobile] bookings DELETE error:", err?.message);
+        res.status(500).json({ error: "Failed to remove booking" });
+      }
+    }
+  );
+
 }

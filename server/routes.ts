@@ -4531,6 +4531,31 @@ export async function registerRoutes(
     res.json(ensureJobNumber(updatedJob));
   }));
 
+  // Customer removes a booking from their own history (soft-hide only, not a real delete)
+  app.delete("/api/jobs/:id/remove-from-history", asyncHandler(async (req, res) => {
+    const jobId = req.params.id;
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Authentication required" });
+
+    if (!supabaseAdmin) return res.status(500).json({ error: "Auth service unavailable" });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !authUser) return res.status(401).json({ error: "Invalid token" });
+
+    // Fetch the job to verify ownership
+    const job = await storage.getJob(jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (String(job.customerId) !== String(authUser.id)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Mark as hidden for this customer (soft delete from their view only)
+    await supabaseAdmin.from('jobs').update({ customer_hidden: true }).eq('id', jobId);
+
+    res.status(204).send();
+  }));
+
   app.delete("/api/jobs/:id", asyncHandler(async (req, res) => {
     const jobId = req.params.id;
     try {

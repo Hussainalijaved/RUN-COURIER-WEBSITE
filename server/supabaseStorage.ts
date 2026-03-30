@@ -967,7 +967,7 @@ export class SupabaseStorage implements IStorage {
     }
     if (filters?.customerId) {
       console.log(`[SupabaseStorage] Filtering jobs by customer_id: ${filters.customerId}`);
-      query = query.eq('customer_id', filters.customerId);
+      query = query.eq('customer_id', filters.customerId).or('customer_hidden.is.null,customer_hidden.eq.false');
     }
     if (filters?.driverId) {
       query = query.eq('driver_id', filters.driverId);

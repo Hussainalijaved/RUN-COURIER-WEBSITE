@@ -35,6 +35,9 @@ A multi-step application process allows prospective drivers to submit details fo
 ### Mobile API
 A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities including profile management, location updates, job management, and proof of delivery uploads, authenticated via Supabase JWT. It supports admin-to-driver job assignments.
 
+### Customer Cross-Platform Account Sync
+Individual and business customers share the same Supabase credentials and `public.users` profile data across the website and mobile app. The mobile customer API at `/api/mobile/v1/customer/*` (authenticated via Supabase JWT) exposes: `GET /profile`, `PATCH /profile`, `GET /bookings`, and `DELETE /bookings/:id`. The `jobs` table has a `customer_hidden` boolean column (auto-migrated on startup). When a customer deletes a booking from history, `customer_hidden` is set to `true` — the job remains visible to admins but is filtered out of all customer-facing queries. The website's customer orders page also has a trash icon on completed/cancelled bookings that triggers the same soft-delete via `DELETE /api/jobs/:id/remove-from-history`.
+
 ### Multi-Drop Stop POD & Auto-Complete
 For multi-drop jobs, Proof of Delivery (POD) (photo + recipient name) is collected per stop. The driver marks each stop as delivered individually. When all stops for a multi-drop job are delivered, the job auto-completes, setting a synthetic POD on the main job, changing its status to "delivered," sending a delivery confirmation email, and broadcasting a WebSocket update.
 
