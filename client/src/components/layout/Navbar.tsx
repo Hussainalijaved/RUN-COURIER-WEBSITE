@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { SmoothImage } from '@/components/ui/smooth-image';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 import {
   Menu,
   X,
@@ -65,8 +65,8 @@ export function Navbar() {
           <SmoothImage 
             src={logoImage} 
             alt="Run Courier" 
-            className="h-7 sm:h-10 w-auto object-contain flex-shrink-0 rounded-lg"
-            wrapperClassName="h-7 sm:h-10 flex-shrink-0"
+            className="h-7 w-7 sm:h-10 sm:w-10 object-cover flex-shrink-0 rounded-lg overflow-hidden"
+            wrapperClassName="h-7 w-7 sm:h-10 sm:w-10 flex-shrink-0 rounded-lg overflow-hidden"
             data-testid="logo-image"
           />
           <span className="font-bold text-[11px] sm:text-lg tracking-tight whitespace-nowrap">

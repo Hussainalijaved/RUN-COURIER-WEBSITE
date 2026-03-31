@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import runCourierLogo from '@assets/run_courier_logo.jpeg';
+import runCourierLogo from '@assets/run_courier_logo.png';
 import type { Job } from '@shared/schema';
 
 interface ShippingLabelProps {

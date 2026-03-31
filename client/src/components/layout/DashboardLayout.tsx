@@ -4,7 +4,7 @@ import { NavigationProgress } from '@/components/NavigationProgress';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 import {
   Sidebar,
   SidebarContent,
@@ -180,7 +180,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-8 w-auto object-contain rounded-lg"
+                className="h-8 w-8 object-cover rounded-lg overflow-hidden flex-shrink-0"
                 data-testid="sidebar-logo-image"
               />
               <div className="flex flex-col">

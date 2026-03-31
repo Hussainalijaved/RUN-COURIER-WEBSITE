@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, LogIn, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 
 export default function SupervisorLogin() {
   const [, setLocation] = useLocation();
@@ -61,7 +61,7 @@ export default function SupervisorLogin() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center gap-3">
-          <img src={logoImage} alt="Run Courier" className="h-14 w-auto object-contain rounded-md" />
+          <img src={logoImage} alt="Run Courier" className="h-14 w-14 object-cover rounded-xl overflow-hidden" />
           <div className="text-center">
             <h1 className="text-2xl font-bold text-foreground">Supervisor Portal</h1>
             <p className="text-sm text-muted-foreground mt-1">Run Courier — Operations Team</p>

@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Building2, CheckCircle2, Phone } from 'lucide-react';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 import type { UserRole } from '@shared/schema';
 import { PostcodeAutocomplete } from '@/components/PostcodeAutocomplete';
 import { apiRequest } from '@/lib/queryClient';
@@ -229,7 +229,7 @@ export default function Signup({ role = 'customer' }: SignupProps) {
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-16 w-auto object-contain rounded-lg"
+                className="h-16 w-16 object-cover rounded-xl overflow-hidden"
                 data-testid="signup-logo-image"
               />
             </div>

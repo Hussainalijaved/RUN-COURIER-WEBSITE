@@ -2,7 +2,7 @@ import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { SmoothImage } from '@/components/ui/smooth-image';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 
 const footerLinks = {
   services: [
@@ -41,8 +41,8 @@ export function Footer() {
               <SmoothImage 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-12 w-auto object-contain rounded-lg"
-                wrapperClassName="h-12 flex-shrink-0"
+                className="h-10 w-10 object-cover rounded-lg overflow-hidden"
+                wrapperClassName="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden"
                 data-testid="footer-logo-image"
               />
               <span className="font-bold text-base tracking-tight">

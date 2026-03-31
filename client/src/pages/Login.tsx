@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight } from 'lucide-react';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 import type { UserRole } from '@shared/schema';
 import { supabase } from '@/lib/supabase';
 
@@ -131,7 +131,7 @@ export default function Login({ role = 'customer' }: LoginProps) {
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-16 w-auto object-contain rounded-lg"
+                className="h-16 w-16 object-cover rounded-xl overflow-hidden"
                 data-testid="login-logo-image"
               />
             </div>

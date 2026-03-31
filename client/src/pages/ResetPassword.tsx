@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight, Lock, CheckCircle, Eye, EyeOff } from 'lucide-react';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 
 const resetPasswordSchema = z.object({
   password: z.string()
@@ -188,7 +188,7 @@ export default function ResetPassword() {
               <img 
                 src={logoImage} 
                 alt="Run Courier" 
-                className="h-16 w-auto object-contain rounded-lg"
+                className="h-16 w-16 object-cover rounded-xl overflow-hidden"
                 data-testid="reset-password-logo"
               />
             </div>

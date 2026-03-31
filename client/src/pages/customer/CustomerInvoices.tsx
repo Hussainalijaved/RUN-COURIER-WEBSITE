@@ -33,7 +33,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import type { Invoice, Job, InvoiceStatus } from '@shared/schema';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 
 const getStatusBadge = (status: InvoiceStatus) => {
   switch (status) {
@@ -179,8 +179,8 @@ function InvoicePreview({ invoiceData, onClose }: { invoiceData: InvoiceWithJobs
             <img 
               src={logoImage} 
               alt="Run Courier Logo" 
-              className="h-16 w-16 object-contain rounded company-logo"
-              style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '8px' }}
+              className="h-16 w-16 object-cover rounded-xl overflow-hidden company-logo"
+              style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '12px' }}
               data-testid="invoice-logo"
             />
             <div>

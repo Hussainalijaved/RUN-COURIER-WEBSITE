@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Lock, Shield } from 'lucide-react';
-import logoImage from '@assets/run_courier_logo.jpeg';
+import logoImage from '@assets/run_courier_logo.png';
 import { supabase } from '@/lib/supabase';
 
 const changePasswordSchema = z.object({
@@ -89,7 +89,7 @@ export default function DriverChangePassword() {
               <img
                 src={logoImage}
                 alt="Run Courier"
-                className="h-16 w-auto object-contain rounded-lg"
+                className="h-16 w-16 object-cover rounded-xl overflow-hidden"
                 data-testid="change-password-logo"
               />
             </div>
