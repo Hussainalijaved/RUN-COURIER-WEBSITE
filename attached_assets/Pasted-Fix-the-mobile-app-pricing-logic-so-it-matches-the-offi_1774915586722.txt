@@ -1,0 +1,141 @@
+Fix the mobile app pricing logic so it matches the official Run Courier pricing system exactly.
+
+IMPORTANT:
+- Remove ALL old pricing logic
+- Do NOT use any hardcoded or outdated values
+- The mobile app must match the website/backend exactly
+- If backend pricing exists, ALWAYS use backend as the source of truth
+
+---------------------------------------
+VEHICLE PRICING
+---------------------------------------
+
+Motorbike:
+- Base: £10
+- Standard: £1.30/mile
+- Rush: £1.60/mile
+
+Car:
+- Base: £19
+- Standard: £1.20/mile
+- Rush: £1.40/mile
+
+Small Van:
+- Base: £25
+- Standard: £1.30/mile
+- Rush: £1.60/mile
+
+Medium Van:
+- Base: £30
+- Standard: £1.40/mile
+- Rush: £1.70/mile
+
+LWB Van:
+- Base: £35
+- Standard: £1.60/mile
+- Rush: £1.80/mile
+
+Luton Van:
+- Base: £40
+- Standard: £1.70/mile
+- Rush: £2.00/mile
+
+---------------------------------------
+RUSH HOUR
+---------------------------------------
+
+Time windows:
+- 07:00–09:00
+- 14:00–19:00
+
+If booking time is inside these windows:
+→ use rush rate
+Else:
+→ use standard rate
+
+---------------------------------------
+BASE CALCULATION
+---------------------------------------
+
+price = base + (distance × rate)
+
+---------------------------------------
+WEIGHT SURCHARGE
+---------------------------------------
+
+1–10 kg → FREE  
+10–20 kg → +£10  
+20–30 kg → +£15  
+30–50 kg → +£20  
+50–100 kg → +£40  
+100–400 kg → +£50  
+400–1200 kg → +£70  
+
+- Weight surcharge is ADDED on top of delivery price
+- Must be applied correctly based on selected weight
+
+---------------------------------------
+WAITING TIME
+---------------------------------------
+
+- First 10 minutes FREE
+- After that: £0.50 per minute
+- Add to final price
+
+---------------------------------------
+MULTI-DROP
+---------------------------------------
+
+- Base charge applied ONLY once
+- Calculate distance between all stops:
+  pickup → stop1 → stop2 → stop3...
+
+- First stop = included
+- Second stop = included
+- From THIRD stop onward:
+  → add £5 per stop
+
+Example:
+- pickup → stop1 = mileage only
+- stop1 → stop2 = mileage only
+- stop2 → stop3 = mileage + £5
+- stop3 → stop4 = mileage + £5
+
+---------------------------------------
+ROUNDING
+---------------------------------------
+
+- Final result must be rounded to 2 decimal places
+
+---------------------------------------
+CRITICAL RULES
+---------------------------------------
+
+- Do NOT calculate pricing differently from website
+- Do NOT duplicate pricing logic if backend exists
+- Do NOT use fallback values
+- Do NOT break existing UI
+
+---------------------------------------
+DEBUG LOGGING (MANDATORY)
+---------------------------------------
+
+Log:
+- vehicle type
+- distance
+- weight
+- rush hour true/false
+- base used
+- rate used
+- weight surcharge
+- waiting time charge
+- number of stops
+- extra stop charges
+- final price
+
+---------------------------------------
+GOAL
+---------------------------------------
+
+The mobile app price must EXACTLY match the website price in all cases.
+No mismatch allowed.

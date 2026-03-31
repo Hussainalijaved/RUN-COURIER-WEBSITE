@@ -43,8 +43,8 @@ export const defaultPricingConfig: PricingConfig = {
     motorbike: {
       name: "Motorbike",
       baseCharge: 10,
-      perMileRate: 1.3,
-      rushHourRate: 1.5,
+      perMileRate: 1.30,
+      rushHourRate: 1.60,
       maxWeight: 5,
     },
     car: {
@@ -58,14 +58,14 @@ export const defaultPricingConfig: PricingConfig = {
       name: "Small Van",
       baseCharge: 25,
       perMileRate: 1.30,
-      rushHourRate: 1.50,
+      rushHourRate: 1.60,
       maxWeight: 400,
     },
     medium_van: {
       name: "Medium Van",
       baseCharge: 30,
       perMileRate: 1.40,
-      rushHourRate: 1.60,
+      rushHourRate: 1.70,
       maxWeight: 750,
     },
     lwb_van: {
@@ -84,19 +84,21 @@ export const defaultPricingConfig: PricingConfig = {
     },
   },
   weightSurcharges: [
-    { min: 10, max: 20, charge: 10 },
-    { min: 20, max: 30, charge: 15 },
-    { min: 30, max: 50, charge: 20 },
-    { min: 50, max: null, charge: 50 },
+    { min: 10,  max: 20,   charge: 10 },
+    { min: 20,  max: 30,   charge: 15 },
+    { min: 30,  max: 50,   charge: 20 },
+    { min: 50,  max: 100,  charge: 40 },
+    { min: 100, max: 400,  charge: 50 },
+    { min: 400, max: null, charge: 70 },
   ],
   centralLondonSurcharge: 18.15,
-  multiDropCharge: 3,
+  multiDropCharge: 5,
   returnTripMultiplier: 0.60,
   waitingTimeFreeMinutes: 10,
   waitingTimePerMinute: 0.5,
   rushHourPeriods: [
     { start: "07:00", end: "09:00" },
-    { start: "17:00", end: "19:00" },
+    { start: "14:00", end: "19:00" },
   ],
 };
 
@@ -213,8 +215,9 @@ export function calculateQuote(
   if (options.isMultiDrop && options.multiDropDistances && options.multiDropDistances.length > 0) {
     totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
     multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
-    // Hidden charge: £5 per additional stop after the first (not displayed in breakdown)
-    hiddenStopCharge = options.multiDropDistances.length * 5;
+    // First stop and second stop are free. From the THIRD stop onward, add £5 per stop.
+    // multiDropDistances[0] = leg to 2nd drop (free), [1] = leg to 3rd drop (+£5), etc.
+    hiddenStopCharge = Math.max(0, options.multiDropDistances.length - 1) * 5;
   }
   
   const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;
@@ -366,7 +369,7 @@ export async function fetchPricingConfig(): Promise<PricingConfig> {
     // Convert rush hour settings to periods array
     const rushHourPeriods = [
       { start: pricingSettings.rushHourStart || '07:00', end: pricingSettings.rushHourEnd || '09:00' },
-      { start: pricingSettings.rushHourStartEvening || '17:00', end: pricingSettings.rushHourEndEvening || '19:00' },
+      { start: pricingSettings.rushHourStartEvening || '14:00', end: pricingSettings.rushHourEndEvening || '19:00' },
     ];
 
     cachedPricingConfig = {
@@ -445,8 +448,9 @@ export async function calculateQuoteAsync(
   if (options.isMultiDrop && options.multiDropDistances && options.multiDropDistances.length > 0) {
     totalMultiDropDistance = options.multiDropDistances.reduce((sum, d) => sum + d, 0);
     multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
-    // Hidden charge: £5 per additional stop after the first (not displayed in breakdown)
-    hiddenStopCharge = options.multiDropDistances.length * 5;
+    // First stop and second stop are free. From the THIRD stop onward, add £5 per stop.
+    // multiDropDistances[0] = leg to 2nd drop (free), [1] = leg to 3rd drop (+£5), etc.
+    hiddenStopCharge = Math.max(0, options.multiDropDistances.length - 1) * 5;
   }
   
   const subtotalBeforeReturn = baseCharge + distanceCharge + multiDropDistanceCharge + weightSurcharge + congestionZoneCharge + multiDropCharge + hiddenStopCharge;

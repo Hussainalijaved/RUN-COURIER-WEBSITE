@@ -3423,6 +3423,141 @@ export function registerMobileRoutes(app: Express): void {
     });
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // POST /api/mobile/v1/quote
+  // Authoritative price calculator for the mobile app.
+  // The mobile app MUST use this endpoint — never calculate prices locally.
+  // Returns the exact same result as the website's pricing engine.
+  // ─────────────────────────────────────────────────────────────────────────
+  app.post("/api/mobile/v1/quote",
+    asyncHandler(async (req, res) => {
+      const {
+        vehicleType,
+        distance,         // miles — first leg (pickup → first drop)
+        weight,           // kg
+        multiDropDistances, // miles[] — additional legs beyond first drop
+        scheduledTime,    // ISO string or null → used for rush-hour check
+        waitingTimeMinutes, // number or 0
+        pickupPostcode,
+        deliveryPostcode,
+      } = req.body;
+
+      const VALID_VEHICLES = ['motorbike','car','small_van','medium_van','lwb_van','luton_van'];
+      if (!vehicleType || !VALID_VEHICLES.includes(vehicleType)) {
+        return res.status(400).json({ error: 'Invalid or missing vehicleType' });
+      }
+      if (typeof distance !== 'number' || distance < 0) {
+        return res.status(400).json({ error: 'distance must be a non-negative number (miles)' });
+      }
+
+      // Load live settings from DB (already cached in storage)
+      const pricingSettings = await storage.getPricingSettings();
+      const vehicles = await storage.getVehicles();
+      const vehicle = vehicles.find(v => v.type === vehicleType);
+      if (!vehicle) return res.status(400).json({ error: 'Vehicle type not found in database' });
+
+      // ── Rush hour check ──────────────────────────────────────────────────
+      const parseTime = (t: string) => {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+      };
+      const checkAt = scheduledTime ? new Date(scheduledTime) : new Date();
+      const currentMinutes = checkAt.getHours() * 60 + checkAt.getMinutes();
+      const morningStart = parseTime(pricingSettings.rushHourStart || '07:00');
+      const morningEnd   = parseTime(pricingSettings.rushHourEnd   || '09:00');
+      const eveningStart = parseTime(pricingSettings.rushHourStartEvening || '14:00');
+      const eveningEnd   = parseTime(pricingSettings.rushHourEndEvening   || '19:00');
+      const rushHour = (currentMinutes >= morningStart && currentMinutes <= morningEnd)
+                    || (currentMinutes >= eveningStart && currentMinutes <= eveningEnd);
+
+      // ── Per-mile rate ────────────────────────────────────────────────────
+      const baseCharge  = parseFloat(vehicle.baseCharge)   || 0;
+      const stdRate     = parseFloat(vehicle.perMileRate)   || 0;
+      const rushRate    = parseFloat(vehicle.rushHourRate || vehicle.perMileRate) || stdRate;
+      const perMileRate = rushHour ? rushRate : stdRate;
+
+      // ── Distance charge (first leg) ──────────────────────────────────────
+      const distanceCharge = distance * perMileRate;
+
+      // ── Multi-drop ───────────────────────────────────────────────────────
+      // First stop: included. Second stop: included. Third stop onward: +£5 each.
+      // multiDropDistances[0] = pickup→stop2 leg, [1] = stop2→stop3 leg (+£5), etc.
+      const drops: number[] = Array.isArray(multiDropDistances) ? multiDropDistances : [];
+      const totalMultiDropDistance = drops.reduce((s, d) => s + d, 0);
+      const multiDropDistanceCharge = totalMultiDropDistance * perMileRate;
+      const extraStopCharge = Math.max(0, drops.length - 1) * 5; // free for 1st+2nd drop
+
+      // ── Weight surcharge ─────────────────────────────────────────────────
+      const kg = typeof weight === 'number' ? weight : 0;
+      const surchargeMap = (pricingSettings.weightSurcharges || {}) as Record<string, number>;
+      let weightSurcharge = 0;
+      if (kg > 400) weightSurcharge = surchargeMap['400-1200'] ?? 70;
+      else if (kg > 100) weightSurcharge = surchargeMap['100-400'] ?? 50;
+      else if (kg > 50)  weightSurcharge = surchargeMap['50-100']  ?? 40;
+      else if (kg > 30)  weightSurcharge = surchargeMap['30-50']   ?? 20;
+      else if (kg > 20)  weightSurcharge = surchargeMap['20-30']   ?? 15;
+      else if (kg > 10)  weightSurcharge = surchargeMap['10-20']   ?? 10;
+      // 0–10 kg is FREE
+
+      // ── Waiting time charge ──────────────────────────────────────────────
+      const waitMins = typeof waitingTimeMinutes === 'number' ? waitingTimeMinutes : 0;
+      const freeMinutes = pricingSettings.waitingTimeFreeMinutes ?? 10;
+      const ratePerMin  = parseFloat(pricingSettings.waitingTimePerMinute || '0.50');
+      const waitingTimeCharge = waitMins > freeMinutes
+        ? (waitMins - freeMinutes) * ratePerMin
+        : 0;
+
+      // ── Final total ──────────────────────────────────────────────────────
+      const subtotal = baseCharge + distanceCharge + multiDropDistanceCharge + extraStopCharge + weightSurcharge;
+      const totalPrice = Math.round((subtotal + waitingTimeCharge) * 100) / 100;
+
+      // ── Debug log (as required by spec) ─────────────────────────────────
+      const numStops = 1 + drops.length; // first drop + additional
+      console.log('[Mobile Quote]', {
+        vehicleType,
+        distance,
+        weight: kg,
+        rushHour,
+        base: baseCharge,
+        rate: perMileRate,
+        weightSurcharge,
+        waitingTimeCharge,
+        numStops,
+        extraStopCharge,
+        finalPrice: totalPrice,
+      });
+
+      res.json({
+        vehicleType,
+        baseCharge:             Math.round(baseCharge * 100) / 100,
+        distanceCharge:         Math.round(distanceCharge * 100) / 100,
+        multiDropDistanceCharge:Math.round(multiDropDistanceCharge * 100) / 100,
+        extraStopCharge:        Math.round(extraStopCharge * 100) / 100,
+        weightSurcharge:        Math.round(weightSurcharge * 100) / 100,
+        waitingTimeCharge:      Math.round(waitingTimeCharge * 100) / 100,
+        totalPrice,
+        rushHour,
+        perMileRate,
+        distance,
+        totalDistance:          distance + totalMultiDropDistance,
+        numStops,
+        debug: {
+          vehicleType,
+          distance,
+          weight: kg,
+          rushHour,
+          baseUsed:           baseCharge,
+          rateUsed:           perMileRate,
+          weightSurcharge,
+          waitingTimeCharge,
+          numStops,
+          extraStopCharge,
+          finalPrice:         totalPrice,
+        },
+      });
+    })
+  );
+
   // Public pricing endpoint for mobile app - no auth required
   app.get("/api/mobile/v1/pricing",
     asyncHandler(async (req, res) => {
@@ -3478,7 +3613,7 @@ export function registerMobileRoutes(app: Express): void {
         waitingTimePerMinute: parseFloat(pricingSettings.waitingTimePerMinute || '0.50'),
         rushHourPeriods: [
           { start: pricingSettings.rushHourStart || '07:00', end: pricingSettings.rushHourEnd || '09:00' },
-          { start: pricingSettings.rushHourStartEvening || '17:00', end: pricingSettings.rushHourEndEvening || '19:00' },
+          { start: pricingSettings.rushHourStartEvening || '14:00', end: pricingSettings.rushHourEndEvening || '19:00' },
         ],
         centralLondonPostcodes: [
           "EC1", "EC2", "EC3", "EC4",

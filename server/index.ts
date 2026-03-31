@@ -526,6 +526,45 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Fix rush hour afternoon window to 14:00–19:00 (was 17:00–19:00) and weight surcharges
+  (async () => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      // Update afternoon rush hour start from 17:00 → 14:00
+      await db.execute(sql`
+        UPDATE pricing_settings
+        SET rush_hour_start_evening = '14:00'
+        WHERE rush_hour_start_evening = '17:00' OR rush_hour_start_evening IS NULL
+      `);
+      // Update weight surcharges to official spec
+      await db.execute(sql`
+        UPDATE pricing_settings
+        SET weight_surcharges = '{"10-20":10,"20-30":15,"30-50":20,"50-100":40,"100-400":50,"400-1200":70}'::jsonb
+        WHERE weight_surcharges IS NOT NULL
+      `);
+      console.log("[MIGRATION] Pricing: rush hour afternoon and weight surcharges updated to official spec");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Pricing spec update error:", e?.message);
+    }
+  })();
+
+  // Fix motorbike per-mile rates in vehicles table to match official spec
+  (async () => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`
+        UPDATE vehicles SET per_mile_rate = 1.30, rush_hour_rate = 1.60
+        WHERE type = 'motorbike'
+          AND (per_mile_rate > 2 OR rush_hour_rate > 2)
+      `);
+      console.log("[MIGRATION] Motorbike rates corrected to £1.30/mile standard, £1.60/mile rush");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Motorbike rate fix error:", e?.message);
+    }
+  })();
+
   // Migrate vehicles table to support new vehicle types (lwb_van, luton_van)
   (async () => {
     try {

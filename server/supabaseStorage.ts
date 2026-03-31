@@ -353,14 +353,15 @@ export class SupabaseStorage implements IStorage {
       waitingTimePerMinute: "0.50",
       rushHourStart: "07:00",
       rushHourEnd: "09:00",
-      rushHourStartEvening: "17:00",
+      rushHourStartEvening: "14:00",
       rushHourEndEvening: "19:00",
       weightSurcharges: {
-        "4-10": 5,
         "10-20": 10,
         "20-30": 15,
         "30-50": 20,
-        "50+": 50
+        "50-100": 40,
+        "100-400": 50,
+        "400-1200": 70,
       },
       serviceTypePricing: {
         "flexible": 0,
@@ -377,8 +378,8 @@ export class SupabaseStorage implements IStorage {
         description: "Fast delivery for small items up to 5kg",
         maxWeight: 5,
         baseCharge: "10.00",
-        perMileRate: "3.00",
-        rushHourRate: "3.00",
+        perMileRate: "1.30",
+        rushHourRate: "1.60",
         iconUrl: null,
       }],
       ["car", {
@@ -1762,12 +1763,12 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
-  private isRushHour(): boolean {
-    const now = new Date();
+  private isRushHour(at?: Date): boolean {
+    const now = at || new Date();
     const time = now.getHours() * 60 + now.getMinutes();
     const morningStart = this.parseTime(this.pricingSettings.rushHourStart || "07:00");
     const morningEnd = this.parseTime(this.pricingSettings.rushHourEnd || "09:00");
-    const eveningStart = this.parseTime(this.pricingSettings.rushHourStartEvening || "17:00");
+    const eveningStart = this.parseTime(this.pricingSettings.rushHourStartEvening || "14:00");
     const eveningEnd = this.parseTime(this.pricingSettings.rushHourEndEvening || "19:00");
     return (time >= morningStart && time <= morningEnd) || (time >= eveningStart && time <= eveningEnd);
   }
@@ -1779,12 +1780,14 @@ export class SupabaseStorage implements IStorage {
 
   private getWeightSurcharge(weight: number): number {
     const surcharges = this.pricingSettings.weightSurcharges as Record<string, number>;
-    if (weight >= 50) return surcharges["50+"] || 50;
-    if (weight >= 30) return surcharges["30-50"] || 20;
-    if (weight >= 20) return surcharges["20-30"] || 15;
-    if (weight >= 10) return surcharges["10-20"] || 10;
-    if (weight >= 4) return surcharges["4-10"] || 5;
-    return 0;
+    // 1-10 kg is FREE; tiers match the official pricing spec
+    if (weight > 400) return surcharges["400-1200"] ?? 70;
+    if (weight > 100) return surcharges["100-400"] ?? 50;
+    if (weight > 50)  return surcharges["50-100"]  ?? 40;
+    if (weight > 30)  return surcharges["30-50"]   ?? 20;
+    if (weight > 20)  return surcharges["20-30"]   ?? 15;
+    if (weight > 10)  return surcharges["10-20"]   ?? 10;
+    return 0; // 0-10 kg free
   }
 
   private isCentralLondon(postcode: string): boolean {
