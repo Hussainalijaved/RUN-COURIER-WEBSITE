@@ -209,6 +209,12 @@ function AnimatedStat({ icon: Icon, value, suffix, label, isDecimal }: {
 export default function Home() {
   const [trackingNumber, setTrackingNumber] = useState('');
 
+  useEffect(() => {
+    document.title = 'Same Day Courier London | Run Courier – Fast & Reliable Delivery';
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute('content', 'Run Courier provides fast, reliable same-day courier services across London and the UK. Book urgent and scheduled deliveries with real-time tracking.');
+  }, []);
+
   const handleTrack = () => {
     if (trackingNumber.trim()) {
       window.location.href = `/track?id=${trackingNumber}`;
@@ -452,6 +458,67 @@ export default function Home() {
                 Track your delivery in real-time until it arrives
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SEO Content Section ── */}
+      <section className="py-20 border-t border-border" aria-label="About Run Courier same day courier services">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold mb-4">London's Leading Same Day Courier Service</h2>
+              <p className="text-muted-foreground max-w-3xl mx-auto text-base leading-relaxed">
+                Run Courier is London's trusted same day courier service, connecting businesses and individuals with fast, dependable delivery solutions across the capital and the wider UK. From urgent documents collected in Canary Wharf to medical specimens transported from Harley Street clinics — our professional courier network is ready to move the moment you book. We operate around the clock, every day of the year, with a diverse fleet of motorbikes, cars, and vans capable of handling any consignment, any size, any distance.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-10 mb-12">
+              <div>
+                <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-[#0077B6] flex-shrink-0" />
+                  Same Day Courier London – Collection in 60 Minutes
+                </h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Our same day courier service covers every London postcode and all major UK destinations. When your delivery cannot wait, we dispatch a driver directly to your door within 60 minutes of booking — no queues, no delays, no handoffs. From the moment your item is collected, our GPS-tracked drivers head straight to the recipient. Businesses across London rely on us for time-critical shipments because we know a missed deadline costs far more than a delivery fee. Real-time updates keep you informed every step of the way.
+                </p>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-[#0077B6] flex-shrink-0" />
+                  Urgent Courier London – When Every Minute Counts
+                </h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  For truly time-sensitive deliveries, Run Courier offers a dedicated direct service — your consignment is the driver's sole priority from collection to drop-off. Whether you're a law firm rushing urgent court documents to the RCJ, a pharmaceutical company dispatching critical medication, or a retailer fulfilling a last-minute customer order, our urgent courier London service ensures nothing gets in the way. Instant booking confirmation, live driver tracking, and real-time delivery notifications give both sender and recipient total peace of mind.
+                </p>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-[#0077B6] flex-shrink-0" />
+                  Medical Courier London – Safe, Secure & Compliant
+                </h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Healthcare logistics demands the highest standards of care, security, and regulatory compliance. Run Courier's medical courier London service is purpose-built for NHS trusts, private hospitals, laboratories, pharmacies, and clinical research organisations. We transport pathology samples, blood products, pharmaceutical supplies, and sensitive medical equipment with drivers trained to understand the gravity of healthcare deliveries. Full chain-of-custody records, digital signature capture, and GPS tracking provide the complete audit trail your organisation requires.
+                </p>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-[#0077B6] flex-shrink-0" />
+                  Same Day Delivery UK – Nationwide Coverage
+                </h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  While London is our heartland, Run Courier's network stretches across the entire United Kingdom. Edinburgh to Exeter, Manchester to Milton Keynes — our same day delivery UK service can reach virtually any postcode. All prices are transparent and calculated upfront, there are no hidden charges, and every consignment is covered by comprehensive goods-in-transit insurance up to £50,000. Our DBS-checked professional drivers represent your brand with the discretion and care your customers deserve at the point of delivery.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-6">
+              <p className="text-sm text-muted-foreground leading-relaxed text-center">
+                <strong className="text-foreground">Why businesses choose Run Courier:</strong> instant online booking, transparent upfront pricing, 60-minute collection, live GPS tracking, digital proof of delivery, 24/7 customer support, and a 99.8% on-time delivery record. Whether you need a regular courier service for your London business or a one-off urgent delivery across the UK — Run Courier is built to deliver.
+              </p>
+            </div>
+
           </div>
         </div>
       </section>
