@@ -12446,15 +12446,31 @@ export async function registerRoutes(
 
     const stopLines = (stops || []).map((s: any, i: number) => `${i + 1}. ${s.postcode}`).join('\n');
     const summary = totalDistance && totalDuration
-      ? `Distance: ${formatDist(totalDistance)} | Time: ${formatTime(totalDuration)}\n\n`
+      ? `Distance: ${formatDist(totalDistance)} | Time: ${formatTime(totalDuration)}`
       : '';
 
-    const message = [
-      `Hi ${driverName || 'Driver'}, your route plan from Run Courier:`,
+    // Build a short path-style Google Maps URL — works reliably in SMS
+    // e.g. https://www.google.com/maps/dir/SW1A+2AA,UK/EC1A+1BB,UK
+    const buildSmsMapUrl = () => {
+      if (stops && stops.length >= 2) {
+        const parts = (stops as any[]).map((s: any) =>
+          (s.postcode + ',UK').replace(/\s+/g, '+')
+        );
+        return `https://www.google.com/maps/dir/${parts.join('/')}`;
+      }
+      return mapsLink || '';
+    };
+    const mapUrl = buildSmsMapUrl();
+
+    const lines: string[] = [
+      `Hi ${driverName || 'Driver'}, your route from Run Courier:`,
       '',
-      summary + (stopLines || routeText || ''),
-      mapsLink ? `\nOpen in Maps: ${mapsLink}` : '',
-    ].filter(Boolean).join('\n').trim();
+    ];
+    if (summary) lines.push(summary, '');
+    if (stopLines) lines.push(stopLines);
+    if (mapUrl) lines.push('', `Open in Maps: ${mapUrl}`);
+
+    const message = lines.join('\n').trim();
 
     const { sendSMS } = await import("./twilioService");
     const result = await sendSMS(to, message);

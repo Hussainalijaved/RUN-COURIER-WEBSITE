@@ -275,12 +275,12 @@ export default function AdminRoutePlanner() {
     return () => { delete window._routePlannerMapCb; };
   }, [initMap]);
 
-  // ── Draw exact road route via Directions API ─────────────────────────────
+  // ── Geocode stops & draw labelled markers + connecting polyline ───────────
   const drawDirectionsRoute = useCallback(async (orderedPostcodes: string[]) => {
     if (!mapInstanceRef.current || !window.google?.maps) return;
     const map = mapInstanceRef.current;
 
-    // Clear any previous markers and directions renderer
+    // Clear previous markers and renderer
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
     if (directionsRendererRef.current) {
@@ -291,111 +291,65 @@ export default function AdminRoutePlanner() {
     if (orderedPostcodes.length < 2) return;
 
     const total = orderedPostcodes.length;
-    const origin = orderedPostcodes[0] + ', UK';
-    const destination = orderedPostcodes[total - 1] + ', UK';
-    const waypoints = orderedPostcodes.slice(1, -1).map(p => ({
-      location: p + ', UK',
-      stopover: true,
-    }));
+    const coords: google.maps.LatLng[] = [];
 
-    const directionsService = new google.maps.DirectionsService();
+    // Geocode each stop via backend proxy (already used by leg breakdown)
+    for (let i = 0; i < orderedPostcodes.length; i++) {
+      try {
+        const res = await fetch(`/api/maps/geocode?address=${encodeURIComponent(orderedPostcodes[i] + ', UK')}`);
+        const data = await res.json();
+        if (data.results?.[0]?.geometry?.location) {
+          const { lat, lng } = data.results[0].geometry.location;
+          coords.push(new google.maps.LatLng(lat, lng));
+        }
+      } catch { /* skip on error */ }
+    }
 
-    try {
-      const result = await directionsService.route({
-        origin,
-        destination,
-        waypoints,
-        travelMode: google.maps.TravelMode.DRIVING,
-        optimizeWaypoints: false, // backend already ordered the stops
-        region: 'GB',
-      });
+    if (coords.length === 0) return;
 
-      // Renderer draws the exact road-following route — same path as leg breakdown
-      const renderer = new google.maps.DirectionsRenderer({
-        map,
-        directions: result,
-        suppressMarkers: true, // we draw custom labelled markers below
-        polylineOptions: {
-          strokeColor: '#2563eb',
-          strokeOpacity: 0.9,
-          strokeWeight: 5,
-        },
-      });
-      directionsRendererRef.current = renderer;
+    const bounds = new google.maps.LatLngBounds();
 
-      // Add custom A/B/C… circle markers matching the leg-breakdown labels
-      const bounds = new google.maps.LatLngBounds();
-      result.routes[0].legs.forEach((leg, i) => {
-        const pos = leg.start_location;
-        bounds.extend(pos);
-        const label = ALPHA[i] || String(i + 1);
-        const color = stopColor(i, total);
-        markersRef.current.push(new google.maps.Marker({
-          position: pos,
-          map,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: color,
-            fillOpacity: 1,
-            strokeColor: '#fff',
-            strokeWeight: 2,
-            scale: 14,
-          },
-          label: { text: label, color: '#fff', fontSize: '11px', fontWeight: 'bold' },
-          title: orderedPostcodes[i],
-          zIndex: 100 + i,
-        }));
-      });
-
-      // Last stop (destination)
-      const lastLeg = result.routes[0].legs[result.routes[0].legs.length - 1];
-      const lastPos = lastLeg.end_location;
-      bounds.extend(lastPos);
+    // Place A/B/C… labelled circle markers matching the leg-breakdown labels
+    coords.forEach((coord, i) => {
+      bounds.extend(coord);
       markersRef.current.push(new google.maps.Marker({
-        position: lastPos,
+        position: coord,
         map,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          fillColor: stopColor(total - 1, total),
+          fillColor: stopColor(i, total),
           fillOpacity: 1,
           strokeColor: '#fff',
           strokeWeight: 2,
           scale: 14,
         },
-        label: { text: ALPHA[total - 1] || String(total), color: '#fff', fontSize: '11px', fontWeight: 'bold' },
-        title: orderedPostcodes[total - 1],
-        zIndex: 100 + total - 1,
+        label: { text: ALPHA[i] || String(i + 1), color: '#fff', fontSize: '11px', fontWeight: 'bold' },
+        title: orderedPostcodes[i],
+        zIndex: 100 + i,
       }));
+    });
 
+    // Draw polyline in the exact optimised order
+    if (coords.length >= 2) {
+      new google.maps.Polyline({
+        path: coords,
+        geodesic: true,
+        strokeColor: '#2563eb',
+        strokeOpacity: 0.85,
+        strokeWeight: 4,
+        map,
+        icons: [{
+          icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, strokeColor: '#1d4ed8' },
+          offset: '100%',
+        }],
+      });
+    }
+
+    if (coords.length === 1) {
+      map.setCenter(coords[0]);
+      map.setZoom(13);
+    } else {
       map.fitBounds(bounds, { top: 60, bottom: 40, left: 40, right: 40 });
-    } catch (err) {
-      console.error('[RoutePlanner] DirectionsService error:', err);
-      // Fallback: geocode & draw straight-line markers so the map isn't blank
-      for (let i = 0; i < orderedPostcodes.length; i++) {
-        try {
-          const res = await fetch(`/api/maps/geocode?address=${encodeURIComponent(orderedPostcodes[i] + ', UK')}`);
-          const data = await res.json();
-          if (data.results?.[0]?.geometry?.location) {
-            const { lat, lng } = data.results[0].geometry.location;
-            const coord = new google.maps.LatLng(lat, lng);
-            markersRef.current.push(new google.maps.Marker({
-              position: coord,
-              map,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                fillColor: stopColor(i, orderedPostcodes.length),
-                fillOpacity: 1,
-                strokeColor: '#fff',
-                strokeWeight: 2,
-                scale: 14,
-              },
-              label: { text: ALPHA[i] || String(i + 1), color: '#fff', fontSize: '11px', fontWeight: 'bold' },
-              title: orderedPostcodes[i],
-              zIndex: 100 + i,
-            }));
-          }
-        } catch { /* skip */ }
-      }
     }
   }, []);
 
