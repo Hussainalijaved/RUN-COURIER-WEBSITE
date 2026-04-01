@@ -602,6 +602,12 @@ export default function AdminJobs() {
   }, [selectedJob?.id, savedNotes]);
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
+
+  // ── Table scroll sync refs ─────────────────────────────────────────────────
+  const tableScrollRef    = useRef<HTMLDivElement>(null);
+  const topScrollRef      = useRef<HTMLDivElement>(null);
+  const scrollPhantomRef  = useRef<HTMLDivElement>(null);
+  const isSyncingScrollRef = useRef(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.7 });
@@ -1540,6 +1546,39 @@ export default function AdminJobs() {
     });
   };
 
+  // ── Table scroll sync: keep top scrollbar & table in sync ─────────────────
+  useEffect(() => {
+    const tableEl = tableScrollRef.current;
+    if (!tableEl) return;
+    const update = () => {
+      if (scrollPhantomRef.current) {
+        scrollPhantomRef.current.style.width = `${tableEl.scrollWidth}px`;
+      }
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(tableEl);
+    return () => observer.disconnect();
+  }, [filteredJobs]);
+
+  const handleTableScroll = () => {
+    if (isSyncingScrollRef.current) return;
+    isSyncingScrollRef.current = true;
+    if (topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
+  };
+
+  const handleTopScroll = () => {
+    if (isSyncingScrollRef.current) return;
+    isSyncingScrollRef.current = true;
+    if (tableScrollRef.current && topScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
+  };
+
   const openLabelDialog = async (job: Job) => {
     setJobForLabel(job);
     setMultiDropStops([]);
@@ -1901,10 +1940,28 @@ export default function AdminJobs() {
                 ))}
               </div>
             ) : filteredJobs.length > 0 ? (
-              <Table>
+              <>
+                {/* Top mirror scrollbar — lets you scroll horizontally without reaching the bottom */}
+                <div
+                  ref={topScrollRef}
+                  className="overflow-x-auto mb-px"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}
+                  onScroll={handleTopScroll}
+                >
+                  <div ref={scrollPhantomRef} style={{ height: 1, minWidth: '100%' }} />
+                </div>
+
+                {/* Scrollable table container with its own horizontal scrollbar */}
+                <div
+                  ref={tableScrollRef}
+                  className="overflow-x-auto"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}
+                  onScroll={handleTableScroll}
+                >
+              <Table className="min-w-[1100px]">
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]">
+                  <TableRow className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))] hover:bg-background">
+                    <TableHead className="w-[40px] min-w-[40px] sticky left-0 z-30 bg-background">
                       <Checkbox 
                         checked={allAssignableSelected}
                         onCheckedChange={toggleAllAssignable}
@@ -1912,9 +1969,9 @@ export default function AdminJobs() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead>Job No.</TableHead>
-                    <TableHead>Tracking #</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead className="min-w-[100px] sticky left-[40px] z-30 bg-background">Job No.</TableHead>
+                    <TableHead className="min-w-[130px] sticky left-[140px] z-30 bg-background">Tracking #</TableHead>
+                    <TableHead className="min-w-[110px] sticky left-[270px] z-30 bg-background border-r border-border">Type</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Driver</TableHead>
@@ -1932,7 +1989,8 @@ export default function AdminJobs() {
                       !['picked_up', 'on_the_way_delivery', 'delivered', 'cancelled'].includes(job.status);
                     return (
                     <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
-                      <TableCell>
+                      {/* ── Frozen col 1: checkbox ── */}
+                      <TableCell className="sticky left-0 z-10 bg-background">
                         <Checkbox 
                           checked={selectedJobIds.has(String(job.id))}
                           onCheckedChange={() => toggleJobSelection(job.id)}
@@ -1940,7 +1998,8 @@ export default function AdminJobs() {
                           data-testid={`checkbox-job-${job.id}`}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm font-semibold">
+                      {/* ── Frozen col 2: Job No. ── */}
+                      <TableCell className="font-mono text-sm font-semibold sticky left-[40px] z-10 bg-background">
                         <span className="flex items-center gap-1 group/copy">
                           <span>{(job as any).jobNumber || '—'}</span>
                           {(job as any).jobNumber && (
@@ -1950,7 +2009,8 @@ export default function AdminJobs() {
                           )}
                         </span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
+                      {/* ── Frozen col 3: Tracking # ── */}
+                      <TableCell className="font-mono text-xs text-muted-foreground sticky left-[140px] z-10 bg-background">
                         <span className="flex items-center gap-1 group/copy">
                           <span>{job.trackingNumber}</span>
                           <span className="invisible group-hover/copy:visible">
@@ -1958,7 +2018,8 @@ export default function AdminJobs() {
                           </span>
                         </span>
                       </TableCell>
-                      <TableCell>
+                      {/* ── Frozen col 4: Type — right border marks the freeze line ── */}
+                      <TableCell className="sticky left-[270px] z-10 bg-background border-r border-border">
                         {(job as any).customerType === 'business' ? (
                           <Badge variant="outline" className="gap-1">
                             <Building2 className="h-3 w-3" />
@@ -2274,6 +2335,8 @@ export default function AdminJobs() {
                   })}
                 </TableBody>
               </Table>
+                </div>{/* /tableScrollRef */}
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Package className="h-12 w-12 text-muted-foreground mb-4" />
