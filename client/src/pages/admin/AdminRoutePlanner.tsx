@@ -30,6 +30,7 @@ import {
   Milestone,
   Mail,
   MessageCircle,
+  Smartphone,
   Send,
   Loader2,
   RotateCcw,
@@ -217,7 +218,7 @@ export default function AdminRoutePlanner() {
   const [customEmail, setCustomEmail] = useState('');
   const [customPhone, setCustomPhone] = useState('');
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
-  const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp'>('email');
+  const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp' | 'sms'>('email');
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -543,6 +544,27 @@ export default function AdminRoutePlanner() {
     setSendDialogOpen(false);
   };
 
+  const sendRouteSms = async () => {
+    const phone = getDriverPhone();
+    if (!phone) { toast({ title: 'Enter a phone number', variant: 'destructive' }); return; }
+    setSending(true);
+    try {
+      await apiRequest('POST', '/api/route-planner/send-sms', {
+        to: phone,
+        driverName: selectedDriver?.fullName || 'Driver',
+        routeText: buildRouteText(),
+        mapsLink: buildMapsLink(),
+        stops: displayedStops,
+        totalDistance: routeResult?.totalDistance,
+        totalDuration: routeResult?.totalDuration,
+      });
+      toast({ title: 'Route sent via SMS' });
+      setSendDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: 'Failed to send SMS', description: err.message, variant: 'destructive' });
+    } finally { setSending(false); }
+  };
+
   const copyRouteText = () => {
     navigator.clipboard.writeText(buildRouteText()).then(() => {
       setCopied(true);
@@ -848,6 +870,14 @@ export default function AdminRoutePlanner() {
               </button>
               <button
                 type="button"
+                className={`flex-1 py-2 text-sm flex items-center justify-center gap-2 transition-colors ${sendMethod === 'sms' ? 'bg-blue-600 text-white' : 'hover:bg-muted'}`}
+                onClick={() => setSendMethod('sms')}
+                data-testid="tab-sms"
+              >
+                <Smartphone className="h-4 w-4" />SMS
+              </button>
+              <button
+                type="button"
                 className={`flex-1 py-2 text-sm flex items-center justify-center gap-2 transition-colors ${sendMethod === 'whatsapp' ? 'bg-green-600 text-white' : 'hover:bg-muted'}`}
                 onClick={() => setSendMethod('whatsapp')}
                 data-testid="tab-whatsapp"
@@ -869,6 +899,25 @@ export default function AdminRoutePlanner() {
                 {selectedDriver?.email && (
                   <p className="text-xs text-muted-foreground">Using {selectedDriver.fullName}'s email</p>
                 )}
+              </div>
+            )}
+
+            {sendMethod === 'sms' && (
+              <div className="space-y-2">
+                <Label>Mobile Number</Label>
+                <Input
+                  value={selectedDriver?.phone || customPhone}
+                  onChange={e => { if (!selectedDriver) setCustomPhone(e.target.value); }}
+                  placeholder="+44 7700 900000"
+                  type="tel"
+                  data-testid="input-driver-sms-phone"
+                />
+                {selectedDriver?.phone && (
+                  <p className="text-xs text-muted-foreground">Using {selectedDriver.fullName}'s number</p>
+                )}
+                <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                  A text message with the route summary and Google Maps link will be sent via SMS.
+                </p>
               </div>
             )}
 
@@ -899,12 +948,24 @@ export default function AdminRoutePlanner() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setSendDialogOpen(false)}>Cancel</Button>
-            {sendMethod === 'email' ? (
+            {sendMethod === 'email' && (
               <Button onClick={sendRouteEmail} disabled={sending} data-testid="button-confirm-send-email">
                 {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
                 Send Email
               </Button>
-            ) : (
+            )}
+            {sendMethod === 'sms' && (
+              <Button
+                className="bg-blue-600 text-white"
+                onClick={sendRouteSms}
+                disabled={sending}
+                data-testid="button-confirm-send-sms"
+              >
+                {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Smartphone className="h-4 w-4 mr-2" />}
+                Send SMS
+              </Button>
+            )}
+            {sendMethod === 'whatsapp' && (
               <Button
                 className="bg-green-600 text-white"
                 onClick={sendViaWhatsApp}

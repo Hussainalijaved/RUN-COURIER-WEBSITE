@@ -12431,6 +12431,41 @@ export async function registerRoutes(
     }
   }));
 
+  // ─── Route Planner: Send SMS ───────────────────────────────────
+  app.post("/api/route-planner/send-sms", asyncHandler(async (req, res) => {
+    const { to, driverName, routeText, mapsLink, stops, totalDistance, totalDuration } = req.body;
+    if (!to) return res.status(400).json({ error: "Recipient phone number is required" });
+
+    const formatDist = (m: number) => `${m.toFixed(1)} mi`;
+    const formatTime = (min: number) => {
+      if (min < 60) return `${min} min`;
+      const h = Math.floor(min / 60);
+      const m2 = min % 60;
+      return m2 > 0 ? `${h}h ${m2}min` : `${h}h`;
+    };
+
+    const stopLines = (stops || []).map((s: any, i: number) => `${i + 1}. ${s.postcode}`).join('\n');
+    const summary = totalDistance && totalDuration
+      ? `Distance: ${formatDist(totalDistance)} | Time: ${formatTime(totalDuration)}\n\n`
+      : '';
+
+    const message = [
+      `Hi ${driverName || 'Driver'}, your route plan from Run Courier:`,
+      '',
+      summary + (stopLines || routeText || ''),
+      mapsLink ? `\nOpen in Maps: ${mapsLink}` : '',
+    ].filter(Boolean).join('\n').trim();
+
+    const { sendSMS } = await import("./twilioService");
+    const result = await sendSMS(to, message);
+
+    if (result.success) {
+      res.json({ success: true, messageId: result.messageId });
+    } else {
+      res.status(500).json({ error: result.error || "Failed to send SMS" });
+    }
+  }));
+
   // ============= INVOICE PAYMENT WITH EMBEDDED STRIPE =============
 
   // Public endpoint: Get invoice payment details by token
