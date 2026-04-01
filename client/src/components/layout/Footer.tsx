@@ -196,7 +196,7 @@ export function Footer() {
           </p>
           <span className="hidden sm:inline text-muted-foreground text-sm">·</span>
           <a
-            href="https://www.google.com/maps/place/RUN+COURIER"
+            href="https://maps.app.goo.gl/phjXuWWA3vpB8XJv5"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
