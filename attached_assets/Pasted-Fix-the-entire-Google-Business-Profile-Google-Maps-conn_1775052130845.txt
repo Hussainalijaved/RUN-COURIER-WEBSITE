@@ -1,0 +1,44 @@
+Fix the entire Google Business Profile / Google Maps connection across the website for Run Courier.
+
+Problem:
+The current “Find us on Google” link and related Google profile references are not working correctly. On some devices they open an invalid map result, generic map screen, or fail to open the real Run Courier Google Business Profile. I need the whole setup fixed properly everywhere.
+
+Use this as the official Google Business Profile link:
+https://maps.app.goo.gl/phjXuWWA3vpB8XJv5?g_st=ic
+
+Tasks:
+1. Find every place in the website code where a Google Maps, Google profile, Google Business, “Find us on Google”, location, map button, footer link, badge, schema, or sameAs link is used.
+2. Replace all incorrect, generic, broken, placeholder, invalid coordinate, or incomplete Google map/profile URLs with this exact official link:
+   https://maps.app.goo.gl/phjXuWWA3vpB8XJv5?g_st=ic
+3. Fix the “Find us on Google” button or link so it opens the real Run Courier Google Business Profile correctly on desktop, iPhone, and Android.
+4. Update all SEO structured data / JSON-LD schema related to LocalBusiness so the Google business profile reference is correct everywhere.
+5. If there is a sameAs array in schema, make sure it includes the correct official Google Business Profile link.
+6. Remove any old wrong links such as:
+   - generic google maps place links
+   - broken /maps/place/RUN+COURIER links
+   - invalid coordinate links
+   - placeholder URLs
+   - share URLs that do not open the correct profile
+7. Make sure the website does not generate or rewrite the Google profile link incorrectly anywhere in JavaScript, templates, components, or config files.
+8. Check header, footer, contact page, SEO config, schema components, buttons, badges, map cards, and any reusable settings/constants file.
+9. Keep the existing design, text, styling, layout, branding, and functionality exactly the same unless a change is required to fix the Google profile issue.
+10. Test the final result so that clicking the Google link from any place on the website opens the correct Run Courier Google Business Profile.
+
+Also improve LocalBusiness schema if needed using these business details:
+- Business name: Run Courier
+- Website: https://runcourier.co.uk
+- Business category: Courier service
+- Address: 112 Bridgwater Road, Ruislip, HA4 6LW, United Kingdom
+- Phone: +44 20 4634 6100
+
+Expected result:
+- Every Google business/profile link on the website works correctly
+- “Find us on Google” opens the real profile on all devices
+- Structured data is corrected
+- No invalid map result appears anymore
+- Nothing else on the website is changed unnecessarily
+
+After finishing:
+- Show me exactly what files or sections were changed
+- Confirm the final Google profile URL being used everywhere
+- Confirm that the link was tested for desktop and mobile behavior

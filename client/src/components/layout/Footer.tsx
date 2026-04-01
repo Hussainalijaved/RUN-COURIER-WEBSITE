@@ -98,7 +98,7 @@ export function Footer() {
                 <SiTrustpilot className="h-5 w-5" />
               </a>
               <a
-                href="https://share.google/HvFEmz6I7HRFfmOjx"
+                href="https://maps.app.goo.gl/phjXuWWA3vpB8XJv5?g_st=ic"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#4285F4] hover:text-[#1a73e8] transition-colors"
@@ -196,7 +196,7 @@ export function Footer() {
           </p>
           <span className="hidden sm:inline text-muted-foreground text-sm">·</span>
           <a
-            href="https://maps.app.goo.gl/phjXuWWA3vpB8XJv5"
+            href="https://maps.app.goo.gl/phjXuWWA3vpB8XJv5?g_st=ic"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
