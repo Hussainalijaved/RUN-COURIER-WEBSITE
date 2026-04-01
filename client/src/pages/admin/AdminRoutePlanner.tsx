@@ -225,7 +225,7 @@ export default function AdminRoutePlanner() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
-  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
   const mapsReadyRef = useRef(false);
 
   const { data: drivers } = useQuery<Driver[]>({ queryKey: ['/api/drivers'] });
@@ -280,12 +280,12 @@ export default function AdminRoutePlanner() {
     if (!mapInstanceRef.current || !window.google?.maps) return;
     const map = mapInstanceRef.current;
 
-    // Clear previous markers and renderer
+    // Clear previous markers and polyline
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
-    if (directionsRendererRef.current) {
-      directionsRendererRef.current.setMap(null);
-      directionsRendererRef.current = null;
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
     }
 
     if (orderedPostcodes.length < 2) return;
@@ -329,14 +329,14 @@ export default function AdminRoutePlanner() {
       }));
     });
 
-    // Draw polyline in the exact optimised order
+    // Draw polyline in the exact optimised order and store in ref for cleanup
     if (coords.length >= 2) {
-      new google.maps.Polyline({
+      polylineRef.current = new google.maps.Polyline({
         path: coords,
         geodesic: true,
         strokeColor: '#2563eb',
         strokeOpacity: 0.85,
-        strokeWeight: 4,
+        strokeWeight: 5,
         map,
         icons: [{
           icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, strokeColor: '#1d4ed8' },
@@ -472,7 +472,7 @@ export default function AdminRoutePlanner() {
     setDisplayedStops([]);
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
-    if (directionsRendererRef.current) { directionsRendererRef.current.setMap(null); directionsRendererRef.current = null; }
+    if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setCenter({ lat: 52.5, lng: -1.5 });
       mapInstanceRef.current.setZoom(6);
