@@ -116,6 +116,11 @@ const ReturnTripService = lazy(() => import("@/pages/services/ServicePage").then
 const ScheduledService = lazy(() => import("@/pages/services/ServicePage").then(m => ({ default: m.ScheduledService })));
 const RestaurantsService = lazy(() => import("@/pages/services/ServicePage").then(m => ({ default: m.RestaurantsService })));
 
+const SameDayCourierLondon = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.SameDayCourierLondon })));
+const MedicalCourierPage = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.MedicalCourierPage })));
+const BusinessCourierServices = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.BusinessCourierServices })));
+const UrgentDeliveryLondon = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.UrgentDeliveryLondon })));
+
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
 const AdminDocuments = lazy(() => import("@/pages/admin/AdminDocuments"));
 const AdminJobs = lazy(() => import("@/pages/admin/AdminJobs"));
@@ -252,6 +257,10 @@ function Router() {
         <Route path="/services/return-trip" component={ReturnTripService} />
         <Route path="/services/scheduled" component={ScheduledService} />
         <Route path="/services/restaurants" component={RestaurantsService} />
+        <Route path="/same-day-courier-london" component={SameDayCourierLondon} />
+        <Route path="/medical-courier" component={MedicalCourierPage} />
+        <Route path="/business-courier-services" component={BusinessCourierServices} />
+        <Route path="/urgent-delivery-london" component={UrgentDeliveryLondon} />
 
         <Route path="/admin">
           <ProtectedRoute allowedRoles={['admin']}>
