@@ -98,7 +98,7 @@ export function Footer() {
                 <SiTrustpilot className="h-5 w-5" />
               </a>
               <a
-                href="https://maps.app.goo.gl/phjXuWWA3vpB8XJv5?g_st=ic"
+                href="https://www.google.com/maps/place/RUN+COURIER/@51.5597064,-0.4078805,17z/data=!3m1!4b1!4m6!3m5!1s0x48766d0056326347:0xaa9fa003b207ee79!8m2!3d51.5597064!4d-0.4078805!16s%2Fg%2F11xfj7nr0_"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#4285F4] hover:text-[#1a73e8] transition-colors"
@@ -196,7 +196,7 @@ export function Footer() {
           </p>
           <span className="hidden sm:inline text-muted-foreground text-sm">·</span>
           <a
-            href="https://maps.app.goo.gl/phjXuWWA3vpB8XJv5?g_st=ic"
+            href="https://www.google.com/maps/place/RUN+COURIER/@51.5597064,-0.4078805,17z/data=!3m1!4b1!4m6!3m5!1s0x48766d0056326347:0xaa9fa003b207ee79!8m2!3d51.5597064!4d-0.4078805!16s%2Fg%2F11xfj7nr0_"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"

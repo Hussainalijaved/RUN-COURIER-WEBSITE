@@ -1,0 +1,38 @@
+Fix the “Find us on Google” link/button so it opens exactly to the real Run Courier Google Maps business listing view, not directions mode and not a generic map page.
+
+Target behavior:
+When the user clicks “Find us on Google”, it must open the actual Google Maps business listing for RUN COURIER, with the business card/profile visible, exactly like a normal Google Maps place listing.
+
+Correct result must:
+- open the real RUN COURIER place listing
+- show the business card/profile in Google Maps
+- not open directions mode
+- not open a blank or generic map page
+- not open invalid coordinates
+- not open a generic search result without the place listing selected
+
+Official source link to use:
+https://maps.app.goo.gl/phjXuWWA3vpB8XJv5?g_st=ic
+
+What to do:
+1. Find the current “Find us on Google” button/link everywhere in the website.
+2. Replace the current broken Google Maps URL with a direct place-listing URL that opens the actual Run Courier Google Maps business profile/listing view.
+3. Do not use:
+   - /maps/dir/
+   - coordinate-only links
+   - invalid coord links
+   - generic ?q= links if they do not open the selected place card
+   - links that open only a map without the business listing selected
+4. Preserve the final direct Google Maps place/listing URL after resolving the official short link if needed.
+5. Make sure clicking the button opens the selected Run Courier listing with the business card visible on desktop and mobile.
+6. Update any footer link, contact page link, badge, schema, constants, config, or reusable component using the old broken link.
+7. If structured data / sameAs currently uses a broken map URL, replace it with the same final direct working Google Maps place/listing URL.
+8. Do not change styling, text, layout, or any other functionality.
+
+Important:
+The final result must open exactly to the Google Maps business listing for RUN COURIER, like a selected place card, not just the map.
+
+After finishing:
+- show me the exact final URL used
+- show me which files/components were changed
+- confirm it was tested and opens the actual selected Run Courier listing
