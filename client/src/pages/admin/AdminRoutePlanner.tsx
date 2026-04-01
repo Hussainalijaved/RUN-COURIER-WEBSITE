@@ -843,12 +843,15 @@ export default function AdminRoutePlanner() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Select Driver (optional)</Label>
-              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+              <Select
+                value={selectedDriverId || '__manual__'}
+                onValueChange={v => setSelectedDriverId(v === '__manual__' ? '' : v)}
+              >
                 <SelectTrigger data-testid="select-driver">
                   <SelectValue placeholder="Choose a driver…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— Enter manually —</SelectItem>
+                  <SelectItem value="__manual__">— Enter manually —</SelectItem>
                   {activeDrivers.map(d => (
                     <SelectItem key={d.id} value={d.id}>
                       {d.fullName} {d.driverCode ? `(${d.driverCode})` : ''}
