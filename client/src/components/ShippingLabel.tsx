@@ -1,6 +1,36 @@
 import { forwardRef } from 'react';
-import runCourierLogo from '@assets/run_courier_logo.png';
 import type { Job } from '@shared/schema';
+
+/* Inline SVG logo — vector-sharp at any DPI, ideal for thermal printing */
+const RunCourierLogoSVG = ({ size = 24 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 100 100"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ display: 'block', flexShrink: 0 }}
+    aria-hidden="true"
+  >
+    {/* Head */}
+    <circle cx="62" cy="18" r="9" fill="#000" />
+    {/* Torso / running body */}
+    <line x1="62" y1="27" x2="50" y2="58" stroke="#000" strokeWidth="7" strokeLinecap="round" />
+    {/* Rear leg */}
+    <line x1="50" y1="58" x2="30" y2="82" stroke="#000" strokeWidth="6" strokeLinecap="round" />
+    {/* Front leg */}
+    <line x1="50" y1="58" x2="62" y2="85" stroke="#000" strokeWidth="6" strokeLinecap="round" />
+    {/* Arm holding box (forward arm) */}
+    <line x1="58" y1="38" x2="80" y2="32" stroke="#000" strokeWidth="6" strokeLinecap="round" />
+    {/* Package/box */}
+    <rect x="75" y="20" width="18" height="16" rx="2" fill="#000" />
+    {/* Rear arm */}
+    <line x1="56" y1="42" x2="40" y2="52" stroke="#000" strokeWidth="6" strokeLinecap="round" />
+    {/* Speed lines */}
+    <line x1="5" y1="36" x2="22" y2="36" stroke="#000" strokeWidth="4" strokeLinecap="round" />
+    <line x1="10" y1="47" x2="24" y2="47" stroke="#000" strokeWidth="3" strokeLinecap="round" />
+    <line x1="15" y1="57" x2="26" y2="57" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+  </svg>
+);
 
 interface ShippingLabelProps {
   job: Job;
@@ -96,8 +126,8 @@ export const ShippingLabel = forwardRef<HTMLDivElement, ShippingLabelProps>(
           {/* ── HEADER ── */}
           <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <img src={runCourierLogo} alt="" style={{ width: '24px', height: '24px', borderRadius: '4px', display: 'block', flexShrink: 0 }} />
-              <div style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3px', lineHeight: 1.1 }}>RUN COURIER<span style={{ fontSize: '8px', verticalAlign: 'super' }}>&trade;</span></div>
+              <RunCourierLogoSVG size={26} />
+              <div style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.3px', lineHeight: 1.1 }}>RUN COURIER<span style={{ fontSize: '9px', verticalAlign: 'super' }}>&trade;</span></div>
             </div>
             <div style={{ textAlign: 'right', fontSize: '7px', color: '#000', lineHeight: 1.4 }}>
               <div>www.runcourier.co.uk</div>
