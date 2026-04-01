@@ -13,58 +13,57 @@ declare global {
 }
 
 const CONVERSION_TAG = 'AW-17051034778/8V4hCmnKgpQceEJrJyMI_';
-const LOG = '[GoogleAds]';
 
+/**
+ * Fire a Google Ads conversion event.
+ *
+ * • Deduplicates via sessionStorage (key = rc_ads_conv_<transactionId>).
+ * • Polls window.gtag every 300 ms for up to 5 s (gtag is deferred in index.html).
+ * • If gtag never arrives, removes the sessionStorage key so the next page load retries.
+ */
 function fireGoogleAdsConversion(value: number, transactionId: string) {
   const key = `rc_ads_conv_${transactionId}`;
 
-  // ── Guard 1: sessionStorage duplicate prevention ─────────────────────────
   if (sessionStorage.getItem(key)) {
-    console.log(`${LOG} Conversion Blocked by sessionStorage`, { key });
+    console.log('[GoogleAds] Conversion already fired for', transactionId, '— skipping duplicate');
     return;
   }
 
-  // Mark as fired BEFORE the async gtag call so a rapid re-render can't slip in
+  // Mark immediately so concurrent renders cannot slip through
   sessionStorage.setItem(key, '1');
 
-  const fire = () => {
-    console.log(`${LOG} Google Ads Conversion Fired`, {
+  console.log('Firing Google Ads conversion', { trackingNumber: transactionId, paidAmount: value });
+
+  const doFire = () => {
+    window.gtag!('event', 'conversion', {
       send_to: CONVERSION_TAG,
-      value,
+      value: value || 1,
       currency: 'GBP',
-      transaction_id: transactionId,
+      transaction_id: transactionId || String(Date.now()),
     });
-    if (typeof window.gtag === 'function') {
-      window.gtag('event', 'conversion', {
-        send_to: CONVERSION_TAG,
-        value,
-        currency: 'GBP',
-        transaction_id: transactionId,
-      });
-    } else {
-      console.warn(`${LOG} window.gtag not available after polling — conversion could not be sent`);
-    }
+    console.log('[GoogleAds] gtag conversion sent', { send_to: CONVERSION_TAG, value, transactionId });
   };
 
-  // gtag is deferred-loaded 2 s after page load in index.html — poll until ready
   if (typeof window.gtag === 'function') {
-    fire();
-  } else {
-    console.log(`${LOG} window.gtag not yet ready — starting poll (max 6 s)`);
-    let waited = 0;
-    const timer = setInterval(() => {
-      waited += 250;
-      if (typeof window.gtag === 'function') {
-        clearInterval(timer);
-        fire();
-      } else if (waited >= 6000) {
-        clearInterval(timer);
-        console.warn(`${LOG} window.gtag never became available — conversion not sent`);
-        // Undo the sessionStorage mark so a future page load can retry
-        sessionStorage.removeItem(key);
-      }
-    }, 250);
+    doFire();
+    return;
   }
+
+  // gtag not yet ready — poll every 300 ms, give up after 5 s
+  console.log('[GoogleAds] window.gtag not ready — polling every 300 ms (max 5 s)');
+  let elapsed = 0;
+  const interval = setInterval(() => {
+    elapsed += 300;
+    if (typeof window.gtag === 'function') {
+      clearInterval(interval);
+      doFire();
+    } else if (elapsed >= 5000) {
+      clearInterval(interval);
+      // Remove lock so the next navigation can retry
+      sessionStorage.removeItem(key);
+      console.warn('[GoogleAds] window.gtag never became available — conversion not sent');
+    }
+  }, 300);
 }
 
 export default function PaymentSuccess() {
@@ -80,10 +79,10 @@ export default function PaymentSuccess() {
   const [countdown, setCountdown]           = useState(5);
   const [paidAmount, setPaidAmount]         = useState<number | null>(null);
 
-  // Ref to prevent double-firing in StrictMode double-invoke
+  // Prevent double-fire on React StrictMode double-invoke
   const conversionFiredRef = useRef(false);
 
-  // ── Step 1: Parse URL params and kick off confirmation if needed ──────────
+  // ── Step 1: Parse URL and kick off any async confirmation ─────────────────
   useEffect(() => {
     const params      = new URLSearchParams(searchParams);
     const sessionId   = params.get('session_id');
@@ -92,14 +91,7 @@ export default function PaymentSuccess() {
     const jn          = params.get('jobNumber');
     const amountParam = params.get('amount');
 
-    console.log(`${LOG} PaymentSuccess mounted`, {
-      route: '/payment/success',
-      tracking,
-      jobNumber: jn,
-      amount: amountParam,
-      payLater,
-      sessionId,
-    });
+    console.log('[PaymentSuccess] Params:', { tracking, jobNumber: jn, amount: amountParam, payLater, sessionId });
 
     if (jn)          setJobNumber(jn);
     if (amountParam) setPaidAmount(parseFloat(amountParam));
@@ -119,91 +111,43 @@ export default function PaymentSuccess() {
     }
   }, [searchParams]);
 
-  // ── Step 2: When tracking is confirmed but amount is missing, fetch it ────
-  // This handles the case where the customer lands on the page without ?amount=
-  // in the URL (e.g. deployed site before the ?amount= fix, or manual navigation).
+  // ── Step 2: Fire Google Ads conversion ───────────────────────────────────
+  // Fires as soon as payment is confirmed and a trackingNumber is available.
+  // Uses paidAmount if already known, falls back to 1 (value is a bonus — the
+  // conversion event itself is what matters for Tag Assistant detection).
+  // Does NOT block on the price fetch — avoids race with the 5-s redirect.
   useEffect(() => {
-    if (!trackingNumber || isPayLater || isLoading || error || paidAmount !== null) return;
-
-    console.log(`${LOG} Amount not in URL — fetching from server for tracking: ${trackingNumber}`);
-
-    fetch(`/api/booking/confirmed-price?tracking=${encodeURIComponent(trackingNumber)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (typeof data.totalPrice === 'number' && data.totalPrice > 0) {
-          console.log(`${LOG} Server returned totalPrice: ${data.totalPrice}`);
-          setPaidAmount(data.totalPrice);
-        } else {
-          console.warn(`${LOG} Server returned no valid price:`, data);
-          // Set 0 so the conversion fires even without price — better than not firing
-          setPaidAmount(0);
-        }
-      })
-      .catch(err => {
-        console.error(`${LOG} Price fetch failed:`, err);
-        setPaidAmount(0);
-      });
-  }, [trackingNumber, isPayLater, isLoading, error, paidAmount]);
-
-  // ── Step 3: Fire conversion once all guards are satisfied ─────────────────
-  useEffect(() => {
-    const transactionId = jobNumber || trackingNumber;
-
-    console.log(`${LOG} Conversion guard check`, {
-      isPayLater,
-      isLoading,
-      error,
-      trackingNumber,
-      paidAmount,
-      transactionId,
-      'typeof window.gtag': typeof window.gtag,
-      alreadyFiredThisRender: conversionFiredRef.current,
-    });
-
-    if (conversionFiredRef.current) {
-      console.log(`${LOG} Conversion Skipped — already fired this render cycle`);
-      return;
-    }
-
-    if (isPayLater) {
-      console.log(`${LOG} Conversion Skipped — isPayLater: true (no card charge)`);
-      return;
-    }
-    if (isLoading) {
-      console.log(`${LOG} Conversion Skipped — isLoading: true (payment not yet confirmed)`);
-      return;
-    }
-    if (error) {
-      console.log(`${LOG} Conversion Skipped — error: "${error}"`);
-      return;
-    }
-    if (!trackingNumber) {
-      console.log(`${LOG} Conversion Skipped — trackingNumber: null`);
-      return;
-    }
-    if (paidAmount === null) {
-      console.log(`${LOG} Conversion Skipped — paidAmount: null (waiting for price fetch)`);
-      return;
-    }
-    if (!transactionId) {
-      console.log(`${LOG} Conversion Skipped — transactionId is empty`);
-      return;
-    }
-
+    if (isLoading || error || !trackingNumber) return;
+    if (conversionFiredRef.current) return;
     conversionFiredRef.current = true;
-    fireGoogleAdsConversion(paidAmount, transactionId);
 
-  }, [isPayLater, isLoading, error, trackingNumber, jobNumber, paidAmount]);
+    const transactionId = jobNumber || trackingNumber || String(Date.now());
+    // Use real price if available in state; fall back to 1 so we never pass NaN/null
+    const value = (paidAmount !== null && paidAmount > 0) ? paidAmount : 1;
 
-  // ── Auto-redirect countdown ───────────────────────────────────────────────
+    fireGoogleAdsConversion(value, transactionId);
+
+    // If price wasn't in the URL, fetch it for display purposes only (not for conversion)
+    if (paidAmount === null && !isPayLater) {
+      fetch(`/api/booking/confirmed-price?tracking=${encodeURIComponent(trackingNumber)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (typeof d.totalPrice === 'number' && d.totalPrice > 0) {
+            setPaidAmount(d.totalPrice);
+          }
+        })
+        .catch(() => {}); // silent — display only
+    }
+  }, [isLoading, error, trackingNumber]); // intentionally not depending on paidAmount
+
+  // ── Step 3: Auto-redirect countdown ──────────────────────────────────────
   useEffect(() => {
     if (!isLoading && !error && trackingNumber) {
       const timer = setInterval(() => {
-        setCountdown((prev) => {
+        setCountdown(prev => {
           if (prev <= 1) {
             clearInterval(timer);
-            const redirectUrl = user ? '/customer' : `/track?q=${trackingNumber}`;
-            setLocation(redirectUrl);
+            setLocation(user ? '/customer' : `/track?q=${trackingNumber}`);
             return 0;
           }
           return prev - 1;
@@ -213,7 +157,7 @@ export default function PaymentSuccess() {
     }
   }, [isLoading, error, trackingNumber, user, setLocation]);
 
-  // ── Stripe Checkout session confirmation (session_id path) ────────────────
+  // ── Stripe Checkout session confirmation ──────────────────────────────────
   const confirmPayment = async (sessionId: string) => {
     try {
       const response = await fetch('/api/booking/confirm-payment', {
@@ -229,8 +173,8 @@ export default function PaymentSuccess() {
       }
 
       setTrackingNumber(result.trackingNumber);
-      if (result.jobNumber)   setJobNumber(result.jobNumber);
-      if (result.totalPrice)  setPaidAmount(parseFloat(String(result.totalPrice)));
+      if (result.jobNumber)  setJobNumber(result.jobNumber);
+      if (result.totalPrice) setPaidAmount(parseFloat(String(result.totalPrice)));
       setIsLoading(false);
     } catch (err: any) {
       console.error('Payment confirmation error:', err);
@@ -287,7 +231,7 @@ export default function PaymentSuccess() {
                       </div>
                     )}
                     {trackingNumber && (
-                      <div className={jobNumber ? "pt-3 border-t border-primary/20" : ""}>
+                      <div className={jobNumber ? 'pt-3 border-t border-primary/20' : ''}>
                         <p className="text-sm text-muted-foreground mb-1">Tracking Number</p>
                         <p className="text-lg font-medium text-primary font-mono" data-testid="text-tracking-number">
                           {trackingNumber}
@@ -354,9 +298,7 @@ export default function PaymentSuccess() {
             {!isLoading && error && (
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button asChild className="flex-1" data-testid="link-contact">
-                  <Link href="/contact">
-                    Contact Support
-                  </Link>
+                  <Link href="/contact">Contact Support</Link>
                 </Button>
                 <Button asChild variant="outline" className="flex-1" data-testid="link-home-error">
                   <Link href="/">
