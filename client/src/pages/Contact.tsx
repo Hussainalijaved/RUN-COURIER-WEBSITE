@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Mail, Phone, MapPin, Clock, Loader2, Send, Star } from 'lucide-react';
 import { SiWhatsapp, SiTrustpilot } from 'react-icons/si';
 import { SmoothBackground } from '@/components/ui/smooth-image';
-import contactHeroImage from '@assets/generated_images/customer_service_lady_with_headphones.png';
+import contactHeroImage from '@assets/generated_images/customer_service_lady_with_headphones_opt.jpg';
 
 const contactSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -130,6 +130,7 @@ export default function Contact() {
     <PublicLayout>
       <SmoothBackground 
         src={contactHeroImage}
+        priority
         className="min-h-[400px] lg:min-h-[450px] flex items-center"
         overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50"
       >

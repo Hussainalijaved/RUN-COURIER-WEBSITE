@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { SmoothImage } from '@/components/ui/smooth-image';
-import logoImage from '@assets/run_courier_logo.png';
+import logoImage from '@assets/run_courier_logo_opt.png';
 import {
   Menu,
   X,

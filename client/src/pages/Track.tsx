@@ -20,7 +20,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { SmoothBackground } from '@/components/ui/smooth-image';
-import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept.png';
+import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept_opt.jpg';
 import type { JobStatus } from '@shared/schema';
 import { TrackingLiveMap } from '@/components/TrackingLiveMap';
 
@@ -256,6 +256,7 @@ export default function Track() {
     <PublicLayout>
       <SmoothBackground 
         src={trackingHeroImage}
+        priority
         className="min-h-[400px] flex items-center"
         overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0077B6]/60 to-[#00B4D8]/50"
       >

@@ -280,6 +280,7 @@ export default function Home() {
     <PublicLayout>
       <SmoothBackground 
         src={heroBackground}
+        priority
         className="min-h-[600px] lg:min-h-[700px] flex flex-col"
         overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50"
       >

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Link } from "wouter";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { SmoothBackground } from "@/components/ui/smooth-image";
-import supportHeroImage from "@assets/generated_images/customer_support_representative_professional.png";
+import supportHeroImage from "@assets/generated_images/customer_support_representative_professional_opt.jpg";
 import { 
   MapPin, 
   CreditCard, 
@@ -134,6 +134,7 @@ export default function Support() {
       {/* Page Header */}
       <SmoothBackground 
         src={supportHeroImage}
+        priority
         className="min-h-[400px] lg:min-h-[450px] flex items-center"
         overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50"
       >

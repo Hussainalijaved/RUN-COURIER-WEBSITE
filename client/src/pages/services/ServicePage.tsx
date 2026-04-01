@@ -24,9 +24,9 @@ import sameDayHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.06.18_8ff5
 import multiDropHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.07.21_17b4d701_1764877686495.jpg';
 import retailHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.19.15_47cde5e4_1764877777467.jpg';
 import returnTripHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_21.14.32_790bffe7_1764877840111.jpg';
-import scheduledHeroImage from '@assets/generated_images/scheduled_delivery_courier_service.png';
-import restaurantsHeroImage from '@assets/generated_images/restaurant_catering_delivery_service.png';
-import legalHeroImage from '@assets/generated_images/legal_document_courier_delivery.png';
+import scheduledHeroImage from '@assets/generated_images/scheduled_delivery_courier_service_opt.jpg';
+import restaurantsHeroImage from '@assets/generated_images/restaurant_catering_delivery_service_opt.jpg';
+import legalHeroImage from '@assets/generated_images/legal_document_courier_delivery_opt.jpg';
 
 interface ServicePageProps {
   type: 'same-day' | 'medical' | 'legal' | 'retail' | 'multi-drop' | 'return-trip' | 'scheduled' | 'restaurants';

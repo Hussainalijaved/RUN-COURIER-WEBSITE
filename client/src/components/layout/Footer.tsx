@@ -2,7 +2,7 @@ import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { SmoothImage } from '@/components/ui/smooth-image';
-import logoImage from '@assets/run_courier_logo.png';
+import logoImage from '@assets/run_courier_logo_opt.png';
 
 const footerLinks = {
   services: [

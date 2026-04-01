@@ -14,7 +14,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
-import logoImage from '@assets/run_courier_logo.png';
+import logoImage from '@assets/run_courier_logo_opt.png';
 
 export default function ContractSign() {
   const params = useParams<{ token: string }>();

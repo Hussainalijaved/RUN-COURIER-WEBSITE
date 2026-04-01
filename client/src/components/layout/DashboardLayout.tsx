@@ -4,7 +4,7 @@ import { NavigationProgress } from '@/components/NavigationProgress';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import logoImage from '@assets/run_courier_logo.png';
+import logoImage from '@assets/run_courier_logo_opt.png';
 import {
   Sidebar,
   SidebarContent,

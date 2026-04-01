@@ -62,6 +62,8 @@ interface SmoothBackgroundProps {
   className?: string;
   children?: React.ReactNode;
   overlayClassName?: string;
+  /** Set true for above-the-fold hero images (LCP element) — skips fade-in and hints high fetch priority */
+  priority?: boolean;
 }
 
 export function SmoothBackground({
@@ -69,12 +71,19 @@ export function SmoothBackground({
   className,
   children,
   overlayClassName,
+  priority = false,
 }: SmoothBackgroundProps) {
   const alreadyLoaded = loadedImages.has(src);
-  const [loaded, setLoaded] = useState(alreadyLoaded);
+  const [loaded, setLoaded] = useState(alreadyLoaded || priority);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
+    if (priority) {
+      loadedImages.add(src);
+      setLoaded(true);
+      return;
+    }
+
     if (loadedImages.has(src)) {
       setLoaded(true);
       return;
@@ -97,20 +106,38 @@ export function SmoothBackground({
     return () => {
       img.onload = null;
     };
-  }, [src]);
+  }, [src, priority]);
 
   return (
     <div className={cn("relative", className)}>
-      {!loaded && (
-        <div className="absolute inset-0 bg-muted/20 animate-pulse" />
+      {/* Priority (LCP) images: render an actual <img> so the browser preload scanner
+          discovers the resource and assigns it high priority. Visually it's identical
+          to the CSS background approach. */}
+      {priority ? (
+        <img
+          {...({ fetchpriority: 'high' } as React.ImgHTMLAttributes<HTMLImageElement>)}
+          src={src}
+          alt=""
+          aria-hidden="true"
+          loading="eager"
+          decoding="sync"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ pointerEvents: 'none' }}
+        />
+      ) : (
+        <>
+          {!loaded && (
+            <div className="absolute inset-0 bg-muted/20 animate-pulse" />
+          )}
+          <div
+            className={cn(
+              "absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out",
+              loaded ? "opacity-100" : "opacity-0"
+            )}
+            style={{ backgroundImage: `url(${src})` }}
+          />
+        </>
       )}
-      <div
-        className={cn(
-          "absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out",
-          loaded ? "opacity-100" : "opacity-0"
-        )}
-        style={{ backgroundImage: `url(${src})` }}
-      />
       {overlayClassName && (
         <div className={cn("absolute inset-0", overlayClassName)} />
       )}

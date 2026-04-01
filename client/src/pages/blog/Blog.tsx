@@ -318,6 +318,7 @@ export function BlogIndex() {
     <PublicLayout>
       <SmoothBackground
         src={heroImage}
+        priority
         className="min-h-[320px] flex items-center"
         overlayClassName="bg-gradient-to-r from-[#0077B6]/75 via-[#0096C7]/65 to-[#00B4D8]/55"
       >

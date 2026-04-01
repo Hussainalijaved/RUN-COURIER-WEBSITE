@@ -80,6 +80,7 @@ function SeoPage({
       {/* ── Hero ── */}
       <SmoothBackground
         src={heroImage}
+        priority
         className="min-h-[460px] lg:min-h-[520px] flex flex-col"
         overlayClassName={heroOverlay}
       >

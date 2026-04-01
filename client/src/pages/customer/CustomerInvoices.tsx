@@ -33,7 +33,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import type { Invoice, Job, InvoiceStatus } from '@shared/schema';
-import logoImage from '@assets/run_courier_logo.png';
+import logoImage from '@assets/run_courier_logo_opt.png';
 
 const getStatusBadge = (status: InvoiceStatus) => {
   switch (status) {
