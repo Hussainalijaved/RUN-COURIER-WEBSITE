@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
-import { Mail, Phone, MapPin, Clock } from 'lucide-react';
-import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore, SiGoogleplay, SiGoogle } from 'react-icons/si';
+import { Mail, Phone, MapPin } from 'lucide-react';
+import { SiFacebook, SiTrustpilot, SiAppstore, SiGoogle } from 'react-icons/si';
 import { SmoothImage } from '@/components/ui/smooth-image';
 import logoImage from '@assets/run_courier_logo_opt.png';
 
@@ -115,15 +115,6 @@ export function Footer() {
                 data-testid="appstore-link-top"
               >
                 <SiAppstore className="h-5 w-5" />
-              </a>
-              <a 
-                href="#" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
-                data-testid="playstore-link-top"
-              >
-                <SiGoogleplay className="h-5 w-5" />
               </a>
             </div>
           </div>
