@@ -468,11 +468,13 @@ export default function AdminRoutePlanner() {
       const data: RouteResult = await res.json();
       setRouteResult(data);
 
-      // Build the ordered list for display and map drawing
-      const ordered = [{ postcode: origin }, ...drops.map(p => ({ postcode: p }))];
+      // Rebuild stops in the optimised order the backend decided on.
+      // data.optimizedOrder[i] = index into the drops[] array for the i-th waypoint.
+      const orderedDrops = data.optimizedOrder.map(idx => drops[idx]);
+      const ordered = [{ postcode: origin }, ...orderedDrops.map(p => ({ postcode: p }))];
       setDisplayedStops(ordered);
 
-      // Draw on map
+      // Draw the exact road route in the same optimised order
       await drawDirectionsRoute(ordered.map(s => s.postcode));
 
       toast({
