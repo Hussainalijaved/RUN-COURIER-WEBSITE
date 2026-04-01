@@ -534,7 +534,7 @@ export default function Track() {
                   </CardContent>
                 </Card>
 
-                {job.driverName && (
+                {job.driverName && !['delivered', 'cancelled', 'failed'].includes(job.status) && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base flex items-center gap-2">
