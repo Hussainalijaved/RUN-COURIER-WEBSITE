@@ -9771,6 +9771,21 @@ export async function registerRoutes(
     });
   }));
 
+  // Minimal price lookup for booking confirmation page.
+  // Returns only totalPrice — tracking number acts as the auth token.
+  // Called by PaymentSuccess.tsx when ?amount= is not in the URL.
+  app.get("/api/booking/confirmed-price", asyncHandler(async (req, res) => {
+    const { tracking } = req.query;
+    if (!tracking || typeof tracking !== 'string') {
+      return res.status(400).json({ error: 'Tracking number required' });
+    }
+    const job = await storage.getJobByTrackingNumber(tracking.toUpperCase());
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    res.json({ totalPrice: parseFloat(String(job.totalPrice || 0)) });
+  }));
+
   const docUrlFields = ['profilePictureUrl', 'drivingLicenceFrontUrl', 'drivingLicenceBackUrl', 'dbsCertificateUrl', 'goodsInTransitInsuranceUrl', 'hireAndRewardUrl'] as const;
 
   function resolveDocUrls(app: any): any {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearch, Link, useLocation } from 'wouter';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, Package, Home, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
-// Declare gtag on window for TypeScript
 declare global {
   interface Window {
     gtag?: (...args: any[]) => void;
@@ -14,14 +13,27 @@ declare global {
 }
 
 const CONVERSION_TAG = 'AW-17051034778/8V4hCmnKgpQceEJrJyMI_';
+const LOG = '[GoogleAds]';
 
 function fireGoogleAdsConversion(value: number, transactionId: string) {
-  // Prevent duplicate firing on page refresh using sessionStorage
   const key = `rc_ads_conv_${transactionId}`;
-  if (sessionStorage.getItem(key)) return;
+
+  // ── Guard 1: sessionStorage duplicate prevention ─────────────────────────
+  if (sessionStorage.getItem(key)) {
+    console.log(`${LOG} Conversion Blocked by sessionStorage`, { key });
+    return;
+  }
+
+  // Mark as fired BEFORE the async gtag call so a rapid re-render can't slip in
   sessionStorage.setItem(key, '1');
 
   const fire = () => {
+    console.log(`${LOG} Google Ads Conversion Fired`, {
+      send_to: CONVERSION_TAG,
+      value,
+      currency: 'GBP',
+      transaction_id: transactionId,
+    });
     if (typeof window.gtag === 'function') {
       window.gtag('event', 'conversion', {
         send_to: CONVERSION_TAG,
@@ -29,13 +41,16 @@ function fireGoogleAdsConversion(value: number, transactionId: string) {
         currency: 'GBP',
         transaction_id: transactionId,
       });
+    } else {
+      console.warn(`${LOG} window.gtag not available after polling — conversion could not be sent`);
     }
   };
 
-  // gtag is deferred-loaded with a 2 s delay in index.html — poll until ready
+  // gtag is deferred-loaded 2 s after page load in index.html — poll until ready
   if (typeof window.gtag === 'function') {
     fire();
   } else {
+    console.log(`${LOG} window.gtag not yet ready — starting poll (max 6 s)`);
     let waited = 0;
     const timer = setInterval(() => {
       waited += 250;
@@ -44,6 +59,9 @@ function fireGoogleAdsConversion(value: number, transactionId: string) {
         fire();
       } else if (waited >= 6000) {
         clearInterval(timer);
+        console.warn(`${LOG} window.gtag never became available — conversion not sent`);
+        // Undo the sessionStorage mark so a future page load can retry
+        sessionStorage.removeItem(key);
       }
     }, 250);
   }
@@ -53,26 +71,39 @@ export default function PaymentSuccess() {
   const searchParams = useSearch();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
-  const [jobNumber, setJobNumber] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isPayLater, setIsPayLater] = useState(false);
-  const [countdown, setCountdown] = useState(5);
-  // Stores the confirmed paid amount for the conversion event
-  const [paidAmount, setPaidAmount] = useState<number | null>(null);
 
+  const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
+  const [jobNumber, setJobNumber]           = useState<string | null>(null);
+  const [isLoading, setIsLoading]           = useState(true);
+  const [error, setError]                   = useState<string | null>(null);
+  const [isPayLater, setIsPayLater]         = useState(false);
+  const [countdown, setCountdown]           = useState(5);
+  const [paidAmount, setPaidAmount]         = useState<number | null>(null);
+
+  // Ref to prevent double-firing in StrictMode double-invoke
+  const conversionFiredRef = useRef(false);
+
+  // ── Step 1: Parse URL params and kick off confirmation if needed ──────────
   useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    const sessionId = params.get('session_id');
-    const tracking = params.get('tracking');
-    const payLater = params.get('payLater');
-    const jn = params.get('jobNumber');
-    const amount = params.get('amount');
-    
-    if (jn) setJobNumber(jn);
-    if (amount) setPaidAmount(parseFloat(amount));
-    
+    const params      = new URLSearchParams(searchParams);
+    const sessionId   = params.get('session_id');
+    const tracking    = params.get('tracking');
+    const payLater    = params.get('payLater');
+    const jn          = params.get('jobNumber');
+    const amountParam = params.get('amount');
+
+    console.log(`${LOG} PaymentSuccess mounted`, {
+      route: '/payment/success',
+      tracking,
+      jobNumber: jn,
+      amount: amountParam,
+      payLater,
+      sessionId,
+    });
+
+    if (jn)          setJobNumber(jn);
+    if (amountParam) setPaidAmount(parseFloat(amountParam));
+
     if (payLater === 'true' && tracking) {
       setIsPayLater(true);
       setTrackingNumber(tracking);
@@ -88,22 +119,89 @@ export default function PaymentSuccess() {
     }
   }, [searchParams]);
 
-  // Fire Google Ads purchase conversion once when a paid booking is confirmed
+  // ── Step 2: When tracking is confirmed but amount is missing, fetch it ────
+  // This handles the case where the customer lands on the page without ?amount=
+  // in the URL (e.g. deployed site before the ?amount= fix, or manual navigation).
   useEffect(() => {
-    if (!isPayLater && !isLoading && !error && trackingNumber && paidAmount !== null) {
-      const transactionId = jobNumber || trackingNumber;
-      fireGoogleAdsConversion(paidAmount, transactionId);
+    if (!trackingNumber || isPayLater || isLoading || error || paidAmount !== null) return;
+
+    console.log(`${LOG} Amount not in URL — fetching from server for tracking: ${trackingNumber}`);
+
+    fetch(`/api/booking/confirmed-price?tracking=${encodeURIComponent(trackingNumber)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data.totalPrice === 'number' && data.totalPrice > 0) {
+          console.log(`${LOG} Server returned totalPrice: ${data.totalPrice}`);
+          setPaidAmount(data.totalPrice);
+        } else {
+          console.warn(`${LOG} Server returned no valid price:`, data);
+          // Set 0 so the conversion fires even without price — better than not firing
+          setPaidAmount(0);
+        }
+      })
+      .catch(err => {
+        console.error(`${LOG} Price fetch failed:`, err);
+        setPaidAmount(0);
+      });
+  }, [trackingNumber, isPayLater, isLoading, error, paidAmount]);
+
+  // ── Step 3: Fire conversion once all guards are satisfied ─────────────────
+  useEffect(() => {
+    const transactionId = jobNumber || trackingNumber;
+
+    console.log(`${LOG} Conversion guard check`, {
+      isPayLater,
+      isLoading,
+      error,
+      trackingNumber,
+      paidAmount,
+      transactionId,
+      'typeof window.gtag': typeof window.gtag,
+      alreadyFiredThisRender: conversionFiredRef.current,
+    });
+
+    if (conversionFiredRef.current) {
+      console.log(`${LOG} Conversion Skipped — already fired this render cycle`);
+      return;
     }
+
+    if (isPayLater) {
+      console.log(`${LOG} Conversion Skipped — isPayLater: true (no card charge)`);
+      return;
+    }
+    if (isLoading) {
+      console.log(`${LOG} Conversion Skipped — isLoading: true (payment not yet confirmed)`);
+      return;
+    }
+    if (error) {
+      console.log(`${LOG} Conversion Skipped — error: "${error}"`);
+      return;
+    }
+    if (!trackingNumber) {
+      console.log(`${LOG} Conversion Skipped — trackingNumber: null`);
+      return;
+    }
+    if (paidAmount === null) {
+      console.log(`${LOG} Conversion Skipped — paidAmount: null (waiting for price fetch)`);
+      return;
+    }
+    if (!transactionId) {
+      console.log(`${LOG} Conversion Skipped — transactionId is empty`);
+      return;
+    }
+
+    conversionFiredRef.current = true;
+    fireGoogleAdsConversion(paidAmount, transactionId);
+
   }, [isPayLater, isLoading, error, trackingNumber, jobNumber, paidAmount]);
 
-  // Auto-redirect countdown after booking is confirmed
+  // ── Auto-redirect countdown ───────────────────────────────────────────────
   useEffect(() => {
     if (!isLoading && !error && trackingNumber) {
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            // Redirect to customer dashboard if logged in, otherwise to tracking page
             const redirectUrl = user ? '/customer' : `/track?q=${trackingNumber}`;
             setLocation(redirectUrl);
             return 0;
@@ -111,11 +209,11 @@ export default function PaymentSuccess() {
           return prev - 1;
         });
       }, 1000);
-
       return () => clearInterval(timer);
     }
   }, [isLoading, error, trackingNumber, user, setLocation]);
 
+  // ── Stripe Checkout session confirmation (session_id path) ────────────────
   const confirmPayment = async (sessionId: string) => {
     try {
       const response = await fetch('/api/booking/confirm-payment', {
@@ -131,9 +229,8 @@ export default function PaymentSuccess() {
       }
 
       setTrackingNumber(result.trackingNumber);
-      if (result.jobNumber) setJobNumber(result.jobNumber);
-      // Capture paid amount from server response for conversion tracking
-      if (result.totalPrice) setPaidAmount(parseFloat(result.totalPrice));
+      if (result.jobNumber)   setJobNumber(result.jobNumber);
+      if (result.totalPrice)  setPaidAmount(parseFloat(String(result.totalPrice)));
       setIsLoading(false);
     } catch (err: any) {
       console.error('Payment confirmation error:', err);
@@ -231,7 +328,6 @@ export default function PaymentSuccess() {
                   </div>
                 </div>
 
-                {/* Auto-redirect countdown */}
                 <div className="text-center text-sm text-muted-foreground" data-testid="text-redirect-countdown">
                   Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
                 </div>
