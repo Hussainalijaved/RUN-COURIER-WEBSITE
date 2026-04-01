@@ -2,8 +2,8 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
-// Base URL for tracking links - uses current deployment or production
-const BASE_URL = process.env.APP_URL || 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev';
+// Base URL for tracking links - always use production domain in emails
+const BASE_URL = process.env.APP_URL || 'https://runcourier.co.uk';
 
 // Logo URL - derived from BASE_URL to stay consistent across deployments
 const LOGO_URL = `${BASE_URL}/logo-email.jpg`;

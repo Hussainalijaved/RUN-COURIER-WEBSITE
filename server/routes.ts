@@ -9191,7 +9191,7 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Customer email or customer ID required" });
     }
 
-    const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
     
     const session = await stripeService.createCheckoutSession(
       stripeCustomerId,
@@ -9554,7 +9554,7 @@ export async function registerRoutes(
     }
 
     const customerEmail = bookingData.customerEmail || `${bookingData.pickupPhone}@guest.runcourier.co.uk`;
-    const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
     
     const session = await stripeService.createBookingCheckoutSession(
       customerEmail,
@@ -11940,10 +11940,9 @@ export async function registerRoutes(
       });
     }
     
-    // Generate payment URL
-    const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-    const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
-    const paymentUrl = `${protocol}://${baseUrl}/invoice-pay/${paymentToken}`;
+    // Generate payment URL - always use production domain, fall back to request host in dev
+    const baseUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+    const paymentUrl = `${baseUrl}/invoice-pay/${paymentToken}`;
     
     // Save invoice to Supabase for future reference
     const invoiceId = uuidv4();
