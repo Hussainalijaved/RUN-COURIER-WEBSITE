@@ -225,7 +225,7 @@ export default function AdminRoutePlanner() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
-  const polylineRef = useRef<google.maps.Polyline | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
   const mapsReadyRef = useRef(false);
 
   const { data: drivers } = useQuery<Driver[]>({ queryKey: ['/api/drivers'] });
@@ -275,83 +275,127 @@ export default function AdminRoutePlanner() {
     return () => { delete window._routePlannerMapCb; };
   }, [initMap]);
 
-  // ── Geocode & draw on map ────────────────────────────────────────────────
-  const drawMarkersAndPolyline = useCallback(async (orderedPostcodes: string[]) => {
+  // ── Draw exact road route via Directions API ─────────────────────────────
+  const drawDirectionsRoute = useCallback(async (orderedPostcodes: string[]) => {
     if (!mapInstanceRef.current || !window.google?.maps) return;
     const map = mapInstanceRef.current;
 
-    // Clear previous
+    // Clear any previous markers and directions renderer
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
-    if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
-
-    // Geocode each stop via our backend proxy
-    const coords: google.maps.LatLng[] = [];
-    for (let i = 0; i < orderedPostcodes.length; i++) {
-      try {
-        const res = await fetch(`/api/maps/geocode?address=${encodeURIComponent(orderedPostcodes[i] + ', UK')}`);
-        const data = await res.json();
-        if (data.results?.[0]?.geometry?.location) {
-          const { lat, lng } = data.results[0].geometry.location;
-          coords.push(new google.maps.LatLng(lat, lng));
-        }
-      } catch { /* skip if geocoding fails */ }
+    if (directionsRendererRef.current) {
+      directionsRendererRef.current.setMap(null);
+      directionsRendererRef.current = null;
     }
 
-    if (coords.length === 0) return;
+    if (orderedPostcodes.length < 2) return;
 
     const total = orderedPostcodes.length;
-    const bounds = new google.maps.LatLngBounds();
+    const origin = orderedPostcodes[0] + ', UK';
+    const destination = orderedPostcodes[total - 1] + ', UK';
+    const waypoints = orderedPostcodes.slice(1, -1).map(p => ({
+      location: p + ', UK',
+      stopover: true,
+    }));
 
-    coords.forEach((coord, i) => {
-      bounds.extend(coord);
-      const label = ALPHA[i] || String(i + 1);
-      const color = stopColor(i, total);
+    const directionsService = new google.maps.DirectionsService();
 
-      // SVG pin marker
-      const svgMarker = {
-        path: google.maps.SymbolPath.CIRCLE,
-        fillColor: color,
-        fillOpacity: 1,
-        strokeColor: '#fff',
-        strokeWeight: 2,
-        scale: 14,
-      };
-
-      const marker = new google.maps.Marker({
-        position: coord,
-        map,
-        icon: svgMarker,
-        label: { text: label, color: '#fff', fontSize: '11px', fontWeight: 'bold' },
-        title: orderedPostcodes[i],
-        zIndex: 100 + i,
+    try {
+      const result = await directionsService.route({
+        origin,
+        destination,
+        waypoints,
+        travelMode: google.maps.TravelMode.DRIVING,
+        optimizeWaypoints: false, // backend already ordered the stops
+        region: 'GB',
       });
-      markersRef.current.push(marker);
-    });
 
-    // Draw polyline connecting stops in order
-    if (coords.length >= 2) {
-      const polyline = new google.maps.Polyline({
-        path: coords,
-        geodesic: true,
-        strokeColor: '#2563eb',
-        strokeOpacity: 0.85,
-        strokeWeight: 4,
+      // Renderer draws the exact road-following route — same path as leg breakdown
+      const renderer = new google.maps.DirectionsRenderer({
         map,
-        icons: [{
-          icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, strokeColor: '#1d4ed8' },
-          offset: '50%',
-        }],
+        directions: result,
+        suppressMarkers: true, // we draw custom labelled markers below
+        polylineOptions: {
+          strokeColor: '#2563eb',
+          strokeOpacity: 0.9,
+          strokeWeight: 5,
+        },
       });
-      polylineRef.current = polyline;
-    }
+      directionsRendererRef.current = renderer;
 
-    // Fit map to show all stops
-    if (coords.length === 1) {
-      map.setCenter(coords[0]);
-      map.setZoom(13);
-    } else {
+      // Add custom A/B/C… circle markers matching the leg-breakdown labels
+      const bounds = new google.maps.LatLngBounds();
+      result.routes[0].legs.forEach((leg, i) => {
+        const pos = leg.start_location;
+        bounds.extend(pos);
+        const label = ALPHA[i] || String(i + 1);
+        const color = stopColor(i, total);
+        markersRef.current.push(new google.maps.Marker({
+          position: pos,
+          map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: color,
+            fillOpacity: 1,
+            strokeColor: '#fff',
+            strokeWeight: 2,
+            scale: 14,
+          },
+          label: { text: label, color: '#fff', fontSize: '11px', fontWeight: 'bold' },
+          title: orderedPostcodes[i],
+          zIndex: 100 + i,
+        }));
+      });
+
+      // Last stop (destination)
+      const lastLeg = result.routes[0].legs[result.routes[0].legs.length - 1];
+      const lastPos = lastLeg.end_location;
+      bounds.extend(lastPos);
+      markersRef.current.push(new google.maps.Marker({
+        position: lastPos,
+        map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: stopColor(total - 1, total),
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+          scale: 14,
+        },
+        label: { text: ALPHA[total - 1] || String(total), color: '#fff', fontSize: '11px', fontWeight: 'bold' },
+        title: orderedPostcodes[total - 1],
+        zIndex: 100 + total - 1,
+      }));
+
       map.fitBounds(bounds, { top: 60, bottom: 40, left: 40, right: 40 });
+    } catch (err) {
+      console.error('[RoutePlanner] DirectionsService error:', err);
+      // Fallback: geocode & draw straight-line markers so the map isn't blank
+      for (let i = 0; i < orderedPostcodes.length; i++) {
+        try {
+          const res = await fetch(`/api/maps/geocode?address=${encodeURIComponent(orderedPostcodes[i] + ', UK')}`);
+          const data = await res.json();
+          if (data.results?.[0]?.geometry?.location) {
+            const { lat, lng } = data.results[0].geometry.location;
+            const coord = new google.maps.LatLng(lat, lng);
+            markersRef.current.push(new google.maps.Marker({
+              position: coord,
+              map,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: stopColor(i, orderedPostcodes.length),
+                fillOpacity: 1,
+                strokeColor: '#fff',
+                strokeWeight: 2,
+                scale: 14,
+              },
+              label: { text: ALPHA[i] || String(i + 1), color: '#fff', fontSize: '11px', fontWeight: 'bold' },
+              title: orderedPostcodes[i],
+              zIndex: 100 + i,
+            }));
+          }
+        } catch { /* skip */ }
+      }
     }
   }, []);
 
@@ -429,7 +473,7 @@ export default function AdminRoutePlanner() {
       setDisplayedStops(ordered);
 
       // Draw on map
-      await drawMarkersAndPolyline(ordered.map(s => s.postcode));
+      await drawDirectionsRoute(ordered.map(s => s.postcode));
 
       toast({
         title: 'Route calculated',
@@ -472,7 +516,7 @@ export default function AdminRoutePlanner() {
     setDisplayedStops([]);
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
-    if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
+    if (directionsRendererRef.current) { directionsRendererRef.current.setMap(null); directionsRendererRef.current = null; }
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setCenter({ lat: 52.5, lng: -1.5 });
       mapInstanceRef.current.setZoom(6);
