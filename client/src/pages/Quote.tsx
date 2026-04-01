@@ -72,6 +72,17 @@ const vehicleOptions: { type: VehicleType; icon: any; name: string; maxWeight: n
 ];
 
 export default function Quote() {
+  useEffect(() => {
+    const title = 'Get an Instant Courier Quote | Run Courier';
+    const desc = 'Get an instant same-day courier quote from Run Courier. Enter your pickup and delivery postcodes for an immediate online price — no sign-up required. Fast, reliable delivery across London and the UK.';
+    document.title = title;
+    (document.querySelector('meta[name="description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', title);
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/quote');
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/quote');
+  }, []);
+
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { booking, updateBooking } = useBooking();

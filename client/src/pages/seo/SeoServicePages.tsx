@@ -29,7 +29,7 @@ import urgentHeroImage from '@assets/WhatsApp_Image_2025-09-06_at_20.08.04_32824
 
 /* ─────────────────────────────────────────────────────── helpers ──── */
 
-function setPageMeta(title: string, description: string) {
+function setPageMeta(title: string, description: string, canonicalPath: string) {
   document.title = title;
   const meta = document.querySelector('meta[name="description"]');
   if (meta) meta.setAttribute('content', description);
@@ -37,6 +37,9 @@ function setPageMeta(title: string, description: string) {
   if (og) og.setAttribute('content', title);
   let ogDesc = document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null;
   if (ogDesc) ogDesc.setAttribute('content', description);
+  const url = `https://runcourier.co.uk${canonicalPath}`;
+  (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', url);
+  (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', url);
 }
 
 interface FeatureItem { icon: typeof Clock; text: string }
@@ -45,6 +48,7 @@ interface SectionBlock { heading: string; body: string }
 interface SeoPageProps {
   title: string;
   metaDescription: string;
+  canonicalPath: string;
   h1: string;
   heroSubtitle: string;
   heroImage: string;
@@ -60,6 +64,7 @@ interface SeoPageProps {
 function SeoPage({
   title,
   metaDescription,
+  canonicalPath,
   h1,
   heroSubtitle,
   heroImage,
@@ -72,8 +77,8 @@ function SeoPage({
   ctaQuoteLabel = 'Get a Quote',
 }: SeoPageProps) {
   useEffect(() => {
-    setPageMeta(title, metaDescription);
-  }, [title, metaDescription]);
+    setPageMeta(title, metaDescription, canonicalPath);
+  }, [title, metaDescription, canonicalPath]);
 
   return (
     <PublicLayout>
@@ -208,6 +213,7 @@ export function SameDayCourierLondon() {
     <SeoPage
       title="Same Day Courier London | Run Courier – 60-Minute Collection"
       metaDescription="Need a same day courier in London? Run Courier offers 60-minute collection, live GPS tracking, and guaranteed same day delivery across London and the UK."
+      canonicalPath="/same-day-courier-london"
       h1="Same Day Courier London"
       heroSubtitle="Collection within 60 minutes. Direct delivery to your recipient. Live tracking every step of the way — across London and the wider UK."
       heroImage={sameDayHeroImage}
@@ -258,6 +264,7 @@ export function MedicalCourierPage() {
     <SeoPage
       title="Medical Courier London | Run Courier – Safe Healthcare Logistics"
       metaDescription="Run Courier's medical courier service handles pathology samples, pharmaceuticals, and medical equipment across London with full compliance and chain of custody."
+      canonicalPath="/medical-courier"
       h1="Medical Courier London"
       heroSubtitle="Secure, compliant, and time-critical healthcare logistics for NHS trusts, hospitals, laboratories, and pharmaceutical organisations across London and the UK."
       heroImage={medicalHeroImage}
@@ -308,6 +315,7 @@ export function BusinessCourierServices() {
     <SeoPage
       title="Business Courier Services London | Run Courier – Corporate Delivery"
       metaDescription="Professional business courier services for London companies. Same day delivery, multi-drop routes, account billing, and dedicated support for your business logistics."
+      canonicalPath="/business-courier-services"
       h1="Business Courier Services London"
       heroSubtitle="Reliable, professional courier services for London businesses. From urgent same day deliveries to regular multi-drop distribution routes — we handle your logistics so you can focus on your business."
       heroImage={businessHeroImage}
@@ -358,6 +366,7 @@ export function UrgentDeliveryLondon() {
     <SeoPage
       title="Urgent Delivery London | Run Courier – Same Hour Courier Service"
       metaDescription="Need urgent delivery in London? Run Courier dispatches within minutes. Direct, dedicated service for time-critical deliveries anywhere in London and the UK."
+      canonicalPath="/urgent-delivery-london"
       h1="Urgent Delivery London"
       heroSubtitle="When it absolutely cannot wait. Run Courier dispatches a dedicated driver within minutes — direct collection, non-stop delivery, live tracking from start to finish."
       heroImage={urgentHeroImage}

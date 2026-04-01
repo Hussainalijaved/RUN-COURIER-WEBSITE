@@ -266,8 +266,13 @@ export default function Home() {
 
   useEffect(() => {
     document.title = 'Same Day Courier London | Run Courier – Fast & Reliable Delivery';
+    const desc = 'Run Courier provides fast, reliable same-day courier services across London and the UK. Book urgent and scheduled deliveries with real-time tracking.';
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute('content', 'Run Courier provides fast, reliable same-day courier services across London and the UK. Book urgent and scheduled deliveries with real-time tracking.');
+    if (meta) meta.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', 'Same Day Courier London | Run Courier – Fast & Reliable Delivery');
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/');
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/');
   }, []);
 
   const handleTrack = () => {

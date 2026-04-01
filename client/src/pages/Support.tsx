@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -80,6 +80,17 @@ const faqs = [
 ];
 
 export default function Support() {
+  useEffect(() => {
+    const title = 'Help & Support | Run Courier';
+    const desc = 'Get help with your Run Courier deliveries. Find answers to frequently asked questions, track your parcel, contact our support team, and manage your account.';
+    document.title = title;
+    (document.querySelector('meta[name="description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', title);
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/support');
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/support');
+  }, []);
+
   const { toast } = useToast();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);

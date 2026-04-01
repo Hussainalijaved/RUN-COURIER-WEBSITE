@@ -10,7 +10,7 @@ import article1Image from '@assets/WhatsApp_Image_2025-11-10_at_20.06.18_8ff558b
 import article2Image from '@assets/WhatsApp_Image_2025-11-10_at_20.19.15_47cde5e4_1764877777467.jpg';
 import article3Image from '@assets/WhatsApp_Image_2025-09-03_at_19.11.49_c1dbfbad_1764877241699.jpg';
 
-function setPageMeta(title: string, description: string) {
+function setPageMeta(title: string, description: string, canonicalPath: string) {
   document.title = title;
   const meta = document.querySelector('meta[name="description"]');
   if (meta) meta.setAttribute('content', description);
@@ -18,6 +18,9 @@ function setPageMeta(title: string, description: string) {
   if (og) og.setAttribute('content', title);
   const ogDesc = document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null;
   if (ogDesc) ogDesc.setAttribute('content', description);
+  const url = `https://runcourier.co.uk${canonicalPath}`;
+  (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', url);
+  (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', url);
 }
 
 /* ─────────────────────────────── Article content components ──── */
@@ -311,6 +314,7 @@ export function BlogIndex() {
     setPageMeta(
       'Courier Blog — Insights & Guides | Run Courier',
       'Expert guides and insights on same-day courier services, urgent delivery solutions, and healthcare logistics in London from the Run Courier team.',
+      '/blog',
     );
   }, []);
 
@@ -413,7 +417,7 @@ export function BlogPost() {
 
   useEffect(() => {
     if (article) {
-      setPageMeta(article.metaTitle, article.metaDescription);
+      setPageMeta(article.metaTitle, article.metaDescription, `/blog/${article.slug}`);
     } else {
       document.title = 'Article Not Found | Run Courier Blog';
     }

@@ -125,6 +125,17 @@ interface MockJob {
 const REFRESH_INTERVAL = 10000; // Refresh every 10 seconds for live updates
 
 export default function Track() {
+  useEffect(() => {
+    const title = 'Track Your Parcel | Run Courier Live Tracking';
+    const desc = 'Track your Run Courier delivery in real time. Enter your booking reference to see live driver location, estimated arrival, and delivery status updates.';
+    document.title = title;
+    (document.querySelector('meta[name="description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', title);
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/track');
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/track');
+  }, []);
+
   const searchParams = useSearch();
   const queryParams = new URLSearchParams(searchParams);
   const routeParams = useParams<{ trackingNumber?: string }>();

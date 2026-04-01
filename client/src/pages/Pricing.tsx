@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -117,6 +118,17 @@ const additionalCharges = [
 
 export default function Pricing() {
   const { vehicles } = defaultPricingConfig;
+
+  useEffect(() => {
+    const title = 'Courier Pricing London | Run Courier – Transparent Delivery Costs';
+    const desc = 'Simple, transparent courier pricing for same-day London deliveries. Get an instant online quote — bikes, cars, vans, and large vans. No hidden fees, 24/7 availability.';
+    document.title = title;
+    (document.querySelector('meta[name="description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', title);
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/pricing');
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/pricing');
+  }, []);
 
   return (
     <PublicLayout>

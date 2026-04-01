@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'wouter';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
@@ -227,10 +228,65 @@ const serviceData = {
   },
 };
 
+const serviceMeta: Record<string, { title: string; desc: string; path: string }> = {
+  'same-day': {
+    title: 'Same-Day Delivery London | Run Courier – 60-Minute Collection',
+    desc: 'Book a same-day courier in London. Collection within 60 minutes, delivery within 4 hours. Available 24/7 with live GPS tracking and proof of delivery.',
+    path: '/services/same-day',
+  },
+  'medical': {
+    title: 'Medical Courier Services London | Run Courier – Healthcare Logistics',
+    desc: 'Specialist medical courier services in London. GDPR-compliant same-day transport of specimens, medications, lab samples, and sensitive healthcare materials.',
+    path: '/services/medical',
+  },
+  'legal': {
+    title: 'Legal Document Courier London | Run Courier – Confidential Delivery',
+    desc: 'Secure, confidential legal document courier in London. Court documents, contracts, and sensitive legal materials delivered same-day with chain of custody.',
+    path: '/services/legal',
+  },
+  'retail': {
+    title: 'Retail & E-Commerce Delivery London | Run Courier – Last-Mile Solutions',
+    desc: 'Last-mile delivery for retailers and e-commerce businesses in London. Same-day fulfilment, branded delivery experience, and proof of delivery for every order.',
+    path: '/services/retail',
+  },
+  'multi-drop': {
+    title: 'Multi-Drop Courier Distribution London | Run Courier',
+    desc: 'Efficient multi-drop courier distribution across London. Smart routing, multiple stops, and individual proof of delivery for each location in a single booking.',
+    path: '/services/multi-drop',
+  },
+  'return-trip': {
+    title: 'Return Trip Courier Service London | Run Courier',
+    desc: 'Same driver, round trip. Run Courier\'s return trip service handles collection and delivery in one seamless booking — perfect for collections and exchanges.',
+    path: '/services/return-trip',
+  },
+  'scheduled': {
+    title: 'Scheduled Delivery Service | Run Courier – Plan Ahead',
+    desc: 'Plan ahead with Run Courier\'s scheduled delivery service. Book deliveries days in advance across London and the UK with guaranteed time slots.',
+    path: '/services/scheduled',
+  },
+  'restaurants': {
+    title: 'Restaurant & Catering Delivery London | Run Courier',
+    desc: 'Specialist food and catering courier services in London. Temperature-aware, same-day deliveries for restaurants, caterers, and food businesses.',
+    path: '/services/restaurants',
+  },
+};
+
 export default function ServicePage({ type }: ServicePageProps) {
   const service = serviceData[type];
   const Icon = service.icon;
   const heroImage = 'heroImage' in service ? service.heroImage : null;
+
+  useEffect(() => {
+    const meta = serviceMeta[type];
+    if (!meta) return;
+    document.title = meta.title;
+    (document.querySelector('meta[name="description"]') as HTMLMetaElement | null)?.setAttribute('content', meta.desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', meta.title);
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', meta.desc);
+    const url = `https://runcourier.co.uk${meta.path}`;
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', url);
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', url);
+  }, [type]);
 
   return (
     <PublicLayout>

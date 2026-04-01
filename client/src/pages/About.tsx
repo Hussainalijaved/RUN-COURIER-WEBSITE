@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { SmoothBackground } from '@/components/ui/smooth-image';
@@ -44,10 +45,22 @@ const stats = [
 ];
 
 export default function About() {
+  useEffect(() => {
+    const title = 'About Run Courier | London\'s Trusted Same-Day Courier';
+    const desc = 'Run Courier is a professional same-day delivery and logistics company serving London and the UK. Learn about our mission, values, fleet, and commitment to reliable, time-critical courier services.';
+    document.title = title;
+    (document.querySelector('meta[name="description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', title);
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/about');
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/about');
+  }, []);
+
   return (
     <PublicLayout>
       <SmoothBackground 
         src={aboutHeroImage}
+        priority
         className="min-h-[400px] lg:min-h-[500px] flex items-center"
         overlayClassName="bg-gradient-to-r from-[#0077B6]/70 via-[#0096C7]/60 to-[#00B4D8]/50"
       >

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -61,7 +61,7 @@ const contactInfo: {
     title: 'Office',
     details: [
       { text: '112 Bridgwater Road' },
-      { text: 'London, UK, HA4 6LW' },
+      { text: 'Ruislip, London HA4 6LW' },
     ],
     subtext: '24/7 Service Available',
   },
@@ -77,6 +77,17 @@ const contactInfo: {
 ];
 
 export default function Contact() {
+  useEffect(() => {
+    const title = 'Contact Run Courier | +44 20 4634 6100 | Same-Day Courier London';
+    const desc = 'Get in touch with Run Courier. Call +44 20 4634 6100 or email info@runcourier.co.uk. Based at 112 Bridgwater Road, Ruislip, London HA4 6LW. 24/7 courier service.';
+    document.title = title;
+    (document.querySelector('meta[name="description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', title);
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/contact');
+    (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/contact');
+  }, []);
+
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
