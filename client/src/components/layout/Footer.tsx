@@ -190,10 +190,20 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-border mt-8 pt-6">
+        <div className="border-t border-border mt-8 pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
           <p className="text-sm text-muted-foreground text-center">
             © {new Date().getFullYear()} Run Courier. All rights reserved.
           </p>
+          <span className="hidden sm:inline text-muted-foreground text-sm">·</span>
+          <a
+            href="https://www.google.com/maps/place/RUN+COURIER"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="link-find-us-google"
+          >
+            Find us on Google
+          </a>
         </div>
       </div>
     </footer>
