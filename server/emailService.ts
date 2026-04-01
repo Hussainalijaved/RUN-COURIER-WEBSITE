@@ -2215,67 +2215,115 @@ export async function sendJobCancellationEmail(
     totalPrice?: string;
   }
 ): Promise<boolean> {
+  // ── Amount is the original paid amount passed in from the DB (already in £).
+  // It is formatted by the caller as `£X.XX` — never recalculated here.
+  const amountDisplay = data.totalPrice || null;
+
   const content = `
-    <h2 style="color: #dc3545; margin-top: 0;">Booking Cancelled</h2>
-    <p style="color: #333; font-size: 16px;">
+    <!-- Header message -->
+    <h2 style="color: #dc3545; margin: 0 0 16px 0; font-size: 22px; font-weight: bold;">Booking Cancelled</h2>
+    <p style="color: #333; font-size: 16px; margin: 0 0 8px 0;">
       Dear ${data.customerName || 'Valued Customer'},
     </p>
-    <p style="color: #333; font-size: 16px;">
+    <p style="color: #555; font-size: 15px; margin: 0 0 24px 0; line-height: 1.5;">
       We regret to inform you that your delivery booking has been cancelled.
     </p>
-    
-    <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <h3 style="color: #333; margin-top: 0;">Booking Details</h3>
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 8px 0; color: #333; width: 140px;"><strong>Tracking #:</strong></td>
-          <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold;">${data.trackingNumber}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #333;"><strong>Pickup:</strong></td>
-          <td style="padding: 8px 0; color: #333;">${data.pickupPostcode}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #333;"><strong>Delivery:</strong></td>
-          <td style="padding: 8px 0; color: #333;">${data.deliveryPostcode}</td>
-        </tr>
-        ${data.totalPrice ? `
-        <tr>
-          <td style="padding: 8px 0; color: #333;"><strong>Amount:</strong></td>
-          <td style="padding: 8px 0; color: #333;">${data.totalPrice}</td>
-        </tr>
-        ` : ''}
-      </table>
-    </div>
-    
+
+    <!-- Booking details — full-width table, label column capped so it never overflows on 320px screens -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
+           style="border-collapse: collapse; background-color: #f8f9fa; border-radius: 8px; margin: 0 0 20px 0;">
+      <tr>
+        <td style="padding: 20px 20px 8px 20px;">
+          <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: bold; color: #333; text-transform: uppercase; letter-spacing: 0.5px;">Booking Details</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 0 20px 20px 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
+            <tr>
+              <td style="padding: 7px 12px 7px 0; color: #666; font-size: 14px; width: 38%; vertical-align: top; white-space: nowrap;">Tracking #</td>
+              <td style="padding: 7px 0; color: #111; font-size: 14px; font-family: 'Courier New', Courier, monospace; font-weight: bold; word-break: break-all;">${data.trackingNumber}</td>
+            </tr>
+            <tr style="border-top: 1px solid #e9ecef;">
+              <td style="padding: 7px 12px 7px 0; color: #666; font-size: 14px; vertical-align: top; white-space: nowrap;">Pickup</td>
+              <td style="padding: 7px 0; color: #333; font-size: 14px;">${data.pickupPostcode}</td>
+            </tr>
+            <tr style="border-top: 1px solid #e9ecef;">
+              <td style="padding: 7px 12px 7px 0; color: #666; font-size: 14px; vertical-align: top; white-space: nowrap;">Delivery</td>
+              <td style="padding: 7px 0; color: #333; font-size: 14px;">${data.deliveryPostcode}</td>
+            </tr>
+            ${amountDisplay ? `
+            <tr style="border-top: 1px solid #e9ecef;">
+              <td style="padding: 7px 12px 7px 0; color: #666; font-size: 14px; vertical-align: top; white-space: nowrap;">Amount Paid</td>
+              <td style="padding: 7px 0; color: #111; font-size: 16px; font-weight: bold;">${amountDisplay}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </td>
+      </tr>
+    </table>
+
     ${data.cancellationReason ? `
-    <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <h3 style="color: #856404; margin-top: 0;">Reason for Cancellation</h3>
-      <p style="color: #856404; font-size: 14px; margin: 0;">
-        ${data.cancellationReason}
-      </p>
-    </div>
+    <!-- Cancellation reason box -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
+           style="border-collapse: collapse; background-color: #fff8e1; border: 1px solid #ffc107; border-radius: 8px; margin: 0 0 20px 0;">
+      <tr>
+        <td style="padding: 16px 20px;">
+          <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #856404; text-transform: uppercase; letter-spacing: 0.5px;">Reason for Cancellation</p>
+          <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.5;">${data.cancellationReason}</p>
+        </td>
+      </tr>
+    </table>
     ` : ''}
-    
-    <p style="color: #333; font-size: 14px;">
-      If you have already made a payment for this booking, a refund will be processed within 5-7 business days.
+
+    <!-- Refund notice -->
+    ${amountDisplay ? `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
+           style="border-collapse: collapse; background-color: #e8f4fd; border-radius: 8px; margin: 0 0 20px 0;">
+      <tr>
+        <td style="padding: 14px 20px;">
+          <p style="margin: 0; color: #0c5460; font-size: 14px; line-height: 1.5;">
+            <strong>Refund information:</strong> A refund of <strong>${amountDisplay}</strong> will be returned to your original payment method within 5&ndash;7 business days.
+          </p>
+        </td>
+      </tr>
+    </table>
+    ` : `
+    <p style="color: #555; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;">
+      If you have already made a payment for this booking, a refund will be processed within 5&ndash;7 business days.
     </p>
-    
-    <p style="color: #333; font-size: 14px;">
+    `}
+
+    <p style="color: #555; font-size: 14px; line-height: 1.5; margin: 0 0 24px 0;">
       If you have any questions or would like to rebook, please don't hesitate to contact us.
     </p>
-    
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${BASE_URL}/book" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
-        Book Another Delivery
-      </a>
-    </div>
-    
-    <div style="text-align: center; margin: 20px 0;">
-      <a href="tel:+442046346100" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-size: 14px; display: inline-block;">
-        Call Us: +44 20 4634 6100
-      </a>
-    </div>
+
+    <!-- CTA buttons — table-based so they render full-width on mobile without media queries -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse; margin: 0 0 12px 0;">
+      <tr>
+        <td align="center" style="padding: 0 0 12px 0;">
+          <a href="${BASE_URL}/book"
+             style="background-color: #007BFF; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold;
+                    display: block; width: 100%; max-width: 320px; box-sizing: border-box;
+                    padding: 15px 24px; border-radius: 6px; text-align: center; mso-padding-alt: 0;">
+            Book Another Delivery
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td align="center" style="padding: 0 0 12px 0;">
+          <a href="tel:+442046346100"
+             style="background-color: #28a745; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: bold;
+                    display: block; width: 100%; max-width: 320px; box-sizing: border-box;
+                    padding: 13px 24px; border-radius: 6px; text-align: center; mso-padding-alt: 0;">
+            Call Us: +44 20 4634 6100
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Bottom spacer — prevents content being hidden behind Gmail mobile reply bar -->
+    <div style="height: 48px; line-height: 48px; font-size: 1px;">&nbsp;</div>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Booking Cancelled');
@@ -2286,19 +2334,21 @@ Dear ${data.customerName || 'Valued Customer'},
 We regret to inform you that your delivery booking has been cancelled.
 
 Booking Details:
-- Tracking #: ${data.trackingNumber}
-- Pickup: ${data.pickupPostcode}
-- Delivery: ${data.deliveryPostcode}
-${data.totalPrice ? `- Amount: ${data.totalPrice}` : ''}
+  Tracking #: ${data.trackingNumber}
+  Pickup:     ${data.pickupPostcode}
+  Delivery:   ${data.deliveryPostcode}
+${amountDisplay ? `  Amount Paid: ${amountDisplay}` : ''}
 
 ${data.cancellationReason ? `Reason for Cancellation:
-${data.cancellationReason}` : ''}
+${data.cancellationReason}
 
-If you have already made a payment for this booking, a refund will be processed within 5-7 business days.
+` : ''}${amountDisplay ? `A refund of ${amountDisplay} will be returned to your original payment method within 5-7 business days.` : 'If you have already made a payment for this booking, a refund will be processed within 5-7 business days.'}
 
-If you have any questions or would like to rebook, please contact us at +44 20 4634 6100.
+To rebook or for any questions, please contact us:
+  Phone: +44 20 4634 6100
+  Web:   ${BASE_URL}/book
 
-Run Courier - https://runcourier.co.uk`;
+Run Courier — ${BASE_URL}`;
 
   return sendEmailNotification(customerEmail, `Booking Cancelled - ${data.trackingNumber}`, htmlContent, textContent);
 }
