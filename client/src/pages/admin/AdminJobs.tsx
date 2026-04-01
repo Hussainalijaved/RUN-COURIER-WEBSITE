@@ -35,6 +35,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -603,11 +604,6 @@ export default function AdminJobs() {
   const labelRef = useRef<HTMLDivElement>(null);
   const prevJobCountRef = useRef<number>(0);
 
-  // ── Table scroll sync refs ─────────────────────────────────────────────────
-  const tableScrollRef    = useRef<HTMLDivElement>(null);
-  const topScrollRef      = useRef<HTMLDivElement>(null);
-  const scrollPhantomRef  = useRef<HTMLDivElement>(null);
-  const isSyncingScrollRef = useRef(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { playAlert, playNotification } = useNotificationSound({ enabled: soundEnabled, volume: 0.7 });
@@ -1546,39 +1542,6 @@ export default function AdminJobs() {
     });
   };
 
-  // ── Table scroll sync: keep top scrollbar & table in sync ─────────────────
-  useEffect(() => {
-    const tableEl = tableScrollRef.current;
-    if (!tableEl) return;
-    const update = () => {
-      if (scrollPhantomRef.current) {
-        scrollPhantomRef.current.style.width = `${tableEl.scrollWidth}px`;
-      }
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(tableEl);
-    return () => observer.disconnect();
-  }, [filteredJobs]);
-
-  const handleTableScroll = () => {
-    if (isSyncingScrollRef.current) return;
-    isSyncingScrollRef.current = true;
-    if (topScrollRef.current && tableScrollRef.current) {
-      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
-    }
-    requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
-  };
-
-  const handleTopScroll = () => {
-    if (isSyncingScrollRef.current) return;
-    isSyncingScrollRef.current = true;
-    if (tableScrollRef.current && topScrollRef.current) {
-      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
-    }
-    requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
-  };
-
   const openLabelDialog = async (job: Job) => {
     setJobForLabel(job);
     setMultiDropStops([]);
@@ -1940,59 +1903,25 @@ export default function AdminJobs() {
                 ))}
               </div>
             ) : filteredJobs.length > 0 ? (
-              <>
-                {/* ── Top mirror scrollbar ─────────────────────────────────────────────
-                    Always visible above the table — moving it scrolls the table too.
-                    The phantom div inside is kept the same width as the table. */}
-                <div
-                  ref={topScrollRef}
-                  className="overflow-x-auto"
-                  style={{
-                    height: 14,
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: 'hsl(var(--border)) transparent',
-                  }}
-                  onScroll={handleTopScroll}
-                >
-                  <div ref={scrollPhantomRef} style={{ height: 1, minWidth: '100%' }} />
-                </div>
-
-                {/* ── Table container ───────────────────────────────────────────────────
-                    height-constrained so it scrolls BOTH axes internally — no page scroll
-                    needed to reach the horizontal scrollbar at the bottom. */}
-                <div
-                  ref={tableScrollRef}
-                  className="overflow-auto"
-                  style={{
-                    maxHeight: 'calc(100vh - 460px)',
-                    minHeight: 280,
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: 'hsl(var(--border)) transparent',
-                  }}
-                  onScroll={handleTableScroll}
-                >
-              <Table className="min-w-[1100px]">
+              <div className="overflow-x-auto">
+              <Table>
                 <TableHeader>
-                  <TableRow className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))] hover:bg-background">
-                    <TableHead className="w-[40px] min-w-[40px] sticky left-0 z-30 bg-background">
-                      <Checkbox 
+                  <TableRow>
+                    <TableHead className="w-[40px]">
+                      <Checkbox
                         checked={allAssignableSelected}
                         onCheckedChange={toggleAllAssignable}
                         disabled={assignableJobs.length === 0}
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead className="min-w-[100px] sticky left-[40px] z-30 bg-background">Job No.</TableHead>
-                    <TableHead className="min-w-[130px] sticky left-[140px] z-30 bg-background">Tracking #</TableHead>
-                    <TableHead className="min-w-[110px] sticky left-[270px] z-30 bg-background border-r border-border">Type</TableHead>
+                    <TableHead>Job No.</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Vehicle</TableHead>
                     <TableHead>Driver</TableHead>
-                    <TableHead>Office</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Pickup Time</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Driver Pay</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -2001,18 +1930,21 @@ export default function AdminJobs() {
                     const isAssignable = ['pending', 'offered', 'assigned'].includes(job.status) && 
                       !['picked_up', 'on_the_way_delivery', 'delivered', 'cancelled'].includes(job.status);
                     return (
-                    <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
-                      {/* ── Frozen col 1: checkbox ── */}
-                      <TableCell className="sticky left-0 z-10 bg-background">
-                        <Checkbox 
+                    <TableRow
+                      key={job.id}
+                      data-testid={`row-job-${job.id}`}
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => setSelectedJob(job)}
+                    >
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        <Checkbox
                           checked={selectedJobIds.has(String(job.id))}
                           onCheckedChange={() => toggleJobSelection(job.id)}
                           disabled={!isAssignable}
                           data-testid={`checkbox-job-${job.id}`}
                         />
                       </TableCell>
-                      {/* ── Frozen col 2: Job No. ── */}
-                      <TableCell className="font-mono text-sm font-semibold sticky left-[40px] z-10 bg-background">
+                      <TableCell className="font-mono text-sm font-semibold">
                         <span className="flex items-center gap-1 group/copy">
                           <span>{(job as any).jobNumber || '—'}</span>
                           {(job as any).jobNumber && (
@@ -2022,82 +1954,21 @@ export default function AdminJobs() {
                           )}
                         </span>
                       </TableCell>
-                      {/* ── Frozen col 3: Tracking # ── */}
-                      <TableCell className="font-mono text-xs text-muted-foreground sticky left-[140px] z-10 bg-background">
-                        <span className="flex items-center gap-1 group/copy">
-                          <span>{job.trackingNumber}</span>
-                          <span className="invisible group-hover/copy:visible">
-                            <CopyButton value={job.trackingNumber} data-testid={`button-copy-tracking-${job.id}`} />
-                          </span>
-                        </span>
-                      </TableCell>
-                      {/* ── Frozen col 4: Type — right border marks the freeze line ── */}
-                      <TableCell className="sticky left-[270px] z-10 bg-background border-r border-border">
-                        {(job as any).customerType === 'business' ? (
-                          <Badge variant="outline" className="gap-1">
-                            <Building2 className="h-3 w-3" />
-                            Business
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="gap-1">
-                            <User className="h-3 w-3" />
-                            Individual
-                          </Badge>
-                        )}
-                      </TableCell>
                       <TableCell>
                         <div className="text-sm">
                           <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-green-500" />
+                            <MapPin className="h-3 w-3 text-green-500 shrink-0" />
                             {job.pickupPostcode}
                           </div>
                           <div className="flex items-center gap-1 text-muted-foreground">
-                            <MapPin className="h-3 w-3 text-red-500" />
+                            <MapPin className="h-3 w-3 text-red-500 shrink-0" />
                             {job.deliveryPostcode}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="capitalize">{job.vehicleType?.replace('_', ' ')}</TableCell>
-                      <TableCell>{getDriverName(job.driverId)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {job.officeCity ? (
-                            <Badge variant="outline" className="gap-1 text-xs whitespace-nowrap" data-testid={`badge-office-${job.id}`}>
-                              <Building2 className="h-3 w-3" />
-                              {job.officeCity}
-                            </Badge>
-                          ) : null}
-                          {(job as any).createdBy ? (() => {
-                            const raw: string = (job as any).createdBy;
-                            if (raw === 'Office') {
-                              return (
-                                <Badge variant="secondary" className="gap-1 text-xs whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
-                                  <Building2 className="h-3 w-3" />
-                                  Office
-                                </Badge>
-                              );
-                            }
-                            if (raw.toLowerCase().startsWith('admin:')) {
-                              return (
-                                <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
-                                  Admin: {raw.slice(6).trim()}
-                                </span>
-                              );
-                            }
-                            if (raw.toLowerCase().startsWith('supervisor:')) {
-                              return (
-                                <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
-                                  Sup: {raw.slice(11).trim()}
-                                </span>
-                              );
-                            }
-                            return (
-                              <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-created-by-${job.id}`}>
-                                {raw}
-                              </span>
-                            );
-                          })() : null}
-                        </div>
+                      <TableCell className="capitalize text-sm">{job.vehicleType?.replace(/_/g, ' ')}</TableCell>
+                      <TableCell className="text-sm">
+                        {job.driverId ? getDriverName(job.driverId) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -2111,7 +1982,7 @@ export default function AdminJobs() {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(job.createdAt)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex flex-col items-end gap-1">
                           <span className="font-medium">{formatPrice(job.totalPrice)}</span>
                           {job.status !== 'cancelled' && (
@@ -2129,27 +2000,7 @@ export default function AdminJobs() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        {(job.driverPrice !== null && job.driverPrice !== undefined) ? (
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="font-medium text-green-600">{formatPrice(job.driverPrice)}</span>
-                            <Badge 
-                              variant="default"
-                              className={`text-xs cursor-pointer ${job.driverPaymentStatus === 'paid' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
-                              onClick={() => updateDriverPaymentMutation.mutate({ 
-                                jobId: job.id, 
-                                driverPaymentStatus: job.driverPaymentStatus === 'paid' ? 'unpaid' : 'paid' 
-                              })}
-                              data-testid={`badge-payment-${job.id}`}
-                            >
-                              {job.driverPaymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
-                            </Badge>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
+                      <TableCell onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                         {/* One-click assign for unassigned pending jobs */}
                         {!job.driverId && job.status === 'pending' && (
@@ -2348,8 +2199,7 @@ export default function AdminJobs() {
                   })}
                 </TableBody>
               </Table>
-                </div>{/* /tableScrollRef */}
-              </>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Package className="h-12 w-12 text-muted-foreground mb-4" />
@@ -2360,13 +2210,13 @@ export default function AdminJobs() {
         </Card>
 
         {/* View Job Details Dialog */}
-        <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-            <DialogHeader className="flex-shrink-0">
+        <Sheet open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
+          <SheetContent className="w-[640px] sm:max-w-[640px] overflow-y-auto flex flex-col gap-0 p-0">
+            <SheetHeader className="flex-shrink-0 p-6 border-b">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
-                  <DialogTitle>Job Details</DialogTitle>
-                  <DialogDescription asChild>
+                  <SheetTitle>Job Details</SheetTitle>
+                  <SheetDescription asChild>
                     <div className="flex flex-col gap-1 mt-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-muted-foreground">Job No.</span>
@@ -2392,7 +2242,7 @@ export default function AdminJobs() {
                       )}
                       <span className="text-xs">Created on {selectedJob && formatDate(selectedJob.createdAt)}</span>
                     </div>
-                  </DialogDescription>
+                  </SheetDescription>
                 </div>
                 {selectedJob && (
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
@@ -2424,9 +2274,9 @@ export default function AdminJobs() {
                   </div>
                 )}
               </div>
-            </DialogHeader>
+            </SheetHeader>
             {selectedJob && (
-              <div className="space-y-6 overflow-y-auto flex-1 pr-2">
+              <div className="space-y-6 p-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <h4 className="font-semibold mb-2">Pickup</h4>
@@ -2969,8 +2819,8 @@ export default function AdminJobs() {
                 </div>
               </div>
             )}
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
 
         {/* Assign Driver Dialog */}
         <Dialog open={assignDialogOpen} onOpenChange={(open) => {
