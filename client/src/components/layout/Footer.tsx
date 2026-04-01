@@ -11,6 +11,10 @@ const footerLinks = {
     { href: '/services/retail', label: 'Retail & E-commerce' },
     { href: '/services/multi-drop', label: 'Multi-Drop' },
     { href: '/services/return-trip', label: 'Return Trip' },
+    { href: '/same-day-courier-london', label: 'Same Day Courier London' },
+    { href: '/urgent-delivery-london', label: 'Urgent Delivery London' },
+    { href: '/medical-courier', label: 'Medical Courier London' },
+    { href: '/business-courier-services', label: 'Business Courier Services' },
   ],
   company: [
     { href: '/about', label: 'About Us' },

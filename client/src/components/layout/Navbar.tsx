@@ -35,6 +35,11 @@ const navLinks = [
       { href: '/services/retail', label: 'Retail & E-commerce' },
       { href: '/services/multi-drop', label: 'Multi-Drop' },
       { href: '/services/return-trip', label: 'Return Trip' },
+      { separator: true },
+      { href: '/same-day-courier-london', label: 'Same Day Courier London' },
+      { href: '/urgent-delivery-london', label: 'Urgent Delivery London' },
+      { href: '/medical-courier', label: 'Medical Courier London' },
+      { href: '/business-courier-services', label: 'Business Courier Services' },
     ],
   },
   { href: '/track', label: 'Track Parcel' },
@@ -84,14 +89,18 @@ export function Navbar() {
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  {link.children.map((child) => (
-                    <DropdownMenuItem key={child.href} asChild>
-                      <Link href={child.href} className="w-full cursor-pointer" data-testid={`nav-${child.label.toLowerCase().replace(/\s/g, '-')}`}>
-                        {child.label}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
+                <DropdownMenuContent align="start" className="w-56">
+                  {link.children.map((child, childIdx) =>
+                    (child as any).separator ? (
+                      <DropdownMenuSeparator key={`sep-${childIdx}`} />
+                    ) : (
+                      <DropdownMenuItem key={child.href} asChild>
+                        <Link href={child.href!} className="w-full cursor-pointer" data-testid={`nav-${child.label!.toLowerCase().replace(/\s/g, '-')}`}>
+                          {child.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    )
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
@@ -162,21 +171,25 @@ export function Navbar() {
               <div className="flex flex-col gap-4 pt-8">
                 {navLinks.map((link, idx) =>
                   link.children ? (
-                    <div key={idx} className="flex flex-col gap-2">
-                      <span className="text-sm font-medium text-muted-foreground">
+                    <div key={idx} className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-muted-foreground px-2">
                         {link.label}
                       </span>
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={() => setIsOpen(false)}
-                        >
-                          <Button variant="ghost" className="w-full justify-start pl-4">
-                            {child.label}
-                          </Button>
-                        </Link>
-                      ))}
+                      {link.children.map((child, childIdx) =>
+                        (child as any).separator ? (
+                          <div key={`sep-${childIdx}`} className="border-t border-border my-1" />
+                        ) : (
+                          <Link
+                            key={child.href}
+                            href={child.href!}
+                            onClick={() => setIsOpen(false)}
+                          >
+                            <Button variant="ghost" className="w-full justify-start pl-4">
+                              {child.label}
+                            </Button>
+                          </Link>
+                        )
+                      )}
                     </div>
                   ) : (
                     <Link
