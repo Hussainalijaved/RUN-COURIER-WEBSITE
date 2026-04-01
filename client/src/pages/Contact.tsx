@@ -17,8 +17,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Phone, MapPin, Clock, Loader2, Send } from 'lucide-react';
-import { SiWhatsapp } from 'react-icons/si';
+import { Mail, Phone, MapPin, Clock, Loader2, Send, Star } from 'lucide-react';
+import { SiWhatsapp, SiTrustpilot } from 'react-icons/si';
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import contactHeroImage from '@assets/generated_images/customer_service_lady_with_headphones.png';
 
@@ -275,6 +275,30 @@ export default function Contact() {
                   </CardContent>
                 </Card>
               ))}
+
+              <a
+                href="https://uk.trustpilot.com/review/runcourier.co.uk"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="contact-trustpilot-link"
+              >
+                <Card className="hover-elevate cursor-pointer">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <SiTrustpilot className="h-6 w-6 text-green-500 flex-shrink-0" />
+                      <span className="font-semibold text-green-600">Rated Excellent</span>
+                    </div>
+                    <div className="flex gap-0.5 mb-2">
+                      {[1,2,3,4,5].map((i) => (
+                        <Star key={i} className="h-5 w-5 fill-green-500 text-green-500" />
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      See our verified customer reviews on Trustpilot
+                    </p>
+                  </CardContent>
+                </Card>
+              </a>
             </div>
           </div>
         </div>
@@ -313,6 +337,29 @@ export default function Contact() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border" aria-label="Our office location">
+        <div className="container mx-auto px-4 py-10">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold mb-2">Find Us</h2>
+            <p className="text-muted-foreground text-sm">
+              112 Bridgwater Road, Ruislip, London HA4 6LW
+            </p>
+          </div>
+          <div className="w-full rounded-xl overflow-hidden border border-border" style={{ height: '380px' }}>
+            <iframe
+              src="https://maps.google.com/maps?q=112+Bridgwater+Road,+Ruislip,+HA4+6LW,+London&t=&z=15&ie=UTF8&iwloc=&output=embed"
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Run Courier Office Location – 112 Bridgwater Road, Ruislip"
+            />
           </div>
         </div>
       </section>

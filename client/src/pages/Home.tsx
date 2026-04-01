@@ -28,6 +28,10 @@ import {
   Users,
   Timer,
   Headphones,
+  BadgeCheck,
+  FileCheck,
+  Building2,
+  Banknote,
 } from 'lucide-react';
 
 function useCountUp(end: number, duration: number = 2000, startOnView: boolean = true) {
@@ -171,6 +175,57 @@ const features = [
     icon: Package,
     title: 'Any Size',
     description: 'From urgent documents to bulky equipment, our diverse fleet handles everything. Motorbikes, cars, and vans ready for any job.',
+  },
+  {
+    icon: BadgeCheck,
+    title: 'DBS Checked Drivers',
+    description: 'Every driver is thoroughly vetted with DBS checks and identity verification. Your consignments are always in safe, professional hands.',
+  },
+  {
+    icon: FileCheck,
+    title: 'Digital Proof of Delivery',
+    description: 'Instant digital confirmation with photo capture, recipient signature, and GPS timestamp. A full audit trail is available the moment delivery is made.',
+  },
+  {
+    icon: Building2,
+    title: 'Business Accounts',
+    description: 'Set up a business account for consolidated monthly billing, priority booking, and volume discounts. Tailored for companies of all sizes.',
+  },
+  {
+    icon: Banknote,
+    title: 'Transparent Pricing',
+    description: 'Upfront quotes with no hidden fees, no fuel surcharges, and no surprises. You know exactly what you pay before confirming your booking.',
+  },
+];
+
+const testimonials = [
+  {
+    quote: "Run Courier delivered urgent court documents within 45 minutes of our call. Exceptional service that kept our case on track. Reliable, professional, and incredibly fast when it matters most.",
+    name: "James Thornton",
+    role: "Operations Manager",
+    company: "Legal Services, London",
+    rating: 5,
+  },
+  {
+    quote: "We use Run Courier for all our medical specimen transfers between sites. Their drivers handle everything with the utmost care and understand the urgency. Couldn't ask for a more dependable partner.",
+    name: "Dr. Sarah Mitchell",
+    role: "Pathology Coordinator",
+    company: "NHS Trust, London",
+    rating: 5,
+  },
+  {
+    quote: "Our e-commerce business runs on Run Courier for same-day London deliveries. The real-time tracking has virtually eliminated 'where's my order?' calls. Our customers love the experience.",
+    name: "Marcus Reid",
+    role: "Founder",
+    company: "Online Retail, Greater London",
+    rating: 5,
+  },
+  {
+    quote: "Multi-drop deliveries used to take two members of staff all day. Run Courier handles the same routes in half the time and the drivers are always courteous and on time. Brilliant service.",
+    name: "Emma Lawson",
+    role: "Operations Director",
+    company: "Catering & Events Company",
+    rating: 5,
   },
 ];
 
@@ -458,6 +513,48 @@ export default function Home() {
                 Track your delivery in real-time until it arrives
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials Section ── */}
+      <section className="py-20 bg-card border-t border-border">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">What Our Customers Say</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Thousands of businesses and individuals trust Run Courier every day. Here's what some of them have to say.
+            </p>
+            <a
+              href="https://uk.trustpilot.com/review/runcourier.co.uk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-4 text-sm text-green-600 hover:underline font-medium"
+              data-testid="testimonials-trustpilot-link"
+            >
+              <SiTrustpilot className="h-4 w-4" />
+              See all reviews on Trustpilot
+            </a>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            {testimonials.map((t, idx) => (
+              <Card key={idx} className="flex flex-col">
+                <CardContent className="p-6 flex flex-col gap-4 h-full">
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: t.rating }).map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-green-500 text-green-500" />
+                    ))}
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted-foreground flex-1">
+                    "{t.quote}"
+                  </p>
+                  <div className="border-t border-border pt-4">
+                    <p className="font-semibold text-sm">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.role} · {t.company}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
