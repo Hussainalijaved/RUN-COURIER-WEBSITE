@@ -1941,21 +1941,34 @@ export default function AdminJobs() {
               </div>
             ) : filteredJobs.length > 0 ? (
               <>
-                {/* Top mirror scrollbar — lets you scroll horizontally without reaching the bottom */}
+                {/* ── Top mirror scrollbar ─────────────────────────────────────────────
+                    Always visible above the table — moving it scrolls the table too.
+                    The phantom div inside is kept the same width as the table. */}
                 <div
                   ref={topScrollRef}
-                  className="overflow-x-auto mb-px"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}
+                  className="overflow-x-auto"
+                  style={{
+                    height: 14,
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'hsl(var(--border)) transparent',
+                  }}
                   onScroll={handleTopScroll}
                 >
                   <div ref={scrollPhantomRef} style={{ height: 1, minWidth: '100%' }} />
                 </div>
 
-                {/* Scrollable table container with its own horizontal scrollbar */}
+                {/* ── Table container ───────────────────────────────────────────────────
+                    height-constrained so it scrolls BOTH axes internally — no page scroll
+                    needed to reach the horizontal scrollbar at the bottom. */}
                 <div
                   ref={tableScrollRef}
-                  className="overflow-x-auto"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}
+                  className="overflow-auto"
+                  style={{
+                    maxHeight: 'calc(100vh - 460px)',
+                    minHeight: 280,
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'hsl(var(--border)) transparent',
+                  }}
                   onScroll={handleTableScroll}
                 >
               <Table className="min-w-[1100px]">
