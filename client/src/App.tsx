@@ -88,6 +88,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Login, { AdminLogin } from "@/pages/Login";
 import Signup, { DriverSignup, VendorSignup } from "@/pages/Signup";
+import Quote from "@/pages/Quote";
 
 const About = lazy(() => import("@/pages/About"));
 const Contact = lazy(() => import("@/pages/Contact"));
@@ -99,7 +100,6 @@ const AdminSignup = lazy(() => import("@/pages/AdminSignup"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Book = lazy(() => import("@/pages/Book"));
-const Quote = lazy(() => import("@/pages/Quote"));
 const PaymentSuccess = lazy(() => import("@/pages/PaymentSuccess"));
 const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
 const PaymentLink = lazy(() => import("@/pages/PaymentLink").then(m => ({ default: m.default })));

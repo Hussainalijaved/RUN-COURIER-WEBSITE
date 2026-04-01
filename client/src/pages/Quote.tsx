@@ -464,7 +464,7 @@ export default function Quote() {
                   </CardHeader>
                   <CardContent>
                     <Form {...form}>
-                      <form className="space-y-6">
+                      <form className="space-y-6" aria-label="Get a delivery quote">
                         <div className="grid sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
