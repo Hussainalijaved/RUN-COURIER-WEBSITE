@@ -66,7 +66,7 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4">
-        <Link href="/" className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0 min-w-0" data-testid="logo-link">
+        <Link href="/" onClick={() => setLocation('/')} className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0 min-w-0 cursor-pointer" data-testid="logo-link">
           <SmoothImage 
             src={logoImage} 
             alt="Run Courier" 
