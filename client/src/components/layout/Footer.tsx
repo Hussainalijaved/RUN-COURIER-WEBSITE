@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
-import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore, SiGoogleplay } from 'react-icons/si';
+import { SiWhatsapp, SiFacebook, SiTrustpilot, SiAppstore, SiGoogleplay, SiGoogle } from 'react-icons/si';
 import { SmoothImage } from '@/components/ui/smooth-image';
 import logoImage from '@assets/run_courier_logo_opt.png';
 
@@ -96,6 +96,16 @@ export function Footer() {
                 data-testid="trustpilot-link-top"
               >
                 <SiTrustpilot className="h-5 w-5" />
+              </a>
+              <a
+                href="https://share.google/HvFEmz6I7HRFfmOjx"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#4285F4] hover:text-[#1a73e8] transition-colors"
+                aria-label="Find us on Google"
+                data-testid="google-business-link"
+              >
+                <SiGoogle className="h-5 w-5" />
               </a>
               <a 
                 href="https://apps.apple.com/app/run-courier-driver/id6756506175" 
