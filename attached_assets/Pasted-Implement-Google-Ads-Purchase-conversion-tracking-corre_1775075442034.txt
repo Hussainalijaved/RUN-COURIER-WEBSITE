@@ -1,0 +1,55 @@
+Implement Google Ads Purchase conversion tracking correctly for my Run Courier website.
+
+IMPORTANT:
+- Do not change any existing pricing, booking, Stripe, design, or business logic except what is required for conversion tracking.
+- Fix this end-to-end professionally.
+- The conversion must fire ONLY after a successful Stripe payment, never on quote page load, booking form load, button click, or before payment.
+- If there is no proper payment success page, create one and use it only for successful paid bookings.
+
+Google Ads event snippet to implement:
+<script>
+gtag('event', 'conversion', {
+  'send_to': 'AW-17051034778/8V4hCmnKgpQceEJrJyMI_',
+  'value': FINAL_PRICE,
+  'currency': 'GBP',
+  'transaction_id': BOOKING_ID
+});
+</script>
+
+What I need you to do:
+1. Find the exact point in my website flow where Stripe confirms payment success.
+2. Make sure the customer is redirected after successful payment to a dedicated success page such as:
+   /booking-success
+   or reuse my existing success/confirmation page if one already exists.
+3. Fire the Google Ads conversion ONLY on that success page and only for confirmed successful Stripe payments.
+4. Replace:
+   - FINAL_PRICE with the real final paid booking total dynamically
+   - BOOKING_ID with the real unique booking/order/payment reference dynamically
+5. Use currency GBP.
+6. Prevent duplicate conversion firing on page refresh or repeat visits to the success page.
+7. If the global Google tag is missing, install it correctly site-wide before the event snippet.
+8. Keep the event snippet in the correct place and ensure it works with my existing custom code.
+9. Preserve GCLID / Google click identifier through the booking and Stripe payment flow if needed.
+10. Test the full flow and confirm:
+   - conversion only fires after real successful payment
+   - value sent equals real booking amount
+   - transaction_id is unique
+   - no conversion fires on quote page or before payment
+   - no duplicate conversions on refresh
+
+Technical expectations:
+- My website is custom-coded, so implement this in code, not as a fake placeholder.
+- Do not leave value as 1.0.
+- Do not leave transaction_id empty.
+- Do not use page-load conversion on /Quote or any quote page.
+- Do not break Stripe checkout or booking confirmation flow.
+
+If needed, update Stripe success_url so it redirects to the correct success page with enough data to identify the paid booking securely.
+
+At the end, show me:
+1. which files you changed
+2. the exact success page route used
+3. where the Google tag was added
+4. where the conversion event fires
+5. how duplicate firing is prevented
+6. how FINAL_PRICE and BOOKING_ID are populated

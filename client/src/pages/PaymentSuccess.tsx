@@ -6,6 +6,49 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, Package, Home, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
+// Declare gtag on window for TypeScript
+declare global {
+  interface Window {
+    gtag?: (...args: any[]) => void;
+  }
+}
+
+const CONVERSION_TAG = 'AW-17051034778/8V4hCmnKgpQceEJrJyMI_';
+
+function fireGoogleAdsConversion(value: number, transactionId: string) {
+  // Prevent duplicate firing on page refresh using sessionStorage
+  const key = `rc_ads_conv_${transactionId}`;
+  if (sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, '1');
+
+  const fire = () => {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', 'conversion', {
+        send_to: CONVERSION_TAG,
+        value,
+        currency: 'GBP',
+        transaction_id: transactionId,
+      });
+    }
+  };
+
+  // gtag is deferred-loaded with a 2 s delay in index.html — poll until ready
+  if (typeof window.gtag === 'function') {
+    fire();
+  } else {
+    let waited = 0;
+    const timer = setInterval(() => {
+      waited += 250;
+      if (typeof window.gtag === 'function') {
+        clearInterval(timer);
+        fire();
+      } else if (waited >= 6000) {
+        clearInterval(timer);
+      }
+    }, 250);
+  }
+}
+
 export default function PaymentSuccess() {
   const searchParams = useSearch();
   const { user } = useAuth();
@@ -16,6 +59,8 @@ export default function PaymentSuccess() {
   const [error, setError] = useState<string | null>(null);
   const [isPayLater, setIsPayLater] = useState(false);
   const [countdown, setCountdown] = useState(5);
+  // Stores the confirmed paid amount for the conversion event
+  const [paidAmount, setPaidAmount] = useState<number | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
@@ -23,8 +68,10 @@ export default function PaymentSuccess() {
     const tracking = params.get('tracking');
     const payLater = params.get('payLater');
     const jn = params.get('jobNumber');
+    const amount = params.get('amount');
     
     if (jn) setJobNumber(jn);
+    if (amount) setPaidAmount(parseFloat(amount));
     
     if (payLater === 'true' && tracking) {
       setIsPayLater(true);
@@ -40,6 +87,14 @@ export default function PaymentSuccess() {
       setIsLoading(false);
     }
   }, [searchParams]);
+
+  // Fire Google Ads purchase conversion once when a paid booking is confirmed
+  useEffect(() => {
+    if (!isPayLater && !isLoading && !error && trackingNumber && paidAmount !== null) {
+      const transactionId = jobNumber || trackingNumber;
+      fireGoogleAdsConversion(paidAmount, transactionId);
+    }
+  }, [isPayLater, isLoading, error, trackingNumber, jobNumber, paidAmount]);
 
   // Auto-redirect countdown after booking is confirmed
   useEffect(() => {
@@ -77,6 +132,8 @@ export default function PaymentSuccess() {
 
       setTrackingNumber(result.trackingNumber);
       if (result.jobNumber) setJobNumber(result.jobNumber);
+      // Capture paid amount from server response for conversion tracking
+      if (result.totalPrice) setPaidAmount(parseFloat(result.totalPrice));
       setIsLoading(false);
     } catch (err: any) {
       console.error('Payment confirmation error:', err);

@@ -1685,10 +1685,11 @@ export default function Book() {
                       title: 'Payment Successful!',
                       description: `Your booking has been confirmed. Job number: ${jobNumber || trackingNumber}`,
                     });
+                    const paidAmount = pendingBookingData?.totalPrice ?? 0;
                     clearBooking();
                     setPrefetchedClientSecret(null);
                     setPrefetchedPaymentIntentId(null);
-                    setLocation(`/payment/success?tracking=${trackingNumber}&jobNumber=${jobNumber || ''}`);
+                    setLocation(`/payment/success?tracking=${trackingNumber}&jobNumber=${jobNumber || ''}&amount=${paidAmount}`);
                   }}
                   onCancel={() => {
                     setShowEmbeddedPayment(false);

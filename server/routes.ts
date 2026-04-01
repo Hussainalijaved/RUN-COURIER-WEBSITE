@@ -9766,7 +9766,8 @@ export async function registerRoutes(
       success: true, 
       trackingNumber: job.trackingNumber,
       jobNumber: job.jobNumber || jobNumber,
-      jobId: job.id 
+      jobId: job.id,
+      totalPrice
     });
   }));
 
