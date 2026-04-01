@@ -147,8 +147,9 @@ export async function sendSMS(to: string, message: string): Promise<{ success: b
 }
 
 // Send booking confirmation SMS to customer
-export async function sendBookingConfirmationSMS(phone: string, trackingNumber: string, pickupAddress: string): Promise<{ success: boolean; error?: string }> {
-  const message = `Run Courier: Your booking is confirmed! Tracking: ${trackingNumber}. Pickup from: ${pickupAddress}. Track at: runcourier.co.uk/track/${trackingNumber}`;
+export async function sendBookingConfirmationSMS(phone: string, trackingNumber: string, pickupAddress: string, jobNumber?: string): Promise<{ success: boolean; error?: string }> {
+  const jobRef = jobNumber ? ` Job No: ${jobNumber}.` : '';
+  const message = `Run Courier: Your booking is confirmed!${jobRef} Tracking: ${trackingNumber}. Pickup from: ${pickupAddress}. Track at: runcourier.co.uk/track/${trackingNumber}`;
   return sendSMS(phone, message);
 }
 

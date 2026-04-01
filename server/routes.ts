@@ -9530,7 +9530,7 @@ export async function registerRoutes(
     // Send SMS confirmation to pickup contact
     const pickupPhone = metadata.pickupPhone || jobData.pickupContactPhone;
     if (pickupPhone) {
-      await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode)
+      await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode, job.jobNumber || jobNumber)
         .catch(err => console.error('Failed to send SMS confirmation:', err));
     }
 
@@ -9657,7 +9657,7 @@ export async function registerRoutes(
     
     // Send SMS confirmation to pickup contact
     if (bookingData.pickupPhone) {
-      await sendBookingConfirmationSMS(bookingData.pickupPhone, trackingNumber, bookingData.pickupAddress || bookingData.pickupPostcode)
+      await sendBookingConfirmationSMS(bookingData.pickupPhone, trackingNumber, bookingData.pickupAddress || bookingData.pickupPostcode, job.jobNumber || jobNumber)
         .catch(err => console.error('Failed to send SMS confirmation:', err));
     }
 
@@ -9758,7 +9758,7 @@ export async function registerRoutes(
     // Send SMS confirmation to pickup contact
     const pickupPhone = metadata.pickupPhone || jobData.pickupContactPhone;
     if (pickupPhone) {
-      await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode)
+      await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode, job.jobNumber || jobNumber)
         .catch(err => console.error('Failed to send SMS confirmation:', err));
     }
 
