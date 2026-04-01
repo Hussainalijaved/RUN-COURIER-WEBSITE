@@ -121,6 +121,9 @@ const MedicalCourierPage = lazy(() => import("@/pages/seo/SeoServicePages").then
 const BusinessCourierServices = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.BusinessCourierServices })));
 const UrgentDeliveryLondon = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.UrgentDeliveryLondon })));
 
+const BlogIndex = lazy(() => import("@/pages/blog/Blog").then(m => ({ default: m.BlogIndex })));
+const BlogPost = lazy(() => import("@/pages/blog/Blog").then(m => ({ default: m.BlogPost })));
+
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
 const AdminDocuments = lazy(() => import("@/pages/admin/AdminDocuments"));
 const AdminJobs = lazy(() => import("@/pages/admin/AdminJobs"));
@@ -261,6 +264,8 @@ function Router() {
         <Route path="/medical-courier" component={MedicalCourierPage} />
         <Route path="/business-courier-services" component={BusinessCourierServices} />
         <Route path="/urgent-delivery-london" component={UrgentDeliveryLondon} />
+        <Route path="/blog" component={BlogIndex} />
+        <Route path="/blog/:slug" component={BlogPost} />
 
         <Route path="/admin">
           <ProtectedRoute allowedRoles={['admin']}>

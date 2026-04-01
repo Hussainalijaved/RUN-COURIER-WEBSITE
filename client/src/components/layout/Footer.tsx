@@ -18,6 +18,7 @@ const footerLinks = {
   ],
   company: [
     { href: '/about', label: 'About Us' },
+    { href: '/blog', label: 'Blog & Insights' },
     { href: '/contact', label: 'Contact' },
     { href: '/track', label: 'Track Parcel' },
     { href: '/support', label: 'Support & Help' },

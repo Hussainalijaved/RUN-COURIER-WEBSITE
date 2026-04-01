@@ -632,6 +632,81 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Latest from the Blog ── */}
+      <section className="py-20 border-t border-border">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold mb-3">Latest Insights</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Guides and expertise from the Run Courier team on courier services, logistics, and more.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-8">
+            {[
+              {
+                href: '/blog/how-same-day-courier-services-work-in-london',
+                category: 'Guides',
+                title: 'How Same-Day Courier Services Work in London',
+                excerpt: 'From booking and driver dispatch to live tracking and proof of delivery — a complete walkthrough of the same-day courier process.',
+                date: '20 March 2025',
+                readTime: '7 min',
+                categoryClass: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+              },
+              {
+                href: '/blog/urgent-delivery-solutions-for-businesses',
+                category: 'Business',
+                title: 'Urgent Delivery Solutions for Businesses',
+                excerpt: 'When deadlines are absolute and delays have real consequences, urgent couriers provide the speed and reliability London businesses depend on.',
+                date: '28 March 2025',
+                readTime: '8 min',
+                categoryClass: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+              },
+              {
+                href: '/blog/why-medical-courier-services-are-important',
+                category: 'Healthcare',
+                title: 'Why Medical Courier Services Are Important',
+                excerpt: 'Healthcare logistics demands the highest standards of speed, compliance, and care. We explore why specialist medical couriers are essential.',
+                date: '1 April 2025',
+                readTime: '9 min',
+                categoryClass: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+              },
+            ].map((post) => (
+              <Link key={post.href} href={post.href}>
+                <Card className="h-full flex flex-col hover-elevate cursor-pointer group">
+                  <CardContent className="p-6 flex flex-col gap-3 h-full">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${post.categoryClass}`}>
+                        {post.category}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{post.readTime} read</span>
+                    </div>
+                    <h3 className="font-bold leading-snug group-hover:text-[#0077B6] transition-colors flex-1">
+                      {post.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {post.excerpt}
+                    </p>
+                    <div className="flex items-center justify-between pt-2 border-t border-border">
+                      <span className="text-xs text-muted-foreground">{post.date}</span>
+                      <span className="text-xs font-medium text-[#0077B6] flex items-center gap-1 group-hover:underline">
+                        Read more <ArrowRight className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+          <div className="text-center">
+            <Link href="/blog">
+              <Button variant="outline" className="gap-2" data-testid="blog-view-all">
+                View All Articles <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="py-20 bg-card">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
