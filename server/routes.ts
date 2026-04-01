@@ -3709,7 +3709,7 @@ export async function registerRoutes(
             pickupPostcode: job.pickupPostcode,
             deliveryPostcode: job.deliveryPostcode,
             cancellationReason: cancellationReason,
-            totalPrice: job.totalPrice ? `£${(Number(job.totalPrice) / 100).toFixed(2)}` : undefined,
+            totalPrice: job.totalPrice ? `£${Number(job.totalPrice).toFixed(2)}` : undefined,
           });
           console.log(`[Job Cancellation] Sent cancellation email to ${customerEmail} for job ${job.trackingNumber}`);
         } else {
