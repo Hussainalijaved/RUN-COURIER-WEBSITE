@@ -138,12 +138,15 @@ export default function AdminApiClients() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/api-clients", data),
-    onSuccess: (res: any) => {
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/admin/api-clients", data);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/api-clients"] });
       setCreateOpen(false);
       setForm({ companyName: "", contactName: "", email: "", phone: "", allowQuote: true, allowBooking: false, allowTracking: true, allowCancel: false, allowWebhooks: false, notes: "" });
-      setNewKeyDialog({ open: true, key: res.apiKey, company: res.company_name });
+      setNewKeyDialog({ open: true, key: data.apiKey, company: data.company_name });
     },
     onError: (err: any) => {
       toast({ title: "Failed to create client", description: err?.message, variant: "destructive" });
@@ -175,11 +178,14 @@ export default function AdminApiClients() {
   });
 
   const regenerateMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("POST", `/api/admin/api-clients/${id}/regenerate-key`),
-    onSuccess: (res: any, id) => {
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/admin/api-clients/${id}/regenerate-key`);
+      return { ...(await res.json()), _clientId: id };
+    },
+    onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/api-clients"] });
-      const client = clients.find((c) => c.id === id);
-      setNewKeyDialog({ open: true, key: res.apiKey, company: client?.company_name || "" });
+      const client = clients.find((c) => c.id === data._clientId);
+      setNewKeyDialog({ open: true, key: data.apiKey, company: client?.company_name || "" });
     },
     onError: (err: any) => {
       toast({ title: "Regeneration failed", description: err?.message, variant: "destructive" });
