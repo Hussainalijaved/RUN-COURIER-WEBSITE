@@ -23,7 +23,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification, wrapEmailContent } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
@@ -16221,24 +16221,40 @@ ON CONFLICT (type) DO NOTHING;
       businessType, platformUsed, monthlyVolume, integrationType, notes,
     } = req.body;
 
+    // Validate required fields
     if (!companyName || !contactName || !email || !integrationType) {
       return res.status(400).json({ error: 'validation_failed', message: 'Company name, contact name, email, and integration type are required.' });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) {
       return res.status(400).json({ error: 'validation_failed', message: 'Valid email address required.' });
     }
 
+    const normalizedEmail = String(email).toLowerCase().trim();
+
     const pool = await getApiPool();
     try {
+      // Duplicate protection: reject if an active request already exists for this email
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM api_integration_requests WHERE email = $1 AND status IN ('new','contacted','in_progress') LIMIT 1`,
+        [normalizedEmail]
+      );
+      if (existing.length > 0) {
+        return res.status(409).json({
+          error: 'duplicate_request',
+          message: 'An active integration request already exists for this email address. Our team will be in touch with you shortly.',
+        });
+      }
+
+      // Insert and return the full saved row so email values match DB exactly
       const { rows } = await pool.query(
         `INSERT INTO api_integration_requests
           (company_name, contact_name, email, phone, website, business_type, platform_used, monthly_volume, integration_type, notes)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         RETURNING id`,
+         RETURNING *`,
         [
           String(companyName).slice(0, 200),
           String(contactName).slice(0, 200),
-          String(email).slice(0, 200),
+          normalizedEmail.slice(0, 200),
           phone ? String(phone).slice(0, 50) : null,
           website ? String(website).slice(0, 300) : null,
           businessType ? String(businessType).slice(0, 100) : null,
@@ -16249,17 +16265,90 @@ ON CONFLICT (type) DO NOTHING;
         ]
       );
 
-      // Send email notification to admin (non-fatal)
-      sendAdminNotification(
-        `New API Integration Request — ${companyName}`,
-        `<p><strong>${contactName}</strong> from <strong>${companyName}</strong> has submitted an API integration request.</p>
-         <p><strong>Email:</strong> ${email}</p>
-         <p><strong>Integration Type:</strong> ${integrationType}</p>
-         <p><strong>Monthly Volume:</strong> ${monthlyVolume || 'N/A'}</p>
-         <p><strong>Platform:</strong> ${platformUsed || 'N/A'}</p>`,
-      ).catch(() => {});
+      const saved = rows[0];
 
-      res.status(201).json({ success: true, id: rows[0]?.id, message: 'Your request has been received. Our team will be in touch shortly.' });
+      // Build and send improved admin notification email (non-fatal)
+      try {
+        const adminUrl = `${process.env.APP_URL || 'https://runcourier.co.uk'}/admin/api-requests`;
+        const submittedAt = new Date(saved.created_at).toLocaleString('en-GB', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London',
+        });
+
+        const integrationTypeLabels: Record<string, string> = {
+          quote: 'Quote API', booking: 'Booking API',
+          tracking: 'Tracking API', custom: 'Custom Integration',
+        };
+        const integrationLabel = String(saved.integration_type)
+          .split(',')
+          .map((t: string) => integrationTypeLabels[t.trim()] || t.trim())
+          .join(', ');
+
+        // Safely escape user-supplied values for inline HTML
+        const esc = (v: string | null | undefined): string =>
+          v ? String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+
+        const row = (label: string, value: string | null | undefined): string =>
+          value
+            ? `<tr>
+                <td style="padding:8px 12px 8px 0;color:#666;font-size:14px;width:160px;vertical-align:top;white-space:nowrap;">${label}</td>
+                <td style="padding:8px 0;font-size:14px;color:#111;font-weight:500;">${esc(value)}</td>
+               </tr>`
+            : '';
+
+        const divider = `<tr><td colspan="2" style="padding:2px 0;">
+          <hr style="border:none;border-top:1px solid #e8e8e8;margin:6px 0;"></td></tr>`;
+
+        const emailHtml = wrapEmailContent(`
+          <h2 style="color:#111;font-size:20px;font-weight:700;margin:0 0 6px 0;">New API Integration Request</h2>
+          <p style="color:#555;font-size:14px;margin:0 0 24px 0;">
+            A business has submitted an API integration request and is awaiting your review.
+          </p>
+
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            <tbody>
+              ${row('Request ID', `#${saved.id}`)}
+              ${row('Status', 'New')}
+              ${row('Submitted', submittedAt)}
+              ${divider}
+              ${row('Company', saved.company_name)}
+              ${row('Contact', saved.contact_name)}
+              ${row('Email', saved.email)}
+              ${saved.phone ? row('Phone', saved.phone) : ''}
+              ${saved.website ? row('Website', saved.website) : ''}
+              ${divider}
+              ${row('Integration Types', integrationLabel)}
+              ${saved.monthly_volume ? row('Monthly Volume', saved.monthly_volume) : ''}
+              ${saved.business_type ? row('Business Type', saved.business_type) : ''}
+              ${saved.platform_used ? row('Platform / System', saved.platform_used) : ''}
+              ${saved.notes ? `<tr>
+                <td style="padding:8px 12px 8px 0;color:#666;font-size:14px;vertical-align:top;">Notes</td>
+                <td style="padding:8px 0;font-size:14px;color:#111;">${esc(saved.notes)}</td>
+              </tr>` : ''}
+            </tbody>
+          </table>
+
+          <div style="text-align:center;margin:28px 0 16px 0;">
+            <a href="${adminUrl}"
+               style="background-color:#007BFF;color:#ffffff;padding:12px 32px;border-radius:6px;
+                      text-decoration:none;font-size:15px;font-weight:600;display:inline-block;">
+              View Request in Admin
+            </a>
+          </div>
+          <p style="color:#999;font-size:12px;text-align:center;margin:0;">
+            <a href="${adminUrl}" style="color:#007BFF;">${adminUrl}</a>
+          </p>
+        `, 'API Integration Request');
+
+        await sendAdminNotification(
+          `New API Integration Request — ${saved.company_name} (#${saved.id})`,
+          emailHtml,
+        );
+      } catch (_emailErr) {
+        // Email failure is non-fatal — request is already saved
+      }
+
+      res.status(201).json({ success: true, id: saved.id, message: 'Your request has been received. Our team will be in touch shortly.' });
     } finally {
       await pool.end();
     }
