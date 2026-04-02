@@ -717,6 +717,84 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // ── API Integration tables ───────────────────────────────────────────────
+  (async () => {
+    try {
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        host: process.env.PGHOST,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false },
+        max: 2,
+      });
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS api_clients (
+          id SERIAL PRIMARY KEY,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          company_name TEXT NOT NULL,
+          contact_name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT,
+          linked_business_user_id TEXT,
+          api_key_hash TEXT NOT NULL,
+          api_key_last4 VARCHAR(4) NOT NULL,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          allow_quote BOOLEAN NOT NULL DEFAULT TRUE,
+          allow_booking BOOLEAN NOT NULL DEFAULT FALSE,
+          allow_tracking BOOLEAN NOT NULL DEFAULT TRUE,
+          allow_cancel BOOLEAN NOT NULL DEFAULT FALSE,
+          allow_webhooks BOOLEAN NOT NULL DEFAULT FALSE,
+          notes TEXT,
+          last_used_at TIMESTAMPTZ,
+          request_count INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS api_integration_requests (
+          id SERIAL PRIMARY KEY,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          company_name TEXT NOT NULL,
+          contact_name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT,
+          website TEXT,
+          business_type TEXT,
+          platform_used TEXT,
+          monthly_volume TEXT,
+          integration_type TEXT NOT NULL,
+          notes TEXT,
+          status TEXT NOT NULL DEFAULT 'new',
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS api_logs (
+          id SERIAL PRIMARY KEY,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          api_client_id INTEGER,
+          client_name TEXT,
+          endpoint TEXT NOT NULL,
+          method TEXT NOT NULL,
+          request_payload_safe JSONB,
+          response_payload_safe JSONB,
+          status_code INTEGER NOT NULL,
+          success BOOLEAN NOT NULL,
+          error_message TEXT,
+          booking_reference TEXT,
+          ip_address TEXT
+        )
+      `);
+      await pool.end();
+      console.log("[MIGRATION] API integration tables created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] API integration tables migration error:", e?.message);
+    }
+  })();
+
   // Backfill job_admin_notes from Supabase (runs once; safe if columns don't exist in Supabase yet)
   (async () => {
     try {

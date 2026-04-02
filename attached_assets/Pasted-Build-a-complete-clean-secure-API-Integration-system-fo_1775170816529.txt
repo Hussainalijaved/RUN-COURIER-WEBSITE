@@ -1,0 +1,407 @@
+Build a complete, clean, secure API Integration system for the existing RUN COURIER website and admin platform without breaking or changing any existing working features, pricing logic, booking flow, Stripe flow, Supabase data, driver system, or UI styling unless required for this task.
+
+IMPORTANT RULES:
+- Do not rebuild the whole website.
+- Do not change existing customer booking flow.
+- Do not remove any current features.
+- Do not change existing database data unless needed for API integration.
+- Keep the current RUN COURIER branding and design style.
+- Everything must work with the existing website, admin panel, and Supabase backend.
+- Build professionally, production-ready, mobile responsive, and secure.
+- Add clear comments in code.
+- Add proper validation, error handling, and logging.
+
+GOAL:
+Add a full API Integration system so approved business clients can connect their own systems to RUN COURIER for automated quoting, booking, tracking, and future webhook updates.
+
+==================================================
+1. PUBLIC WEBSITE PAGES
+==================================================
+
+Create a new public page:
+- /api-integration
+
+This page must explain professionally that RUN COURIER supports API integration for business clients.
+Include sections for:
+- Automated Quotes
+- Automated Booking
+- Live Tracking
+- Business Account Setup
+- Custom Integrations
+- Secure API Access
+
+Add a professional CTA button:
+- Request API Integration
+
+Create a new form page or section:
+- /api-integration-request
+
+Form fields:
+- Company Name
+- Contact Name
+- Email
+- Phone
+- Website
+- Business Type
+- Platform/System Used
+- Estimated Monthly Delivery Volume
+- Required Integration Type (Quote API / Booking API / Tracking API / Custom)
+- Notes
+
+When submitted:
+- Save into Supabase
+- Show success message
+- Send notification to admin dashboard
+- Optionally send email notification to admin if email system already exists
+
+==================================================
+2. ADMIN PANEL - API CLIENT MANAGEMENT
+==================================================
+
+Add a new admin section:
+- API Clients
+- API Requests
+- API Logs
+
+In API Clients admin section, allow admin to:
+- Create new API client
+- Link API client to a business account if applicable
+- Generate secure API key
+- Regenerate API key
+- Enable/disable API access
+- Set permissions per client:
+  - quote access
+  - booking access
+  - tracking access
+  - cancel access (for future use)
+  - webhook access (for future use)
+- Add internal notes
+- View last usage date
+- View total requests count
+
+In API Requests admin section:
+- Show all submitted integration enquiry forms
+- Allow admin to mark status:
+  - new
+  - contacted
+  - in progress
+  - approved
+  - rejected
+
+In API Logs admin section:
+- Store and display:
+  - date/time
+  - client name
+  - endpoint used
+  - request method
+  - status code
+  - success/failure
+  - short error message
+  - booking reference if created
+- Add filters by client, endpoint, date, and status
+
+==================================================
+3. DATABASE / SUPABASE
+==================================================
+
+Create only the required new tables/fields safely.
+
+Recommended tables:
+
+api_clients
+- id
+- created_at
+- company_name
+- contact_name
+- email
+- phone
+- linked_business_user_id (nullable)
+- api_key_hash
+- api_key_last4
+- is_active
+- allow_quote
+- allow_booking
+- allow_tracking
+- allow_cancel
+- allow_webhooks
+- notes
+- last_used_at
+- request_count
+
+api_integration_requests
+- id
+- created_at
+- company_name
+- contact_name
+- email
+- phone
+- website
+- business_type
+- platform_used
+- monthly_volume
+- integration_type
+- notes
+- status
+
+api_logs
+- id
+- created_at
+- api_client_id
+- endpoint
+- method
+- request_payload_safe
+- response_payload_safe
+- status_code
+- success
+- error_message
+- booking_reference
+
+If needed, add webhook-related tables later but prepare structure cleanly.
+
+IMPORTANT:
+- Never store raw API keys in plain text after creation.
+- Store hashed API key securely.
+- Only show full key once when generated, then only show masked version.
+- Use proper Supabase RLS so only admins can access API admin data.
+
+==================================================
+4. API AUTHENTICATION & SECURITY
+==================================================
+
+Implement secure API key authentication.
+
+Requirements:
+- Every API request must require header:
+  Authorization: Bearer {API_KEY}
+or X-API-Key
+- Validate client is active
+- Validate endpoint permission
+- Rate-limit requests per client
+- Prevent duplicate booking submissions
+- Sanitize all payloads
+- Validate all required fields
+- Return professional JSON responses
+- Never expose internal errors publicly
+- Log failed and successful requests
+
+Add helper functions for:
+- authenticateApiClient
+- logApiRequest
+- validateApiPermission
+- generateApiKey
+- hashApiKey
+- duplicateRequestCheck
+
+==================================================
+5. API ENDPOINTS
+==================================================
+
+Build the following API endpoints connected to the existing RUN COURIER logic.
+
+A. POST /api/quote
+Purpose:
+Return a delivery quote using existing RUN COURIER pricing rules.
+
+Input example:
+- pickup postcode/address
+- delivery postcode/address
+- vehicle type
+- date
+- time
+- weight
+- multi-drop details if applicable
+- return trip flag
+- congestion zone if applicable
+- waiting time only if part of existing logic
+- any other required pricing inputs already used in the site
+
+Requirements:
+- Use the SAME existing pricing logic already used on the website/admin
+- Do not create a different pricing engine
+- Return:
+  - success
+  - quote reference
+  - vehicle type
+  - total price
+  - surcharge breakdown if allowed internally
+  - message
+  - expiry note if needed
+
+B. POST /api/book-job
+Purpose:
+Create a booking automatically from approved API clients.
+
+Requirements:
+- Reuse existing booking/job creation system
+- Save booking into current jobs/bookings structure
+- Generate booking reference using current system logic
+- Support:
+  - sender details
+  - recipient details
+  - pickup details
+  - delivery details
+  - vehicle type
+  - parcel/job details
+  - weight
+  - special instructions
+  - multi-drop if currently supported
+  - return trip if supported
+  - payment type or business account mode
+- Allow one of two modes:
+  1. direct create booking
+  2. create booking request pending admin review
+- Make the system configurable so admin can choose which mode applies per API client later if possible
+
+Return:
+- success
+- booking reference
+- internal status
+- tracking URL if available
+- message
+
+C. GET /api/track/{bookingReference}
+Purpose:
+Allow API clients to check current booking/job status.
+
+Return:
+- booking reference
+- current status
+- timestamps if available
+- driver assigned yes/no
+- pickup complete yes/no
+- delivered yes/no
+- POD status if available
+- last update time
+- tracking link if available
+
+D. GET /api/pricing
+Purpose:
+Return supported vehicle/pricing structure summary if needed for client integration.
+Keep this controlled and only show allowed data.
+
+E. GET /api/health
+Purpose:
+Simple endpoint for client connection testing.
+Return success true and environment status.
+
+Prepare structure for future endpoints but do not fully implement unless simple:
+- POST /api/cancel-job
+- POST /api/webhooks/register
+- POST /api/webhooks/test
+
+==================================================
+6. WEBHOOK-READY ARCHITECTURE
+==================================================
+
+Prepare the code structure so later RUN COURIER can send webhook updates to client systems when:
+- booking created
+- booking accepted
+- driver assigned
+- driver arrived
+- picked up
+- delivered
+- cancelled
+- price updated
+
+Do not overbuild if not needed now, but create clean service structure for future webhook module.
+
+==================================================
+7. API DOCUMENTATION PAGE
+==================================================
+
+Create a clean documentation page for approved clients or admin use.
+This can be:
+- /developers
+or protected admin/client documentation page.
+
+Include:
+- authentication method
+- header examples
+- endpoint list
+- sample requests
+- sample responses
+- status/error codes
+- required fields
+- support contact section
+
+Make it professional and readable.
+
+==================================================
+8. EXISTING BUSINESS LOGIC INTEGRATION
+==================================================
+
+The API system must reuse existing RUN COURIER business logic:
+- current pricing logic
+- vehicle logic
+- booking references
+- tracking logic
+- current Supabase structure where possible
+- business account support if available
+- admin approval workflow if available
+
+Do not duplicate business logic unnecessarily.
+Refactor only if needed so both website and API use the same shared services.
+
+==================================================
+9. UI / UX REQUIREMENTS
+==================================================
+
+- Keep design clean and professional
+- Match RUN COURIER branding
+- Mobile responsive
+- Admin tables clean and easy to use
+- Use status badges where helpful
+- Add copy button when API key is first shown
+- Add warning that full API key is shown only once
+- Add search/filter in admin logs and client list
+
+==================================================
+10. ERROR RESPONSES
+==================================================
+
+Return clear JSON errors such as:
+- invalid_api_key
+- inactive_client
+- permission_denied
+- validation_failed
+- duplicate_request
+- booking_not_found
+- internal_error
+
+Do not expose raw stack traces.
+
+==================================================
+11. TESTING
+==================================================
+
+Test fully before finishing:
+- integration request form submission
+- admin client creation
+- api key generation
+- quote endpoint
+- booking endpoint
+- tracking endpoint
+- inactive key rejection
+- missing field validation
+- duplicate booking prevention
+- logging
+- mobile responsiveness
+- no regression to current website features
+
+==================================================
+12. FINAL DELIVERABLE
+==================================================
+
+When complete, provide:
+1. Summary of everything added
+2. List of new pages/routes
+3. List of new Supabase tables/fields
+4. List of new API endpoints
+5. Any environment variables required
+6. Clear instructions for how admin creates a new API client
+7. Example API request samples
+8. Confirmation that existing website features were not broken
+
+Most important:
+Build this as a real working API integration module for RUN COURIER, not as a fake demo or static page.
+Everything must connect properly to the current live system and existing backend logic.

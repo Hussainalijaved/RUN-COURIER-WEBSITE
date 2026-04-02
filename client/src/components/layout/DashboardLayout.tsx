@@ -54,6 +54,9 @@ import {
   BookUser,
   Layers,
   Route,
+  Code2,
+  ClipboardList,
+  ScrollText,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
 
@@ -86,6 +89,9 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/contacts', label: 'Contacts', icon: BookUser },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/supervisors', label: 'Supervisors', icon: Users },
+    { href: '/admin/api-clients', label: 'API Clients', icon: Code2 },
+    { href: '/admin/api-requests', label: 'API Requests', icon: ClipboardList },
+    { href: '/admin/api-logs', label: 'API Logs', icon: ScrollText },
     { href: '/admin/pricing', label: 'Settings', icon: SlidersHorizontal },
   ],
   driver: [

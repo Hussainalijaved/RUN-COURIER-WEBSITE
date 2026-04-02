@@ -59,6 +59,9 @@ function usePrefetchAllRoutes() {
         import("@/pages/admin/AdminProfile");
         import("@/pages/admin/AdminContacts");
         import("@/pages/admin/AdminRoutePlanner");
+        import("@/pages/admin/AdminApiClients");
+        import("@/pages/admin/AdminApiRequests");
+        import("@/pages/admin/AdminApiLogs");
         import("@/pages/supervisor/SupervisorDashboard");
         import("@/pages/supervisor/SupervisorJobs");
         import("@/pages/supervisor/SupervisorMap");
@@ -143,6 +146,12 @@ const AdminProfile = lazy(() => import("@/pages/admin/AdminProfile"));
 const AdminContacts = lazy(() => import("@/pages/admin/AdminContacts"));
 const PostcodeMap = lazy(() => import("@/pages/admin/PostcodeMap"));
 const AdminRoutePlanner = lazy(() => import("@/pages/admin/AdminRoutePlanner"));
+const AdminApiClients = lazy(() => import("@/pages/admin/AdminApiClients"));
+const AdminApiRequests = lazy(() => import("@/pages/admin/AdminApiRequests"));
+const AdminApiLogs = lazy(() => import("@/pages/admin/AdminApiLogs"));
+const ApiIntegration = lazy(() => import("@/pages/ApiIntegration"));
+const ApiIntegrationRequest = lazy(() => import("@/pages/ApiIntegrationRequest"));
+const Developers = lazy(() => import("@/pages/Developers"));
 
 const SupervisorLogin = lazy(() => import("@/pages/supervisor/SupervisorLogin"));
 const SupervisorRegister = lazy(() => import("@/pages/supervisor/SupervisorRegister"));
@@ -191,6 +200,9 @@ function Router() {
         <Route path="/privacy" component={Privacy} />
         <Route path="/pricing-policy" component={PricingPolicy} />
         <Route path="/support" component={Support} />
+        <Route path="/api-integration" component={ApiIntegration} />
+        <Route path="/api-integration-request" component={ApiIntegrationRequest} />
+        <Route path="/developers" component={Developers} />
         
         <Route path="/login">
           <PublicOnlyRoute>
@@ -360,6 +372,21 @@ function Router() {
         <Route path="/admin/route-planner">
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminRoutePlanner />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/api-clients">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminApiClients />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/api-requests">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminApiRequests />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/api-logs">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminApiLogs />
           </ProtectedRoute>
         </Route>
         <Route path="/admin/profile">

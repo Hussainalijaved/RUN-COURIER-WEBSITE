@@ -523,6 +523,89 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type BookingQuoteInput = z.infer<typeof bookingQuoteSchema>;
 
+// ============================================================
+// API INTEGRATION SYSTEM
+// ============================================================
+
+// API Clients — approved businesses with API access
+export const apiClients = pgTable("api_clients", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at").defaultNow(),
+  companyName: text("company_name").notNull(),
+  contactName: text("contact_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  linkedBusinessUserId: text("linked_business_user_id"), // nullable — Supabase auth uid
+  apiKeyHash: text("api_key_hash").notNull(),             // bcrypt hash — never expose
+  apiKeyLast4: varchar("api_key_last4", { length: 4 }).notNull(), // masked display
+  isActive: boolean("is_active").default(true).notNull(),
+  allowQuote: boolean("allow_quote").default(true).notNull(),
+  allowBooking: boolean("allow_booking").default(false).notNull(),
+  allowTracking: boolean("allow_tracking").default(true).notNull(),
+  allowCancel: boolean("allow_cancel").default(false).notNull(),
+  allowWebhooks: boolean("allow_webhooks").default(false).notNull(),
+  notes: text("notes"),
+  lastUsedAt: timestamp("last_used_at"),
+  requestCount: integer("request_count").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertApiClientSchema = createInsertSchema(apiClients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+  requestCount: true,
+});
+export type InsertApiClient = z.infer<typeof insertApiClientSchema>;
+export type ApiClient = typeof apiClients.$inferSelect;
+
+// API Integration Requests — enquiry forms from potential business clients
+export const apiIntegrationRequests = pgTable("api_integration_requests", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at").defaultNow(),
+  companyName: text("company_name").notNull(),
+  contactName: text("contact_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  website: text("website"),
+  businessType: text("business_type"),
+  platformUsed: text("platform_used"),
+  monthlyVolume: text("monthly_volume"),
+  integrationType: text("integration_type").notNull(), // comma-separated flags
+  notes: text("notes"),
+  status: text("status").default("new").notNull(), // new | contacted | in_progress | approved | rejected
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertApiIntegrationRequestSchema = createInsertSchema(apiIntegrationRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+});
+export type InsertApiIntegrationRequest = z.infer<typeof insertApiIntegrationRequestSchema>;
+export type ApiIntegrationRequest = typeof apiIntegrationRequests.$inferSelect;
+
+// API Logs — per-request audit trail
+export const apiLogs = pgTable("api_logs", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at").defaultNow(),
+  apiClientId: integer("api_client_id"),   // nullable for unauthenticated / failed auth
+  clientName: text("client_name"),
+  endpoint: text("endpoint").notNull(),
+  method: text("method").notNull(),
+  requestPayloadSafe: jsonb("request_payload_safe"),  // sanitised copy
+  responsePayloadSafe: jsonb("response_payload_safe"),
+  statusCode: integer("status_code").notNull(),
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  bookingReference: text("booking_reference"),
+  ipAddress: text("ip_address"),
+});
+
+export type ApiLog = typeof apiLogs.$inferSelect;
+
 // Invoice payment tokens for secure email payment links
 export type InvoicePaymentTokenStatus = "pending" | "paid" | "expired";
 

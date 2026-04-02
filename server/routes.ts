@@ -23,7 +23,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
@@ -16159,6 +16159,690 @@ VALUES
 ON CONFLICT (type) DO NOTHING;
 `;
     res.type('text/plain').send(sql);
+  }));
+
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // API INTEGRATION SYSTEM
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const {
+    authenticateApiClient,
+    requireApiPermission,
+    generateApiKey,
+    hashApiKey,
+    getKeyLast4,
+    logApiRequest,
+    duplicateRequestCheck,
+  } = await import('./apiAuth');
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /** Strip sensitive/internal fields before logging a request payload */
+  function sanitisePayload(obj: any): any {
+    if (!obj || typeof obj !== 'object') return obj;
+    const REDACT = ['password', 'api_key', 'apiKey', 'authorization', 'card', 'cvv', 'secret'];
+    const out: any = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (REDACT.some(r => k.toLowerCase().includes(r))) out[k] = '[REDACTED]';
+      else out[k] = v;
+    }
+    return out;
+  }
+
+  function getClientIp(req: Request): string {
+    return (
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket.remoteAddress ||
+      'unknown'
+    );
+  }
+
+  // ── Neon pool helper for API tables ──────────────────────────────────────
+
+  async function getApiPool() {
+    const { Pool } = await import('pg');
+    return new Pool({
+      host: process.env.PGHOST,
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE,
+      port: parseInt(process.env.PGPORT || '5432'),
+      ssl: { rejectUnauthorized: false },
+      max: 3,
+    });
+  }
+
+  // ── PUBLIC: Submit API Integration Request form ───────────────────────────
+
+  app.post('/api/integration-requests', asyncHandler(async (req, res) => {
+    const {
+      companyName, contactName, email, phone, website,
+      businessType, platformUsed, monthlyVolume, integrationType, notes,
+    } = req.body;
+
+    if (!companyName || !contactName || !email || !integrationType) {
+      return res.status(400).json({ error: 'validation_failed', message: 'Company name, contact name, email, and integration type are required.' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'validation_failed', message: 'Valid email address required.' });
+    }
+
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO api_integration_requests
+          (company_name, contact_name, email, phone, website, business_type, platform_used, monthly_volume, integration_type, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING id`,
+        [
+          String(companyName).slice(0, 200),
+          String(contactName).slice(0, 200),
+          String(email).slice(0, 200),
+          phone ? String(phone).slice(0, 50) : null,
+          website ? String(website).slice(0, 300) : null,
+          businessType ? String(businessType).slice(0, 100) : null,
+          platformUsed ? String(platformUsed).slice(0, 200) : null,
+          monthlyVolume ? String(monthlyVolume).slice(0, 100) : null,
+          String(integrationType).slice(0, 500),
+          notes ? String(notes).slice(0, 2000) : null,
+        ]
+      );
+
+      // Send email notification to admin (non-fatal)
+      sendAdminNotification(
+        `New API Integration Request — ${companyName}`,
+        `<p><strong>${contactName}</strong> from <strong>${companyName}</strong> has submitted an API integration request.</p>
+         <p><strong>Email:</strong> ${email}</p>
+         <p><strong>Integration Type:</strong> ${integrationType}</p>
+         <p><strong>Monthly Volume:</strong> ${monthlyVolume || 'N/A'}</p>
+         <p><strong>Platform:</strong> ${platformUsed || 'N/A'}</p>`,
+      ).catch(() => {});
+
+      res.status(201).json({ success: true, id: rows[0]?.id, message: 'Your request has been received. Our team will be in touch shortly.' });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // ── ADMIN: API Clients CRUD ───────────────────────────────────────────────
+
+  // List all API clients
+  app.get('/api/admin/api-clients', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, created_at, company_name, contact_name, email, phone,
+                linked_business_user_id, api_key_last4, is_active,
+                allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
+                notes, last_used_at, request_count, updated_at
+         FROM api_clients ORDER BY created_at DESC`
+      );
+      res.json(rows);
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Create new API client + generate key
+  app.post('/api/admin/api-clients', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const {
+      companyName, contactName, email, phone, linkedBusinessUserId,
+      allowQuote, allowBooking, allowTracking, allowCancel, allowWebhooks, notes,
+    } = req.body;
+
+    if (!companyName || !contactName || !email) {
+      return res.status(400).json({ error: 'validation_failed', message: 'Company name, contact name, and email are required.' });
+    }
+
+    const rawKey = generateApiKey();
+    const keyHash = hashApiKey(rawKey);
+    const keyLast4 = getKeyLast4(rawKey);
+
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO api_clients
+          (company_name, contact_name, email, phone, linked_business_user_id,
+           api_key_hash, api_key_last4, is_active,
+           allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13)
+         RETURNING id, created_at, company_name, contact_name, email, phone,
+                   api_key_last4, is_active, allow_quote, allow_booking, allow_tracking,
+                   allow_cancel, allow_webhooks, notes, request_count`,
+        [
+          String(companyName).slice(0, 200),
+          String(contactName).slice(0, 200),
+          String(email).slice(0, 200),
+          phone ? String(phone).slice(0, 50) : null,
+          linkedBusinessUserId || null,
+          keyHash,
+          keyLast4,
+          allowQuote !== false,
+          allowBooking === true,
+          allowTracking !== false,
+          allowCancel === true,
+          allowWebhooks === true,
+          notes ? String(notes).slice(0, 2000) : null,
+        ]
+      );
+      // Return the raw key ONCE — never stored in plain text after this point
+      res.status(201).json({ ...rows[0], apiKey: rawKey, apiKeyWarning: 'Store this key securely. It will not be shown again.' });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Get single API client
+  app.get('/api/admin/api-clients/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, created_at, company_name, contact_name, email, phone,
+                linked_business_user_id, api_key_last4, is_active,
+                allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
+                notes, last_used_at, request_count, updated_at
+         FROM api_clients WHERE id = $1`,
+        [parseInt(req.params.id)]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'not_found' });
+      res.json(rows[0]);
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Update API client
+  app.patch('/api/admin/api-clients/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const {
+      companyName, contactName, email, phone, linkedBusinessUserId,
+      isActive, allowQuote, allowBooking, allowTracking, allowCancel, allowWebhooks, notes,
+    } = req.body;
+
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `UPDATE api_clients SET
+          company_name = COALESCE($1, company_name),
+          contact_name = COALESCE($2, contact_name),
+          email = COALESCE($3, email),
+          phone = COALESCE($4, phone),
+          linked_business_user_id = COALESCE($5, linked_business_user_id),
+          is_active = COALESCE($6, is_active),
+          allow_quote = COALESCE($7, allow_quote),
+          allow_booking = COALESCE($8, allow_booking),
+          allow_tracking = COALESCE($9, allow_tracking),
+          allow_cancel = COALESCE($10, allow_cancel),
+          allow_webhooks = COALESCE($11, allow_webhooks),
+          notes = COALESCE($12, notes),
+          updated_at = NOW()
+         WHERE id = $13
+         RETURNING id, company_name, contact_name, email, phone,
+                   api_key_last4, is_active, allow_quote, allow_booking, allow_tracking,
+                   allow_cancel, allow_webhooks, notes, request_count, last_used_at`,
+        [
+          companyName ? String(companyName).slice(0, 200) : null,
+          contactName ? String(contactName).slice(0, 200) : null,
+          email ? String(email).slice(0, 200) : null,
+          phone !== undefined ? (phone ? String(phone).slice(0, 50) : null) : undefined,
+          linkedBusinessUserId !== undefined ? (linkedBusinessUserId || null) : undefined,
+          isActive !== undefined ? isActive : null,
+          allowQuote !== undefined ? allowQuote : null,
+          allowBooking !== undefined ? allowBooking : null,
+          allowTracking !== undefined ? allowTracking : null,
+          allowCancel !== undefined ? allowCancel : null,
+          allowWebhooks !== undefined ? allowWebhooks : null,
+          notes !== undefined ? (notes ? String(notes).slice(0, 2000) : null) : undefined,
+          parseInt(req.params.id),
+        ]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'not_found' });
+      res.json(rows[0]);
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Delete API client
+  app.delete('/api/admin/api-clients/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      await pool.query(`DELETE FROM api_clients WHERE id = $1`, [parseInt(req.params.id)]);
+      res.json({ success: true });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Regenerate API key for a client
+  app.post('/api/admin/api-clients/:id/regenerate-key', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const rawKey = generateApiKey();
+    const keyHash = hashApiKey(rawKey);
+    const keyLast4 = getKeyLast4(rawKey);
+
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `UPDATE api_clients SET api_key_hash = $1, api_key_last4 = $2, updated_at = NOW()
+         WHERE id = $3 RETURNING id, company_name`,
+        [keyHash, keyLast4, parseInt(req.params.id)]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'not_found' });
+      res.json({
+        success: true,
+        apiKey: rawKey,
+        apiKeyLast4: keyLast4,
+        apiKeyWarning: 'Store this key securely. It will not be shown again.',
+      });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // ── ADMIN: API Integration Requests ──────────────────────────────────────
+
+  app.get('/api/admin/api-integration-requests', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM api_integration_requests ORDER BY created_at DESC`
+      );
+      res.json(rows);
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  app.patch('/api/admin/api-integration-requests/:id/status', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    const allowed = ['new', 'contacted', 'in_progress', 'approved', 'rejected'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: 'validation_failed', message: 'Invalid status value.' });
+    }
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `UPDATE api_integration_requests SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+        [status, parseInt(req.params.id)]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'not_found' });
+      res.json(rows[0]);
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  app.delete('/api/admin/api-integration-requests/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      await pool.query(`DELETE FROM api_integration_requests WHERE id = $1`, [parseInt(req.params.id)]);
+      res.json({ success: true });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // ── ADMIN: API Logs ───────────────────────────────────────────────────────
+
+  app.get('/api/admin/api-logs', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { clientId, endpoint, status, dateFrom, dateTo, limit: limitParam } = req.query;
+    const limit = Math.min(parseInt(String(limitParam || '200')), 500);
+    const conditions: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (clientId) { conditions.push(`api_client_id = $${idx++}`); values.push(parseInt(String(clientId))); }
+    if (endpoint) { conditions.push(`endpoint ILIKE $${idx++}`); values.push(`%${endpoint}%`); }
+    if (status === 'success') { conditions.push(`success = true`); }
+    else if (status === 'failure') { conditions.push(`success = false`); }
+    if (dateFrom) { conditions.push(`created_at >= $${idx++}`); values.push(dateFrom); }
+    if (dateTo) { conditions.push(`created_at <= $${idx++}`); values.push(dateTo); }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    values.push(limit);
+
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, created_at, api_client_id, client_name, endpoint, method,
+                status_code, success, error_message, booking_reference, ip_address
+         FROM api_logs ${where} ORDER BY created_at DESC LIMIT $${idx}`,
+        values
+      );
+      res.json(rows);
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  app.delete('/api/admin/api-logs', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      // Keep last 30 days, delete older
+      await pool.query(`DELETE FROM api_logs WHERE created_at < NOW() - INTERVAL '30 days'`);
+      res.json({ success: true });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // ── HEALTH CHECK ─────────────────────────────────────────────────────────
+
+  app.get('/api/health', asyncHandler(async (req, res) => {
+    res.json({
+      success: true,
+      status: 'operational',
+      service: 'Run Courier API',
+      version: 'v1',
+      timestamp: new Date().toISOString(),
+    });
+  }));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EXTERNAL PARTNER API — v1 (requires valid API key)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // GET /api/v1/health — connection test (no auth required)
+  app.get('/api/v1/health', asyncHandler(async (req, res) => {
+    res.json({ success: true, status: 'operational', service: 'Run Courier Partner API', version: 'v1' });
+  }));
+
+  // GET /api/v1/pricing — return vehicle types and base pricing structure
+  app.get('/api/v1/pricing', authenticateApiClient, requireApiPermission('quote'), asyncHandler(async (req, res) => {
+    const client = req.apiClient!;
+    const ip = getClientIp(req);
+
+    const vehicles = await storage.getVehicles();
+    const result = vehicles.map(v => ({
+      vehicleType: (v as any).type || (v as any).vehicleType,
+      name: (v as any).name,
+      maxWeightKg: (v as any).maxWeight,
+      basePriceGbp: parseFloat((v as any).baseCharge),
+      perMileRateGbp: parseFloat((v as any).perMileRate),
+    }));
+
+    await logApiRequest({
+      apiClientId: client.id, clientName: client.companyName,
+      endpoint: '/api/v1/pricing', method: 'GET',
+      statusCode: 200, success: true, ipAddress: ip,
+    });
+    res.json({ success: true, vehicles: result });
+  }));
+
+  // POST /api/v1/quote — get a delivery quote using existing pricing engine
+  app.post('/api/v1/quote', authenticateApiClient, requireApiPermission('quote'), asyncHandler(async (req, res) => {
+    const client = req.apiClient!;
+    const ip = getClientIp(req);
+    const safePayload = sanitisePayload(req.body);
+
+    const {
+      pickupPostcode, deliveryPostcode, vehicleType, weight,
+      pickupDate, pickupTime, isMultiDrop, multiDropStops, isReturnTrip,
+    } = req.body;
+
+    // Validate required fields
+    if (!pickupPostcode || !deliveryPostcode || !vehicleType || !pickupDate || !pickupTime) {
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: '/api/v1/quote', method: 'POST',
+        requestPayloadSafe: safePayload, statusCode: 400, success: false,
+        errorMessage: 'validation_failed: missing required fields', ipAddress: ip,
+      });
+      return res.status(400).json({
+        error: 'validation_failed',
+        message: 'Required fields: pickupPostcode, deliveryPostcode, vehicleType, pickupDate, pickupTime',
+      });
+    }
+
+    const validVehicles = ['motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van'];
+    if (!validVehicles.includes(vehicleType)) {
+      return res.status(400).json({ error: 'validation_failed', message: `vehicleType must be one of: ${validVehicles.join(', ')}` });
+    }
+
+    try {
+      // Use existing quote calculator (same as website)
+      const quoteInput = {
+        pickupPostcode: String(pickupPostcode).toUpperCase().trim(),
+        deliveryPostcode: String(deliveryPostcode).toUpperCase().trim(),
+        vehicleType,
+        weight: Math.max(0, parseFloat(weight) || 0),
+        pickupDate: String(pickupDate),
+        pickupTime: String(pickupTime),
+        isMultiDrop: !!isMultiDrop,
+        multiDropStops: Array.isArray(multiDropStops) ? multiDropStops : [],
+        isReturnTrip: !!isReturnTrip,
+        returnToSameLocation: true,
+      };
+
+      const quote = await storage.calculateQuote(quoteInput);
+      const quoteRef = `QT-${Date.now().toString(36).toUpperCase()}`;
+
+      const result = {
+        success: true,
+        quoteReference: quoteRef,
+        vehicleType,
+        totalPriceGbp: quote.total,
+        breakdown: {
+          baseCharge: quote.baseCharge,
+          distanceCharge: quote.distanceCharge,
+          weightSurcharge: quote.weightSurcharge,
+          isRushHour: quote.isRushHour,
+        },
+        validFor: '30 minutes',
+        message: 'Quote generated successfully.',
+      };
+
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: '/api/v1/quote', method: 'POST',
+        requestPayloadSafe: safePayload,
+        responsePayloadSafe: { success: true, totalPriceGbp: quote.total },
+        statusCode: 200, success: true, ipAddress: ip,
+      });
+      res.json(result);
+    } catch (err: any) {
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: '/api/v1/quote', method: 'POST',
+        requestPayloadSafe: safePayload, statusCode: 500, success: false,
+        errorMessage: err?.message || 'internal_error', ipAddress: ip,
+      });
+      res.status(500).json({ error: 'internal_error', message: 'Failed to calculate quote. Please try again.' });
+    }
+  }));
+
+  // POST /api/v1/book-job — create a booking
+  app.post('/api/v1/book-job', authenticateApiClient, requireApiPermission('booking'), asyncHandler(async (req, res) => {
+    const client = req.apiClient!;
+    const ip = getClientIp(req);
+    const safePayload = sanitisePayload(req.body);
+
+    // Duplicate request prevention via Idempotency-Key header
+    const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
+    if (idempotencyKey && duplicateRequestCheck(idempotencyKey)) {
+      return res.status(409).json({ error: 'duplicate_request', message: 'This request has already been processed. Check Idempotency-Key.' });
+    }
+
+    const {
+      pickupAddress, pickupPostcode, pickupContactName, pickupContactPhone,
+      deliveryAddress, deliveryPostcode, recipientName, recipientPhone,
+      vehicleType, weight, specialInstructions,
+      pickupDate, pickupTime, isMultiDrop, isReturnTrip,
+    } = req.body;
+
+    // Validate required fields
+    const missing = [];
+    if (!pickupAddress) missing.push('pickupAddress');
+    if (!pickupPostcode) missing.push('pickupPostcode');
+    if (!deliveryAddress) missing.push('deliveryAddress');
+    if (!deliveryPostcode) missing.push('deliveryPostcode');
+    if (!vehicleType) missing.push('vehicleType');
+    if (!pickupDate) missing.push('pickupDate');
+    if (!pickupTime) missing.push('pickupTime');
+
+    if (missing.length) {
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: '/api/v1/book-job', method: 'POST',
+        requestPayloadSafe: safePayload, statusCode: 400, success: false,
+        errorMessage: `validation_failed: missing ${missing.join(', ')}`, ipAddress: ip,
+      });
+      return res.status(400).json({ error: 'validation_failed', message: `Missing required fields: ${missing.join(', ')}` });
+    }
+
+    const validVehicles = ['motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van'];
+    if (!validVehicles.includes(vehicleType)) {
+      return res.status(400).json({ error: 'validation_failed', message: `vehicleType must be one of: ${validVehicles.join(', ')}` });
+    }
+
+    try {
+      // Calculate price using existing engine
+      const quoteInput = {
+        pickupPostcode: String(pickupPostcode).toUpperCase().trim(),
+        deliveryPostcode: String(deliveryPostcode).toUpperCase().trim(),
+        vehicleType,
+        weight: Math.max(0, parseFloat(weight) || 0),
+        pickupDate: String(pickupDate),
+        pickupTime: String(pickupTime),
+        isMultiDrop: !!isMultiDrop,
+        multiDropStops: [],
+        isReturnTrip: !!isReturnTrip,
+        returnToSameLocation: true,
+      };
+      const quote = await storage.calculateQuote(quoteInput);
+
+      // Generate tracking number using existing generator
+      const trackingNumber = await (storage as any).generateTrackingNumber?.() ||
+        `RC${new Date().getFullYear()}${String(Date.now()).slice(-6)}`;
+
+      // Build job data reusing existing structure
+      const jobData: any = {
+        trackingNumber,
+        status: 'pending',
+        pickupAddress: String(pickupAddress).slice(0, 500),
+        pickupPostcode: String(pickupPostcode).toUpperCase().trim(),
+        pickupContactName: pickupContactName ? String(pickupContactName).slice(0, 100) : client.companyName,
+        pickupContactPhone: pickupContactPhone ? String(pickupContactPhone).slice(0, 50) : client.phone || '',
+        deliveryAddress: String(deliveryAddress).slice(0, 500),
+        deliveryPostcode: String(deliveryPostcode).toUpperCase().trim(),
+        recipientName: recipientName ? String(recipientName).slice(0, 100) : '',
+        recipientPhone: recipientPhone ? String(recipientPhone).slice(0, 50) : '',
+        vehicleType,
+        weight: parseFloat(weight) || 0,
+        specialInstructions: specialInstructions ? String(specialInstructions).slice(0, 1000) : null,
+        scheduledPickupTime: `${pickupDate}T${pickupTime}`,
+        isMultiDrop: !!isMultiDrop,
+        isReturnTrip: !!isReturnTrip,
+        totalPrice: quote.total,
+        basePrice: quote.baseCharge,
+        distancePrice: quote.distanceCharge,
+        weightSurcharge: quote.weightSurcharge,
+        paymentMethod: 'api',
+        paymentStatus: 'pending',
+        createdBy: `API: ${client.companyName}`,
+        apiClientId: client.id,
+      };
+
+      const created = await storage.createJob(jobData);
+
+      const trackingUrl = `${process.env.APP_URL || 'https://runcourier.co.uk'}/track/${trackingNumber}`;
+
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: '/api/v1/book-job', method: 'POST',
+        requestPayloadSafe: safePayload,
+        responsePayloadSafe: { success: true, trackingNumber },
+        statusCode: 201, success: true,
+        bookingReference: trackingNumber, ipAddress: ip,
+      });
+
+      res.status(201).json({
+        success: true,
+        bookingReference: trackingNumber,
+        jobId: created?.id,
+        status: 'pending',
+        totalPriceGbp: quote.total,
+        trackingUrl,
+        message: 'Booking created successfully. Our team will process your request.',
+      });
+    } catch (err: any) {
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: '/api/v1/book-job', method: 'POST',
+        requestPayloadSafe: safePayload, statusCode: 500, success: false,
+        errorMessage: err?.message || 'internal_error', ipAddress: ip,
+      });
+      res.status(500).json({ error: 'internal_error', message: 'Failed to create booking. Please try again or contact support.' });
+    }
+  }));
+
+  // GET /api/v1/track/:reference — get booking status
+  app.get('/api/v1/track/:reference', authenticateApiClient, requireApiPermission('tracking'), asyncHandler(async (req, res) => {
+    const client = req.apiClient!;
+    const ip = getClientIp(req);
+    const reference = req.params.reference?.toUpperCase().trim();
+
+    if (!reference) {
+      return res.status(400).json({ error: 'validation_failed', message: 'Booking reference is required.' });
+    }
+
+    try {
+      // Use existing tracking logic (Supabase)
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      const { data: job, error } = await supabaseAdmin
+        .from('jobs')
+        .select('tracking_number, status, created_at, scheduled_pickup_time, pickup_address, delivery_address, driver_id, proof_of_delivery_photo, job_number')
+        .eq('tracking_number', reference)
+        .single();
+
+      if (error || !job) {
+        await logApiRequest({
+          apiClientId: client.id, clientName: client.companyName,
+          endpoint: `/api/v1/track/${reference}`, method: 'GET',
+          statusCode: 404, success: false, errorMessage: 'booking_not_found', ipAddress: ip,
+        });
+        return res.status(404).json({ error: 'booking_not_found', message: `No booking found with reference: ${reference}` });
+      }
+
+      const isDelivered = job.status === 'delivered';
+      const result = {
+        success: true,
+        bookingReference: job.tracking_number,
+        jobNumber: job.job_number || null,
+        status: job.status,
+        statusLabel: job.status?.replace(/_/g, ' ') || job.status,
+        pickupAddress: job.pickup_address,
+        deliveryAddress: job.delivery_address,
+        scheduledPickupTime: job.scheduled_pickup_time || null,
+        driverAssigned: !!job.driver_id,
+        delivered: isDelivered,
+        proofOfDeliveryAvailable: isDelivered && !!job.proof_of_delivery_photo,
+        trackingUrl: `${process.env.APP_URL || 'https://runcourier.co.uk'}/track/${reference}`,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: `/api/v1/track/${reference}`, method: 'GET',
+        responsePayloadSafe: { status: job.status },
+        statusCode: 200, success: true,
+        bookingReference: reference, ipAddress: ip,
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: `/api/v1/track/${reference}`, method: 'GET',
+        statusCode: 500, success: false, errorMessage: err?.message, ipAddress: ip,
+      });
+      res.status(500).json({ error: 'internal_error', message: 'Failed to retrieve booking status.' });
+    }
+  }));
+
+  // POST /api/v1/cancel-job — future endpoint (returns 501)
+  app.post('/api/v1/cancel-job', authenticateApiClient, requireApiPermission('cancel'), asyncHandler(async (req, res) => {
+    res.status(501).json({ error: 'not_implemented', message: 'Job cancellation via API is coming soon. Please contact Run Courier directly.' });
   }));
 
   return httpServer;
