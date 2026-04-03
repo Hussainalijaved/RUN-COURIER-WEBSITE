@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -118,6 +118,7 @@ export default function AdminApiClients() {
     company: "",
   });
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [confirmRegenId, setConfirmRegenId] = useState<number | null>(null);
   const [editClient, setEditClient] = useState<ApiClient | null>(null);
 
   const [form, setForm] = useState<CreateClientForm>({
@@ -138,15 +139,26 @@ export default function AdminApiClients() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/admin/api-clients", data);
-      return res.json();
+    mutationFn: async (payload: any) => {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch("/api/admin/api-clients", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || json?.error || `Error ${res.status}`);
+      console.log("[ApiClients] create response:", JSON.stringify(json));
+      return json;
     },
     onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/api-clients"] });
       setCreateOpen(false);
       setForm({ companyName: "", contactName: "", email: "", phone: "", allowQuote: true, allowBooking: false, allowTracking: true, allowCancel: false, allowWebhooks: false, notes: "" });
-      setNewKeyDialog({ open: true, key: data.apiKey, company: data.company_name });
+      const plainKey = data?.apiKey ?? "";
+      console.log("[ApiClients] setting key in dialog:", plainKey);
+      setNewKeyDialog({ open: true, key: plainKey, company: data?.company_name ?? "" });
     },
     onError: (err: any) => {
       toast({ title: "Failed to create client", description: err?.message, variant: "destructive" });
@@ -179,13 +191,24 @@ export default function AdminApiClients() {
 
   const regenerateMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/admin/api-clients/${id}/regenerate-key`);
-      return { ...(await res.json()), _clientId: id };
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/admin/api-clients/${id}/regenerate-key`, {
+        method: "POST",
+        headers: authHeaders,
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || json?.error || `Error ${res.status}`);
+      console.log("[ApiClients] regenerate response:", JSON.stringify(json));
+      return { ...json, _clientId: id };
     },
     onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/api-clients"] });
+      setConfirmRegenId(null);
       const client = clients.find((c) => c.id === data._clientId);
-      setNewKeyDialog({ open: true, key: data.apiKey, company: client?.company_name || "" });
+      const plainKey = data?.apiKey ?? "";
+      console.log("[ApiClients] regenerated key in dialog:", plainKey);
+      setNewKeyDialog({ open: true, key: plainKey, company: client?.company_name ?? "" });
     },
     onError: (err: any) => {
       toast({ title: "Regeneration failed", description: err?.message, variant: "destructive" });
@@ -277,7 +300,7 @@ export default function AdminApiClients() {
                           <DropdownMenuItem onClick={() => setEditClient(client)}>
                             <Eye className="h-4 w-4 mr-2" /> Edit / View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => regenerateMutation.mutate(client.id)}>
+                          <DropdownMenuItem onClick={() => setConfirmRegenId(client.id)}>
                             <RefreshCw className="h-4 w-4 mr-2" /> Regenerate Key
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -413,8 +436,16 @@ export default function AdminApiClients() {
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border bg-muted p-4">
-            <div className="flex items-center justify-between gap-2">
-              <code className="text-xs font-mono break-all">{newKeyDialog.key}</code>
+            <div className="flex items-start justify-between gap-2">
+              {newKeyDialog.key ? (
+                <code className="text-xs font-mono break-all select-all flex-1" data-testid="text-api-key-value">
+                  {newKeyDialog.key}
+                </code>
+              ) : (
+                <span className="text-xs text-destructive italic flex-1">
+                  Key not received — please try regenerating.
+                </span>
+              )}
               <CopyButton value={newKeyDialog.key} label="API key" />
             </div>
           </div>
@@ -527,6 +558,28 @@ export default function AdminApiClients() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Regenerate Key Confirm */}
+      <AlertDialog open={confirmRegenId !== null} onOpenChange={(o) => { if (!o) setConfirmRegenId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate API Key?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The existing key will be invalidated immediately. Any system using it will stop working. A new key will be shown once — save it securely.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRegenId !== null && regenerateMutation.mutate(confirmRegenId)}
+              disabled={regenerateMutation.isPending}
+              data-testid="button-confirm-regen-key"
+            >
+              {regenerateMutation.isPending ? "Regenerating..." : "Regenerate Key"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Confirm */}
       <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
