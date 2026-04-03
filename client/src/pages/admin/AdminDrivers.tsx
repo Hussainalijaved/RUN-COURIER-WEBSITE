@@ -1816,7 +1816,7 @@ export default function AdminDrivers() {
                 Send SMS to {selectedDriver ? getDriverInfo(selectedDriver).name || 'Driver' : 'Driver'}
               </DialogTitle>
               <DialogDescription>
-                Send a one-way text message to {getDriverInfo(selectedDriver).phone || 'this driver'}. The driver cannot reply to this message.
+                Send a one-way text message to {selectedDriver ? (getDriverInfo(selectedDriver).phone || 'this driver') : 'this driver'}. The driver cannot reply to this message.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2">
