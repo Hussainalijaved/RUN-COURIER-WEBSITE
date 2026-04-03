@@ -33,8 +33,12 @@ export function ProtectedRoute({
     if (loading) return;
     
     if (!user) {
-      console.log('[ProtectedRoute] No user, redirecting to:', redirectTo);
-      setLocation(redirectTo);
+      const currentPath = window.location.pathname + window.location.search;
+      const loginTarget = redirectTo === '/login'
+        ? `/login?redirect=${encodeURIComponent(currentPath)}`
+        : redirectTo;
+      console.log('[ProtectedRoute] No user, redirecting to:', loginTarget);
+      setLocation(loginTarget);
       return;
     }
 

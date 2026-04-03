@@ -16269,7 +16269,7 @@ ON CONFLICT (type) DO NOTHING;
 
       // Build and send improved admin notification email (non-fatal)
       try {
-        const adminUrl = `${process.env.APP_URL || 'https://runcourier.co.uk'}/admin/api-requests`;
+        const adminUrl = `${process.env.APP_URL || 'https://runcourier.co.uk'}/admin/api-requests?id=${saved.id}`;
         const submittedAt = new Date(saved.created_at).toLocaleString('en-GB', {
           day: '2-digit', month: 'short', year: 'numeric',
           hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London',

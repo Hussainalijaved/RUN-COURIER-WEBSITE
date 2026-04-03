@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sheet";
 import { Trash2, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 
 interface ApiIntegrationRequest {
   id: number;
@@ -65,6 +65,7 @@ function statusVariant(status: string): "default" | "secondary" {
 export default function AdminApiRequests() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const search = useSearch();
 
   const [selected, setSelected] = useState<ApiIntegrationRequest | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -72,6 +73,20 @@ export default function AdminApiRequests() {
   const { data: requests = [], isLoading } = useQuery<ApiIntegrationRequest[]>({
     queryKey: ["/api/admin/api-integration-requests"],
   });
+
+  // Auto-open request from ?id= deep link (e.g. from email notification)
+  useEffect(() => {
+    if (!requests.length) return;
+    const params = new URLSearchParams(search);
+    const idParam = params.get("id");
+    if (!idParam) return;
+    const targetId = parseInt(idParam, 10);
+    if (isNaN(targetId)) return;
+    const match = requests.find((r) => r.id === targetId);
+    if (match && (!selected || selected.id !== targetId)) {
+      setSelected(match);
+    }
+  }, [requests, search]);
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
