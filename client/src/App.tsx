@@ -187,9 +187,20 @@ const DriverNotices = lazy(() => import("@/pages/driver/DriverNotices"));
 const DispatcherDashboard = lazy(() => import("@/pages/dispatcher/DispatcherDashboard"));
 const VendorDashboard = lazy(() => import("@/pages/vendor/VendorDashboard"));
 
+function ApiPassthrough() {
+  const [location] = useLocation();
+  useEffect(() => {
+    if (location.startsWith("/api/")) {
+      window.location.href = window.location.origin + location + window.location.search;
+    }
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
+      <ApiPassthrough />
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/about" component={About} />
