@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { setPageMeta } from "@/lib/seo";
 import { useEffect } from "react";
+import heroImage from "@assets/api_integration_hero.jpg";
 import {
   Zap,
   Package,
@@ -113,42 +114,58 @@ export default function ApiIntegration() {
     <PublicLayout>
       {/* Hero */}
       <section
-        className="py-20 px-4"
-        style={{
-          background: "linear-gradient(135deg, #0077B6 0%, #00B4D8 100%)",
-        }}
+        className="relative min-h-[480px] md:min-h-[540px] flex items-center overflow-hidden"
+        aria-label="API Integration hero"
       >
-        <div className="container mx-auto">
-          <div className="max-w-3xl mx-auto text-center text-white">
-            <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/20">
-              Business API
-            </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-              Automate Your Deliveries with the Run Courier API
-            </h1>
-            <p className="text-lg text-white/90 max-w-2xl mx-auto mb-8">
-              Connect your business systems directly to Run Courier. Automate quoting, booking, and live tracking — without lifting the phone.
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Link href="/api-integration-request">
-                <Button
-                  size="lg"
-                  className="bg-white text-[#0077B6] hover:bg-white/90"
-                  data-testid="button-request-api-hero"
-                >
-                  Request API Access <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/developers">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-white/50 text-white bg-white/10 hover:bg-white/20"
-                  data-testid="button-view-docs-hero"
-                >
-                  View Documentation
-                </Button>
-              </Link>
+        {/* Background image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroImage})` }}
+          aria-hidden="true"
+        />
+        {/* Brand overlay — deep blue gradient for Run Courier identity + readability */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(0,55,100,0.88) 0%, rgba(0,119,182,0.80) 50%, rgba(0,180,216,0.72) 100%)",
+          }}
+          aria-hidden="true"
+        />
+        {/* Content */}
+        <div className="relative z-10 w-full px-4 py-20">
+          <div className="container mx-auto">
+            <div className="max-w-3xl mx-auto text-center text-white">
+              <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/20 no-default-hover-elevate">
+                Business API
+              </Badge>
+              <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight drop-shadow-sm">
+                Automate Your Deliveries with the Run Courier API
+              </h1>
+              <p className="text-lg text-white/90 max-w-2xl mx-auto mb-8 drop-shadow-sm">
+                Connect your business systems directly to Run Courier. Automate quoting, booking, and live tracking — without lifting the phone.
+              </p>
+              <div className="flex flex-wrap gap-4 justify-center">
+                <Link href="/api-integration-request">
+                  <Button
+                    size="lg"
+                    className="bg-white text-[#0077B6] hover:bg-white/90"
+                    data-testid="button-request-api-hero"
+                  >
+                    Request API Access <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/developers">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-white/60 text-white backdrop-blur-sm bg-white/10"
+                    data-testid="button-view-docs-hero"
+                  >
+                    View Documentation
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>

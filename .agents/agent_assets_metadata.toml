@@ -1,0 +1,38 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "nHhQkWwSD1wf_6mpWxf0S"
+uri = "file://attached_assets/stock_images/courier_api_hero_1.jpg"
+type = "image"
+title = "professional courier delivery driver with parcels boxes loading white van business logistics"
+
+[[outputs]]
+id = "_ntntwgO6favu5JRVrG7y"
+uri = "file://attached_assets/stock_images/courier_api_hero_2.jpg"
+type = "image"
+title = "professional courier delivery driver with parcels boxes loading white van business logistics"
+
+[[outputs]]
+id = "HqytRrkCV8gfmV2eiYyK7"
+uri = "file://attached_assets/stock_images/courier_api_hero_3.jpg"
+type = "image"
+title = "professional courier delivery driver with parcels boxes loading white van business logistics"
+
+[[outputs]]
+id = "Th-6bvdytaYh-k_GcoDNR"
+uri = "file://attached_assets/stock_images/logistics_warehouse_hero_1.jpg"
+type = "image"
+title = "logistics warehouse parcels boxes stacked sorting facility modern clean professional aerial view"
+
+[[outputs]]
+id = "EhGyiQzUIU2FYeiMUQImU"
+uri = "file://attached_assets/stock_images/logistics_warehouse_hero_2.jpg"
+type = "image"
+title = "logistics warehouse parcels boxes stacked sorting facility modern clean professional aerial view"
+
+[[outputs]]
+id = "SOtqE_4hONExMWmoCq66F"
+uri = "file://attached_assets/stock_images/logistics_warehouse_hero_3.jpg"
+type = "image"
+title = "logistics warehouse parcels boxes stacked sorting facility modern clean professional aerial view"
