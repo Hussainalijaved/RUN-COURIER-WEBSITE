@@ -1746,7 +1746,7 @@ export default function AdminDrivers() {
                     </Button>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    {getDriverInfo(selectedDriver).phone && (
+                    {selectedDriver && getDriverInfo(selectedDriver).phone && (
                       <Button
                         variant="outline"
                         onClick={() => {
