@@ -49,6 +49,7 @@ import {
   Mail,
   ZoomIn,
   X,
+  MessageSquare,
 } from 'lucide-react';
 import {
   Select,
@@ -80,10 +81,36 @@ export default function AdminApplications() {
   const [emailMessage, setEmailMessage] = useState('');
   const [emailTarget, setEmailTarget] = useState<DriverApplication | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [sendingReminderIds, setSendingReminderIds] = useState<Set<string>>(new Set());
   const [migrationSqlOpen, setMigrationSqlOpen] = useState(false);
   const [migrationSql, setMigrationSql] = useState('');
   const { toast } = useToast();
   const { user } = useAuth();
+
+  async function sendSmsReminder(application: DriverApplication) {
+    if (!application.phone) {
+      toast({ title: 'No phone number', description: 'This applicant has no phone number on record.', variant: 'destructive' });
+      return;
+    }
+    setSendingReminderIds(prev => new Set(prev).add(application.id));
+    try {
+      const res = await apiRequest('POST', '/api/admin/sms/application-reminder', {
+        phone: application.phone,
+        name: application.fullName,
+        applicationId: application.id,
+      });
+      if (res.ok) {
+        toast({ title: 'SMS reminder sent', description: `Reminder sent to ${application.fullName}` });
+      } else {
+        const data = await res.json();
+        toast({ title: 'Failed to send SMS', description: data.error || 'Please try again', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Failed to send SMS', description: 'Please try again', variant: 'destructive' });
+    } finally {
+      setSendingReminderIds(prev => { const s = new Set(prev); s.delete(application.id); return s; });
+    }
+  }
 
   const { data: applications, isLoading } = useQuery<DriverApplication[]>({
     queryKey: ['/api/driver-applications'],
@@ -581,6 +608,25 @@ export default function AdminApplications() {
             <Eye className="h-4 w-4 mr-1" />
             View
           </Button>
+          {(application.status === 'pending' || application.status === 'corrections_needed') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                sendSmsReminder(application);
+              }}
+              disabled={sendingReminderIds.has(application.id)}
+              data-testid={`button-sms-reminder-${application.id}`}
+            >
+              {sendingReminderIds.has(application.id) ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <MessageSquare className="h-4 w-4 mr-1" />
+              )}
+              SMS Reminder
+            </Button>
+          )}
           {application.status === 'approved' && (
             <Button
               size="sm"

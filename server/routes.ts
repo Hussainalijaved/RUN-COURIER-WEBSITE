@@ -9025,6 +9025,45 @@ export async function registerRoutes(
   }));
 
   // ============================================
+  // ADMIN / SUPERVISOR — MANUAL SMS
+  // ============================================
+  app.post("/api/admin/sms/driver", asyncHandler(async (req, res) => {
+    const { phone, message, driverName } = req.body;
+    if (!phone || !message) {
+      return res.status(400).json({ error: "phone and message are required" });
+    }
+    if (message.trim().length === 0) {
+      return res.status(400).json({ error: "Message cannot be empty" });
+    }
+    if (message.length > 1600) {
+      return res.status(400).json({ error: "Message too long (max 1600 characters)" });
+    }
+    const { sendSMS } = await import("./twilioService");
+    const result = await sendSMS(phone, message.trim());
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || "Failed to send SMS" });
+    }
+    console.log(`[Admin SMS] Sent to driver${driverName ? ` ${driverName}` : ''} (${phone.slice(0, 5)}***)`);
+    res.json({ success: true, messageId: result.messageId });
+  }));
+
+  app.post("/api/admin/sms/application-reminder", asyncHandler(async (req, res) => {
+    const { phone, name, applicationId } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: "phone is required" });
+    }
+    const greeting = name ? `Hi ${name.split(' ')[0]}` : 'Hi';
+    const message = `${greeting}, this is Run Courier. Your driver application is incomplete. Please visit runcourier.co.uk/driver-application to complete it and join our team. Questions? Reply STOP to opt out.`;
+    const { sendSMS } = await import("./twilioService");
+    const result = await sendSMS(phone, message);
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || "Failed to send SMS" });
+    }
+    console.log(`[Admin SMS] Application reminder sent${applicationId ? ` for app ${applicationId}` : ''} to ${phone.slice(0, 5)}***`);
+    res.json({ success: true, messageId: result.messageId });
+  }));
+
+  // ============================================
   // DRIVER NOTICES (Driver-facing)
   // ============================================
   app.get("/api/driver/notices", asyncHandler(async (req, res) => {

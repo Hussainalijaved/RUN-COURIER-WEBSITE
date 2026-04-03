@@ -78,6 +78,7 @@ import {
   CheckCheck,
   EyeOff,
   Smartphone,
+  MessageSquare,
 } from 'lucide-react';
 import { cn, normalizeDocUrl } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -155,6 +156,9 @@ export default function AdminDrivers() {
   const [resetPasswordResult, setResetPasswordResult] = useState<{tempPassword: string; driverEmail: string; driverName: string; driverCode: string} | null>(null);
   const [driverToResetPassword, setDriverToResetPassword] = useState<Driver | null>(null);
   const [showInactive, setShowInactive] = useState(true);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [smsMessage, setSmsMessage] = useState('');
+  const [smsSending, setSmsSending] = useState(false);
   const [pushNotifOpen, setPushNotifOpen] = useState(false);
   const [pushNotifTarget, setPushNotifTarget] = useState<{ id?: string; name: string } | null>(null);
   const [pushNotifTitle, setPushNotifTitle] = useState('');
@@ -1742,6 +1746,19 @@ export default function AdminDrivers() {
                     </Button>
                   )}
                   <div className="flex flex-wrap gap-2">
+                    {getDriverInfo(selectedDriver).phone && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSmsMessage('');
+                          setSmsDialogOpen(true);
+                        }}
+                        data-testid="button-send-sms-driver"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Send SMS
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -1786,6 +1803,72 @@ export default function AdminDrivers() {
                   </div>
                 </div>
               )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* SMS Dialog */}
+        <Dialog open={smsDialogOpen} onOpenChange={setSmsDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Send SMS to {selectedDriver ? getDriverInfo(selectedDriver).name || 'Driver' : 'Driver'}
+              </DialogTitle>
+              <DialogDescription>
+                Send a one-way text message to {getDriverInfo(selectedDriver).phone || 'this driver'}. The driver cannot reply to this message.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <Label className="text-sm font-medium">Message</Label>
+                <Textarea
+                  placeholder="Type your message here..."
+                  value={smsMessage}
+                  onChange={(e) => setSmsMessage(e.target.value)}
+                  className="mt-1.5 min-h-[120px]"
+                  maxLength={1600}
+                  data-testid="input-sms-message"
+                />
+                <p className="text-xs text-muted-foreground mt-1 text-right">{smsMessage.length}/1600</p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setSmsDialogOpen(false)} disabled={smsSending}>
+                Cancel
+              </Button>
+              <Button
+                disabled={smsSending || smsMessage.trim().length === 0}
+                onClick={async () => {
+                  if (!selectedDriver) return;
+                  const phone = getDriverInfo(selectedDriver).phone;
+                  if (!phone) return;
+                  setSmsSending(true);
+                  try {
+                    const res = await apiRequest('POST', '/api/admin/sms/driver', {
+                      phone,
+                      message: smsMessage.trim(),
+                      driverName: getDriverInfo(selectedDriver).name,
+                    });
+                    if (res.ok) {
+                      toast({ title: 'SMS sent successfully' });
+                      setSmsDialogOpen(false);
+                      setSmsMessage('');
+                    } else {
+                      const data = await res.json();
+                      toast({ title: 'Failed to send SMS', description: data.error || 'Please try again', variant: 'destructive' });
+                    }
+                  } catch {
+                    toast({ title: 'Failed to send SMS', description: 'Please try again', variant: 'destructive' });
+                  } finally {
+                    setSmsSending(false);
+                  }
+                }}
+                data-testid="button-confirm-send-sms"
+              >
+                {smsSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-2" />}
+                {smsSending ? 'Sending...' : 'Send SMS'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
