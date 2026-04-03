@@ -81,26 +81,41 @@ export default function AdminApplications() {
   const [emailMessage, setEmailMessage] = useState('');
   const [emailTarget, setEmailTarget] = useState<DriverApplication | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
-  const [sendingReminderIds, setSendingReminderIds] = useState<Set<string>>(new Set());
+  const [smsReminderDialogOpen, setSmsReminderDialogOpen] = useState(false);
+  const [smsReminderMessage, setSmsReminderMessage] = useState('');
+  const [smsReminderTarget, setSmsReminderTarget] = useState<DriverApplication | null>(null);
+  const [smsReminderSending, setSmsReminderSending] = useState(false);
   const [migrationSqlOpen, setMigrationSqlOpen] = useState(false);
   const [migrationSql, setMigrationSql] = useState('');
   const { toast } = useToast();
   const { user } = useAuth();
 
-  async function sendSmsReminder(application: DriverApplication) {
+  function openSmsReminderDialog(application: DriverApplication) {
     if (!application.phone) {
       toast({ title: 'No phone number', description: 'This applicant has no phone number on record.', variant: 'destructive' });
       return;
     }
-    setSendingReminderIds(prev => new Set(prev).add(application.id));
+    const firstName = application.fullName?.split(' ')[0] || '';
+    const defaultMsg = `Hi ${firstName}, this is Run Courier. Your driver application is incomplete. Please visit runcourier.co.uk/driver-application to complete it and join our team.`;
+    setSmsReminderTarget(application);
+    setSmsReminderMessage(defaultMsg);
+    setSmsReminderDialogOpen(true);
+  }
+
+  async function handleSendSmsReminder() {
+    if (!smsReminderTarget || !smsReminderMessage.trim()) return;
+    setSmsReminderSending(true);
     try {
-      const res = await apiRequest('POST', '/api/admin/sms/application-reminder', {
-        phone: application.phone,
-        name: application.fullName,
-        applicationId: application.id,
+      const res = await apiRequest('POST', '/api/admin/sms/driver', {
+        phone: smsReminderTarget.phone,
+        message: smsReminderMessage.trim(),
+        driverName: smsReminderTarget.fullName,
       });
       if (res.ok) {
-        toast({ title: 'SMS reminder sent', description: `Reminder sent to ${application.fullName}` });
+        toast({ title: 'SMS sent', description: `Message sent to ${smsReminderTarget.fullName}` });
+        setSmsReminderDialogOpen(false);
+        setSmsReminderMessage('');
+        setSmsReminderTarget(null);
       } else {
         const data = await res.json();
         toast({ title: 'Failed to send SMS', description: data.error || 'Please try again', variant: 'destructive' });
@@ -108,7 +123,7 @@ export default function AdminApplications() {
     } catch {
       toast({ title: 'Failed to send SMS', description: 'Please try again', variant: 'destructive' });
     } finally {
-      setSendingReminderIds(prev => { const s = new Set(prev); s.delete(application.id); return s; });
+      setSmsReminderSending(false);
     }
   }
 
@@ -614,17 +629,12 @@ export default function AdminApplications() {
               variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
-                sendSmsReminder(application);
+                openSmsReminderDialog(application);
               }}
-              disabled={sendingReminderIds.has(application.id)}
               data-testid={`button-sms-reminder-${application.id}`}
             >
-              {sendingReminderIds.has(application.id) ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <MessageSquare className="h-4 w-4 mr-1" />
-              )}
-              SMS Reminder
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Send SMS
             </Button>
           )}
           {application.status === 'approved' && (
@@ -1292,6 +1302,52 @@ export default function AdminApplications() {
                 <Mail className="h-4 w-4 mr-2" />
               )}
               Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SMS Compose Dialog */}
+      <Dialog open={smsReminderDialogOpen} onOpenChange={(open) => { if (!smsReminderSending) setSmsReminderDialogOpen(open); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Send SMS to {smsReminderTarget?.fullName}
+            </DialogTitle>
+            <DialogDescription>
+              Sending to {smsReminderTarget?.phone}. Edit the message below before sending.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="smsReminderMessage">Message</Label>
+              <Textarea
+                id="smsReminderMessage"
+                value={smsReminderMessage}
+                onChange={(e) => setSmsReminderMessage(e.target.value)}
+                className="mt-1.5 min-h-[130px]"
+                maxLength={1600}
+                data-testid="input-sms-reminder-message"
+              />
+              <p className="text-xs text-muted-foreground mt-1 text-right">{smsReminderMessage.length}/1600</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSmsReminderDialogOpen(false)} disabled={smsReminderSending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendSmsReminder}
+              disabled={smsReminderSending || !smsReminderMessage.trim()}
+              data-testid="button-confirm-send-sms-reminder"
+            >
+              {smsReminderSending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <MessageSquare className="h-4 w-4 mr-2" />
+              )}
+              {smsReminderSending ? 'Sending...' : 'Send SMS'}
             </Button>
           </DialogFooter>
         </DialogContent>
