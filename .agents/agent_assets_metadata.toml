@@ -36,3 +36,21 @@ id = "SOtqE_4hONExMWmoCq66F"
 uri = "file://attached_assets/stock_images/logistics_warehouse_hero_3.jpg"
 type = "image"
 title = "logistics warehouse parcels boxes stacked sorting facility modern clean professional aerial view"
+
+[[outputs]]
+id = "Fof5U8NuNOvnLA17kZGoE"
+uri = "file://attached_assets/stock_images/dev_hero_city_logistics_1.jpg"
+type = "image"
+title = "modern city night delivery van fleet parked clean professional logistics hub exterior building"
+
+[[outputs]]
+id = "cdzXcVa42nd5bGqN2HfL-"
+uri = "file://attached_assets/stock_images/dev_hero_city_logistics_2.jpg"
+type = "image"
+title = "modern city night delivery van fleet parked clean professional logistics hub exterior building"
+
+[[outputs]]
+id = "udgiTzQF1WrfPZOfuUIHE"
+uri = "file://attached_assets/stock_images/dev_hero_city_logistics_3.jpg"
+type = "image"
+title = "modern city night delivery van fleet parked clean professional logistics hub exterior building"

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Check, ArrowRight } from "lucide-react";
 import { setPageMeta } from "@/lib/seo";
+import heroImage from "@assets/developers_hero.jpg";
 
 function CodeBlock({ code, language = "json" }: { code: string; language?: string }) {
   const { toast } = useToast();
@@ -208,29 +209,59 @@ export default function Developers() {
     <PublicLayout>
       {/* Page header */}
       <section
-        className="py-16 px-4"
-        style={{
-          background: "linear-gradient(135deg, #0077B6 0%, #00B4D8 100%)",
-        }}
+        className="relative min-h-[380px] md:min-h-[420px] flex items-center overflow-hidden"
+        aria-label="Developer Documentation hero"
       >
-        <div className="container mx-auto">
-          <div className="max-w-3xl mx-auto text-white">
-            <Badge className="mb-3 bg-white/20 text-white border-white/30 hover:bg-white/20">
-              Partner API v1
-            </Badge>
-            <h1 className="text-4xl font-bold mb-3">Developer Documentation</h1>
-            <p className="text-white/90 text-lg max-w-2xl">
-              The Run Courier Partner API lets approved business clients automate quoting, booking, and tracking via a simple REST interface.
-            </p>
-            <div className="mt-6">
-              <Link href="/api-integration-request">
-                <Button
-                  className="bg-white text-[#0077B6] hover:bg-white/90"
-                  data-testid="button-request-access-docs"
-                >
-                  Request API Access <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+        {/* Background image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroImage})` }}
+          aria-hidden="true"
+        />
+        {/* Deep navy brand overlay — darker than api-integration page for a more focused docs feel */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(0,30,70,0.92) 0%, rgba(0,80,140,0.82) 50%, rgba(0,119,182,0.70) 100%)",
+          }}
+          aria-hidden="true"
+        />
+        {/* Content */}
+        <div className="relative z-10 w-full px-4 py-16">
+          <div className="container mx-auto">
+            <div className="max-w-3xl mx-auto">
+              {/* Frosted glass card */}
+              <div className="backdrop-blur-md bg-white/10 border border-white/20 rounded-xl px-8 py-8 md:px-10 shadow-xl">
+                <Badge className="mb-3 bg-white/20 text-white border-white/30 no-default-hover-elevate">
+                  Partner API v1
+                </Badge>
+                <h1 className="text-4xl font-bold mb-3 text-white drop-shadow-sm">
+                  Developer Documentation
+                </h1>
+                <p className="text-white/90 text-lg max-w-2xl leading-relaxed">
+                  The Run Courier Partner API lets approved business clients automate quoting, booking, and tracking via a simple REST interface.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Link href="/api-integration-request">
+                    <Button
+                      className="bg-white text-[#0077B6] hover:bg-white/90"
+                      data-testid="button-request-access-docs"
+                    >
+                      Request API Access <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link href="/api-integration">
+                    <Button
+                      variant="outline"
+                      className="border-white/60 text-white backdrop-blur-sm bg-white/10"
+                      data-testid="button-learn-api-integration"
+                    >
+                      Learn About Integration
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
