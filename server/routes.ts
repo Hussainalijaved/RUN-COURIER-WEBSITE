@@ -17317,7 +17317,7 @@ ON CONFLICT (type) DO NOTHING;
       const { supabaseAdmin } = await import('./supabaseAdmin');
       const { data: job, error } = await supabaseAdmin
         .from('jobs')
-        .select('tracking_number, status, created_at, scheduled_pickup_time, pickup_address, delivery_address, driver_id, proof_of_delivery_photo, job_number')
+        .select('tracking_number, status, created_at, scheduled_pickup_time, pickup_address, pickup_postcode, delivery_address, delivery_postcode, vehicle_type, driver_id, job_number')
         .eq('tracking_number', reference)
         .single();
 
@@ -17325,7 +17325,7 @@ ON CONFLICT (type) DO NOTHING;
         await logApiRequest({
           apiClientId: client.id, clientName: client.companyName,
           endpoint: `/api/v1/track/${reference}`, method: 'GET',
-          statusCode: 404, success: false, errorMessage: 'booking_not_found', ipAddress: ip,
+          statusCode: 404, success: false, errorMessage: error?.message || 'booking_not_found', ipAddress: ip,
         });
         return res.status(404).json({ error: 'booking_not_found', message: `No booking found with reference: ${reference}` });
       }
@@ -17334,15 +17334,18 @@ ON CONFLICT (type) DO NOTHING;
       const result = {
         success: true,
         bookingReference: job.tracking_number,
-        jobNumber: job.job_number || null,
+        jobNumber: (job as any).job_number || null,
         status: job.status,
         statusLabel: job.status?.replace(/_/g, ' ') || job.status,
         pickupAddress: job.pickup_address,
+        pickupPostcode: (job as any).pickup_postcode || null,
         deliveryAddress: job.delivery_address,
+        deliveryPostcode: (job as any).delivery_postcode || null,
+        vehicleType: (job as any).vehicle_type || null,
         scheduledPickupTime: job.scheduled_pickup_time || null,
         driverAssigned: !!job.driver_id,
         delivered: isDelivered,
-        proofOfDeliveryAvailable: isDelivered && !!job.proof_of_delivery_photo,
+        proofOfDeliveryAvailable: false,
         trackingUrl: `${process.env.APP_URL || 'https://runcourier.co.uk'}/track/${reference}`,
         lastUpdated: new Date().toISOString(),
       };
