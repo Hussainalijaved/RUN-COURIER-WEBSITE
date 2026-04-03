@@ -43,6 +43,7 @@ const navLinks = [
     ],
   },
   { href: '/track', label: 'Track Parcel' },
+  { href: '/api-integration', label: 'API Integration' },
   { href: '/contact', label: 'Contact' },
 ];
 

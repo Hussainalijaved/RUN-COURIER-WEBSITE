@@ -713,6 +713,72 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── API Integration for Businesses ── */}
+      <section className="py-20 border-t border-border" data-testid="section-api-integration">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-sm font-semibold px-3 py-1.5 rounded-md mb-4">
+                  <Zap className="h-4 w-4" />
+                  Built for Businesses
+                </div>
+                <h2 className="text-3xl font-bold mb-4 leading-tight">
+                  API Integration for Businesses
+                </h2>
+                <p className="text-muted-foreground text-base leading-relaxed mb-6">
+                  Connect your platform directly to Run Courier. Automate quoting, booking, and real-time tracking without touching our website — all through a clean, developer-friendly REST API.
+                </p>
+                <ul className="space-y-3 mb-8">
+                  {[
+                    'Instant delivery quotes from your own system',
+                    'Automated job booking and scheduling',
+                    'Live tracking status for every shipment',
+                    'Webhook notifications on delivery events',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                      <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/api-integration">
+                    <Button size="lg" className="gap-2 bg-[#0077B6] hover:bg-[#005f92]" data-testid="cta-api-integration">
+                      Request API Access
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link href="/developers">
+                    <Button size="lg" variant="outline" data-testid="cta-api-docs">
+                      View Documentation
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { icon: Zap, title: 'Quote API', desc: 'Get instant pricing for any delivery in real time.' },
+                  { icon: Package, title: 'Booking API', desc: 'Create and manage jobs programmatically.' },
+                  { icon: MapPin, title: 'Tracking API', desc: 'Poll live status for any active shipment.' },
+                  { icon: Clock, title: 'Webhooks', desc: 'Push events straight to your system on delivery.' },
+                ].map(({ icon: Icon, title, desc }) => (
+                  <Card key={title} className="p-5">
+                    <CardContent className="p-0 space-y-2">
+                      <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <p className="font-semibold text-sm">{title}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="py-20 bg-card">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">

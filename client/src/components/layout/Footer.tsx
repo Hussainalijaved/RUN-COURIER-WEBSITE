@@ -21,6 +21,7 @@ const footerLinks = {
     { href: '/blog', label: 'Blog & Insights' },
     { href: '/contact', label: 'Contact' },
     { href: '/track', label: 'Track Parcel' },
+    { href: '/api-integration', label: 'API Integration' },
     { href: '/support', label: 'Support & Help' },
   ],
   legal: [
