@@ -459,7 +459,7 @@ function validateBasePrice(vehicleType: string, basePrice: number): number {
 function getMinDriverPrice(vehicleType: string | null | undefined): number {
   const vt = String(vehicleType || 'car').toLowerCase().split('|')[0]; // strip vehicle reg suffix
   switch (vt) {
-    case 'motorbike': return 5;
+    case 'motorbike': return 6;
     case 'car':       return 12;
     case 'small_van': return 15;
     case 'medium_van': return 17;

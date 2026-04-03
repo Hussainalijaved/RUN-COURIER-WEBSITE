@@ -104,7 +104,7 @@ const createJobSchema = z.object({
 });
 
 const DRIVER_MIN_PRICES: Record<string, number> = {
-  motorbike: 5,
+  motorbike: 6,
   car: 12,
   small_van: 15,
   medium_van: 17,
@@ -114,10 +114,24 @@ const DRIVER_MIN_PRICES: Record<string, number> = {
   flatbed: 17,
 };
 
+const DRIVER_MILE_RATES_CREATE: Record<string, number> = {
+  motorbike: 0.80,
+  car: 1.00,
+  small_van: 1.00,
+  medium_van: 1.00,
+  lwb_van: 1.10,
+  large_van: 1.00,
+  luton_van: 1.20,
+  flatbed: 1.00,
+};
+
+// Motorbike has a fixed £5 start fee on top of per-mile rate
 function calcAutoDriverPrice(distanceMiles: number, vehicleType: string | undefined | null): number {
   const vt = String(vehicleType || 'car').toLowerCase().split('|')[0];
   const minPrice = DRIVER_MIN_PRICES[vt] ?? 12;
-  return Math.max(distanceMiles * 1.00, minPrice);
+  const rate = DRIVER_MILE_RATES_CREATE[vt] ?? 1.00;
+  const startFee = vt === 'motorbike' ? 5 : 0;
+  return Math.max(startFee + distanceMiles * rate, minPrice);
 }
 
 const getTodayDate = () => {
