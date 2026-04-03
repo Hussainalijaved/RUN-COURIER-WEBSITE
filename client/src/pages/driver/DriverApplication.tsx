@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Phone, Shield } from "lucide-react";
+import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Phone, Shield, AlertCircle, XCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -87,6 +87,7 @@ export default function DriverApplication() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
   const [nationalityOpen, setNationalityOpen] = useState(false);
+  const [step2Attempted, setStep2Attempted] = useState(false);
   
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
@@ -381,16 +382,24 @@ export default function DriverApplication() {
           }
         }
         return true;
-      case 2:
-        if (!uploadedFiles.drivingLicenceFront || !uploadedFiles.drivingLicenceBack) {
+      case 2: {
+        setStep2Attempted(true);
+        const missingDocs: string[] = [];
+        if (!uploadedFiles.profilePicture) missingDocs.push("Profile photo");
+        if (!uploadedFiles.drivingLicenceFront) missingDocs.push("Driving licence (front)");
+        if (!uploadedFiles.drivingLicenceBack) missingDocs.push("Driving licence (back)");
+        if (!uploadedFiles.goodsInTransitInsurance) missingDocs.push("Goods in transit insurance");
+        if (!uploadedFiles.hireAndReward) missingDocs.push("Hire and reward insurance");
+        if (missingDocs.length > 0) {
           toast({
-            title: "Documents required",
-            description: "Please upload both sides of your driving licence.",
+            title: "Required documents missing",
+            description: `Please upload: ${missingDocs.join(", ")}. DBS certificate can be added later.`,
             variant: "destructive",
           });
           return false;
         }
         return true;
+      }
       case 3:
         return form.trigger(["vehicleType", "vehicleRegistration", "vehicleMake", "vehicleModel", "vehicleColor", "bankName", "accountHolderName", "sortCode", "accountNumber"]);
       default:
@@ -411,7 +420,37 @@ export default function DriverApplication() {
     }
   };
 
+  const getSubmissionIssues = (): string[] => {
+    const issues: string[] = [];
+    const values = form.getValues();
+    if (!values.fullName?.trim() || values.fullName.length < 2) issues.push("Full name");
+    if (!values.email?.trim()) issues.push("Email address");
+    if (!phoneVerified) issues.push("Phone number (must be verified)");
+    if (!values.postcode?.trim()) issues.push("Postcode");
+    if (!values.fullAddress?.trim()) issues.push("Full address");
+    if (!values.nationality?.trim()) issues.push("Nationality");
+    if (!values.nationalInsuranceNumber?.trim()) issues.push("National Insurance number");
+    if (!values.isBritish && !values.rightToWorkShareCode?.trim()) issues.push("Right to work share code");
+    if (!uploadedFiles.profilePicture) issues.push("Profile photo");
+    if (!uploadedFiles.drivingLicenceFront) issues.push("Driving licence (front)");
+    if (!uploadedFiles.drivingLicenceBack) issues.push("Driving licence (back)");
+    if (!uploadedFiles.goodsInTransitInsurance) issues.push("Goods in transit insurance");
+    if (!uploadedFiles.hireAndReward) issues.push("Hire and reward insurance");
+    if (!values.vehicleType) issues.push("Vehicle type");
+    if (!values.vehicleRegistration?.trim()) issues.push("Vehicle registration");
+    if (!values.vehicleMake?.trim()) issues.push("Vehicle make");
+    if (!values.vehicleModel?.trim()) issues.push("Vehicle model");
+    if (!values.vehicleColor?.trim()) issues.push("Vehicle colour");
+    if (!values.bankName?.trim()) issues.push("Bank name");
+    if (!values.accountHolderName?.trim()) issues.push("Account holder name");
+    if (!values.sortCode?.trim()) issues.push("Sort code");
+    if (!values.accountNumber?.trim()) issues.push("Account number");
+    return issues;
+  };
+
   const onSubmit = (data: DriverApplicationFormValues) => {
+    const issues = getSubmissionIssues();
+    if (issues.length > 0) return;
     submitApplicationMutation.mutate(data);
   };
 
@@ -445,7 +484,6 @@ export default function DriverApplication() {
 
     return (
       <div className="flex flex-col items-center gap-3">
-        <Label className="text-base font-medium">Profile Picture</Label>
         <p className="text-sm text-muted-foreground text-center">A clear photo of yourself for identification</p>
         <label className="cursor-pointer group relative">
           <div className={cn(
@@ -513,18 +551,21 @@ export default function DriverApplication() {
     label, 
     type, 
     required = false,
-    description 
+    description,
+    showError = false,
   }: { 
     label: string; 
     type: keyof typeof uploadedFiles;
     required?: boolean;
     description?: string;
+    showError?: boolean;
   }) => {
     const isThisUploading = uploadingType === type;
     const isOtherUploading = isUploading && uploadingType !== type;
     const isUploaded = !!uploadedFiles[type];
     const fileName = uploadedFileNames[type];
     const preview = previewUrls[type];
+    const hasError = required && !isUploaded && showError;
 
     return (
       <div className="space-y-2">
@@ -532,9 +573,16 @@ export default function DriverApplication() {
           {label}
           {required && <span className="text-destructive">*</span>}
           {isUploaded && <CheckCircle className="h-4 w-4 text-green-500" />}
+          {hasError && <XCircle className="h-4 w-4 text-destructive" />}
         </Label>
         {description && (
           <p className="text-sm text-muted-foreground">{description}</p>
+        )}
+        {hasError && (
+          <p className="text-sm text-destructive flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            This document is required before you can submit
+          </p>
         )}
         {isUploaded ? (
           <div className="flex items-center gap-3 rounded-md border border-green-500/30 bg-green-500/10 p-3">
@@ -982,7 +1030,28 @@ export default function DriverApplication() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <ProfilePictureUpload />
+                  <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm flex items-start gap-2">
+                    <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <span className="text-muted-foreground">
+                      All documents marked <span className="text-destructive font-medium">*</span> are required before you can submit.{" "}
+                      <span className="font-medium">DBS certificate is optional</span> — you can upload it later.
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col items-center gap-3">
+                    <Label className="text-base font-medium flex items-center gap-1">
+                      Profile Photo <span className="text-destructive">*</span>
+                      {uploadedFiles.profilePicture && <CheckCircle className="h-4 w-4 text-green-500" />}
+                      {step2Attempted && !uploadedFiles.profilePicture && <XCircle className="h-4 w-4 text-destructive" />}
+                    </Label>
+                    {step2Attempted && !uploadedFiles.profilePicture && (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        A profile photo is required before you can submit
+                      </p>
+                    )}
+                    <ProfilePictureUpload />
+                  </div>
 
                   <div className="border-t pt-6" />
 
@@ -991,12 +1060,14 @@ export default function DriverApplication() {
                       label="Driving Licence (Front)"
                       type="drivingLicenceFront"
                       required
+                      showError={step2Attempted}
                       description="Front side of your UK driving licence"
                     />
                     <FileUploadField
                       label="Driving Licence (Back)"
                       type="drivingLicenceBack"
                       required
+                      showError={step2Attempted}
                       description="Back side of your UK driving licence"
                     />
                   </div>
@@ -1004,18 +1075,22 @@ export default function DriverApplication() {
                   <FileUploadField
                     label="DBS Certificate"
                     type="dbsCertificate"
-                    description="Disclosure and Barring Service certificate (if available)"
+                    description="Disclosure and Barring Service certificate — optional, can be uploaded later"
                   />
 
                   <FileUploadField
                     label="Goods in Transit Insurance"
                     type="goodsInTransitInsurance"
+                    required
+                    showError={step2Attempted}
                     description="Proof of goods in transit insurance coverage"
                   />
 
                   <FileUploadField
                     label="Hire and Reward Insurance"
                     type="hireAndReward"
+                    required
+                    showError={step2Attempted}
                     description="Proof of hire and reward insurance coverage"
                   />
                 </CardContent>
@@ -1212,150 +1287,191 @@ export default function DriverApplication() {
               </Card>
             )}
 
-            {currentStep === 4 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5" />
-                    Review Your Application
-                  </CardTitle>
-                  <CardDescription>
-                    Please review your information before submitting.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="font-medium text-foreground mb-3">Personal Details</h4>
-                      <dl className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Full Name:</dt>
-                          <dd className="font-medium" data-testid="text-review-name">{form.getValues("fullName")}</dd>
+            {currentStep === 4 && (() => {
+              const submissionIssues = getSubmissionIssues();
+              const isReady = submissionIssues.length === 0;
+              const docMeta: Record<string, { label: string; required: boolean }> = {
+                profilePicture: { label: "Profile Photo", required: true },
+                drivingLicenceFront: { label: "Driving Licence (Front)", required: true },
+                drivingLicenceBack: { label: "Driving Licence (Back)", required: true },
+                dbsCertificate: { label: "DBS Certificate", required: false },
+                goodsInTransitInsurance: { label: "Goods in Transit Insurance", required: true },
+                hireAndReward: { label: "Hire and Reward Insurance", required: true },
+              };
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Review Your Application
+                    </CardTitle>
+                    <CardDescription>
+                      Please review your information before submitting.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+
+                    {isReady ? (
+                      <div className="rounded-md border border-green-500/30 bg-green-500/10 px-4 py-3 flex items-start gap-2" data-testid="banner-ready-to-submit">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium text-green-700 dark:text-green-400">Your application is complete and ready to submit.</p>
+                          <p className="text-green-600 dark:text-green-500 mt-0.5">DBS certificate is optional — you can upload it later if needed.</p>
                         </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Email:</dt>
-                          <dd className="font-medium" data-testid="text-review-email">{form.getValues("email")}</dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Phone:</dt>
-                          <dd className="font-medium flex items-center gap-1">
-                            {form.getValues("phone")}
-                            {phoneVerified && (
-                              <Shield className="h-3 w-3 text-green-600" />
-                            )}
-                          </dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Postcode:</dt>
-                          <dd className="font-medium">{form.getValues("postcode")}</dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Nationality:</dt>
-                          <dd className="font-medium">{form.getValues("nationality")}</dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">British Citizen:</dt>
-                          <dd className="font-medium">{form.getValues("isBritish") ? "Yes" : "No"}</dd>
-                        </div>
-                        {!isBritish && (
-                          <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Right to Work Share Code:</dt>
-                            <dd className="font-medium">{form.getValues("rightToWorkShareCode")}</dd>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3" data-testid="banner-incomplete">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                          <div className="text-sm">
+                            <p className="font-medium text-destructive">You must complete all required fields before submitting.</p>
+                            <p className="text-muted-foreground mt-0.5">DBS certificate can be added later.</p>
                           </div>
-                        )}
-                      </dl>
-                    </div>
-
-                    <div>
-                      <h4 className="font-medium text-foreground mb-3">Documents Uploaded</h4>
-                      <ul className="space-y-2 text-sm">
-                        {Object.entries(uploadedFiles).map(([key, value]) => {
-                          const labels: Record<string, string> = {
-                            profilePicture: "Profile Picture",
-                            drivingLicenceFront: "Driving Licence (Front)",
-                            drivingLicenceBack: "Driving Licence (Back)",
-                            dbsCertificate: "DBS Certificate",
-                            goodsInTransitInsurance: "Goods in Transit Insurance",
-                            hireAndReward: "Hire and Reward Insurance",
-                          };
-                          return (
-                            <li key={key} className="flex items-center gap-2">
-                              {value ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <div className="h-4 w-4 rounded-full border-2 border-muted" />
-                              )}
-                              <span className={value ? "text-foreground" : "text-muted-foreground"}>
-                                {labels[key]}
-                              </span>
+                        </div>
+                        <ul className="mt-3 space-y-1">
+                          {submissionIssues.map(issue => (
+                            <li key={issue} className="flex items-center gap-2 text-sm text-destructive" data-testid={`missing-${issue.replace(/\s+/g, '-').toLowerCase()}`}>
+                              <XCircle className="h-3 w-3 shrink-0" />
+                              {issue}
                             </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  </div>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
-                  <div className="border-t pt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <h4 className="font-medium text-foreground mb-3">Vehicle</h4>
-                        <dl className="space-y-1 text-sm">
+                        <h4 className="font-medium text-foreground mb-3">Personal Details</h4>
+                        <dl className="space-y-2 text-sm">
                           <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Type:</dt>
-                            <dd className="font-medium capitalize" data-testid="text-review-vehicle">{(form.getValues("vehicleType") || '').replace(/_/g, " ")}</dd>
+                            <dt className="text-muted-foreground">Full Name:</dt>
+                            <dd className="font-medium" data-testid="text-review-name">{form.getValues("fullName")}</dd>
                           </div>
                           <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Registration:</dt>
-                            <dd className="font-medium uppercase" data-testid="text-review-registration">{form.getValues("vehicleRegistration")}</dd>
+                            <dt className="text-muted-foreground">Email:</dt>
+                            <dd className="font-medium" data-testid="text-review-email">{form.getValues("email")}</dd>
                           </div>
                           <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Make:</dt>
-                            <dd className="font-medium" data-testid="text-review-make">{form.getValues("vehicleMake")}</dd>
+                            <dt className="text-muted-foreground">Phone:</dt>
+                            <dd className="font-medium flex items-center gap-1">
+                              {form.getValues("phone")}
+                              {phoneVerified && (
+                                <Shield className="h-3 w-3 text-green-600" />
+                              )}
+                            </dd>
                           </div>
                           <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Model:</dt>
-                            <dd className="font-medium" data-testid="text-review-model">{form.getValues("vehicleModel")}</dd>
+                            <dt className="text-muted-foreground">Postcode:</dt>
+                            <dd className="font-medium">{form.getValues("postcode")}</dd>
                           </div>
                           <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Colour:</dt>
-                            <dd className="font-medium" data-testid="text-review-color">{form.getValues("vehicleColor")}</dd>
+                            <dt className="text-muted-foreground">Nationality:</dt>
+                            <dd className="font-medium">{form.getValues("nationality")}</dd>
                           </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">British Citizen:</dt>
+                            <dd className="font-medium">{form.getValues("isBritish") ? "Yes" : "No"}</dd>
+                          </div>
+                          {!isBritish && (
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Right to Work Share Code:</dt>
+                              <dd className="font-medium">{form.getValues("rightToWorkShareCode") || <span className="text-destructive text-xs">Missing</span>}</dd>
+                            </div>
+                          )}
                         </dl>
                       </div>
+
                       <div>
-                        <h4 className="font-medium text-foreground mb-3">Bank Details</h4>
-                        <dl className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Bank:</dt>
-                            <dd className="font-medium">{form.getValues("bankName")}</dd>
-                          </div>
-                          <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Account Holder:</dt>
-                            <dd className="font-medium">{form.getValues("accountHolderName")}</dd>
-                          </div>
-                          <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Sort Code:</dt>
-                            <dd className="font-medium">{form.getValues("sortCode")}</dd>
-                          </div>
-                          <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Account Number:</dt>
-                            <dd className="font-medium">****{form.getValues("accountNumber").slice(-4)}</dd>
-                          </div>
-                        </dl>
+                        <h4 className="font-medium text-foreground mb-3">Documents</h4>
+                        <ul className="space-y-2 text-sm">
+                          {Object.entries(docMeta).map(([key, meta]) => {
+                            const uploaded = !!uploadedFiles[key as keyof typeof uploadedFiles];
+                            const isMissing = meta.required && !uploaded;
+                            return (
+                              <li key={key} className="flex items-center gap-2">
+                                {uploaded ? (
+                                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                                ) : isMissing ? (
+                                  <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                                ) : (
+                                  <div className="h-4 w-4 rounded-full border-2 border-muted shrink-0" />
+                                )}
+                                <span className={isMissing ? "text-destructive font-medium" : uploaded ? "text-foreground" : "text-muted-foreground"}>
+                                  {meta.label}
+                                  {meta.required ? <span className="text-destructive ml-0.5">*</span> : <span className="text-muted-foreground ml-1 text-xs">(optional)</span>}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          <span className="text-destructive">*</span> Required before submission
+                        </p>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="bg-muted/50 rounded-lg p-4 text-sm">
-                    <p className="text-muted-foreground">
-                      By submitting this application, you confirm that all information provided is accurate 
-                      and that you have the legal right to work in the United Kingdom. Your application will 
-                      be reviewed by our team and we will contact you within 2-3 business days.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    <div className="border-t pt-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <h4 className="font-medium text-foreground mb-3">Vehicle</h4>
+                          <dl className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Type:</dt>
+                              <dd className="font-medium capitalize" data-testid="text-review-vehicle">{(form.getValues("vehicleType") || '').replace(/_/g, " ")}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Registration:</dt>
+                              <dd className="font-medium uppercase" data-testid="text-review-registration">{form.getValues("vehicleRegistration")}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Make:</dt>
+                              <dd className="font-medium" data-testid="text-review-make">{form.getValues("vehicleMake")}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Model:</dt>
+                              <dd className="font-medium" data-testid="text-review-model">{form.getValues("vehicleModel")}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Colour:</dt>
+                              <dd className="font-medium" data-testid="text-review-color">{form.getValues("vehicleColor")}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-foreground mb-3">Bank Details</h4>
+                          <dl className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Bank:</dt>
+                              <dd className="font-medium">{form.getValues("bankName")}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Account Holder:</dt>
+                              <dd className="font-medium">{form.getValues("accountHolderName")}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Sort Code:</dt>
+                              <dd className="font-medium">{form.getValues("sortCode")}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Account Number:</dt>
+                              <dd className="font-medium">****{form.getValues("accountNumber").slice(-4)}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/50 rounded-lg p-4 text-sm">
+                      <p className="text-muted-foreground">
+                        By submitting this application, you confirm that all information provided is accurate 
+                        and that you have the legal right to work in the United Kingdom. Your application will 
+                        be reviewed by our team and we will contact you within 2-3 business days.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             <div className="flex justify-between pt-4">
               {currentStep > 1 ? (
@@ -1375,13 +1491,18 @@ export default function DriverApplication() {
               ) : (
                 <Button 
                   type="submit" 
-                  disabled={submitApplicationMutation.isPending}
+                  disabled={submitApplicationMutation.isPending || getSubmissionIssues().length > 0}
                   data-testid="button-submit-application"
                 >
                   {submitApplicationMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Submitting...
+                    </>
+                  ) : getSubmissionIssues().length > 0 ? (
+                    <>
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Complete Required Fields
                     </>
                   ) : (
                     <>

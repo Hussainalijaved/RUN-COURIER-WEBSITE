@@ -9962,6 +9962,26 @@ export async function registerRoutes(
       });
     }
 
+    // ── Completeness validation (beyond Zod schema) ───────────────────────
+    const missingRequired: string[] = [];
+    if (!data.profilePictureUrl) missingRequired.push("Profile photo");
+    if (!data.drivingLicenceFrontUrl) missingRequired.push("Driving licence (front)");
+    if (!data.drivingLicenceBackUrl) missingRequired.push("Driving licence (back)");
+    if (!data.goodsInTransitInsuranceUrl) missingRequired.push("Goods in transit insurance");
+    if (!data.hireAndRewardUrl) missingRequired.push("Hire and reward insurance");
+    if (!data.vehicleRegistration?.trim()) missingRequired.push("Vehicle registration");
+    if (!data.vehicleMake?.trim()) missingRequired.push("Vehicle make");
+    if (!data.vehicleModel?.trim()) missingRequired.push("Vehicle model");
+    if (!data.vehicleColor?.trim()) missingRequired.push("Vehicle colour");
+    if (!data.isBritish && !data.rightToWorkShareCode?.trim()) missingRequired.push("Right to work share code (required for non-British applicants)");
+    if (missingRequired.length > 0) {
+      return res.status(400).json({
+        error: `Application is incomplete. Please provide all required items before submitting. Missing: ${missingRequired.join(", ")}. Note: DBS certificate can be submitted later.`,
+        code: "INCOMPLETE_APPLICATION",
+        missingFields: missingRequired,
+      });
+    }
+
     let application;
     try {
       application = await storage.createDriverApplication(data);
