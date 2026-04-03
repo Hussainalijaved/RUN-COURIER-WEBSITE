@@ -30,7 +30,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Trash2, ExternalLink, CheckCircle, Loader2, Mail, AlertTriangle, Link2 } from "lucide-react";
+import { Trash2, ExternalLink, CheckCircle, Loader2, Mail, AlertTriangle, Link2, CreditCard, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { Link, useSearch } from "wouter";
 
@@ -55,7 +55,7 @@ interface ApiIntegrationRequest {
 
 interface ApproveResult {
   success: boolean;
-  apiClient: { id: number; company_name: string; api_key_last4: string };
+  apiClient: { id: number; company_name: string; api_key_last4: string; payment_mode?: string; stripe_customer_id?: string | null };
   emailSent: boolean;
   message: string;
 }
@@ -80,6 +80,7 @@ export default function AdminApiRequests() {
   const [selected, setSelected] = useState<ApiIntegrationRequest | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [approveResult, setApproveResult] = useState<ApproveResult | null>(null);
+  const [pendingPaymentMode, setPendingPaymentMode] = useState<"instant" | "pay_later">("instant");
 
   const { data: requests = [], isLoading } = useQuery<ApiIntegrationRequest[]>({
     queryKey: ["/api/admin/api-integration-requests"],
@@ -112,21 +113,21 @@ export default function AdminApiRequests() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({ id, paymentMode }: { id: number; paymentMode: "instant" | "pay_later" }) => {
       const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/admin/api-integration-requests/${id}/approve`, {
         method: "POST",
         headers: { ...authHeaders, "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ paymentMode }),
       });
       const json = await res.json();
       if (!res.ok) throw json;
       return json as ApproveResult;
     },
-    onSuccess: (result, id) => {
+    onSuccess: (result, { id }) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/api-integration-requests"] });
       setApproveResult(result);
-      // Update selected with latest data
       setSelected((prev) => prev && prev.id === id
         ? { ...prev, status: "approved", linked_api_client_id: result.apiClient.id, api_access_email_sent: result.emailSent }
         : prev
@@ -178,7 +179,7 @@ export default function AdminApiRequests() {
               <Card
                 key={req.id}
                 className="hover-elevate cursor-pointer"
-                onClick={() => { setApproveResult(null); setSelected(req); }}
+                onClick={() => { setApproveResult(null); setSelected(req); setPendingPaymentMode("instant"); }}
                 data-testid={`card-api-request-${req.id}`}
               >
                 <CardContent className="pt-4 pb-4">
@@ -251,7 +252,7 @@ export default function AdminApiRequests() {
       </div>
 
       {/* Detail Sheet */}
-      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) { setSelected(null); setApproveResult(null); } }}>
+      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) { setSelected(null); setApproveResult(null); setPendingPaymentMode("instant"); } }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selected && (
             <>
@@ -263,7 +264,7 @@ export default function AdminApiRequests() {
 
                 {/* Approval success banner */}
                 {approveResult && (
-                  <div className={`rounded-md border p-4 text-sm space-y-1 ${approveResult.emailSent ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"}`}>
+                  <div className={`rounded-md border p-4 text-sm space-y-1.5 ${approveResult.emailSent ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"}`}>
                     <div className="flex items-center gap-2 font-semibold">
                       {approveResult.emailSent
                         ? <CheckCircle className="h-4 w-4 text-green-600" />
@@ -276,6 +277,14 @@ export default function AdminApiRequests() {
                       <p className="text-muted-foreground">
                         API Client #{approveResult.apiClient.id} created · key ending in{" "}
                         <span className="font-mono font-semibold">…{approveResult.apiClient.api_key_last4}</span>
+                        {" · "}{approveResult.apiClient.payment_mode === "pay_later" ? "Pay Later" : "Instant Pay"}
+                      </p>
+                    )}
+                    {approveResult.apiClient?.stripe_customer_id && (
+                      <p className="text-muted-foreground flex items-center gap-1.5">
+                        <CreditCard className="h-3.5 w-3.5 text-violet-500" />
+                        Stripe customer created:{" "}
+                        <span className="font-mono text-xs">{approveResult.apiClient.stripe_customer_id}</span>
                       </p>
                     )}
                   </div>
@@ -365,20 +374,50 @@ export default function AdminApiRequests() {
                   </Select>
                 </div>
 
-                {/* Approve button — only show when not yet approved */}
+                {/* Payment mode + approve — only show when not yet approved */}
                 {!selected.linked_api_client_id && selected.status !== "rejected" && (
-                  <Button
-                    className="w-full"
-                    onClick={() => approveMutation.mutate(selected.id)}
-                    disabled={approveMutation.isPending}
-                    data-testid="button-approve-request"
-                  >
-                    {approveMutation.isPending ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
-                    ) : (
-                      <><CheckCircle className="h-4 w-4 mr-2" /> Approve & Send API Access</>
-                    )}
-                  </Button>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Payment Mode</p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={pendingPaymentMode === "instant" ? "default" : "outline"}
+                          className="flex-1 gap-1.5"
+                          onClick={() => setPendingPaymentMode("instant")}
+                          data-testid="button-payment-mode-instant"
+                        >
+                          <Zap className="h-3.5 w-3.5" /> Instant Pay
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={pendingPaymentMode === "pay_later" ? "default" : "outline"}
+                          className="flex-1 gap-1.5"
+                          onClick={() => setPendingPaymentMode("pay_later")}
+                          data-testid="button-payment-mode-pay-later"
+                        >
+                          <CreditCard className="h-3.5 w-3.5" /> Pay Later
+                        </Button>
+                      </div>
+                      {pendingPaymentMode === "pay_later" && (
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          A Stripe customer will be created automatically for invoicing.
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => approveMutation.mutate({ id: selected.id, paymentMode: pendingPaymentMode })}
+                      disabled={approveMutation.isPending}
+                      data-testid="button-approve-request"
+                    >
+                      {approveMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
+                      ) : (
+                        <><CheckCircle className="h-4 w-4 mr-2" /> Approve & Send API Access</>
+                      )}
+                    </Button>
+                  </div>
                 )}
 
                 <p className="text-xs text-muted-foreground">

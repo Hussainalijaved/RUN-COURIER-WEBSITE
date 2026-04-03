@@ -16524,7 +16524,39 @@ ON CONFLICT (type) DO NOTHING;
         ]
       );
       if (!rows[0]) return res.status(404).json({ error: 'not_found' });
-      res.json(rows[0]);
+      let updatedClient = rows[0];
+
+      // Auto-create Stripe customer if switching to pay_later with no existing stripe_customer_id
+      if (updatedClient.payment_mode === 'pay_later' && !updatedClient.stripe_customer_id) {
+        console.log(`[PatchAPIClient] payment_mode=pay_later but no stripe_customer_id — auto-creating Stripe customer for client #${updatedClient.id}`);
+        try {
+          const { getUncachableStripeClient } = await import('./stripeClient');
+          const stripe = await getUncachableStripeClient();
+          if (stripe) {
+            const customer = await stripe.customers.create({
+              email: updatedClient.email,
+              name:  updatedClient.company_name,
+              metadata: { source: 'api_client', api_client_id: String(updatedClient.id) },
+            });
+            const { rows: updRows } = await pool.query(
+              `UPDATE api_clients SET stripe_customer_id = $1 WHERE id = $2
+               RETURNING id, company_name, contact_name, email, phone,
+                         api_key_last4, is_active, allow_quote, allow_booking, allow_tracking,
+                         allow_cancel, allow_webhooks, notes, request_count, last_used_at,
+                         payment_mode, stripe_customer_id, invoice_cycle, account_status, credit_limit`,
+              [customer.id, updatedClient.id]
+            );
+            if (updRows[0]) updatedClient = updRows[0];
+            console.log(`[PatchAPIClient] Stripe customer created — id=${customer.id}`);
+          } else {
+            console.warn('[PatchAPIClient] Stripe not configured — skipping customer creation');
+          }
+        } catch (stripeErr: any) {
+          console.error('[PatchAPIClient] Stripe customer creation failed (non-fatal):', stripeErr?.message || stripeErr);
+        }
+      }
+
+      res.json(updatedClient);
     } finally {
       await pool.end();
     }
@@ -16664,8 +16696,35 @@ ON CONFLICT (type) DO NOTHING;
         return res.status(500).json({ error: 'key_generation_failed', message: 'API key generation produced an empty result.' });
       }
 
-      // ── Step 5: Insert api_clients row ───────────────────────────────────
-      console.log('[ApproveAPI] Step 5: Inserting api_clients row…');
+      // ── Step 5: Resolve payment mode + optionally create Stripe customer ──
+      const { paymentMode } = req.body;
+      const resolvedPaymentMode = paymentMode === 'pay_later' ? 'pay_later' : 'instant';
+      console.log(`[ApproveAPI] Step 5a: payment_mode=${resolvedPaymentMode}`);
+
+      let stripeCustomerId: string | null = null;
+      if (resolvedPaymentMode === 'pay_later') {
+        console.log('[ApproveAPI] Step 5b: Creating Stripe customer for pay_later client…');
+        try {
+          const { getUncachableStripeClient } = await import('./stripeClient');
+          const stripe = await getUncachableStripeClient();
+          if (stripe) {
+            const customer = await stripe.customers.create({
+              email: String(integRequest.email),
+              name:  String(integRequest.company_name),
+              metadata: { source: 'api_client', company: String(integRequest.company_name) },
+            });
+            stripeCustomerId = customer.id;
+            console.log(`[ApproveAPI] Stripe customer created — id=${stripeCustomerId}`);
+          } else {
+            console.warn('[ApproveAPI] Stripe not configured — skipping customer creation');
+          }
+        } catch (stripeErr: any) {
+          console.error('[ApproveAPI] Stripe customer creation failed (non-fatal):', stripeErr?.message || stripeErr);
+        }
+      }
+
+      // ── Step 5c: Insert api_clients row ──────────────────────────────────
+      console.log('[ApproveAPI] Step 5c: Inserting api_clients row…');
       let newClient: any;
       try {
         const { rows: clientRows } = await pool.query(
@@ -16673,10 +16732,12 @@ ON CONFLICT (type) DO NOTHING;
             (company_name, contact_name, email, phone,
              api_key_hash, api_key_last4, is_active,
              allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
+             payment_mode, stripe_customer_id,
              notes)
-           VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12)
+           VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,$13,$14)
            RETURNING id, company_name, contact_name, email, api_key_last4,
-                     allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks`,
+                     allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
+                     payment_mode, stripe_customer_id`,
           [
             String(integRequest.company_name).slice(0, 200),
             String(integRequest.contact_name).slice(0, 200),
@@ -16689,11 +16750,13 @@ ON CONFLICT (type) DO NOTHING;
             allowTracking,
             allowCancel,
             allowWebhooks,
+            resolvedPaymentMode,
+            stripeCustomerId,
             `Auto-created from integration request #${requestId}`,
           ]
         );
         newClient = clientRows[0];
-        console.log(`[ApproveAPI] api_clients row created — id=${newClient?.id}`);
+        console.log(`[ApproveAPI] api_clients row created — id=${newClient?.id} payment_mode=${newClient?.payment_mode} stripe_customer_id=${newClient?.stripe_customer_id ?? 'none'}`);
       } catch (dbErr: any) {
         console.error('[ApproveAPI] DB insert into api_clients failed:', dbErr?.message || dbErr);
         return res.status(500).json({ error: 'db_insert_failed', message: `Database insert failed: ${dbErr?.message || dbErr}` });
