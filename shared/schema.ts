@@ -548,6 +548,12 @@ export const apiClients = pgTable("api_clients", {
   lastUsedAt: timestamp("last_used_at"),
   requestCount: integer("request_count").default(0).notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  // Payment mode
+  paymentMode: text("payment_mode").default("instant").notNull(),      // 'instant' | 'pay_later'
+  stripeCustomerId: text("stripe_customer_id"),
+  invoiceCycle: text("invoice_cycle").default("weekly").notNull(),     // 'weekly' | 'monthly'
+  accountStatus: text("account_status").default("active").notNull(),   // 'active' | 'suspended' | 'overdue'
+  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }),
 });
 
 export const insertApiClientSchema = createInsertSchema(apiClients).omit({

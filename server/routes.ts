@@ -16364,7 +16364,8 @@ ON CONFLICT (type) DO NOTHING;
         `SELECT id, created_at, company_name, contact_name, email, phone,
                 linked_business_user_id, api_key_last4, is_active,
                 allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
-                notes, last_used_at, request_count, updated_at
+                notes, last_used_at, request_count, updated_at,
+                payment_mode, stripe_customer_id, invoice_cycle, account_status, credit_limit
          FROM api_clients ORDER BY created_at DESC`
       );
       res.json(rows);
@@ -16378,11 +16379,17 @@ ON CONFLICT (type) DO NOTHING;
     const {
       companyName, contactName, email, phone, linkedBusinessUserId,
       allowQuote, allowBooking, allowTracking, allowCancel, allowWebhooks, notes,
+      paymentMode, invoiceCycle, accountStatus, creditLimit,
     } = req.body;
 
     if (!companyName || !contactName || !email) {
       return res.status(400).json({ error: 'validation_failed', message: 'Company name, contact name, and email are required.' });
     }
+
+    const resolvedPaymentMode = ['instant', 'pay_later'].includes(paymentMode) ? paymentMode : 'instant';
+    const resolvedInvoiceCycle = ['weekly', 'monthly'].includes(invoiceCycle) ? invoiceCycle : 'weekly';
+    const resolvedAccountStatus = ['active', 'suspended', 'overdue'].includes(accountStatus) ? accountStatus : 'active';
+    const resolvedCreditLimit = creditLimit ? parseFloat(creditLimit) : null;
 
     const rawKey = generateApiKey();
     const keyHash = hashApiKey(rawKey);
@@ -16394,11 +16401,13 @@ ON CONFLICT (type) DO NOTHING;
         `INSERT INTO api_clients
           (company_name, contact_name, email, phone, linked_business_user_id,
            api_key_hash, api_key_last4, is_active,
-           allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13)
+           allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks, notes,
+           payment_mode, invoice_cycle, account_status, credit_limit)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING id, created_at, company_name, contact_name, email, phone,
                    api_key_last4, is_active, allow_quote, allow_booking, allow_tracking,
-                   allow_cancel, allow_webhooks, notes, request_count`,
+                   allow_cancel, allow_webhooks, notes, request_count,
+                   payment_mode, invoice_cycle, account_status, credit_limit`,
         [
           String(companyName).slice(0, 200),
           String(contactName).slice(0, 200),
@@ -16413,6 +16422,10 @@ ON CONFLICT (type) DO NOTHING;
           allowCancel === true,
           allowWebhooks === true,
           notes ? String(notes).slice(0, 2000) : null,
+          resolvedPaymentMode,
+          resolvedInvoiceCycle,
+          resolvedAccountStatus,
+          resolvedCreditLimit,
         ]
       );
       // Return the raw key ONCE — never stored in plain text after this point
@@ -16430,7 +16443,8 @@ ON CONFLICT (type) DO NOTHING;
         `SELECT id, created_at, company_name, contact_name, email, phone,
                 linked_business_user_id, api_key_last4, is_active,
                 allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
-                notes, last_used_at, request_count, updated_at
+                notes, last_used_at, request_count, updated_at,
+                payment_mode, stripe_customer_id, invoice_cycle, account_status, credit_limit
          FROM api_clients WHERE id = $1`,
         [parseInt(req.params.id)]
       );
@@ -16446,7 +16460,21 @@ ON CONFLICT (type) DO NOTHING;
     const {
       companyName, contactName, email, phone, linkedBusinessUserId,
       isActive, allowQuote, allowBooking, allowTracking, allowCancel, allowWebhooks, notes,
+      paymentMode, invoiceCycle, accountStatus, creditLimit,
     } = req.body;
+
+    const resolvedPaymentMode = paymentMode !== undefined
+      ? (['instant', 'pay_later'].includes(paymentMode) ? paymentMode : null)
+      : null;
+    const resolvedInvoiceCycle = invoiceCycle !== undefined
+      ? (['weekly', 'monthly'].includes(invoiceCycle) ? invoiceCycle : null)
+      : null;
+    const resolvedAccountStatus = accountStatus !== undefined
+      ? (['active', 'suspended', 'overdue'].includes(accountStatus) ? accountStatus : null)
+      : null;
+    const resolvedCreditLimit = creditLimit !== undefined
+      ? (creditLimit !== null && creditLimit !== '' ? parseFloat(creditLimit) : null)
+      : undefined;
 
     const pool = await getApiPool();
     try {
@@ -16464,11 +16492,16 @@ ON CONFLICT (type) DO NOTHING;
           allow_cancel = COALESCE($10, allow_cancel),
           allow_webhooks = COALESCE($11, allow_webhooks),
           notes = COALESCE($12, notes),
+          payment_mode = COALESCE($13, payment_mode),
+          invoice_cycle = COALESCE($14, invoice_cycle),
+          account_status = COALESCE($15, account_status),
+          credit_limit = CASE WHEN $16::text = '__unset__' THEN credit_limit ELSE $17::numeric END,
           updated_at = NOW()
-         WHERE id = $13
+         WHERE id = $18
          RETURNING id, company_name, contact_name, email, phone,
                    api_key_last4, is_active, allow_quote, allow_booking, allow_tracking,
-                   allow_cancel, allow_webhooks, notes, request_count, last_used_at`,
+                   allow_cancel, allow_webhooks, notes, request_count, last_used_at,
+                   payment_mode, stripe_customer_id, invoice_cycle, account_status, credit_limit`,
         [
           companyName ? String(companyName).slice(0, 200) : null,
           contactName ? String(contactName).slice(0, 200) : null,
@@ -16482,6 +16515,11 @@ ON CONFLICT (type) DO NOTHING;
           allowCancel !== undefined ? allowCancel : null,
           allowWebhooks !== undefined ? allowWebhooks : null,
           notes !== undefined ? (notes ? String(notes).slice(0, 2000) : null) : undefined,
+          resolvedPaymentMode,
+          resolvedInvoiceCycle,
+          resolvedAccountStatus,
+          resolvedCreditLimit === undefined ? '__unset__' : 'set',
+          resolvedCreditLimit === undefined ? null : resolvedCreditLimit,
           parseInt(req.params.id),
         ]
       );
@@ -17037,10 +17075,13 @@ ON CONFLICT (type) DO NOTHING;
       const trackingNumber = await (storage as any).generateTrackingNumber?.() ||
         `RC${new Date().getFullYear()}${String(Date.now()).slice(-6)}`;
 
+      // Determine payment behaviour from the API client's payment mode
+      const isPayLater = client.paymentMode === 'pay_later';
+
       // Build job data reusing existing structure
       const jobData: any = {
         trackingNumber,
-        status: 'pending',
+        status: isPayLater ? 'pending' : 'pending',        // both start pending, admin confirms
         pickupAddress: String(pickupAddress).slice(0, 500),
         pickupPostcode: String(pickupPostcode).toUpperCase().trim(),
         pickupContactName: pickupContactName ? String(pickupContactName).slice(0, 100) : client.companyName,
@@ -17059,8 +17100,8 @@ ON CONFLICT (type) DO NOTHING;
         basePrice: quote.baseCharge,
         distancePrice: quote.distanceCharge,
         weightSurcharge: quote.weightSurcharge,
-        paymentMethod: 'api',
-        paymentStatus: 'pending',
+        paymentMethod: isPayLater ? 'api_invoice' : 'api',
+        paymentStatus: isPayLater ? 'pay_later' : 'pending',
         createdBy: `API: ${client.companyName}`,
         apiClientId: client.id,
       };
@@ -17069,24 +17110,29 @@ ON CONFLICT (type) DO NOTHING;
 
       const trackingUrl = `${process.env.APP_URL || 'https://runcourier.co.uk'}/track/${trackingNumber}`;
 
-      await logApiRequest({
-        apiClientId: client.id, clientName: client.companyName,
-        endpoint: '/api/v1/book-job', method: 'POST',
-        requestPayloadSafe: safePayload,
-        responsePayloadSafe: { success: true, trackingNumber },
-        statusCode: 201, success: true,
-        bookingReference: trackingNumber, ipAddress: ip,
-      });
-
-      res.status(201).json({
+      const responsePayload = {
         success: true,
         bookingReference: trackingNumber,
         jobId: created?.id,
         status: 'pending',
+        paymentMode: isPayLater ? 'pay_later' : 'instant',
         totalPriceGbp: quote.total,
         trackingUrl,
-        message: 'Booking created successfully. Our team will process your request.',
+        message: isPayLater
+          ? 'Booking created and added to your invoice account. You will be invoiced on your regular billing cycle.'
+          : 'Booking created successfully. Our team will process your request.',
+      };
+
+      await logApiRequest({
+        apiClientId: client.id, clientName: client.companyName,
+        endpoint: '/api/v1/book-job', method: 'POST',
+        requestPayloadSafe: safePayload,
+        responsePayloadSafe: { success: true, trackingNumber, paymentMode: responsePayload.paymentMode },
+        statusCode: 201, success: true,
+        bookingReference: trackingNumber, ipAddress: ip,
       });
+
+      res.status(201).json(responsePayload);
     } catch (err: any) {
       await logApiRequest({
         apiClientId: client.id, clientName: client.companyName,

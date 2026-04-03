@@ -29,6 +29,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Plus,
   RefreshCw,
   Copy,
@@ -37,6 +44,9 @@ import {
   Eye,
   Mail,
   MoreHorizontal,
+  CreditCard,
+  FileText,
+  AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -64,6 +74,12 @@ interface ApiClient {
   notes?: string;
   last_used_at?: string;
   request_count: number;
+  // Payment fields
+  payment_mode: "instant" | "pay_later";
+  stripe_customer_id?: string;
+  invoice_cycle: "weekly" | "monthly";
+  account_status: "active" | "suspended" | "overdue";
+  credit_limit?: string | null;
 }
 
 interface CreateClientForm {
@@ -77,6 +93,9 @@ interface CreateClientForm {
   allowCancel: boolean;
   allowWebhooks: boolean;
   notes: string;
+  paymentMode: "instant" | "pay_later";
+  invoiceCycle: "weekly" | "monthly";
+  creditLimit: string;
 }
 
 function CopyButton({ value, label }: { value: string; label?: string }) {
@@ -106,15 +125,52 @@ function PermissionBadge({ label, allowed }: { label: string; allowed: boolean }
   );
 }
 
+function PaymentModeBadge({ mode, accountStatus }: { mode: "instant" | "pay_later"; accountStatus: "active" | "suspended" | "overdue" }) {
+  if (mode === "pay_later") {
+    if (accountStatus === "overdue") {
+      return (
+        <Badge variant="destructive" className="text-xs gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          Invoice — Overdue
+        </Badge>
+      );
+    }
+    if (accountStatus === "suspended") {
+      return (
+        <Badge variant="secondary" className="text-xs gap-1">
+          <FileText className="h-3 w-3" />
+          Invoice — Suspended
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-xs gap-1 border-blue-500 text-blue-600 dark:text-blue-400">
+        <FileText className="h-3 w-3" />
+        Invoice Account
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-xs gap-1 border-green-500 text-green-600 dark:text-green-400">
+      <CreditCard className="h-3 w-3" />
+      Instant Payment
+    </Badge>
+  );
+}
+
+function AccountStatusBadge({ status }: { status: "active" | "suspended" | "overdue" }) {
+  if (status === "overdue") return <Badge variant="destructive" className="text-xs">Overdue</Badge>;
+  if (status === "suspended") return <Badge variant="secondary" className="text-xs">Suspended</Badge>;
+  return null;
+}
+
 export default function AdminApiClients() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newKeyDialog, setNewKeyDialog] = useState<{ open: boolean; key: string; company: string }>({
-    open: false,
-    key: "",
-    company: "",
+    open: false, key: "", company: "",
   });
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [confirmRegenId, setConfirmRegenId] = useState<number | null>(null);
@@ -132,6 +188,9 @@ export default function AdminApiClients() {
     allowCancel: false,
     allowWebhooks: false,
     notes: "",
+    paymentMode: "instant",
+    invoiceCycle: "weekly",
+    creditLimit: "",
   });
 
   const { data: clients = [], isLoading } = useQuery<ApiClient[]>({
@@ -149,16 +208,18 @@ export default function AdminApiClients() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.message || json?.error || `Error ${res.status}`);
-      console.log("[ApiClients] create response:", JSON.stringify(json));
       return json;
     },
     onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/api-clients"] });
       setCreateOpen(false);
-      setForm({ companyName: "", contactName: "", email: "", phone: "", allowQuote: true, allowBooking: false, allowTracking: true, allowCancel: false, allowWebhooks: false, notes: "" });
-      const plainKey = data?.apiKey ?? "";
-      console.log("[ApiClients] setting key in dialog:", plainKey);
-      setNewKeyDialog({ open: true, key: plainKey, company: data?.company_name ?? "" });
+      setForm({
+        companyName: "", contactName: "", email: "", phone: "",
+        allowQuote: true, allowBooking: false, allowTracking: true,
+        allowCancel: false, allowWebhooks: false, notes: "",
+        paymentMode: "instant", invoiceCycle: "weekly", creditLimit: "",
+      });
+      setNewKeyDialog({ open: true, key: data?.apiKey ?? "", company: data?.company_name ?? "" });
     },
     onError: (err: any) => {
       toast({ title: "Failed to create client", description: err?.message, variant: "destructive" });
@@ -199,16 +260,13 @@ export default function AdminApiClients() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.message || json?.error || `Error ${res.status}`);
-      console.log("[ApiClients] regenerate response:", JSON.stringify(json));
       return { ...json, _clientId: id };
     },
     onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/api-clients"] });
       setConfirmRegenId(null);
       const client = clients.find((c) => c.id === data._clientId);
-      const plainKey = data?.apiKey ?? "";
-      console.log("[ApiClients] regenerated key in dialog:", plainKey);
-      setNewKeyDialog({ open: true, key: plainKey, company: client?.company_name ?? "" });
+      setNewKeyDialog({ open: true, key: data?.apiKey ?? "", company: client?.company_name ?? "" });
     },
     onError: (err: any) => {
       toast({ title: "Regeneration failed", description: err?.message, variant: "destructive" });
@@ -255,6 +313,11 @@ export default function AdminApiClients() {
     },
   });
 
+  // Summary counts
+  const instantCount = clients.filter((c) => c.payment_mode !== "pay_later").length;
+  const invoiceCount = clients.filter((c) => c.payment_mode === "pay_later").length;
+  const overdueCount = clients.filter((c) => c.account_status === "overdue").length;
+
   return (
     <DashboardLayout>
       <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -270,6 +333,32 @@ export default function AdminApiClients() {
             <Plus className="h-4 w-4 mr-2" /> New API Client
           </Button>
         </div>
+
+        {/* Payment mode summary */}
+        {clients.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            <Card className="flex-1 min-w-[140px]">
+              <CardContent className="py-3 px-4">
+                <p className="text-xs text-muted-foreground">Instant Payment</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{instantCount}</p>
+              </CardContent>
+            </Card>
+            <Card className="flex-1 min-w-[140px]">
+              <CardContent className="py-3 px-4">
+                <p className="text-xs text-muted-foreground">Invoice Accounts</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{invoiceCount}</p>
+              </CardContent>
+            </Card>
+            {overdueCount > 0 && (
+              <Card className="flex-1 min-w-[140px]">
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs text-muted-foreground">Overdue Accounts</p>
+                  <p className="text-2xl font-bold text-destructive">{overdueCount}</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Client List */}
         {isLoading ? (
@@ -292,6 +381,11 @@ export default function AdminApiClients() {
                         <Badge variant={client.is_active ? "default" : "secondary"}>
                           {client.is_active ? "Active" : "Disabled"}
                         </Badge>
+                        <PaymentModeBadge
+                          mode={client.payment_mode ?? "instant"}
+                          accountStatus={client.account_status ?? "active"}
+                        />
+                        <AccountStatusBadge status={client.account_status ?? "active"} />
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {client.contact_name} · {client.email}
@@ -307,6 +401,14 @@ export default function AdminApiClients() {
                       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                         <span>Key: <code className="font-mono">••••{client.api_key_last4}</code></span>
                         <span>{client.request_count.toLocaleString()} requests</span>
+                        {client.payment_mode === "pay_later" && (
+                          <>
+                            <span>Billing: {client.invoice_cycle ?? "weekly"}</span>
+                            {client.credit_limit && (
+                              <span>Credit limit: £{parseFloat(client.credit_limit).toFixed(2)}</span>
+                            )}
+                          </>
+                        )}
                         {client.last_used_at && (
                           <span>Last used: {format(new Date(client.last_used_at), "d MMM yyyy HH:mm")}</span>
                         )}
@@ -355,7 +457,7 @@ export default function AdminApiClients() {
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create API Client</DialogTitle>
             <DialogDescription>
@@ -404,6 +506,70 @@ export default function AdminApiClients() {
                 />
               </div>
             </div>
+
+            {/* Payment Mode */}
+            <div className="space-y-3 rounded-md border p-3">
+              <Label className="text-sm font-medium">Payment Mode</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["instant", "pay_later"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setForm({ ...form, paymentMode: mode })}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm transition-colors text-left ${
+                      form.paymentMode === mode
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "border-border hover-elevate"
+                    }`}
+                    data-testid={`button-payment-mode-${mode}`}
+                  >
+                    {mode === "instant"
+                      ? <><CreditCard className="h-4 w-4 shrink-0" /><span>Instant Payment</span></>
+                      : <><FileText className="h-4 w-4 shrink-0" /><span>Invoice Account</span></>
+                    }
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {form.paymentMode === "instant"
+                  ? "Each API booking will require payment before the job is confirmed."
+                  : "Bookings are created immediately and invoiced on a regular billing cycle."}
+              </p>
+
+              {form.paymentMode === "pay_later" && (
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Billing Cycle</Label>
+                    <Select
+                      value={form.invoiceCycle}
+                      onValueChange={(v) => setForm({ ...form, invoiceCycle: v as "weekly" | "monthly" })}
+                    >
+                      <SelectTrigger data-testid="select-invoice-cycle">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Credit Limit (£, optional)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={form.creditLimit}
+                      onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
+                      placeholder="e.g. 5000"
+                      data-testid="input-credit-limit"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Permissions */}
             <div className="space-y-3">
               <Label>Permissions</Label>
               {[
@@ -448,6 +614,9 @@ export default function AdminApiClients() {
                 allowCancel: form.allowCancel,
                 allowWebhooks: form.allowWebhooks,
                 notes: form.notes || undefined,
+                paymentMode: form.paymentMode,
+                invoiceCycle: form.invoiceCycle,
+                creditLimit: form.creditLimit ? parseFloat(form.creditLimit) : undefined,
               })}
               disabled={createMutation.isPending || !form.companyName || !form.contactName || !form.email}
               data-testid="button-confirm-create-client"
@@ -495,7 +664,7 @@ export default function AdminApiClients() {
       {/* Edit Dialog */}
       {editClient && (
         <Dialog open={!!editClient} onOpenChange={(o) => { if (!o) setEditClient(null); }}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit {editClient.company_name}</DialogTitle>
             </DialogHeader>
@@ -536,6 +705,82 @@ export default function AdminApiClients() {
                   />
                 </div>
               </div>
+
+              {/* Payment Mode */}
+              <div className="space-y-3 rounded-md border p-3">
+                <Label className="text-sm font-medium">Payment Mode</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["instant", "pay_later"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setEditClient({ ...editClient, payment_mode: mode })}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm transition-colors text-left ${
+                        editClient.payment_mode === mode
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-border hover-elevate"
+                      }`}
+                      data-testid={`button-edit-payment-mode-${mode}`}
+                    >
+                      {mode === "instant"
+                        ? <><CreditCard className="h-4 w-4 shrink-0" /><span>Instant Payment</span></>
+                        : <><FileText className="h-4 w-4 shrink-0" /><span>Invoice Account</span></>
+                      }
+                    </button>
+                  ))}
+                </div>
+
+                {editClient.payment_mode === "pay_later" && (
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Billing Cycle</Label>
+                      <Select
+                        value={editClient.invoice_cycle ?? "weekly"}
+                        onValueChange={(v) => setEditClient({ ...editClient, invoice_cycle: v as "weekly" | "monthly" })}
+                      >
+                        <SelectTrigger data-testid="select-edit-invoice-cycle">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Credit Limit (£, optional)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={editClient.credit_limit ?? ""}
+                        onChange={(e) => setEditClient({ ...editClient, credit_limit: e.target.value })}
+                        placeholder="e.g. 5000"
+                        data-testid="input-edit-credit-limit"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Account Status</Label>
+                  <Select
+                    value={editClient.account_status ?? "active"}
+                    onValueChange={(v) => setEditClient({ ...editClient, account_status: v as "active" | "suspended" | "overdue" })}
+                  >
+                    <SelectTrigger data-testid="select-edit-account-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="overdue">Overdue</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Permissions */}
               <div className="space-y-3">
                 <Label>Permissions</Label>
                 {[
@@ -580,6 +825,10 @@ export default function AdminApiClients() {
                   allowCancel: editClient.allow_cancel,
                   allowWebhooks: editClient.allow_webhooks,
                   notes: editClient.notes || null,
+                  paymentMode: editClient.payment_mode,
+                  invoiceCycle: editClient.invoice_cycle,
+                  accountStatus: editClient.account_status,
+                  creditLimit: editClient.credit_limit !== undefined ? editClient.credit_limit : null,
                 })}
                 disabled={updateMutation.isPending}
                 data-testid="button-save-edit-client"
@@ -648,7 +897,7 @@ export default function AdminApiClients() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId !== null && deleteMutation.mutate(deleteId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-delete-client"
             >
               Delete

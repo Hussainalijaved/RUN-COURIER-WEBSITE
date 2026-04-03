@@ -95,6 +95,16 @@ Admins can create contract templates with placeholder variables, send contracts 
 ### Driver Notice / Broadcast System
 Admins can create notice templates, send notices to all active approved drivers or selected drivers, and track viewing/acknowledgement status. Notices can optionally require driver acknowledgement and trigger email notifications.
 
+### API Integration System
+A complete API Integration system allows approved business clients to integrate with Run Courier programmatically. The system includes: an API key authentication middleware (`server/apiAuth.ts`) using SHA-256 hashed keys stored in Neon PostgreSQL; rate limiting; permission-based access control (quote, booking, tracking, cancel, webhooks); detailed request logging in `api_logs`; admin CRUD for `api_clients` and `api_integration_requests`; public endpoints at `/api/v1/quote`, `/api/v1/book-job`, `/api/v1/track/:ref`, `/api/v1/cancel/:ref`, `/api/v1/pricing`; and an admin approval flow that auto-creates an API client record and sends an access email with the plaintext key. The approval endpoint requires `Authorization: Bearer <token>` header. Admin pages: `AdminApiClients.tsx`, `AdminApiRequests.tsx`, `AdminApiLogs.tsx`.
+
+### API Client Payment Modes
+API clients have two payment modes stored in `api_clients.payment_mode`:
+- **`instant`** (default): Each booking via `/api/v1/book-job` sets `payment_method='api'` and `payment_status='pending'`.
+- **`pay_later`**: Each booking sets `payment_method='api_invoice'` and `payment_status='pay_later'`, added to invoice ledger.
+
+Additional invoice account fields: `invoice_cycle` (weekly/monthly), `account_status` (active/suspended/overdue), `credit_limit` (nullable decimal), `stripe_customer_id`. Admins can manage all payment settings per client in `AdminApiClients.tsx` via the Edit dialog. The list page shows colour-coded badges: Instant Payment (green) vs Invoice Account (blue), with warning badges for overdue/suspended accounts.
+
 ### Supervisor System
 A dedicated operations supervisor role with a separate login portal at `/supervisor/login`. Supervisors are invited by admins via email (invite link with 7-day expiry), self-register at `/supervisor/register?token=...`, and must be approved by an admin before gaining access. The `supervisors` table (auto-migrated on startup) tracks invite status, activation, and notes. Admin manages supervisors at `/admin/supervisors` (invite, approve/reject, suspend, delete). Active supervisors access a full operations dashboard including: Dashboard with live stats, Jobs list, Create Job (same UI/logic as admin), Live Map, Drivers, Customers, Invoices, and Job History. The `UserRole` type includes `'supervisor'`, DashboardLayout/ProtectedRoute/dashboardRoutes all handle the supervisor role, and the `/api/supervisor/*` and `/api/supervisors/*` backend routes manage all supervisor operations. Supervisor status flow: `pending` (invited, not yet registered) → `pending_approval` (registered, awaiting admin approval) → `active` (approved) → `suspended` / `deactivated`.
 

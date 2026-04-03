@@ -792,6 +792,12 @@ async function runBackgroundTasks() {
       await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS linked_api_client_id INTEGER`);
       await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent BOOLEAN DEFAULT false`);
       await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent_at TIMESTAMPTZ`);
+      // Payment mode columns for API clients
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS payment_mode TEXT NOT NULL DEFAULT 'instant'`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS invoice_cycle TEXT NOT NULL DEFAULT 'weekly'`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'active'`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(10,2)`);
       await pool.end();
       console.log("[MIGRATION] API integration tables created/verified successfully");
     } catch (e: any) {
