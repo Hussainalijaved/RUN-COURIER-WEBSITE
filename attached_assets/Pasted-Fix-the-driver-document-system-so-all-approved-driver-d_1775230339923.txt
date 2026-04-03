@@ -1,0 +1,44 @@
+Fix the driver document system so all approved driver documents are saved permanently in ONE shared backend profile and automatically appear in both:
+1. the website driver dashboard
+2. the mobile app driver dashboard
+
+Current problem:
+Drivers have to upload documents again separately in the mobile app and website. This must stop.
+
+Required behavior:
+- When a driver uploads documents on the website, save them to the central backend/database and storage.
+- When the same driver logs into the mobile app, all previously uploaded documents must load automatically from the same backend.
+- When a driver uploads documents in the mobile app, the same documents must also appear automatically on the website.
+- The website and mobile app must always show the same driver profile data and the same saved documents.
+- No duplicate document systems.
+- No separate storage for web and app.
+- No need for drivers to upload the same files twice.
+
+Approval logic:
+- Once admin approves the driver, keep all approved documents linked permanently to that driver account.
+- Documents must remain visible in the driver profile/dashboard after logout/login.
+- Documents must remain available unless replaced by the driver or removed by admin.
+- Admin must be able to review the same saved documents from the admin panel at any time.
+
+Technical requirements:
+- Use one shared Supabase backend for both website and mobile app.
+- Store document file URLs/paths in the driver profile or driver documents table.
+- Store actual files in Supabase Storage, organized by driver ID.
+- Link every document to the authenticated driver account using the same user ID/driver ID across web and mobile.
+- On login, fetch the existing driver profile and all saved documents from the backend and render them automatically.
+- If a document already exists, show it as uploaded/verified instead of asking to upload again.
+- Prevent creating a second empty profile for the same driver on mobile app.
+- Ensure the mobile app uses the same user record as the website.
+
+What to fix:
+1. Single source of truth for driver profile and documents
+2. Persistent document saving after approval
+3. Automatic sync between website and mobile app
+4. Same document status everywhere: uploaded / pending / approved / rejected
+5. Same files visible after login on any device
+
+Important:
+- Do not change any other business logic.
+- Do not reset existing approved drivers.
+- Preserve all current approved documents and migrate them into the shared system if needed.
+- Fix this end-to-end, including database, storage, API queries, and frontend display on both web and mobile.

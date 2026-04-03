@@ -29,6 +29,15 @@ Driver GPS locations are processed via WebSockets for real-time updates and REST
 ### Mobile API
 Dedicated mobile APIs (`/api/mobile/v1/driver/*` and `/api/mobile/v1/customer/*`) provide driver-specific functionalities (profile management, location updates, job management, POD uploads) and customer functionalities (profile management, booking history) authenticated via Supabase JWT.
 
+### Unified Document System (Web + Mobile)
+All driver documents share a single source of truth across web and mobile:
+- **Single storage**: Supabase Storage (`DRIVER-DOCUMENTS` bucket), organised by driver ID
+- **Single tracking table**: `driver_documents` in Supabase — written by both web and mobile, read by both `GET /api/documents` (web) and `GET /api/mobile/v1/driver/documents` (mobile)
+- **Driver URL columns**: `drivers` table holds canonical URL shortcuts (`driving_licence_front_url`, `driving_licence_back_url`, `goods_in_transit_insurance_url`, `hire_reward_insurance_url`, `profile_picture_url`, `dbs_certificate_url`). Both web upload (`POST /api/documents/upload`) and mobile register (`POST /api/mobile/v1/driver/documents/register`) update these columns in the background after every upload.
+- **`GET /api/mobile/v1/driver/documents`**: Returns all documents from `driver_documents` plus any URL-column documents not yet in that table (synthesized with `approved` status).
+- **`GET /api/documents?driverId=X`**: Always synthesizes any driver URL-column documents missing from the aggregate results, so application-uploaded docs always appear on the web dashboard.
+- No document is stored in two separate systems; no driver needs to upload twice.
+
 ### Multi-Drop Stop POD & Auto-Complete
 Proof of Delivery (POD) (photo + recipient name) is collected per stop for multi-drop jobs. Upon delivery of all stops, the job auto-completes, setting a synthetic POD on the main job, changing its status to "delivered," sending a delivery confirmation email, and broadcasting a WebSocket update.
 

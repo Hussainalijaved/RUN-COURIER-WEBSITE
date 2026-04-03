@@ -1130,6 +1130,86 @@ export function registerMobileRoutes(app: Express): void {
     })
   );
 
+  // List all documents for the authenticated driver from the shared driver_documents table
+  app.get("/api/mobile/v1/driver/documents",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+
+      if (driver.isActive === false) {
+        return res.status(403).json({ error: "Your account has been deactivated.", code: "ACCOUNT_DEACTIVATED" });
+      }
+
+      // Fetch from shared driver_documents table
+      const { data: dbDocs, error: dbErr } = await supabaseAdmin!
+        .from('driver_documents')
+        .select('*')
+        .eq('driver_id', driver.id)
+        .order('uploaded_at', { ascending: false });
+
+      if (dbErr) {
+        console.error('[Mobile Docs List] driver_documents fetch error:', dbErr);
+      }
+
+      // Also synthesize documents from the drivers table URL columns (for application-uploaded docs
+      // that may not have a driver_documents entry yet)
+      const { data: driverRow } = await supabaseAdmin!
+        .from('drivers')
+        .select('driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url, profile_picture_url')
+        .eq('id', driver.id)
+        .maybeSingle();
+
+      const urlColMap: Array<{ col: keyof typeof driverRow; docType: string }> = [
+        { col: 'driving_licence_front_url',     docType: 'driving_license' },
+        { col: 'driving_licence_back_url',      docType: 'driving_license_back' },
+        { col: 'dbs_certificate_url',           docType: 'dbs_certificate' },
+        { col: 'goods_in_transit_insurance_url',docType: 'goods_in_transit_insurance' },
+        { col: 'hire_reward_insurance_url',     docType: 'hire_and_reward_insurance' },
+        { col: 'profile_picture_url',           docType: 'profile_picture' },
+      ];
+
+      const existingTypes = new Set((dbDocs || []).map((d: any) => d.doc_type));
+      const synthesized: any[] = [];
+
+      if (driverRow) {
+        for (const { col, docType } of urlColMap) {
+          const url = (driverRow as any)[col];
+          if (url && !existingTypes.has(docType)) {
+            synthesized.push({
+              id: `driver-col-${docType}`,
+              driver_id: driver.id,
+              doc_type: docType,
+              file_url: url,
+              status: 'approved',
+              uploaded_at: null,
+            });
+          }
+        }
+      }
+
+      const allDocs = [...(dbDocs || []), ...synthesized];
+
+      // Normalize each document entry
+      const normalized = allDocs.map((doc: any) => ({
+        id: doc.id,
+        driverId: doc.driver_id,
+        documentType: doc.doc_type || doc.document_type || 'unknown',
+        fileUrl: doc.file_url || doc.url || '',
+        storagePath: doc.storage_path || null,
+        bucket: doc.bucket || 'DRIVER-DOCUMENTS',
+        fileName: doc.file_name || null,
+        status: doc.status || 'pending',
+        expiryDate: doc.expiry_date || null,
+        reviewNotes: doc.review_notes || doc.admin_notes || null,
+        uploadedAt: doc.uploaded_at || null,
+        reviewedAt: doc.reviewed_at || null,
+      }));
+
+      res.json({ success: true, documents: normalized });
+    })
+  );
+
   // Alternative endpoint for mobile apps that upload directly to Supabase Storage
   // This accepts a document URL instead of a file upload
   app.post("/api/mobile/v1/driver/documents/register",

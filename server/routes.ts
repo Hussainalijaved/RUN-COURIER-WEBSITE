@@ -6823,7 +6823,9 @@ export async function registerRoutes(
       });
     }
 
-    if (driverId && allDocuments.length === 0) {
+    if (driverId) {
+      // Always synthesize from driver table URL columns for any doc types not yet in the results.
+      // This covers: (a) empty results, (b) application-uploaded docs not yet in driver_documents.
       try {
         const { supabaseAdmin: sbAdmin } = await import('./supabaseAdmin');
         if (sbAdmin) {
@@ -6832,21 +6834,28 @@ export async function registerRoutes(
             .select('driving_licence_front_url, driving_licence_back_url, dbs_certificate_url, goods_in_transit_insurance_url, hire_reward_insurance_url, profile_picture_url')
             .eq('id', driverId as string)
             .maybeSingle();
+
+          // Build a set of doc types already returned (using multiple type aliases)
+          const existingTypesInResults = new Set(allDocuments.map((d: any) =>
+            (d.type || '').toLowerCase()
+          ));
           
           if (driverRow) {
             const colDocMappings = [
-              { col: 'driving_licence_front_url', type: 'drivingLicenceFront', label: 'Driving Licence (Front)' },
-              { col: 'driving_licence_back_url', type: 'drivingLicenceBack', label: 'Driving Licence (Back)' },
-              { col: 'dbs_certificate_url', type: 'dbsCertificate', label: 'DBS Certificate' },
-              { col: 'goods_in_transit_insurance_url', type: 'goodsInTransitInsurance', label: 'Goods in Transit Insurance' },
-              { col: 'hire_reward_insurance_url', type: 'hireAndReward', label: 'Hire & Reward Insurance' },
-              { col: 'profile_picture_url', type: 'profilePicture', label: 'Profile Picture' },
+              { col: 'driving_licence_front_url',      type: 'driving_license',             aliases: ['drivinglicencefront','drivinglicensefront','driving_license','driving_licence_front'], label: 'Driving Licence (Front)' },
+              { col: 'driving_licence_back_url',       type: 'driving_license_back',         aliases: ['drivinglicenceback','drivinglicenseback','driving_license_back','driving_licence_back'], label: 'Driving Licence (Back)' },
+              { col: 'dbs_certificate_url',            type: 'dbs_certificate',              aliases: ['dbscertificate','dbs_certificate'], label: 'DBS Certificate' },
+              { col: 'goods_in_transit_insurance_url', type: 'goods_in_transit_insurance',   aliases: ['goodsintransitinsurance','goods_in_transit_insurance'], label: 'Goods in Transit Insurance' },
+              { col: 'hire_reward_insurance_url',      type: 'hire_and_reward_insurance',    aliases: ['hirerewardinsurance','hire_and_reward_insurance','hire_reward_insurance','hirereward'], label: 'Hire & Reward Insurance' },
+              { col: 'profile_picture_url',            type: 'profile_picture',              aliases: ['profilepicture','profile_picture'], label: 'Profile Picture' },
             ];
             const columnPaths: string[] = [];
             const columnDocs: any[] = [];
             for (const m of colDocMappings) {
               const url = (driverRow as any)[m.col];
-              if (url && typeof url === 'string' && !url.startsWith('text:')) {
+              // Skip if this doc type is already represented in results
+              const alreadyExists = m.aliases.some((a: string) => existingTypesInResults.has(a));
+              if (url && typeof url === 'string' && !url.startsWith('text:') && !alreadyExists) {
                 const storagePath = url.startsWith('http') ? (extractStoragePath(url) || url) : url;
                 columnPaths.push(storagePath);
                 columnDocs.push({
@@ -6865,6 +6874,7 @@ export async function registerRoutes(
             }
             if (columnDocs.length > 0) {
               const BUCKETS_TO_TRY = ['DRIVER-DOCUMENTS', 'driver-documents'];
+              let signedAny = false;
               for (const bucket of BUCKETS_TO_TRY) {
                 try {
                   const { data: signedData } = await sbAdmin.storage.from(bucket).createSignedUrls(columnPaths, 3600);
@@ -6880,15 +6890,17 @@ export async function registerRoutes(
                     });
                     if (found > 0) {
                       allDocuments.push(...columnDocs.filter(d => d.signedUrl));
-                      console.log(`[Documents] Generated ${found} documents from driver column URLs for ${driverId}`);
+                      console.log(`[Documents] Synthesized ${found} missing docs from driver column URLs for ${driverId}`);
+                      signedAny = true;
                       break;
                     }
                   }
                 } catch (_) {}
               }
-              if (allDocuments.length === 0) {
+              if (!signedAny) {
+                // Add unsigned — the file serving layer will handle these
                 allDocuments.push(...columnDocs);
-                console.log(`[Documents] Added ${columnDocs.length} documents from driver columns (unsigned) for ${driverId}`);
+                console.log(`[Documents] Added ${columnDocs.length} unsigned docs from driver columns for ${driverId}`);
               }
             }
           }
@@ -7266,6 +7278,31 @@ export async function registerRoutes(
           console.error('[Documents] Failed to upsert driver_documents:', upsertErr);
         } else {
           console.log(`[Documents] Upserted driver_documents record with storage_path: ${storagePath}`);
+        }
+
+        // Also update the drivers table URL columns so the mobile app sees the document
+        const docTypeToDriverField: Record<string, string> = {
+          'driving_license':              'driving_licence_front_url',
+          'driving_licence_front':        'driving_licence_front_url',
+          'driving_license_back':         'driving_licence_back_url',
+          'driving_licence_back':         'driving_licence_back_url',
+          'hire_and_reward_insurance':    'hire_reward_insurance_url',
+          'hire_reward_insurance':        'hire_reward_insurance_url',
+          'goods_in_transit_insurance':   'goods_in_transit_insurance_url',
+          'dbs_certificate':              'dbs_certificate_url',
+          'profile_picture':              'profile_picture_url',
+        };
+        const driverField = docTypeToDriverField[safeDocumentType];
+        if (driverField && rawDriverId !== 'application-pending') {
+          const { error: driverUpdateErr } = await bgSupa
+            .from('drivers')
+            .update({ [driverField]: storagePath, updated_at: new Date().toISOString() })
+            .eq('id', rawDriverId);
+          if (driverUpdateErr) {
+            console.error(`[Documents] Failed to update drivers.${driverField}:`, driverUpdateErr.message);
+          } else {
+            console.log(`[Documents] Updated drivers.${driverField} = ${storagePath}`);
+          }
         }
       } catch (e) {
         console.error('[Documents] Background upsert failed:', e);
