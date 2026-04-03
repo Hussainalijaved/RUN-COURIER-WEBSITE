@@ -92,6 +92,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/api-clients', label: 'API Clients', icon: Code2 },
     { href: '/admin/api-requests', label: 'API Requests', icon: ClipboardList },
     { href: '/admin/api-logs', label: 'API Logs', icon: ScrollText },
+    { href: '/admin/api-invoices', label: 'API Invoices', icon: Receipt },
     { href: '/admin/pricing', label: 'Settings', icon: SlidersHorizontal },
   ],
   driver: [

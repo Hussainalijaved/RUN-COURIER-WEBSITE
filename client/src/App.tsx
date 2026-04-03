@@ -62,6 +62,7 @@ function usePrefetchAllRoutes() {
         import("@/pages/admin/AdminApiClients");
         import("@/pages/admin/AdminApiRequests");
         import("@/pages/admin/AdminApiLogs");
+        import("@/pages/admin/AdminApiInvoices");
         import("@/pages/supervisor/SupervisorDashboard");
         import("@/pages/supervisor/SupervisorJobs");
         import("@/pages/supervisor/SupervisorMap");
@@ -149,6 +150,7 @@ const AdminRoutePlanner = lazy(() => import("@/pages/admin/AdminRoutePlanner"));
 const AdminApiClients = lazy(() => import("@/pages/admin/AdminApiClients"));
 const AdminApiRequests = lazy(() => import("@/pages/admin/AdminApiRequests"));
 const AdminApiLogs = lazy(() => import("@/pages/admin/AdminApiLogs"));
+const AdminApiInvoices = lazy(() => import("@/pages/admin/AdminApiInvoices"));
 const ApiIntegration = lazy(() => import("@/pages/ApiIntegration"));
 const ApiIntegrationRequest = lazy(() => import("@/pages/ApiIntegrationRequest"));
 const Developers = lazy(() => import("@/pages/Developers"));
@@ -398,6 +400,11 @@ function Router() {
         <Route path="/admin/api-logs">
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminApiLogs />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/api-invoices">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminApiInvoices />
           </ProtectedRoute>
         </Route>
         <Route path="/admin/profile">

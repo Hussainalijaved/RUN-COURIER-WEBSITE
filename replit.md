@@ -1,7 +1,7 @@
 # Run Courier - Logistics Platform
 
 ## Overview
-Run Courier is a full-stack web application designed for comprehensive courier and delivery management in the UK. It connects customers, drivers, dispatchers, administrators, and vendors, facilitating services like same-day delivery, multi-drop routing, specialized transport, and live tracking. The platform aims to enhance operational efficiency through role-based dashboards, real-time updates, and an advanced pricing engine, with a business vision to optimize logistics, provide a seamless user experience, and secure a significant share of the UK delivery market.
+Run Courier is a full-stack web application for comprehensive courier and delivery management in the UK. It connects customers, drivers, dispatchers, administrators, and vendors to facilitate services like same-day delivery, multi-drop routing, specialized transport, and live tracking. The platform's core purpose is to optimize logistics, provide a seamless user experience, and secure a significant share of the UK delivery market by enhancing operational efficiency through role-based dashboards, real-time updates, and an advanced pricing engine.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,109 +9,80 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend
-The frontend is built with React 18+, TypeScript, and Vite, using Wouter for routing, TanStack Query for server state management, and Radix UI with shadcn/ui for components. Styling is managed by Tailwind CSS, supporting light/dark modes with a design aesthetic inspired by Linear and Stripe, and features responsive, mobile-first layouts.
+The frontend is built using React 18+, TypeScript, and Vite, featuring Wouter for routing, TanStack Query for server state management, and Radix UI with shadcn/ui for components. Styling is handled by Tailwind CSS, supporting responsive, mobile-first layouts and light/dark modes, with a design aesthetic inspired by Linear and Stripe.
 
 ### Backend
-The backend utilizes Node.js, Express, and TypeScript (ESNext modules) to provide a RESTful API. It includes a custom async error handler and uses Supabase as the exclusive data persistence layer. A key architectural decision is the `IStorage` interface, which abstracts data operations, with `SupabaseStorage` as its primary implementation. Server-side code is bundled with esbuild for optimized cold start times.
+The backend is developed with Node.js, Express, and TypeScript (ESNext modules), providing a RESTful API with a custom async error handler. It uses Supabase as the exclusive data persistence layer. A key architectural decision is the `IStorage` interface, abstracting data operations, with `SupabaseStorage` as its primary implementation. Server-side code is bundled with esbuild for optimized performance.
 
 ### Database & Data Layer
-Supabase PostgreSQL serves as the sole data store. The `SupabaseStorage` class implements the `IStorage` interface using the Supabase JavaScript client with a service role key for administrative tasks. Shared TypeScript schemas in `shared/schema.ts` enforce type consistency across the stack.
+Supabase PostgreSQL serves as the sole data store. The `SupabaseStorage` class implements the `IStorage` interface using the Supabase JavaScript client with a service role key. Shared TypeScript schemas enforce type consistency across the stack.
 
 ### Authentication & Authorization
-Supabase Auth manages user authentication and session management. Role-based access control is implemented via `ProtectedRoute` components, directing users to specific dashboards based on their roles (admin, customer, driver, dispatcher, vendor). Admin identification relies on email matching entries in the `public.admins` table, utilizing the `public.is_admin_by_email()` function and RLS policies.
+Supabase Auth manages user authentication and session management. Role-based access control is implemented via `ProtectedRoute` components, directing users to specific dashboards based on their roles (admin, customer, driver, dispatcher, vendor). Admin identification uses email matching entries in the `public.admins` table and RLS policies.
 
 ### Real-Time Features
-A WebSocket server (`ws` library) at `/ws/realtime` enables live driver location tracking, real-time job status updates, broadcasting, and offline detection. It uses secure token-based authentication with Supabase JWT verification. Job status updates are pushed via WebSocket, with administrators receiving all updates and customers receiving updates for their own jobs.
+A WebSocket server (`ws` library) at `/ws/realtime` enables live driver location tracking, real-time job status updates, broadcasting, and offline detection using secure token-based authentication with Supabase JWT verification. Job status updates are pushed via WebSocket, with administrators receiving all updates and customers receiving updates for their jobs.
 
 ### GPS Tracking Architecture
-Driver GPS locations flow through two parallel paths: WebSocket for real-time updates and REST for persistent storage in the `drivers` and `driver_locations` tables. The `driver_locations` table stores one row per driver, enabling Supabase Realtime subscriptions. The admin live map shows active drivers with live GPS and those without, using postcode-geocoded locations.
-
-### Booking State Persistence
-A global `BookingContext` persists booking data to `localStorage` with a 24-hour expiry.
-
-### Driver Application System
-A multi-step application process allows prospective drivers to submit details for admin review and approval, including phone verification via SMS OTP and postcode autocomplete.
+Driver GPS locations are processed via WebSockets for real-time updates and REST for persistent storage in `drivers` and `driver_locations` tables. The `driver_locations` table uses one row per driver, enabling Supabase Realtime subscriptions. The admin live map displays active drivers with real-time GPS and those without, using postcode-geocoded locations.
 
 ### Mobile API
-A dedicated mobile API at `/api/mobile/v1/driver/*` provides driver-specific functionalities including profile management, location updates, job management, and proof of delivery uploads, authenticated via Supabase JWT. It supports admin-to-driver job assignments.
-
-### Customer Cross-Platform Account Sync
-Individual and business customers share the same Supabase credentials and `public.users` profile data across the website and mobile app. The mobile customer API at `/api/mobile/v1/customer/*` (authenticated via Supabase JWT) exposes: `GET /profile`, `PATCH /profile`, `GET /bookings`, and `DELETE /bookings/:id`. The `jobs` table has a `customer_hidden` boolean column (auto-migrated on startup). When a customer deletes a booking from history, `customer_hidden` is set to `true` — the job remains visible to admins but is filtered out of all customer-facing queries. The website's customer orders page also has a trash icon on completed/cancelled bookings that triggers the same soft-delete via `DELETE /api/jobs/:id/remove-from-history`.
+Dedicated mobile APIs (`/api/mobile/v1/driver/*` and `/api/mobile/v1/customer/*`) provide driver-specific functionalities (profile management, location updates, job management, POD uploads) and customer functionalities (profile management, booking history) authenticated via Supabase JWT.
 
 ### Multi-Drop Stop POD & Auto-Complete
-For multi-drop jobs, Proof of Delivery (POD) (photo + recipient name) is collected per stop. The driver marks each stop as delivered individually. When all stops for a multi-drop job are delivered, the job auto-completes, setting a synthetic POD on the main job, changing its status to "delivered," sending a delivery confirmation email, and broadcasting a WebSocket update.
+Proof of Delivery (POD) (photo + recipient name) is collected per stop for multi-drop jobs. Upon delivery of all stops, the job auto-completes, setting a synthetic POD on the main job, changing its status to "delivered," sending a delivery confirmation email, and broadcasting a WebSocket update.
 
 ### Push Notifications
-Real-time push notifications alert drivers instantly when jobs are assigned using Expo Push API. Driver Expo push tokens are stored in the `driver_devices` table.
+Real-time push notifications, powered by Expo Push API, alert drivers instantly when jobs are assigned. Driver Expo push tokens are stored in the `driver_devices` table.
 
 ### Pay Later & Invoicing
 Approved business customers can use a "Pay Later" option, leading to weekly invoicing. An "Invoices" section provides invoice history and PDF download options.
 
 ### Pricing Engine
-A TypeScript-based pricing engine calculates delivery costs, considering vehicle type, distance, surcharges, multi-drop fees, and waiting times. Pricing configurations are synchronized between client and server. All pages calculating quotes use identical distance logic via the `/api/maps/optimized-route` API for consistency.
-
-### Service Type / Service Level
-Four service tiers (Flexible 0%, Standard +10%, Urgent +25%, Dedicated/Direct +40%) are displayed as a 2×2 selector on the Quote page after a quote is generated. The selection is stored in `BookingContext` and flows through to the booking/payment step. The server applies the surcharge on `bookingData.totalPrice` before creating the Stripe PaymentIntent or recording a Pay Later booking. The surcharge is stored per-job as `service_type`, `service_type_percent`, and `service_type_amount` columns (auto-migrated on startup). The admin job detail panel shows the full pricing breakdown (base price → service type % → surcharge → final total). Service type percentages are configurable by admins via the Pricing Settings page and stored in the `service_type_pricing` JSONB column in `pricing_settings`. The server reads configured percentages from the database instead of hardcoded values.
+A TypeScript-based pricing engine calculates delivery costs based on vehicle type, distance, surcharges, multi-drop fees, and waiting times. Pricing configurations are synchronized between client and server, and all quote pages use the `/api/maps/optimized-route` API for consistent distance logic. Service tiers (Flexible, Standard, Urgent, Dedicated/Direct) are configurable by admins and applied as surcharges.
 
 ### Price Isolation
-Strict separation between `customer_price` (stored as `total_price`) and `driver_price` is maintained. This is enforced through RLS policies, role-specific views (`admin_jobs_view`, `driver_jobs_view`, `customer_jobs_view`), explicit column selection in API endpoints, and WebSocket payload filtering.
-
-### Document Upload
-A secure backend API (`POST /api/documents/upload`) handles document uploads (image and PDF formats up to 10MB) using `multer`, storing files in a structured directory.
+Strict separation between `customer_price` (stored as `total_price`) and `driver_price` is maintained through RLS policies, role-specific views (`admin_jobs_view`, `driver_jobs_view`, `customer_jobs_view`), explicit column selection in API endpoints, and WebSocket payload filtering.
 
 ### Soft Delete System
-The system employs soft deletion using `isActive` and `deactivatedAt` fields for drivers and users, preserving historical data.
+The system employs soft deletion using `isActive` and `deactivatedAt` fields for drivers and users, preserving historical data. Customer booking history deletion results in `customer_hidden` being set to `true` on the `jobs` table, filtering it from customer views while retaining it for admins.
 
-### Driver ID Format
-Driver IDs are formatted as `RC` + 2 digits + 1 letter (e.g., RC02C), generated exclusively via the `create-driver` Supabase Edge Function.
-
-### Admin Job Assignment
-Admins can assign jobs to available drivers with custom pricing. Drivers receive notifications and can accept or decline assignments.
-
-### Batch Job Assignment
-Admins can assign multiple jobs to a single driver transactionally via PostgreSQL functions (`batch_assign_driver`), maintaining individual job records and providing grouped notifications.
+### Admin Job Management
+Admins can assign jobs to available drivers (individual or batch assignments), which triggers notifications and allows drivers to accept or decline.
 
 ### Supabase-Only Architecture
 Supabase is the single source of truth for all data, handling authentication, database, real-time subscriptions, and Edge Functions for privileged operations. RLS policies control granular data access.
 
-### Web-Mobile Integration
-The web admin dashboard and Expo mobile app share a unified backend. This includes synchronized job assignment, real-time events via WebSockets, push notifications for drivers, and synchronized driver profiles.
-
-### Job Geocoding
-Jobs are automatically geocoded using Google Maps API to obtain coordinates, which are synced to Supabase for display on the driver mobile app's map.
-
 ### Route Planner
-Admins can plan multi-stop delivery routes at `/admin/route-planner`. Features include: adding multiple postcodes/addresses as stops, reordering stops with up/down controls, configuring custom start/end points (first stop, last stop, or custom postcode), auto-optimization toggle, interactive Google Maps route display using the Directions API, per-leg breakdown (distance and time), copy-to-clipboard, open in Google Maps link, and sending the route to a driver via email (using Resend) or via WhatsApp (`wa.me` deep link). Backend email endpoint: `POST /api/route-planner/send-email`. Reuses existing `/api/maps/optimized-route` for distance/time calculations.
+Admins can plan multi-stop delivery routes with features like adding/reordering stops, custom start/end points, auto-optimization toggle, interactive Google Maps route display, per-leg breakdown, and sending routes to drivers via email or WhatsApp.
 
 ### Driver Payment System
-Admins can pay drivers via bank transfer from the admin panel. The multi-step flow shows driver bank details, accepts an amount, confirms the payment, and records it. Email confirmation is sent to the driver upon success. Payment history includes delete functionality.
+Admins can process driver payments via bank transfer from the admin panel, including payment recording, email confirmation, and history management.
 
 ### Driver Profile & Document Storage
-Drivers can update their profile and upload documents via the mobile app or during website application. Documents are stored in the Supabase Storage bucket `DRIVER-DOCUMENTS` with mobile-compatible path format: `{authUserId}/{docType}_{timestamp}_{filename}`. The `driver_documents` table tracks all documents.
+Drivers can update profiles and upload documents (image/PDF, up to 10MB) via the mobile app or during application. Documents are stored in a Supabase Storage bucket (`DRIVER-DOCUMENTS`) with a structured path.
 
 ### Driver Contract Management
-Admins can create contract templates with placeholder variables, send contracts to multiple drivers at once via email, and track signing status. Drivers receive an email with a public signing link, leading to a canvas-based signature pad. Signed contracts with signature data are stored permanently.
+Admins can create contract templates, send them to multiple drivers for e-signing via a canvas-based signature pad, and track signing status. Signed contracts are stored permanently.
 
 ### Driver Notice / Broadcast System
-Admins can create notice templates, send notices to all active approved drivers or selected drivers, and track viewing/acknowledgement status. Notices can optionally require driver acknowledgement and trigger email notifications.
+Admins can create and send notices to active drivers, with options for required acknowledgement and email notifications.
 
 ### API Integration System
-A complete API Integration system allows approved business clients to integrate with Run Courier programmatically. The system includes: an API key authentication middleware (`server/apiAuth.ts`) using SHA-256 hashed keys stored in Neon PostgreSQL; rate limiting; permission-based access control (quote, booking, tracking, cancel, webhooks); detailed request logging in `api_logs`; admin CRUD for `api_clients` and `api_integration_requests`; public endpoints at `/api/v1/quote`, `/api/v1/book-job`, `/api/v1/track/:ref`, `/api/v1/cancel/:ref`, `/api/v1/pricing`; and an admin approval flow that auto-creates an API client record and sends an access email with the plaintext key. The approval endpoint requires `Authorization: Bearer <token>` header. Admin pages: `AdminApiClients.tsx`, `AdminApiRequests.tsx`, `AdminApiLogs.tsx`.
+A comprehensive API integration system allows approved business clients to integrate programmatically. It includes API key authentication, rate limiting, permission-based access control (quote, booking, tracking, cancel, webhooks), detailed request logging, and admin CRUD for API clients and requests. It supports `instant` payment (each booking is `pending`) or `pay_later` (added to invoice ledger) modes.
 
-### API Client Payment Modes
-API clients have two payment modes stored in `api_clients.payment_mode`:
-- **`instant`** (default): Each booking via `/api/v1/book-job` sets `payment_method='api'` and `payment_status='pending'`.
-- **`pay_later`**: Each booking sets `payment_method='api_invoice'` and `payment_status='pay_later'`, added to invoice ledger.
-
-Additional invoice account fields: `invoice_cycle` (weekly/monthly), `account_status` (active/suspended/overdue), `credit_limit` (nullable decimal), `stripe_customer_id`. Admins can manage all payment settings per client in `AdminApiClients.tsx` via the Edit dialog. The list page shows colour-coded badges: Instant Payment (green) vs Invoice Account (blue), with warning badges for overdue/suspended accounts.
+### Weekly API Invoicing
+An automatic weekly invoicing process runs every Monday for `pay_later` API clients. It queries unbilled jobs, groups them into invoices, creates records in Neon (`api_invoices` + `api_invoice_items`), marks Supabase jobs as `invoiced`, and sends HTML invoice emails with detailed breakdowns. Admins can manage invoices, mark them paid, resend emails, and trigger runs manually via a dedicated admin page.
 
 ### Supervisor System
-A dedicated operations supervisor role with a separate login portal at `/supervisor/login`. Supervisors are invited by admins via email (invite link with 7-day expiry), self-register at `/supervisor/register?token=...`, and must be approved by an admin before gaining access. The `supervisors` table (auto-migrated on startup) tracks invite status, activation, and notes. Admin manages supervisors at `/admin/supervisors` (invite, approve/reject, suspend, delete). Active supervisors access a full operations dashboard including: Dashboard with live stats, Jobs list, Create Job (same UI/logic as admin), Live Map, Drivers, Customers, Invoices, and Job History. The `UserRole` type includes `'supervisor'`, DashboardLayout/ProtectedRoute/dashboardRoutes all handle the supervisor role, and the `/api/supervisor/*` and `/api/supervisors/*` backend routes manage all supervisor operations. Supervisor status flow: `pending` (invited, not yet registered) → `pending_approval` (registered, awaiting admin approval) → `active` (approved) → `suspended` / `deactivated`.
+A dedicated operations supervisor role with a separate login portal. Supervisors are invited by admins, self-register, and must be approved. Active supervisors gain access to a full operations dashboard including live stats, jobs list, create job, live map, drivers, customers, invoices, and job history. The system handles supervisor invite, registration, approval, suspension, and deactivation workflows.
 
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.
--   **Supabase Services**: Authentication, database, real-time subscriptions, and Edge Functions.
+-   **Supabase Services**: Provides authentication, database (PostgreSQL), real-time subscriptions, and Edge Functions.
 -   **Stripe**: Integrated via Edge Functions for payment processing and managing customer IDs for "Pay Later" invoicing.
--   **Resend**: Used for sending transactional emails via `server/emailService.ts` and the `send-email` Edge Function for booking confirmations and delivery confirmations.
+-   **Resend**: Used for sending transactional emails (booking confirmations, delivery confirmations, API invoices, contract sending, route planner emails).
 -   **Twilio**: Used for SMS OTP verification during the driver application process.
+-   **Expo Push API**: Utilized for sending real-time push notifications to drivers.
+-   **Neon (PostgreSQL)**: Used for storing API client data, API integration logs, and API invoicing records.

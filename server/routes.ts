@@ -16886,6 +16886,101 @@ ON CONFLICT (type) DO NOTHING;
     }
   }));
 
+  // ── ADMIN: API Invoices ───────────────────────────────────────────────────
+
+  // List all API invoices
+  app.get('/api/admin/api-invoices', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { status, clientId, limit: limitParam } = req.query;
+    const limit = Math.min(parseInt(String(limitParam || '200')), 500);
+    const conditions: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (status && status !== 'all') { conditions.push(`status = $${idx++}`); values.push(status); }
+    if (clientId) { conditions.push(`api_client_id = $${idx++}`); values.push(parseInt(String(clientId))); }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    values.push(limit);
+
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, invoice_number, api_client_id, company_name, billing_email,
+                period_start, period_end, total_amount, job_count, status,
+                created_at, sent_at, paid_at, notes
+         FROM api_invoices ${where} ORDER BY created_at DESC LIMIT $${idx}`,
+        values
+      );
+      res.json(rows);
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Get single invoice with its line items
+  app.get('/api/admin/api-invoices/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      const { rows: invRows } = await pool.query(
+        `SELECT id, invoice_number, api_client_id, company_name, billing_email,
+                period_start, period_end, total_amount, job_count, status,
+                created_at, sent_at, paid_at, notes
+         FROM api_invoices WHERE id = $1`,
+        [parseInt(req.params.id)]
+      );
+      if (!invRows[0]) return res.status(404).json({ error: 'not_found' });
+
+      const { rows: items } = await pool.query(
+        `SELECT id, job_id, tracking_number, pickup_address, delivery_address,
+                vehicle_type, scheduled_date, amount, created_at
+         FROM api_invoice_items WHERE invoice_id = $1 ORDER BY id`,
+        [parseInt(req.params.id)]
+      );
+
+      res.json({ ...invRows[0], items });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Mark invoice as paid
+  app.patch('/api/admin/api-invoices/:id/mark-paid', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `UPDATE api_invoices SET status = 'paid', paid_at = NOW()
+         WHERE id = $1 RETURNING id, invoice_number, status, paid_at`,
+        [parseInt(req.params.id)]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'not_found' });
+      res.json({ success: true, invoice: rows[0] });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Resend invoice email
+  app.post('/api/admin/api-invoices/:id/resend', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { resendApiInvoice } = await import('./apiInvoicing');
+    try {
+      await resendApiInvoice(parseInt(req.params.id));
+      res.json({ success: true, message: 'Invoice email resent successfully.' });
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message || 'Failed to resend invoice.' });
+    }
+  }));
+
+  // Manually trigger the invoice run (for testing / ad-hoc)
+  app.post('/api/admin/api-invoices/run-now', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const { runWeeklyApiInvoicingJob } = await import('./apiInvoicing');
+    try {
+      const result = await runWeeklyApiInvoicingJob(true);
+      res.json({ success: true, ...result });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Invoice run failed.' });
+    }
+  }));
+
   // ── HEALTH CHECK ─────────────────────────────────────────────────────────
 
   app.get('/api/health', asyncHandler(async (req, res) => {

@@ -2960,3 +2960,133 @@ export async function sendSupervisorInviteEmail(supervisorEmail: string, data: {
   const textContent = `You've Been Invited as a Supervisor\n\nHi${data.supervisorName ? ` ${data.supervisorName}` : ''},\n\n${data.invitedBy} has invited you to join Run Courier as a Supervisor.\n\nAccept your invitation at: ${data.inviteUrl}\n\nThis invitation expires on ${data.expiresAt.toLocaleDateString('en-GB')}.\n\nQuestions? Contact sales@runcourier.co.uk`;
   return sendEmailNotification(supervisorEmail, 'You\'ve Been Invited as a Supervisor - Run Courier', htmlContent, textContent);
 }
+
+export async function sendApiInvoiceEmail(data: {
+  toEmail: string;
+  companyName: string;
+  invoiceNumber: string;
+  periodStart: string;
+  periodEnd: string;
+  dueDate: string;
+  totalAmount: string;
+  jobItems: Array<{
+    trackingNumber: string;
+    pickupAddress: string;
+    deliveryAddress: string;
+    vehicleType: string;
+    scheduledDate: string;
+    amount: number;
+  }>;
+}): Promise<boolean> {
+  const jobRows = data.jobItems.map(job => `
+    <tr>
+      <td style="padding:9px 8px;color:#333;font-family:monospace;font-size:13px;border-bottom:1px solid #eee;">${job.trackingNumber}</td>
+      <td style="padding:9px 8px;color:#333;font-size:13px;border-bottom:1px solid #eee;">${job.scheduledDate}</td>
+      <td style="padding:9px 8px;color:#333;font-size:13px;border-bottom:1px solid #eee;">${job.pickupAddress}</td>
+      <td style="padding:9px 8px;color:#333;font-size:13px;border-bottom:1px solid #eee;">${job.deliveryAddress}</td>
+      <td style="padding:9px 8px;color:#333;font-size:13px;border-bottom:1px solid #eee;text-transform:capitalize;">${job.vehicleType}</td>
+      <td style="padding:9px 8px;color:#333;font-size:13px;border-bottom:1px solid #eee;text-align:right;font-weight:600;">£${job.amount.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const content = `
+    <h2 style="color:#1a1a1a;margin-bottom:8px;">Invoice from Run Courier</h2>
+    <p style="color:#555;font-size:15px;line-height:1.6;">
+      Dear ${data.companyName},<br><br>
+      Please find your invoice for the period <strong>${data.periodStart}</strong> to <strong>${data.periodEnd}</strong>.
+    </p>
+
+    <div style="background:#f0f7ff;border:1px solid #bcd6f5;border-radius:8px;padding:20px;margin:20px 0;">
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="padding:7px 0;color:#555;width:160px;"><strong>Invoice Number:</strong></td>
+          <td style="padding:7px 0;color:#111;font-weight:700;font-family:monospace;">${data.invoiceNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:#555;"><strong>Billing Period:</strong></td>
+          <td style="padding:7px 0;color:#111;">${data.periodStart} — ${data.periodEnd}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:#555;"><strong>Total Jobs:</strong></td>
+          <td style="padding:7px 0;color:#111;">${data.jobItems.length}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:#555;"><strong>Total Amount:</strong></td>
+          <td style="padding:7px 0;color:#111;font-weight:700;font-size:20px;">£${data.totalAmount}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:#555;"><strong>Payment Due:</strong></td>
+          <td style="padding:7px 0;color:#d9534f;font-weight:700;">${data.dueDate}</td>
+        </tr>
+      </table>
+    </div>
+
+    <h3 style="color:#1a1a1a;margin:24px 0 12px 0;">Delivery Breakdown</h3>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f5f5f5;">
+            <th style="padding:10px 8px;text-align:left;color:#333;font-size:12px;border-bottom:2px solid #ddd;text-transform:uppercase;letter-spacing:.4px;">Reference</th>
+            <th style="padding:10px 8px;text-align:left;color:#333;font-size:12px;border-bottom:2px solid #ddd;text-transform:uppercase;letter-spacing:.4px;">Date</th>
+            <th style="padding:10px 8px;text-align:left;color:#333;font-size:12px;border-bottom:2px solid #ddd;text-transform:uppercase;letter-spacing:.4px;">Pickup</th>
+            <th style="padding:10px 8px;text-align:left;color:#333;font-size:12px;border-bottom:2px solid #ddd;text-transform:uppercase;letter-spacing:.4px;">Delivery</th>
+            <th style="padding:10px 8px;text-align:left;color:#333;font-size:12px;border-bottom:2px solid #ddd;text-transform:uppercase;letter-spacing:.4px;">Vehicle</th>
+            <th style="padding:10px 8px;text-align:right;color:#333;font-size:12px;border-bottom:2px solid #ddd;text-transform:uppercase;letter-spacing:.4px;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${jobRows}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5" style="padding:12px 8px;text-align:right;font-weight:700;color:#333;border-top:2px solid #ddd;font-size:14px;">Total Due:</td>
+            <td style="padding:12px 8px;text-align:right;font-weight:700;color:#111;font-size:17px;border-top:2px solid #ddd;">£${data.totalAmount}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div style="background:#e8f4fd;border-radius:8px;padding:20px;margin:24px 0;">
+      <h3 style="color:#333;margin-top:0;">Payment Instructions</h3>
+
+      <p style="color:#333;margin-bottom:10px;font-weight:600;">Option 1: Bank Transfer</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr><td style="padding:5px 0;color:#333;width:160px;"><strong>Account Name:</strong></td><td style="padding:5px 0;color:#333;">RUN COURIER</td></tr>
+        <tr><td style="padding:5px 0;color:#333;"><strong>Sort Code:</strong></td><td style="padding:5px 0;color:#333;">30-99-50</td></tr>
+        <tr><td style="padding:5px 0;color:#333;"><strong>Account Number:</strong></td><td style="padding:5px 0;color:#333;">36113363</td></tr>
+        <tr><td style="padding:5px 0;color:#333;"><strong>Reference:</strong></td><td style="padding:5px 0;color:#333;font-weight:700;font-family:monospace;">${data.invoiceNumber}</td></tr>
+      </table>
+
+      <p style="color:#333;margin-bottom:10px;font-weight:600;">Option 2: Pay by Card</p>
+      <p style="color:#333;margin:0;">Pay securely online at <a href="https://runcourier.co.uk/pay" style="color:#0066cc;">runcourier.co.uk/pay</a></p>
+    </div>
+
+    <p style="color:#555;font-size:14px;">Questions about this invoice? Contact us at <a href="mailto:accounts@runcourier.co.uk" style="color:#007BFF;">accounts@runcourier.co.uk</a></p>
+    <p style="color:#555;font-size:14px;">Thank you for your business.</p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, `Invoice ${data.invoiceNumber}`);
+  const textContent = [
+    `Invoice ${data.invoiceNumber} — Run Courier`,
+    ``,
+    `Dear ${data.companyName},`,
+    ``,
+    `Period: ${data.periodStart} to ${data.periodEnd}`,
+    `Jobs: ${data.jobItems.length}`,
+    `Total: £${data.totalAmount}`,
+    `Due: ${data.dueDate}`,
+    ``,
+    `Payment:`,
+    `  Bank Transfer — Sort: 30-99-50, Acc: 36113363, Ref: ${data.invoiceNumber}`,
+    `  Online — https://runcourier.co.uk/pay`,
+    ``,
+    `Questions? accounts@runcourier.co.uk`,
+  ].join('\n');
+
+  return sendEmailNotification(
+    data.toEmail,
+    `Invoice ${data.invoiceNumber} — Run Courier API Account`,
+    htmlContent,
+    textContent
+  );
+}

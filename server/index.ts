@@ -798,6 +798,39 @@ async function runBackgroundTasks() {
       await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS invoice_cycle TEXT NOT NULL DEFAULT 'weekly'`);
       await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'active'`);
       await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(10,2)`);
+
+      // api_invoices table for weekly billing
+      await pool.query(`CREATE TABLE IF NOT EXISTS api_invoices (
+        id SERIAL PRIMARY KEY,
+        invoice_number TEXT NOT NULL UNIQUE,
+        api_client_id INTEGER NOT NULL,
+        company_name TEXT NOT NULL,
+        billing_email TEXT NOT NULL,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        total_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+        job_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'sent',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        sent_at TIMESTAMPTZ,
+        paid_at TIMESTAMPTZ,
+        notes TEXT
+      )`);
+
+      // line-item rows for each invoice
+      await pool.query(`CREATE TABLE IF NOT EXISTS api_invoice_items (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER NOT NULL REFERENCES api_invoices(id) ON DELETE CASCADE,
+        job_id TEXT NOT NULL,
+        tracking_number TEXT NOT NULL,
+        pickup_address TEXT,
+        delivery_address TEXT,
+        vehicle_type TEXT,
+        scheduled_date TEXT,
+        amount NUMERIC(10,2) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`);
+
       await pool.end();
       console.log("[MIGRATION] API integration tables created/verified successfully");
     } catch (e: any) {
@@ -1417,4 +1450,31 @@ async function runBackgroundTasks() {
       console.warn("[BACKGROUND] Profile picture sync error:", e?.message);
     }
   }, 25000);
+
+  // Ensure api_client_id and payment_method columns exist on Supabase jobs table
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      await supabaseAdmin.rpc('exec_sql', {
+        query: `
+          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS api_client_id TEXT;
+          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_method TEXT;
+        `
+      });
+      console.log("[BACKGROUND] jobs.api_client_id and jobs.payment_method ensured");
+    } catch (e: any) {
+      console.warn("[BACKGROUND] jobs api_client_id/payment_method migration:", e?.message);
+    }
+  })();
+
+  // Start weekly API invoicing scheduler
+  (async () => {
+    try {
+      const { scheduleWeeklyInvoicing } = await import('./apiInvoicing');
+      scheduleWeeklyInvoicing();
+    } catch (e: any) {
+      console.warn("[BACKGROUND] Invoicing scheduler error:", e?.message);
+    }
+  })();
 }

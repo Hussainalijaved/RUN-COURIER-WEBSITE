@@ -264,3 +264,17 @@ export function requireApiPermission(permission: ApiPermission) {
     next();
   };
 }
+
+/** Shared Neon/PG pool factory for API-integration tables */
+export async function getApiPool() {
+  const { Pool } = await import('pg');
+  return new Pool({
+    host: process.env.PGHOST,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+    database: process.env.PGDATABASE,
+    port: parseInt(process.env.PGPORT || '5432'),
+    ssl: { rejectUnauthorized: false },
+    max: 3,
+  });
+}

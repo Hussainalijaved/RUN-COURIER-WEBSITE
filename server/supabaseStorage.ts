@@ -1063,7 +1063,13 @@ export class SupabaseStorage implements IStorage {
     if ((insertJob as any).customerEmail) {
       (dbJob as any).customer_email = (insertJob as any).customerEmail;
     }
-    
+    if ((insertJob as any).apiClientId != null) {
+      (dbJob as any).api_client_id = String((insertJob as any).apiClientId);
+    }
+    if ((insertJob as any).paymentMethod) {
+      (dbJob as any).payment_method = String((insertJob as any).paymentMethod);
+    }
+
     const { data, error } = await supabase
       .from('jobs')
       .insert(dbJob)
@@ -1091,6 +1097,16 @@ export class SupabaseStorage implements IStorage {
         delete (dbJob as any).service_type_amount;
         needsRetry = true;
       }
+      if (error.message?.includes('api_client_id')) {
+        console.warn('[SupabaseStorage] api_client_id column not found, retrying without it');
+        delete (dbJob as any).api_client_id;
+        needsRetry = true;
+      }
+      if (error.message?.includes('payment_method')) {
+        console.warn('[SupabaseStorage] payment_method column not found, retrying without it');
+        delete (dbJob as any).payment_method;
+        needsRetry = true;
+      }
       if (needsRetry) {
         const { data: retryData, error: retryError } = await supabase
           .from('jobs')
@@ -1109,6 +1125,12 @@ export class SupabaseStorage implements IStorage {
             delete (dbJob as any).service_type;
             delete (dbJob as any).service_type_percent;
             delete (dbJob as any).service_type_amount;
+          }
+          if (retryError.message?.includes('api_client_id')) {
+            delete (dbJob as any).api_client_id;
+          }
+          if (retryError.message?.includes('payment_method')) {
+            delete (dbJob as any).payment_method;
           }
           const { data: finalData, error: finalError } = await supabase
             .from('jobs')
