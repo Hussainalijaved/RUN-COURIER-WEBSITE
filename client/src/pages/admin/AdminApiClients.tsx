@@ -217,9 +217,10 @@ export default function AdminApiClients() {
 
   const regenAndNotifyMutation = useMutation({
     mutationFn: async (id: number) => {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/admin/api-clients/${id}/regenerate-key-and-notify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { ...authHeaders, "Content-Type": "application/json" },
         credentials: "include",
       });
       const json = await res.json();

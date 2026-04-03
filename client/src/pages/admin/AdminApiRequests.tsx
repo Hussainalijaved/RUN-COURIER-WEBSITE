@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -113,9 +113,10 @@ export default function AdminApiRequests() {
 
   const approveMutation = useMutation({
     mutationFn: async (id: number) => {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/admin/api-integration-requests/${id}/approve`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { ...authHeaders, "Content-Type": "application/json" },
         credentials: "include",
       });
       const json = await res.json();

@@ -16564,20 +16564,33 @@ ON CONFLICT (type) DO NOTHING;
   // Approve request → create API client + send access email atomically
   app.post('/api/admin/api-integration-requests/:id/approve', requireAdminAccessStrict, asyncHandler(async (req, res) => {
     const requestId = parseInt(req.params.id);
-    if (isNaN(requestId)) return res.status(400).json({ error: 'validation_failed', message: 'Invalid request ID.' });
+    console.log(`[ApproveAPI] ── START ── requestId=${requestId}`);
+
+    if (isNaN(requestId)) {
+      console.warn('[ApproveAPI] Invalid request ID supplied');
+      return res.status(400).json({ error: 'validation_failed', message: 'Invalid request ID.' });
+    }
 
     const pool = await getApiPool();
+    console.log('[ApproveAPI] DB pool created');
+
     try {
-      // Fetch the integration request
+      // ── Step 1: Fetch the integration request ────────────────────────────
+      console.log('[ApproveAPI] Step 1: Fetching integration request…');
       const { rows: reqRows } = await pool.query(
         `SELECT * FROM api_integration_requests WHERE id = $1`,
         [requestId]
       );
       const integRequest = reqRows[0];
-      if (!integRequest) return res.status(404).json({ error: 'not_found', message: 'Integration request not found.' });
+      if (!integRequest) {
+        console.warn(`[ApproveAPI] Request #${requestId} not found in DB`);
+        return res.status(404).json({ error: 'not_found', message: 'Integration request not found.' });
+      }
+      console.log(`[ApproveAPI] Found request: company="${integRequest.company_name}", email="${integRequest.email}", status="${integRequest.status}", linked_client=${integRequest.linked_api_client_id ?? 'none'}`);
 
-      // Prevent duplicate client creation
+      // ── Step 2: Guard against duplicate approval ─────────────────────────
       if (integRequest.linked_api_client_id) {
+        console.warn(`[ApproveAPI] Already approved — linked_api_client_id=${integRequest.linked_api_client_id}`);
         return res.status(409).json({
           error: 'already_approved',
           message: 'This request has already been approved and an API client already exists.',
@@ -16585,63 +16598,99 @@ ON CONFLICT (type) DO NOTHING;
         });
       }
 
-      // Parse integration types into permission flags
+      // ── Step 3: Parse permission flags from integration_type ─────────────
+      console.log('[ApproveAPI] Step 3: Parsing permissions from integration_type:', integRequest.integration_type);
       const types = String(integRequest.integration_type || '').split(',').map((t: string) => t.trim().toLowerCase());
       const allowQuote    = types.includes('quote') || types.includes('quote api');
       const allowBooking  = types.includes('booking') || types.includes('booking api');
       const allowTracking = types.includes('tracking') || types.includes('tracking api');
       const allowCancel   = types.includes('cancel') || types.includes('cancel api');
       const allowWebhooks = false;
+      console.log(`[ApproveAPI] Permissions → quote=${allowQuote} booking=${allowBooking} tracking=${allowTracking} cancel=${allowCancel}`);
 
-      // Generate API key (plaintext only lives in this request scope)
-      const rawKey  = generateApiKey();
-      const keyHash = hashApiKey(rawKey);
-      const keyLast4 = getKeyLast4(rawKey);
+      // ── Step 4: Generate API key ─────────────────────────────────────────
+      console.log('[ApproveAPI] Step 4: Generating API key…');
+      let rawKey = '';
+      let keyHash = '';
+      let keyLast4 = '';
+      try {
+        rawKey   = generateApiKey();
+        keyHash  = hashApiKey(rawKey);
+        keyLast4 = getKeyLast4(rawKey);
+        console.log(`[ApproveAPI] API key generated — last4=****${keyLast4}`);
+      } catch (keyErr: any) {
+        console.error('[ApproveAPI] Key generation error:', keyErr?.message || keyErr);
+        return res.status(500).json({ error: 'key_generation_failed', message: `API key generation failed: ${keyErr?.message || keyErr}` });
+      }
+      if (!rawKey || !keyHash || !keyLast4) {
+        return res.status(500).json({ error: 'key_generation_failed', message: 'API key generation produced an empty result.' });
+      }
 
-      // Create the API client record
-      const { rows: clientRows } = await pool.query(
-        `INSERT INTO api_clients
-          (company_name, contact_name, email, phone,
-           api_key_hash, api_key_last4, is_active,
-           allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
-           notes)
-         VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12)
-         RETURNING id, company_name, contact_name, email, api_key_last4,
-                   allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks`,
-        [
-          String(integRequest.company_name).slice(0, 200),
-          String(integRequest.contact_name).slice(0, 200),
-          String(integRequest.email).slice(0, 200),
-          integRequest.phone ? String(integRequest.phone).slice(0, 50) : null,
-          keyHash,
-          keyLast4,
-          allowQuote,
-          allowBooking,
-          allowTracking,
-          allowCancel,
-          allowWebhooks,
-          `Auto-created from integration request #${requestId}`,
-        ]
-      );
-      const newClient = clientRows[0];
+      // ── Step 5: Insert api_clients row ───────────────────────────────────
+      console.log('[ApproveAPI] Step 5: Inserting api_clients row…');
+      let newClient: any;
+      try {
+        const { rows: clientRows } = await pool.query(
+          `INSERT INTO api_clients
+            (company_name, contact_name, email, phone,
+             api_key_hash, api_key_last4, is_active,
+             allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
+             notes)
+           VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12)
+           RETURNING id, company_name, contact_name, email, api_key_last4,
+                     allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks`,
+          [
+            String(integRequest.company_name).slice(0, 200),
+            String(integRequest.contact_name).slice(0, 200),
+            String(integRequest.email).slice(0, 200),
+            integRequest.phone ? String(integRequest.phone).slice(0, 50) : null,
+            keyHash,
+            keyLast4,
+            allowQuote,
+            allowBooking,
+            allowTracking,
+            allowCancel,
+            allowWebhooks,
+            `Auto-created from integration request #${requestId}`,
+          ]
+        );
+        newClient = clientRows[0];
+        console.log(`[ApproveAPI] api_clients row created — id=${newClient?.id}`);
+      } catch (dbErr: any) {
+        console.error('[ApproveAPI] DB insert into api_clients failed:', dbErr?.message || dbErr);
+        return res.status(500).json({ error: 'db_insert_failed', message: `Database insert failed: ${dbErr?.message || dbErr}` });
+      }
 
-      // Link the API client to the request and mark approved
-      await pool.query(
-        `UPDATE api_integration_requests
-         SET status = 'approved', linked_api_client_id = $1, updated_at = NOW()
-         WHERE id = $2`,
-        [newClient.id, requestId]
-      );
+      if (!newClient) {
+        console.error('[ApproveAPI] INSERT returned no rows');
+        return res.status(500).json({ error: 'db_insert_failed', message: 'API client insert returned no row.' });
+      }
 
-      // Build permissions list for email
+      // ── Step 6: Link client back to request ──────────────────────────────
+      console.log(`[ApproveAPI] Step 6: Linking api_clients.id=${newClient.id} → request #${requestId}…`);
+      try {
+        await pool.query(
+          `UPDATE api_integration_requests
+           SET status = 'approved', linked_api_client_id = $1, updated_at = NOW()
+           WHERE id = $2`,
+          [newClient.id, requestId]
+        );
+        console.log('[ApproveAPI] Request status updated to approved');
+      } catch (updateErr: any) {
+        console.error('[ApproveAPI] Failed to update request status:', updateErr?.message || updateErr);
+        // Non-fatal — client created, continue
+      }
+
+      // ── Step 7: Send access email ────────────────────────────────────────
       const permissions: string[] = [];
       if (allowQuote)    permissions.push('quote');
       if (allowBooking)  permissions.push('booking');
       if (allowTracking) permissions.push('tracking');
       if (allowCancel)   permissions.push('cancel');
 
-      // Send access email — plaintext key passed here, never persisted after this block
+      console.log('[ApproveAPI] Step 7: Sending API access email to', integRequest.email);
       let emailSent = false;
+      let emailError: string | null = null;
       try {
         const { sendApiAccessEmail } = await import('./emailService');
         emailSent = await sendApiAccessEmail({
@@ -16651,30 +16700,44 @@ ON CONFLICT (type) DO NOTHING;
           apiKey:      rawKey,
           permissions,
         });
-      } catch (emailErr) {
-        console.error('[Approve API] Email send error:', emailErr);
+        console.log(`[ApproveAPI] Email result: sent=${emailSent}`);
+      } catch (emailErr: any) {
+        emailError = emailErr?.message || String(emailErr);
+        console.error('[ApproveAPI] Email send threw error:', emailError);
       }
 
-      // Mark email sent only if it actually succeeded
+      // ── Step 8: Mark email sent in DB ────────────────────────────────────
       if (emailSent) {
-        await pool.query(
-          `UPDATE api_integration_requests
-           SET api_access_email_sent = true, api_access_email_sent_at = NOW()
-           WHERE id = $1`,
-          [requestId]
-        );
+        console.log('[ApproveAPI] Step 8: Marking email sent in DB…');
+        try {
+          await pool.query(
+            `UPDATE api_integration_requests
+             SET api_access_email_sent = true, api_access_email_sent_at = NOW()
+             WHERE id = $1`,
+            [requestId]
+          );
+          console.log('[ApproveAPI] Email sent flag recorded');
+        } catch (flagErr: any) {
+          console.error('[ApproveAPI] Failed to record email_sent flag:', flagErr?.message || flagErr);
+        }
       }
 
+      // ── Done ─────────────────────────────────────────────────────────────
+      console.log(`[ApproveAPI] ── COMPLETE ── clientId=${newClient.id} emailSent=${emailSent}`);
       res.json({
         success:   true,
         apiClient: newClient,
         emailSent,
-        message:   emailSent
+        message: emailSent
           ? 'API client created and access email sent successfully.'
-          : 'API client created but email sending failed. Please resend manually.',
+          : `API client created, but email sending failed${emailError ? ': ' + emailError : ''}. Please resend manually.`,
       });
+    } catch (outerErr: any) {
+      const msg = outerErr?.message || String(outerErr);
+      console.error('[ApproveAPI] UNHANDLED ERROR:', msg, outerErr);
+      return res.status(500).json({ error: 'approval_failed', message: `Approval failed: ${msg}` });
     } finally {
-      await pool.end();
+      await pool.end().catch(() => {});
     }
   }));
 
