@@ -2075,6 +2075,12 @@ export async function registerRoutes(
         podSignatureUrl: (job as any).pod_signature_url || null,
         podRecipientName: (job as any).pod_recipient_name || null,
         deliveredAt: (job as any).delivered_at || null,
+        pickupBarcode: (job as any).pickup_barcode || null,
+        deliveryBarcode: (job as any).delivery_barcode || null,
+        barcodeScannedAtPickup: (job as any).barcode_scanned_at_pickup || false,
+        barcodeVerifiedAtDelivery: (job as any).barcode_verified_at_delivery || false,
+        pickupBarcodeScanTime: (job as any).pickup_barcode_scan_time || null,
+        deliveryBarcodeScanTime: (job as any).delivery_barcode_scan_time || null,
       };
       const resolvedTrackResult = await resolveSingleJobPodUrls(trackResult);
       return res.json(ensureJobNumber(resolvedTrackResult));

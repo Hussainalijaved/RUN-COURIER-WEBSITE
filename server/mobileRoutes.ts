@@ -327,7 +327,7 @@ export function registerMobileRoutes(app: Express): void {
       }
       console.log(`[Job Offers API] Looking up jobs for driver IDs: ${allDriverIds.join(', ')}`);
 
-      const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, dropoff_address, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, customer_name, customer_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance';
+      const driverSafeColumns = 'id, tracking_number, status, driver_price, vehicle_type, priority, pickup_address, pickup_postcode, pickup_latitude, pickup_longitude, pickup_instructions, pickup_contact_name, pickup_contact_phone, dropoff_address, delivery_address, delivery_postcode, delivery_latitude, delivery_longitude, delivery_instructions, recipient_name, recipient_phone, sender_name, sender_phone, customer_name, customer_phone, parcel_description, parcel_weight, parcel_dimensions, distance_miles, scheduled_pickup_time, estimated_delivery_time, actual_pickup_time, actual_delivery_time, driver_id, created_at, updated_at, job_number, is_multi_drop, pickup_building_name, delivery_building_name, distance, pickup_barcode, delivery_barcode, barcode_scanned_at_pickup, barcode_verified_at_delivery, pickup_barcode_scan_time, delivery_barcode_scan_time';
 
       // Also check job_assignments table for this driver
       let assignmentJobIds: string[] = [];
@@ -2579,7 +2579,13 @@ export function registerMobileRoutes(app: Express): void {
             is_return_trip,
             notes,
             created_at,
-            updated_at
+            updated_at,
+            pickup_barcode,
+            delivery_barcode,
+            barcode_scanned_at_pickup,
+            barcode_verified_at_delivery,
+            pickup_barcode_scan_time,
+            delivery_barcode_scan_time
           `)
           .eq('id', jobId)
           .single();
@@ -4272,6 +4278,121 @@ export function registerMobileRoutes(app: Express): void {
         driverWaitPay: newDriverWaitPay,
         chargeableMinutes,
         driverPrice: newDriverPrice,
+      });
+    })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PARCEL BARCODE SCANNING  /api/mobile/v1/driver/jobs/:jobId/barcode
+  // Handles customer parcel barcodes (NOT Run Courier tracking numbers).
+  // Pickup scan: saves the barcode found on the parcel.
+  // Delivery scan: verifies the barcode matches the one saved at pickup.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // PATCH /api/mobile/v1/driver/jobs/:jobId/barcode
+  app.patch(
+    "/api/mobile/v1/driver/jobs/:jobId/barcode",
+    requireSupabaseAuth,
+    requireDriverRole,
+    asyncHandler(async (req, res) => {
+      const driver = req.driver!;
+      const { jobId } = req.params;
+      const { type, barcode } = req.body as { type: 'pickup' | 'delivery'; barcode: string };
+
+      if (!type || !['pickup', 'delivery'].includes(type)) {
+        return res.status(400).json({ error: 'type must be "pickup" or "delivery"' });
+      }
+      if (!barcode || typeof barcode !== 'string' || barcode.trim().length === 0) {
+        return res.status(400).json({ error: 'barcode is required' });
+      }
+      const barcodeValue = barcode.trim();
+
+      // Fetch current job to verify ownership and get existing barcode data
+      const { data: job, error: jobError } = await supabaseAdmin!
+        .from('jobs')
+        .select('id, driver_id, status, pickup_barcode, delivery_barcode, barcode_scanned_at_pickup, barcode_verified_at_delivery')
+        .eq('id', String(jobId))
+        .single();
+
+      if (jobError || !job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      const driverIds = [String(driver.id), driver.authUserId ? String(driver.authUserId) : ''].filter(Boolean);
+      if (!driverIds.includes(String(job.driver_id))) {
+        return res.status(403).json({ error: 'Not authorized for this job' });
+      }
+
+      const now = new Date().toISOString();
+
+      if (type === 'pickup') {
+        // Save the customer's parcel barcode at pickup — no tracking number comparison
+        const { error: updateError } = await supabaseAdmin!
+          .from('jobs')
+          .update({
+            pickup_barcode: barcodeValue,
+            barcode_scanned_at_pickup: true,
+            pickup_barcode_scan_time: now,
+            updated_at: now,
+          })
+          .eq('id', String(jobId));
+
+        if (updateError) {
+          console.error('[Barcode] Failed to save pickup barcode:', updateError);
+          return res.status(500).json({ error: 'Failed to save barcode' });
+        }
+
+        console.log(`[Barcode] Job ${jobId}: pickup barcode saved — "${barcodeValue}"`);
+        return res.json({
+          success: true,
+          type: 'pickup',
+          barcode: barcodeValue,
+          scannedAt: now,
+        });
+      }
+
+      // type === 'delivery': verify barcode matches pickup scan
+      const pickupBarcode = (job as any).pickup_barcode;
+      if (!pickupBarcode) {
+        return res.status(400).json({
+          error: 'No pickup barcode on record. Please scan the barcode at pickup first.',
+          code: 'NO_PICKUP_BARCODE',
+        });
+      }
+
+      if (barcodeValue !== pickupBarcode) {
+        console.warn(`[Barcode] Job ${jobId}: delivery mismatch — scanned "${barcodeValue}", expected "${pickupBarcode}"`);
+        return res.status(422).json({
+          error: 'Barcode does not match the one scanned at pickup. Please ensure you have the correct parcel.',
+          code: 'BARCODE_MISMATCH',
+          scanned: barcodeValue,
+          expected: pickupBarcode,
+        });
+      }
+
+      // Barcodes match — record successful delivery verification
+      const { error: updateError } = await supabaseAdmin!
+        .from('jobs')
+        .update({
+          delivery_barcode: barcodeValue,
+          barcode_verified_at_delivery: true,
+          delivery_barcode_scan_time: now,
+          updated_at: now,
+        })
+        .eq('id', String(jobId));
+
+      if (updateError) {
+        console.error('[Barcode] Failed to save delivery barcode:', updateError);
+        return res.status(500).json({ error: 'Failed to save barcode verification' });
+      }
+
+      console.log(`[Barcode] Job ${jobId}: delivery barcode verified — "${barcodeValue}"`);
+      return res.json({
+        success: true,
+        type: 'delivery',
+        barcode: barcodeValue,
+        verified: true,
+        scannedAt: now,
       });
     })
   );

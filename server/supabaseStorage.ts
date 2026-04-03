@@ -173,6 +173,12 @@ function mapDbToJob(dbJob: any): Job {
     adminNotes: null,
     createdAt: dbJob.created_at ? new Date(dbJob.created_at) : new Date(),
     updatedAt: dbJob.updated_at ? new Date(dbJob.updated_at) : null,
+    pickupBarcode: dbJob.pickup_barcode || null,
+    deliveryBarcode: dbJob.delivery_barcode || null,
+    barcodeScannedAtPickup: dbJob.barcode_scanned_at_pickup || false,
+    barcodeVerifiedAtDelivery: dbJob.barcode_verified_at_delivery || false,
+    pickupBarcodeScanTime: dbJob.pickup_barcode_scan_time ? new Date(dbJob.pickup_barcode_scan_time) : null,
+    deliveryBarcodeScanTime: dbJob.delivery_barcode_scan_time ? new Date(dbJob.delivery_barcode_scan_time) : null,
   };
 }
 

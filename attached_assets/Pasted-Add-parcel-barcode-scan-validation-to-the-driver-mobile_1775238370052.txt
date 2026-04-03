@@ -1,0 +1,84 @@
+Add parcel barcode scan validation to the driver mobile app.
+
+Important business rule:
+- The barcode is NOT created by our system.
+- The barcode already exists on the parcel/item if available.
+- Driver scans the barcode printed on the collected item.
+- The same barcode must be scanned again at delivery for the same item.
+
+Required logic:
+
+1. Pickup / Collection
+- Add an optional “Scan Parcel Barcode” button on the collection screen.
+- Scanning is optional.
+- If the parcel has no barcode or driver does not scan one, the job can continue normally.
+- If the driver scans a barcode at collection:
+  - Save that barcode value in the job record in Supabase.
+  - Mark the job as barcode_scanned_at_pickup = true.
+  - Save pickup scan timestamp.
+  - Show the scanned barcode in the driver app and admin panel.
+
+2. Delivery
+- If no barcode was scanned at collection:
+  - Delivery can be completed normally without barcode scan.
+- If a barcode was scanned at collection:
+  - Driver MUST scan a barcode before completing delivery.
+  - The delivery scan must EXACTLY match the barcode scanned at collection.
+  - If barcode does not match, show error:
+    “Scanned barcode does not match the parcel collected”
+  - Block delivery completion until the correct barcode is scanned.
+
+3. Validation rules
+- Do not accept a different barcode at delivery.
+- Do not allow delivery completion if pickup barcode exists but delivery barcode is missing.
+- Do not allow delivery completion if delivery barcode is different from pickup barcode.
+- No manual typing or manual override for barcode values.
+- Barcode value must come only from actual scanner/camera scan.
+
+4. Rescan / replacement at collection
+- If driver already scanned a barcode at collection and scans another one by mistake:
+  - Show confirmation:
+    “Replace previously scanned parcel barcode?”
+  - Only replace if driver confirms.
+- Save only one barcode per job.
+
+5. Database / Supabase
+Add or use fields in jobs table:
+- pickup_barcode (text)
+- delivery_barcode (text)
+- barcode_scanned_at_pickup (boolean)
+- barcode_verified_at_delivery (boolean)
+- pickup_barcode_scan_time (timestamp)
+- delivery_barcode_scan_time (timestamp)
+
+6. Admin dashboard
+Show in admin job details:
+- Pickup barcode
+- Delivery barcode
+- Barcode scanned at pickup: Yes/No
+- Barcode verified at delivery: Yes/No
+- Pickup scan time
+- Delivery scan time
+
+7. Driver app UI
+Add barcode section in job details:
+- At collection: “Scan Parcel Barcode” button
+- After scan: show scanned barcode and status “Barcode captured”
+- At delivery: if pickup barcode exists, show “Barcode verification required before delivery completion”
+- After successful delivery scan: show “Barcode verified”
+
+8. Persistence
+- Barcode data must be saved permanently in Supabase.
+- If app closes or refreshes, the scanned barcode must still appear.
+- Same barcode data must be visible in both mobile app and website admin panel.
+
+9. Platform requirements
+- Must work on both iOS and Android in Expo.
+- Use device camera barcode scanner already available in the app if possible.
+- Do not change any other job flow or pricing logic.
+
+Final expected behavior:
+- Barcode scan is optional at collection.
+- If no barcode is scanned at collection, no barcode is required at delivery.
+- If barcode is scanned at collection, the same barcode becomes mandatory at delivery.
+- Delivery cannot be completed unless the exact same parcel barcode is scanned again.

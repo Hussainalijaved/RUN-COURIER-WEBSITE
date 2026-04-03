@@ -1468,6 +1468,32 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Ensure parcel barcode fields exist on Supabase jobs table
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      const cols = [
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_barcode TEXT`,
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_barcode TEXT`,
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS barcode_scanned_at_pickup BOOLEAN DEFAULT FALSE`,
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS barcode_verified_at_delivery BOOLEAN DEFAULT FALSE`,
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_barcode_scan_time TIMESTAMPTZ`,
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_barcode_scan_time TIMESTAMPTZ`,
+      ];
+      for (const col of cols) {
+        try {
+          await supabaseAdmin.rpc('exec_sql', { query: col });
+        } catch (_e) {
+          // Column may already exist or RPC unavailable — not fatal
+        }
+      }
+      console.log("[MIGRATION] Parcel barcode columns ensured on jobs table");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Barcode columns migration:", e?.message);
+    }
+  })();
+
   // Start weekly API invoicing scheduler
   (async () => {
     try {

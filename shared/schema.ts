@@ -192,6 +192,12 @@ export const jobs = pgTable("jobs", {
   driverHiddenAt: timestamp("driver_hidden_at"),
   driverHiddenBy: varchar("driver_hidden_by", { length: 36 }),
   officeCity: text("office_city"),
+  pickupBarcode: text("pickup_barcode"),
+  deliveryBarcode: text("delivery_barcode"),
+  barcodeScannedAtPickup: boolean("barcode_scanned_at_pickup").default(false),
+  barcodeVerifiedAtDelivery: boolean("barcode_verified_at_delivery").default(false),
+  pickupBarcodeScanTime: timestamp("pickup_barcode_scan_time"),
+  deliveryBarcodeScanTime: timestamp("delivery_barcode_scan_time"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

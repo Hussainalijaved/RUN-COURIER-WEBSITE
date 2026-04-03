@@ -1108,105 +1108,83 @@ export function ActiveJobScreen({ navigation }: any) {
       console.log('[BARCODE] Haptics failed:', e);
     }
 
-    // Validate barcode against backend
-    const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-    console.log('[BARCODE] API URL:', apiUrl);
-    
-    if (!apiUrl) {
-      console.error('[BARCODE] EXPO_PUBLIC_API_URL not configured');
+    // Save / verify the barcode using the dedicated API endpoint.
+    // This is the CUSTOMER'S parcel barcode — NOT the Run Courier tracking number.
+    // Pickup: stores the barcode found on the parcel.
+    // Delivery: verifies that the scanned barcode matches the one saved at pickup.
+    if (!activeJob) {
       setShowBarcodeScanner(false);
       setCameraReady(false);
-      Alert.alert('Configuration Error', 'API URL not configured. Please contact support.');
       return;
     }
 
-    try {
-      console.log('[BARCODE] Validating against backend...');
-      const response = await fetch(`${apiUrl}/api/jobs/scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          trackingCode: barcodeData,
-          driverId: activeJob?.driver_id,
-        }),
-      });
+    const currentScanType = scanType;
 
-      console.log('[BARCODE] Backend response status:', response.status);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No session token');
+      }
+
+      console.log(`[BARCODE] Sending ${currentScanType} barcode to backend: "${barcodeData}"`);
+      const response = await fetch(
+        `/api/mobile/v1/driver/jobs/${activeJob.id}/barcode`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ type: currentScanType, barcode: barcodeData }),
+        }
+      );
+
       const responseData = await response.json();
-      console.log('[BARCODE] Backend response:', JSON.stringify(responseData));
+      console.log('[BARCODE] Backend response:', response.status, JSON.stringify(responseData));
+
+      setShowBarcodeScanner(false);
+      setCameraReady(false);
 
       if (!response.ok) {
-        // Handle specific error cases
-        setShowBarcodeScanner(false);
-        setCameraReady(false);
-        
-        if (response.status === 404) {
-          Alert.alert('Invalid Barcode', responseData.message || 'No job found with this tracking code.');
-        } else if (response.status === 400) {
-          Alert.alert(responseData.error || 'Error', responseData.message || 'Cannot process this barcode.');
-        } else if (response.status === 403) {
-          Alert.alert('Access Denied', responseData.message || 'This job is not assigned to you.');
+        if (response.status === 422 && responseData.code === 'BARCODE_MISMATCH') {
+          // Delivery scan doesn't match pickup barcode
+          Alert.alert(
+            'Wrong Parcel',
+            'This barcode does not match the one scanned at pickup. Please ensure you have the correct parcel.'
+          );
+        } else if (response.status === 400 && responseData.code === 'NO_PICKUP_BARCODE') {
+          Alert.alert(
+            'Scan at Pickup First',
+            'No barcode was recorded at pickup. Please scan the barcode when you collect the parcel.'
+          );
         } else {
-          Alert.alert('Error', responseData.message || 'Failed to validate barcode.');
+          Alert.alert('Barcode Error', responseData.error || 'Failed to process barcode. Please try again.');
         }
         return;
       }
 
-      // Backend validation successful - barcode matches a valid job
-      console.log('[BARCODE] Validation successful - Job ID:', responseData.jobId, 'Tracking:', responseData.trackingCode);
-
-      // Verify the scanned barcode matches the active job's tracking number
-      if (activeJob && activeJob.tracking_number && barcodeData !== activeJob.tracking_number) {
-        console.log('[BARCODE] Tracking mismatch - scanned:', barcodeData, 'expected:', activeJob.tracking_number);
-        setShowBarcodeScanner(false);
-        setCameraReady(false);
-        Alert.alert(
-          'Wrong Parcel',
-          `This barcode (${barcodeData}) does not match your current job (${activeJob.tracking_number}).`
-        );
-        return;
-      }
-
-      // Save the validated barcode to the job
-      const currentScanType = scanType;
+      // Success — update local state so UI reflects the scan immediately
       if (currentScanType === 'pickup') {
         setPickupBarcode(barcodeData);
-        saveBarcodeToJob('pickup_barcode', barcodeData);
+        Alert.alert(
+          'Pickup Barcode Saved',
+          `Barcode recorded: ${barcodeData}\n\nScan the same barcode at delivery to verify the correct parcel.`
+        );
       } else {
         setDeliveryBarcode(barcodeData);
-        saveBarcodeToJob('delivery_barcode', barcodeData);
+        Alert.alert(
+          'Delivery Barcode Verified',
+          `Barcode matched. You have the correct parcel.`
+        );
       }
-      
-      setShowBarcodeScanner(false);
-      setCameraReady(false);
-      
-      Alert.alert(
-        'Barcode Verified',
-        `${currentScanType === 'pickup' ? 'Pickup' : 'Delivery'} barcode verified: ${responseData.trackingCode}`
-      );
 
     } catch (error: any) {
-      console.error('[BARCODE] Network error:', error.message);
+      console.error('[BARCODE] Error:', error.message);
       setShowBarcodeScanner(false);
       setCameraReady(false);
-      Alert.alert('Network Error', 'Unable to verify barcode. Please check your internet connection and try again.');
+      Alert.alert('Network Error', 'Unable to process barcode. Please check your connection and try again.');
     }
   }, [scanned, scanType, activeJob]);
-
-  const saveBarcodeToJob = async (field: string, barcode: string) => {
-    if (!activeJob) return;
-    
-    try {
-      await supabase
-        .from('jobs')
-        .update({ [field]: barcode, updated_at: new Date().toISOString() })
-        .eq('id', activeJob.id);
-    } catch (error) {
-      console.error('Error saving barcode:', error);
-    }
-  };
 
   const formatWaitingTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -1691,11 +1669,20 @@ export function ActiveJobScreen({ navigation }: any) {
                     Pickup
                   </ThemedText>
                   {pickupBarcode || (activeJob as any).pickup_barcode ? (
-                    <View style={[styles.barcodeValue, { backgroundColor: theme.success + '20' }]}>
-                      <Feather name="check-circle" size={14} color={theme.success} />
-                      <ThemedText style={[styles.barcodeText, { color: theme.success }]} numberOfLines={1}>
-                        {pickupBarcode || (activeJob as any).pickup_barcode}
-                      </ThemedText>
+                    <View style={{ gap: 4 }}>
+                      <View style={[styles.barcodeValue, { backgroundColor: theme.success + '20' }]}>
+                        <Feather name="check-circle" size={14} color={theme.success} />
+                        <ThemedText style={[styles.barcodeText, { color: theme.success }]} numberOfLines={1}>
+                          {pickupBarcode || (activeJob as any).pickup_barcode}
+                        </ThemedText>
+                      </View>
+                      <Pressable
+                        style={[styles.scanButton, { backgroundColor: theme.secondaryText + '30' }]}
+                        onPress={() => openBarcodeScanner('pickup')}
+                      >
+                        <Feather name="refresh-cw" size={12} color={theme.secondaryText} />
+                        <Text style={[styles.scanButtonText, { color: theme.secondaryText }]}>Rescan</Text>
+                      </Pressable>
                     </View>
                   ) : (
                     <Pressable

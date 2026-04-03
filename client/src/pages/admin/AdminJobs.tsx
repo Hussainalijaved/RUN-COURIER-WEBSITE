@@ -81,6 +81,7 @@ import {
   ExternalLink,
   Radio,
   PenLine,
+  ScanLine,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -2602,6 +2603,62 @@ export default function AdminJobs() {
                   pickupBuildingName={(selectedJob as any).pickupBuildingName}
                 />
                 
+                {/* Parcel Barcode Section */}
+                {((selectedJob as any).pickupBarcode || (selectedJob as any).deliveryBarcode || (selectedJob as any).barcodeScannedAtPickup) && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold flex items-center gap-2 mb-3">
+                      <ScanLine className="h-4 w-4 text-muted-foreground" />
+                      Parcel Barcode
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pickup Scan</p>
+                        {(selectedJob as any).pickupBarcode ? (
+                          <div className="space-y-1">
+                            <p className="text-sm font-mono bg-muted px-2 py-1 rounded break-all">
+                              {(selectedJob as any).pickupBarcode}
+                            </p>
+                            {(selectedJob as any).pickupBarcodeScanTime && (
+                              <p className="text-xs text-muted-foreground">
+                                {new Date((selectedJob as any).pickupBarcodeScanTime).toLocaleString('en-GB')}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-1 text-green-600">
+                              <CheckCircle className="h-3 w-3" />
+                              <span className="text-xs">Scanned at pickup</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">Not scanned</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Delivery Verify</p>
+                        {(selectedJob as any).deliveryBarcode ? (
+                          <div className="space-y-1">
+                            <p className="text-sm font-mono bg-muted px-2 py-1 rounded break-all">
+                              {(selectedJob as any).deliveryBarcode}
+                            </p>
+                            {(selectedJob as any).deliveryBarcodeScanTime && (
+                              <p className="text-xs text-muted-foreground">
+                                {new Date((selectedJob as any).deliveryBarcodeScanTime).toLocaleString('en-GB')}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-1 text-green-600">
+                              <CheckCircle className="h-3 w-3" />
+                              <span className="text-xs">Verified at delivery</span>
+                            </div>
+                          </div>
+                        ) : (selectedJob as any).pickupBarcode ? (
+                          <p className="text-sm text-amber-600 italic">Not yet verified</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">Not scanned</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Proof of Delivery Section */}
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between mb-3">

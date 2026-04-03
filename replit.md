@@ -77,6 +77,9 @@ Admins can create contract templates, send them to multiple drivers for e-signin
 ### Driver Notice / Broadcast System
 Admins can create and send notices to active drivers, with options for required acknowledgement and email notifications.
 
+### Parcel Barcode Scanning
+Drivers can scan the customer's own barcode at pickup (stored as `pickup_barcode`) and verify at delivery (stored as `delivery_barcode`). The `PATCH /api/mobile/v1/driver/jobs/:jobId/barcode` endpoint handles both operations: pickup saves the barcode, delivery verifies it matches the pickup scan and returns 422 `BARCODE_MISMATCH` if not. Barcode state (scanned/verified flags + timestamps) is persisted in Supabase and displayed in the admin job detail panel. The mobile app allows re-scanning the pickup barcode. Barcodes are completely independent of Run Courier tracking numbers.
+
 ### API Integration System
 A comprehensive API integration system allows approved business clients to integrate programmatically. It includes API key authentication, rate limiting, permission-based access control (quote, booking, tracking, cancel, webhooks), detailed request logging, and admin CRUD for API clients and requests. It supports `instant` payment (each booking is `pending`) or `pay_later` (added to invoice ledger) modes.
 
