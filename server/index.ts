@@ -788,6 +788,10 @@ async function runBackgroundTasks() {
           ip_address TEXT
         )
       `);
+      // Add columns that may be missing from older deployments
+      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS linked_api_client_id INTEGER`);
+      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent_at TIMESTAMPTZ`);
       await pool.end();
       console.log("[MIGRATION] API integration tables created/verified successfully");
     } catch (e: any) {

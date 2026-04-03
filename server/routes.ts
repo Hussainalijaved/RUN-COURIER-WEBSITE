@@ -16561,6 +16561,176 @@ ON CONFLICT (type) DO NOTHING;
     }
   }));
 
+  // Approve request → create API client + send access email atomically
+  app.post('/api/admin/api-integration-requests/:id/approve', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const requestId = parseInt(req.params.id);
+    if (isNaN(requestId)) return res.status(400).json({ error: 'validation_failed', message: 'Invalid request ID.' });
+
+    const pool = await getApiPool();
+    try {
+      // Fetch the integration request
+      const { rows: reqRows } = await pool.query(
+        `SELECT * FROM api_integration_requests WHERE id = $1`,
+        [requestId]
+      );
+      const integRequest = reqRows[0];
+      if (!integRequest) return res.status(404).json({ error: 'not_found', message: 'Integration request not found.' });
+
+      // Prevent duplicate client creation
+      if (integRequest.linked_api_client_id) {
+        return res.status(409).json({
+          error: 'already_approved',
+          message: 'This request has already been approved and an API client already exists.',
+          apiClientId: integRequest.linked_api_client_id,
+        });
+      }
+
+      // Parse integration types into permission flags
+      const types = String(integRequest.integration_type || '').split(',').map((t: string) => t.trim().toLowerCase());
+      const allowQuote    = types.includes('quote') || types.includes('quote api');
+      const allowBooking  = types.includes('booking') || types.includes('booking api');
+      const allowTracking = types.includes('tracking') || types.includes('tracking api');
+      const allowCancel   = types.includes('cancel') || types.includes('cancel api');
+      const allowWebhooks = false;
+
+      // Generate API key (plaintext only lives in this request scope)
+      const rawKey  = generateApiKey();
+      const keyHash = hashApiKey(rawKey);
+      const keyLast4 = getKeyLast4(rawKey);
+
+      // Create the API client record
+      const { rows: clientRows } = await pool.query(
+        `INSERT INTO api_clients
+          (company_name, contact_name, email, phone,
+           api_key_hash, api_key_last4, is_active,
+           allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks,
+           notes)
+         VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12)
+         RETURNING id, company_name, contact_name, email, api_key_last4,
+                   allow_quote, allow_booking, allow_tracking, allow_cancel, allow_webhooks`,
+        [
+          String(integRequest.company_name).slice(0, 200),
+          String(integRequest.contact_name).slice(0, 200),
+          String(integRequest.email).slice(0, 200),
+          integRequest.phone ? String(integRequest.phone).slice(0, 50) : null,
+          keyHash,
+          keyLast4,
+          allowQuote,
+          allowBooking,
+          allowTracking,
+          allowCancel,
+          allowWebhooks,
+          `Auto-created from integration request #${requestId}`,
+        ]
+      );
+      const newClient = clientRows[0];
+
+      // Link the API client to the request and mark approved
+      await pool.query(
+        `UPDATE api_integration_requests
+         SET status = 'approved', linked_api_client_id = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [newClient.id, requestId]
+      );
+
+      // Build permissions list for email
+      const permissions: string[] = [];
+      if (allowQuote)    permissions.push('quote');
+      if (allowBooking)  permissions.push('booking');
+      if (allowTracking) permissions.push('tracking');
+      if (allowCancel)   permissions.push('cancel');
+
+      // Send access email — plaintext key passed here, never persisted after this block
+      let emailSent = false;
+      try {
+        const { sendApiAccessEmail } = await import('./emailService');
+        emailSent = await sendApiAccessEmail({
+          toEmail:     String(integRequest.email),
+          contactName: String(integRequest.contact_name),
+          companyName: String(integRequest.company_name),
+          apiKey:      rawKey,
+          permissions,
+        });
+      } catch (emailErr) {
+        console.error('[Approve API] Email send error:', emailErr);
+      }
+
+      // Mark email sent only if it actually succeeded
+      if (emailSent) {
+        await pool.query(
+          `UPDATE api_integration_requests
+           SET api_access_email_sent = true, api_access_email_sent_at = NOW()
+           WHERE id = $1`,
+          [requestId]
+        );
+      }
+
+      res.json({
+        success:   true,
+        apiClient: newClient,
+        emailSent,
+        message:   emailSent
+          ? 'API client created and access email sent successfully.'
+          : 'API client created but email sending failed. Please resend manually.',
+      });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // Regenerate key for API client and send new access email
+  app.post('/api/admin/api-clients/:id/regenerate-key-and-notify', requireAdminAccessStrict, asyncHandler(async (req, res) => {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ error: 'validation_failed', message: 'Invalid client ID.' });
+
+    const rawKey  = generateApiKey();
+    const keyHash = hashApiKey(rawKey);
+    const keyLast4 = getKeyLast4(rawKey);
+
+    const pool = await getApiPool();
+    try {
+      const { rows } = await pool.query(
+        `UPDATE api_clients SET api_key_hash = $1, api_key_last4 = $2, updated_at = NOW()
+         WHERE id = $3 RETURNING id, company_name, contact_name, email,
+                                  allow_quote, allow_booking, allow_tracking, allow_cancel`,
+        [keyHash, keyLast4, clientId]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'not_found' });
+      const client = rows[0];
+
+      const permissions: string[] = [];
+      if (client.allow_quote)    permissions.push('quote');
+      if (client.allow_booking)  permissions.push('booking');
+      if (client.allow_tracking) permissions.push('tracking');
+      if (client.allow_cancel)   permissions.push('cancel');
+
+      let emailSent = false;
+      try {
+        const { sendApiAccessEmail } = await import('./emailService');
+        emailSent = await sendApiAccessEmail({
+          toEmail:     client.email,
+          contactName: client.contact_name,
+          companyName: client.company_name,
+          apiKey:      rawKey,
+          permissions,
+        });
+      } catch (emailErr) {
+        console.error('[Regenerate Key] Email send error:', emailErr);
+      }
+
+      res.json({
+        success: true,
+        apiKeyLast4: keyLast4,
+        emailSent,
+        message: emailSent
+          ? 'API key regenerated and new access email sent.'
+          : 'API key regenerated but email sending failed.',
+      });
+    } finally {
+      await pool.end();
+    }
+  }));
+
   app.delete('/api/admin/api-integration-requests/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
     const pool = await getApiPool();
     try {

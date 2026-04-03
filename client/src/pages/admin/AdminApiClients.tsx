@@ -35,8 +35,7 @@ import {
   Check,
   Trash2,
   Eye,
-  ShieldCheck,
-  ShieldOff,
+  Mail,
   MoreHorizontal,
 } from "lucide-react";
 import {
@@ -119,6 +118,7 @@ export default function AdminApiClients() {
   });
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [confirmRegenId, setConfirmRegenId] = useState<number | null>(null);
+  const [confirmRegenNotifyId, setConfirmRegenNotifyId] = useState<number | null>(null);
   const [editClient, setEditClient] = useState<ApiClient | null>(null);
 
   const [form, setForm] = useState<CreateClientForm>({
@@ -215,6 +215,34 @@ export default function AdminApiClients() {
     },
   });
 
+  const regenAndNotifyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/admin/api-clients/${id}/regenerate-key-and-notify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || json?.error || `Error ${res.status}`);
+      return { ...json, _clientId: id };
+    },
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/api-clients"] });
+      setConfirmRegenNotifyId(null);
+      const client = clients.find((c) => c.id === data._clientId);
+      toast({
+        title: data.emailSent ? "Key regenerated & email sent" : "Key regenerated — email failed",
+        description: data.emailSent
+          ? `New key ending in …${data.apiKeyLast4} sent to ${client?.email ?? "client"}.`
+          : "Key was regenerated but the access email failed to send. Please resend manually.",
+        variant: data.emailSent ? "default" : "destructive",
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    },
+  });
+
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       apiRequest("PATCH", `/api/admin/api-clients/${id}`, { isActive }),
@@ -302,6 +330,9 @@ export default function AdminApiClients() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setConfirmRegenId(client.id)}>
                             <RefreshCw className="h-4 w-4 mr-2" /> Regenerate Key
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setConfirmRegenNotifyId(client.id)}>
+                            <Mail className="h-4 w-4 mr-2" /> Regenerate Key &amp; Notify
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -576,6 +607,28 @@ export default function AdminApiClients() {
               data-testid="button-confirm-regen-key"
             >
               {regenerateMutation.isPending ? "Regenerating..." : "Regenerate Key"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Regenerate Key & Notify Confirm */}
+      <AlertDialog open={confirmRegenNotifyId !== null} onOpenChange={(o) => { if (!o) setConfirmRegenNotifyId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate Key &amp; Notify Client?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The existing key will be invalidated immediately. A new key will be generated and emailed directly to the client. They will need to update their integration with the new key.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRegenNotifyId !== null && regenAndNotifyMutation.mutate(confirmRegenNotifyId)}
+              disabled={regenAndNotifyMutation.isPending}
+              data-testid="button-confirm-regen-notify"
+            >
+              {regenAndNotifyMutation.isPending ? "Sending..." : "Regenerate & Send Email"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

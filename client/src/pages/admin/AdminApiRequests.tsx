@@ -30,7 +30,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Trash2, ExternalLink } from "lucide-react";
+import { Trash2, ExternalLink, CheckCircle, Loader2, Mail, AlertTriangle, Link2 } from "lucide-react";
 import { format } from "date-fns";
 import { Link, useSearch } from "wouter";
 
@@ -48,6 +48,16 @@ interface ApiIntegrationRequest {
   integration_type: string;
   notes?: string;
   status: string;
+  linked_api_client_id?: number | null;
+  api_access_email_sent?: boolean;
+  api_access_email_sent_at?: string | null;
+}
+
+interface ApproveResult {
+  success: boolean;
+  apiClient: { id: number; company_name: string; api_key_last4: string };
+  emailSent: boolean;
+  message: string;
 }
 
 const STATUS_OPTIONS = [
@@ -69,6 +79,7 @@ export default function AdminApiRequests() {
 
   const [selected, setSelected] = useState<ApiIntegrationRequest | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [approveResult, setApproveResult] = useState<ApproveResult | null>(null);
 
   const { data: requests = [], isLoading } = useQuery<ApiIntegrationRequest[]>({
     queryKey: ["/api/admin/api-integration-requests"],
@@ -97,6 +108,36 @@ export default function AdminApiRequests() {
     },
     onError: (err: any) => {
       toast({ title: "Update failed", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/admin/api-integration-requests/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (!res.ok) throw json;
+      return json as ApproveResult;
+    },
+    onSuccess: (result, id) => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/api-integration-requests"] });
+      setApproveResult(result);
+      // Update selected with latest data
+      setSelected((prev) => prev && prev.id === id
+        ? { ...prev, status: "approved", linked_api_client_id: result.apiClient.id, api_access_email_sent: result.emailSent }
+        : prev
+      );
+    },
+    onError: (err: any) => {
+      const msg = err?.message || "Approval failed. Please try again.";
+      if (err?.error === "already_approved") {
+        toast({ title: "Already approved", description: "This request already has an API client linked.", variant: "destructive" });
+      } else {
+        toast({ title: "Approval failed", description: msg, variant: "destructive" });
+      }
     },
   });
 
@@ -136,7 +177,7 @@ export default function AdminApiRequests() {
               <Card
                 key={req.id}
                 className="hover-elevate cursor-pointer"
-                onClick={() => setSelected(req)}
+                onClick={() => { setApproveResult(null); setSelected(req); }}
                 data-testid={`card-api-request-${req.id}`}
               >
                 <CardContent className="pt-4 pb-4">
@@ -147,6 +188,16 @@ export default function AdminApiRequests() {
                         <Badge variant={statusVariant(req.status)} className="capitalize text-xs">
                           {req.status.replace("_", " ")}
                         </Badge>
+                        {req.linked_api_client_id && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Link2 className="h-3 w-3" /> Client #{req.linked_api_client_id}
+                          </Badge>
+                        )}
+                        {req.api_access_email_sent && (
+                          <Badge variant="outline" className="text-xs gap-1 text-green-600 border-green-200">
+                            <Mail className="h-3 w-3" /> Email sent
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {req.contact_name} · {req.email}
@@ -199,7 +250,7 @@ export default function AdminApiRequests() {
       </div>
 
       {/* Detail Sheet */}
-      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) setSelected(null); }}>
+      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) { setSelected(null); setApproveResult(null); } }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selected && (
             <>
@@ -208,6 +259,48 @@ export default function AdminApiRequests() {
                 <SheetDescription>Integration request details</SheetDescription>
               </SheetHeader>
               <div className="space-y-6">
+
+                {/* Approval success banner */}
+                {approveResult && (
+                  <div className={`rounded-md border p-4 text-sm space-y-1 ${approveResult.emailSent ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"}`}>
+                    <div className="flex items-center gap-2 font-semibold">
+                      {approveResult.emailSent
+                        ? <CheckCircle className="h-4 w-4 text-green-600" />
+                        : <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      }
+                      {approveResult.emailSent ? "Approved & Email Sent" : "Approved — Email Failed"}
+                    </div>
+                    <p className="text-muted-foreground">{approveResult.message}</p>
+                    {approveResult.apiClient && (
+                      <p className="text-muted-foreground">
+                        API Client #{approveResult.apiClient.id} created · key ending in{" "}
+                        <span className="font-mono font-semibold">…{approveResult.apiClient.api_key_last4}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Already linked client info */}
+                {!approveResult && selected.linked_api_client_id && (
+                  <div className="rounded-md border bg-muted/40 p-4 text-sm space-y-2">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <Link2 className="h-4 w-4 text-primary" />
+                      Linked API Client
+                    </div>
+                    <p className="text-muted-foreground">
+                      API Client #{selected.linked_api_client_id} was created automatically when this request was approved.
+                    </p>
+                    {selected.api_access_email_sent && (
+                      <p className="text-muted-foreground flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5 text-green-600" />
+                        Access email sent{selected.api_access_email_sent_at
+                          ? ` on ${format(new Date(selected.api_access_email_sent_at), "d MMM yyyy 'at' HH:mm")}`
+                          : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contact</h3>
                   <div className="space-y-2 text-sm">
@@ -270,6 +363,22 @@ export default function AdminApiRequests() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Approve button — only show when not yet approved */}
+                {!selected.linked_api_client_id && selected.status !== "rejected" && (
+                  <Button
+                    className="w-full"
+                    onClick={() => approveMutation.mutate(selected.id)}
+                    disabled={approveMutation.isPending}
+                    data-testid="button-approve-request"
+                  >
+                    {approveMutation.isPending ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
+                    ) : (
+                      <><CheckCircle className="h-4 w-4 mr-2" /> Approve & Send API Access</>
+                    )}
+                  </Button>
+                )}
 
                 <p className="text-xs text-muted-foreground">
                   Submitted {format(new Date(selected.created_at), "d MMM yyyy 'at' HH:mm")}

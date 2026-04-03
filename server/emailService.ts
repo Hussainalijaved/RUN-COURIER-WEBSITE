@@ -2818,6 +2818,112 @@ export async function sendContractSigningEmail(
   return sendEmailNotification(driverEmail, `Contract Ready for Signing - ${data.contractTitle} - Run Courier`, htmlContent, textContent);
 }
 
+export async function sendApiAccessEmail(data: {
+  toEmail: string;
+  contactName: string;
+  companyName: string;
+  apiKey: string;
+  permissions: string[];
+}): Promise<boolean> {
+  const permLabels: Record<string, string> = {
+    quote: 'Quote API',
+    booking: 'Booking API',
+    tracking: 'Tracking API',
+    cancel: 'Cancel API',
+  };
+  const permList = data.permissions.map(p => permLabels[p] || p).join(', ');
+
+  const content = `
+    <h2 style="color:#1a1a1a;margin-bottom:8px;">API Access Approved</h2>
+    <p style="color:#555;font-size:15px;line-height:1.6;">
+      Hi ${data.contactName},<br><br>
+      Your API integration request for <strong>${data.companyName}</strong> has been reviewed and approved.
+      You can now start integrating with the Run Courier API using the credentials below.
+    </p>
+
+    <div style="background:#f0f7ff;border:1px solid #bcd6f5;border-radius:8px;padding:20px;margin:24px 0;">
+      <p style="margin:0 0 8px 0;font-size:13px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Your API Key</p>
+      <p style="font-family:monospace;font-size:15px;font-weight:700;color:#0077B6;word-break:break-all;margin:0 0 12px 0;">${data.apiKey}</p>
+      <p style="margin:0;font-size:12px;color:#e55;">
+        <strong>Important:</strong> This key will not be shown again. Store it securely in an environment variable and never commit it to source control.
+      </p>
+    </div>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tbody>
+        <tr>
+          <td style="padding:8px 12px 8px 0;color:#666;font-size:14px;width:140px;white-space:nowrap;">Base URL</td>
+          <td style="padding:8px 0;font-size:14px;color:#111;font-weight:500;font-family:monospace;">https://runcourier.co.uk</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px 8px 0;color:#666;font-size:14px;">Permissions</td>
+          <td style="padding:8px 0;font-size:14px;color:#111;font-weight:500;">${permList || 'Quote, Tracking'}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px 8px 0;color:#666;font-size:14px;">Documentation</td>
+          <td style="padding:8px 0;font-size:14px;">
+            <a href="https://runcourier.co.uk/developers" style="color:#007BFF;">runcourier.co.uk/developers</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px 8px 0;color:#666;font-size:14px;">Rate Limit</td>
+          <td style="padding:8px 0;font-size:14px;color:#111;">60 requests per minute</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:#1a1a1a;font-size:16px;margin:24px 0 8px 0;">Authentication</h3>
+    <p style="color:#555;font-size:14px;margin-bottom:12px;">
+      Include your API key on every request using either of these headers:
+    </p>
+    <div style="background:#f4f4f4;border-radius:6px;padding:14px;font-family:monospace;font-size:13px;color:#333;margin-bottom:24px;">
+      Authorization: Bearer ${data.apiKey}<br><br>
+      <span style="color:#888;"># or alternatively:</span><br>
+      X-Api-Key: ${data.apiKey}
+    </div>
+
+    <div style="text-align:center;margin:28px 0 16px 0;">
+      <a href="https://runcourier.co.uk/developers"
+         style="background-color:#007BFF;color:#ffffff;padding:12px 32px;border-radius:6px;
+                text-decoration:none;font-size:15px;font-weight:600;display:inline-block;">
+        View Documentation
+      </a>
+    </div>
+
+    <p style="color:#888;font-size:13px;line-height:1.6;">
+      Need help? Contact our integration team at
+      <a href="mailto:sales@runcourier.co.uk" style="color:#007BFF;">sales@runcourier.co.uk</a>
+      or visit <a href="https://runcourier.co.uk/contact" style="color:#007BFF;">runcourier.co.uk/contact</a>.
+    </p>
+  `;
+
+  const htmlContent = wrapEmailContent(content, 'API Access Approved');
+  const textContent = [
+    `API Access Approved — Run Courier`,
+    ``,
+    `Hi ${data.contactName},`,
+    ``,
+    `Your API integration request for ${data.companyName} has been approved.`,
+    ``,
+    `YOUR API KEY (save this — it will not be shown again):`,
+    data.apiKey,
+    ``,
+    `Base URL: https://runcourier.co.uk`,
+    `Permissions: ${permList}`,
+    `Documentation: https://runcourier.co.uk/developers`,
+    `Rate limit: 60 requests per minute`,
+    ``,
+    `Questions? Email sales@runcourier.co.uk`,
+  ].join('\n');
+
+  return sendEmailNotification(
+    data.toEmail,
+    `API Access Approved — Run Courier`,
+    htmlContent,
+    textContent,
+  );
+}
+
 export async function sendSupervisorInviteEmail(supervisorEmail: string, data: {
   supervisorName?: string;
   inviteUrl: string;
