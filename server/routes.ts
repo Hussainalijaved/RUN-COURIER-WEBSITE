@@ -9960,7 +9960,9 @@ export async function registerRoutes(
     const applications = await storage.getDriverApplications({
       status: status as DriverApplicationStatus | undefined,
     });
-    res.json(applications.map(resolveDocUrls));
+    // Exclude draft applications from the default admin list (they are incomplete saves)
+    const filtered = status ? applications : applications.filter(a => a.status !== 'draft');
+    res.json(filtered.map(resolveDocUrls));
   }));
 
   app.get("/api/driver-applications/:id", asyncHandler(async (req, res) => {
@@ -10004,10 +10006,61 @@ export async function registerRoutes(
     }
   }));
 
+  // ── Draft save (upsert by email, no completeness validation) ─────────────
+  app.post("/api/driver-applications/draft", asyncHandler(async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required to save a draft" });
+
+    const existing = await storage.getDriverApplicationByEmail(email);
+
+    // Only allow draft upsert if status is draft (or no existing record)
+    if (existing && existing.status !== 'draft') {
+      return res.status(409).json({
+        error: "An application with this email already exists",
+        status: existing.status,
+        applicationId: existing.id,
+      });
+    }
+
+    const DRAFT_DEFAULTS = {
+      vehicleType: 'motorbike' as any,
+      bankName: '',
+      accountHolderName: '',
+      sortCode: '',
+      accountNumber: '',
+      fullName: '',
+      phone: '',
+      postcode: '',
+      fullAddress: '',
+      nationality: '',
+      nationalInsuranceNumber: '',
+    };
+
+    const draftData: any = { ...DRAFT_DEFAULTS, ...req.body, status: 'draft' };
+
+    // Remove fields that shouldn't be set directly
+    delete draftData.phoneVerificationToken;
+    delete draftData.phoneVerified;
+
+    let application;
+    if (existing) {
+      // Delete old draft and recreate — ensures all fields get updated
+      // (updateDriverApplication only maps a subset of fields)
+      await storage.deleteDriverApplication(existing.id);
+    }
+    application = await storage.createDriverApplication(draftData as any);
+
+    res.json(application);
+  }));
+
   app.post("/api/driver-applications", asyncHandler(async (req, res) => {
     const existingApplication = await storage.getDriverApplicationByEmail(req.body.email);
     if (existingApplication) {
-      if (existingApplication.status === 'corrections_needed' || existingApplication.status === 'rejected') {
+      if (existingApplication.status === 'draft') {
+        // Draft → pending: just delete so we recreate with proper status
+        await storage.deleteDriverApplication(existingApplication.id);
+        console.log(`[Driver Application] Deleted draft ${existingApplication.id} to promote to pending`);
+      } else if (existingApplication.status === 'corrections_needed' || existingApplication.status === 'rejected') {
         await storage.deleteDriverApplication(existingApplication.id);
         console.log(`[Driver Application] Deleted ${existingApplication.status} application ${existingApplication.id} for resubmission`);
       } else if (existingApplication.status === 'approved') {

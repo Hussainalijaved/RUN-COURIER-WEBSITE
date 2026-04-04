@@ -1,0 +1,54 @@
+Fix the driver application workflow so drivers cannot submit an incomplete application.
+
+Requirements:
+
+1. Do not change the UI design unless needed for validation messages.
+2. Drivers must be allowed to save progress as draft.
+3. Drivers must NOT be allowed to submit the application for review if any required fields or documents are missing.
+4. Incomplete applications must stay in "Draft" or "Incomplete" status, not "Pending Verification".
+5. Only fully completed applications can move to "Pending Verification".
+
+Validation rules:
+- Check all required profile fields before submit
+- Check all required documents before submit
+- Check conditional requirements based on nationality and vehicle type
+
+Examples:
+- If nationality is not British, require Right to Work / share code
+- If vehicle type is car, require the correct car documents/photos
+- If vehicle type is van, require van-specific vehicle photos and insurance
+- Driving licence front and back must both exist if required
+- Insurance documents must exist if required
+- Profile picture must exist if required
+
+Implementation details:
+1. Add a server-side validation function before submission:
+   - build a list of missing required fields
+   - build a list of missing required documents
+   - if anything is missing, block submission and return validation errors
+
+2. Add frontend validation:
+   - when driver clicks Submit Application, show exactly what is missing
+   - example:
+     - Driving Licence Back missing
+     - Hire & Reward Insurance missing
+     - Vehicle Registration missing
+
+3. Admin dashboard:
+   - do not count incomplete draft applications as pending verification
+   - only submitted complete applications should appear in Pending Verification
+
+4. Data model:
+   - application_status = draft | pending_verification | verified | rejected
+   - do not set pending_verification unless validation passes
+
+5. Add a completion checker:
+   - calculate completion percentage
+   - calculate missing items count
+   - use this only for display, not as a replacement for strict validation
+
+Expected result:
+- Driver can save incomplete progress
+- Driver cannot submit until all required items are complete
+- Admin sees only complete submitted applications in review
+- No more drivers showing as pending/unverified with multiple missing items

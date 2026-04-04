@@ -255,7 +255,7 @@ export const vendorApiKeys = pgTable("vendor_api_keys", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type DriverApplicationStatus = "pending" | "approved" | "rejected" | "corrections_needed";
+export type DriverApplicationStatus = "pending" | "approved" | "rejected" | "corrections_needed" | "draft";
 export type InvoiceStatus = "pending" | "paid" | "overdue" | "cancelled";
 export type JobAssignmentStatus = "pending" | "sent" | "accepted" | "rejected" | "cancelled" | "expired" | "withdrawn" | "removed" | "cleaned";
 

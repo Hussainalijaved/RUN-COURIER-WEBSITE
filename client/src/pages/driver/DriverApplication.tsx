@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Phone, Shield, AlertCircle, XCircle, Info } from "lucide-react";
+import { Truck, Upload, User, FileText, CreditCard, CheckCircle, Loader2, ArrowLeft, ArrowRight, ChevronsUpDown, Check, Phone, Shield, AlertCircle, XCircle, Info, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -141,6 +141,123 @@ export default function DriverApplication() {
   });
 
   const isBritish = form.watch("isBritish");
+
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+
+  // ── Completion percentage ────────────────────────────────────────────────
+  const getCompletionItems = () => {
+    const values = form.getValues();
+    const items = [
+      { label: "Full name", done: !!values.fullName?.trim() },
+      { label: "Email", done: !!values.email?.trim() },
+      { label: "Phone (verified)", done: phoneVerified },
+      { label: "Postcode", done: !!values.postcode?.trim() },
+      { label: "Full address", done: !!values.fullAddress?.trim() },
+      { label: "Nationality", done: !!values.nationality?.trim() },
+      { label: "National Insurance number", done: !!values.nationalInsuranceNumber?.trim() },
+      { label: "Right to work share code", done: values.isBritish ? true : !!values.rightToWorkShareCode?.trim() },
+      { label: "Profile photo", done: !!uploadedFiles.profilePicture },
+      { label: "Driving licence (front)", done: !!uploadedFiles.drivingLicenceFront },
+      { label: "Driving licence (back)", done: !!uploadedFiles.drivingLicenceBack },
+      { label: "Goods in transit insurance", done: !!uploadedFiles.goodsInTransitInsurance },
+      { label: "Hire and reward insurance", done: !!uploadedFiles.hireAndReward },
+      { label: "Vehicle type", done: !!values.vehicleType },
+      { label: "Vehicle registration", done: !!values.vehicleRegistration?.trim() },
+      { label: "Vehicle make", done: !!values.vehicleMake?.trim() },
+      { label: "Vehicle model", done: !!values.vehicleModel?.trim() },
+      { label: "Vehicle colour", done: !!values.vehicleColor?.trim() },
+      { label: "Bank name", done: !!values.bankName?.trim() },
+      { label: "Account holder name", done: !!values.accountHolderName?.trim() },
+      { label: "Sort code", done: !!values.sortCode?.trim() },
+      { label: "Account number", done: !!values.accountNumber?.trim() },
+    ];
+    const completed = items.filter(i => i.done).length;
+    const percentage = Math.round((completed / items.length) * 100);
+    return { items, completed, total: items.length, percentage };
+  };
+
+  // ── Draft save ────────────────────────────────────────────────────────────
+  const saveDraft = useCallback(async () => {
+    const values = form.getValues();
+    const email = values.email?.trim();
+    if (!email) {
+      toast({ title: "Email required", description: "Please enter your email address before saving progress.", variant: "destructive" });
+      return;
+    }
+    setIsSavingDraft(true);
+    try {
+      const draftData = {
+        ...values,
+        profilePictureUrl: uploadedFiles.profilePicture,
+        drivingLicenceFrontUrl: uploadedFiles.drivingLicenceFront,
+        drivingLicenceBackUrl: uploadedFiles.drivingLicenceBack,
+        dbsCertificateUrl: uploadedFiles.dbsCertificate,
+        goodsInTransitInsuranceUrl: uploadedFiles.goodsInTransitInsurance,
+        hireAndRewardUrl: uploadedFiles.hireAndReward,
+      };
+      const response = await apiRequest("POST", "/api/driver-applications/draft", draftData);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save draft");
+      }
+      const savedId = data.id || draftId;
+      if (savedId) {
+        setDraftId(savedId);
+        localStorage.setItem("draftApplicationId", savedId);
+        localStorage.setItem("draftApplicationEmail", email);
+      }
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 3000);
+      toast({ title: "Progress saved", description: "Your application progress has been saved. You can return to it anytime." });
+    } catch (err: any) {
+      toast({ title: "Could not save progress", description: err.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }, [form, uploadedFiles, draftId, toast]);
+
+  // ── Load draft on mount ───────────────────────────────────────────────────
+  useEffect(() => {
+    const savedId = localStorage.getItem("draftApplicationId");
+    if (!savedId) return;
+    fetch(`/api/driver-applications/${savedId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((draft: any) => {
+        if (!draft || draft.status !== 'draft') {
+          localStorage.removeItem("draftApplicationId");
+          localStorage.removeItem("draftApplicationEmail");
+          return;
+        }
+        setDraftId(savedId);
+        // Pre-fill form fields
+        const fields: (keyof DriverApplicationFormValues)[] = [
+          "fullName", "email", "phone", "postcode", "fullAddress", "buildingName",
+          "nationality", "isBritish", "nationalInsuranceNumber", "rightToWorkShareCode",
+          "vehicleType", "vehicleRegistration", "vehicleMake", "vehicleModel", "vehicleColor",
+          "bankName", "accountHolderName", "sortCode", "accountNumber",
+        ];
+        const formValues: any = {};
+        for (const f of fields) {
+          const snakeKey = f.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`);
+          const val = (draft as any)[f] ?? (draft as any)[snakeKey];
+          if (val !== undefined && val !== null) formValues[f] = val;
+        }
+        form.reset({ ...form.getValues(), ...formValues });
+        // Restore uploaded files
+        setUploadedFiles({
+          profilePicture: draft.profilePictureUrl || draft.profile_picture_url || null,
+          drivingLicenceFront: draft.drivingLicenceFrontUrl || draft.driving_licence_front_url || null,
+          drivingLicenceBack: draft.drivingLicenceBackUrl || draft.driving_licence_back_url || null,
+          dbsCertificate: draft.dbsCertificateUrl || draft.dbs_certificate_url || null,
+          goodsInTransitInsurance: draft.goodsInTransitInsuranceUrl || draft.goods_in_transit_insurance_url || null,
+          hireAndReward: draft.hireAndRewardUrl || draft.hire_and_reward_url || null,
+        });
+        toast({ title: "Draft restored", description: "Your saved progress has been loaded. Continue where you left off." });
+      })
+      .catch(() => {});
+  }, []);
 
   const uploadFile = useCallback(async (file: File, type: keyof typeof uploadedFiles) => {
     setIsUploading(true);
@@ -296,6 +413,8 @@ export default function DriverApplication() {
       return response.json();
     },
     onSuccess: () => {
+      localStorage.removeItem("draftApplicationId");
+      localStorage.removeItem("draftApplicationEmail");
       toast({
         title: "Application submitted",
         description: "Your driver application has been submitted for review. We'll be in touch soon!",
@@ -1290,6 +1409,7 @@ export default function DriverApplication() {
             {currentStep === 4 && (() => {
               const submissionIssues = getSubmissionIssues();
               const isReady = submissionIssues.length === 0;
+              const completion = getCompletionItems();
               const docMeta: Record<string, { label: string; required: boolean }> = {
                 profilePicture: { label: "Profile Photo", required: true },
                 drivingLicenceFront: { label: "Driving Licence (Front)", required: true },
@@ -1311,6 +1431,24 @@ export default function DriverApplication() {
                   </CardHeader>
                   <CardContent className="space-y-6">
 
+                    {/* Completion progress bar */}
+                    <div data-testid="completion-progress">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-foreground">Application completion</span>
+                        <span className={`text-sm font-semibold ${completion.percentage === 100 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} data-testid="text-completion-percentage">
+                          {completion.percentage}%
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${completion.percentage === 100 ? 'bg-green-500' : completion.percentage >= 75 ? 'bg-yellow-500' : 'bg-destructive'}`}
+                          style={{ width: `${completion.percentage}%` }}
+                          data-testid="bar-completion"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{completion.completed} of {completion.total} required items completed</p>
+                    </div>
+
                     {isReady ? (
                       <div className="rounded-md border border-green-500/30 bg-green-500/10 px-4 py-3 flex items-start gap-2" data-testid="banner-ready-to-submit">
                         <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
@@ -1325,7 +1463,7 @@ export default function DriverApplication() {
                           <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                           <div className="text-sm">
                             <p className="font-medium text-destructive">You must complete all required fields before submitting.</p>
-                            <p className="text-muted-foreground mt-0.5">DBS certificate can be added later.</p>
+                            <p className="text-muted-foreground mt-0.5">DBS certificate can be added later. Go back to previous steps to fill in the missing items.</p>
                           </div>
                         </div>
                         <ul className="mt-3 space-y-1">
@@ -1473,7 +1611,7 @@ export default function DriverApplication() {
               );
             })()}
 
-            <div className="flex justify-between pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
               {currentStep > 1 ? (
                 <Button type="button" variant="outline" onClick={prevStep} data-testid="button-prev-step">
                   <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1483,35 +1621,55 @@ export default function DriverApplication() {
                 <div />
               )}
 
-              {currentStep < 4 ? (
-                <Button type="button" onClick={nextStep} data-testid="button-next-step">
-                  Next
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              ) : (
-                <Button 
-                  type="submit" 
-                  disabled={submitApplicationMutation.isPending || getSubmissionIssues().length > 0}
-                  data-testid="button-submit-application"
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Save Progress button — available on all steps */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={saveDraft}
+                  disabled={isSavingDraft}
+                  data-testid="button-save-draft"
                 >
-                  {submitApplicationMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : getSubmissionIssues().length > 0 ? (
-                    <>
-                      <AlertCircle className="h-4 w-4 mr-2" />
-                      Complete Required Fields
-                    </>
+                  {isSavingDraft ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : draftSaved ? (
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
                   ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Submit Application
-                    </>
+                    <Save className="h-4 w-4 mr-2" />
                   )}
+                  {draftSaved ? "Saved!" : "Save Progress"}
                 </Button>
-              )}
+
+                {currentStep < 4 ? (
+                  <Button type="button" onClick={nextStep} data-testid="button-next-step">
+                    Next
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={submitApplicationMutation.isPending || getSubmissionIssues().length > 0}
+                    data-testid="button-submit-application"
+                  >
+                    {submitApplicationMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : getSubmissionIssues().length > 0 ? (
+                      <>
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                        Complete Required Fields
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Submit Application
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </form>
         </Form>

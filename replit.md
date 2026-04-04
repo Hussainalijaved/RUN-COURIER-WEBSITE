@@ -89,6 +89,15 @@ An automatic weekly invoicing process runs every Monday for `pay_later` API clie
 ### Supervisor System
 A dedicated operations supervisor role with a separate login portal. Supervisors are invited by admins, self-register, and must be approved. Active supervisors gain access to a full operations dashboard including live stats, jobs list, create job, live map, drivers, customers, invoices, and job history. The system handles supervisor invite, registration, approval, suspension, and deactivation workflows.
 
+### Driver Application Draft System
+The driver application form supports saving progress as a draft. Key behaviours:
+- **Status flow**: `draft` → `pending` (on full submit). The `draft` status is stored in `driver_applications.status`.
+- **Save Progress**: A "Save Progress" button is available on every step, calling `POST /api/driver-applications/draft`. Drafts are upserted by email — if a draft exists it is deleted and recreated with fresh data.
+- **Resume**: On page load, the form checks `localStorage.draftApplicationId` and fetches the draft from the server to pre-fill all fields and restore uploaded document URLs.
+- **Submit guard**: The submit button on step 4 is disabled if `getSubmissionIssues()` returns any missing items. The backend also validates completeness on `POST /api/driver-applications` before setting status to `pending`.
+- **Admin isolation**: The `GET /api/driver-applications` endpoint excludes drafts from the default list (no `status` query param). Admin sees only `pending`/`approved`/`rejected`/`corrections_needed` applications.
+- **Completion tracker**: Step 4 shows a visual progress bar (`getCompletionItems()`) with percentage complete and count of remaining items.
+
 ## External Dependencies
 
 -   **Google Maps Integration**: Used for geocoding, distance calculations, and route visualization.
