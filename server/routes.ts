@@ -10560,78 +10560,179 @@ export async function registerRoutes(
     const { supabaseAdmin: sb } = await import('./supabaseAdmin');
     if (!sb) return res.status(500).json({ error: 'Storage service unavailable' });
 
+    // Also fetch all driver URL columns so we can fall back to the approved driver's copy
     const { data: appRow, error: appErr } = await sb
       .from('driver_applications')
-      .select(`id, ${col}`)
+      .select(`id, email, ${col}`)
       .eq('id', appId)
       .single();
 
     if (appErr || !appRow) return res.status(404).json({ error: 'Application not found' });
 
-    const storagePath: string | null = (appRow as any)[col];
-    if (!storagePath) return res.status(404).json({ error: 'Document not uploaded' });
+    const rawStoredValue: string | null = (appRow as any)[col];
 
-    // Detect content-type from extension
-    const ext = (storagePath.split('.').pop() || '').toLowerCase().split('?')[0];
-    const MIME: Record<string, string> = {
-      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-      gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+    // Helper: stream a Supabase signed URL to the response
+    const streamSignedUrl = async (signedUrl: string, ct: string): Promise<boolean> => {
+      try {
+        const remote = await fetch(signedUrl);
+        if (!remote.ok) return false;
+        res.setHeader('Content-Type', ct);
+        res.setHeader('Cache-Control', 'private, max-age=120');
+        const { Readable } = await import('stream');
+        Readable.fromWeb(remote.body as any).pipe(res);
+        return true;
+      } catch (_) { return false; }
     };
-    const contentType = MIME[ext] || 'application/octet-stream';
 
-    // 1. Try Supabase 'driver-documents' bucket (lowercase) — where the mobile app stores them
-    const { data: signed } = await sb.storage
-      .from('driver-documents')
-      .createSignedUrl(storagePath, 300);
+    // Helper: try a storage path against both buckets; return true if served
+    const tryStoragePath = async (sp: string, ct: string): Promise<boolean> => {
+      for (const bucket of ['DRIVER-DOCUMENTS', 'driver-documents']) {
+        try {
+          const { data } = await sb.storage.from(bucket).createSignedUrl(sp, 300);
+          if (data?.signedUrl) {
+            const ok = await streamSignedUrl(data.signedUrl, ct);
+            if (ok) return true;
+          }
+        } catch (_) {}
+      }
+      return false;
+    };
 
-    if (signed?.signedUrl) {
+    // Build the list of candidate storage paths to try, in priority order
+    const buildCandidatePaths = (raw: string): string[] => {
+      const candidates: string[] = [];
+      // 1. Extract clean path from full Supabase URL
+      const extracted = extractStoragePath(raw);
+      if (extracted) candidates.push(extracted);
+      // 2. The raw value itself (if it looks like a plain storage path)
+      if (!raw.startsWith('http') && !raw.startsWith('/')) candidates.push(raw);
+      // 3. Normalise application-pending/ → applications/pending/
+      const fileName = raw.split('/').pop()?.split('?')[0] || '';
+      if (raw.includes('application-pending/') && !raw.includes('applications/pending/')) {
+        const converted = raw.replace(/^.*application-pending\//, 'applications/pending/');
+        candidates.push(converted);
+      }
+      // 4. Always try both prefixes with just the filename
+      if (fileName) {
+        candidates.push(`applications/pending/${fileName}`);
+        candidates.push(`application-pending/${fileName}`);
+      }
+      return [...new Set(candidates.filter(Boolean))];
+    };
+
+    // Helper: detect MIME from any path/URL string
+    const detectMime = (src: string): string => {
+      const ext = (src.split('.').pop() || '').toLowerCase().split('?')[0];
+      const MIME: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+      };
+      return MIME[ext] || 'application/octet-stream';
+    };
+
+    // ── STRATEGY 1: Try the stored application value ──────────────────────────
+    if (rawStoredValue) {
+      const ct = detectMime(rawStoredValue);
+
+      // If the stored value IS a full signed/public URL, fetch directly first
+      if (rawStoredValue.startsWith('http')) {
+        try {
+          const direct = await fetch(rawStoredValue);
+          if (direct.ok) {
+            res.setHeader('Content-Type', ct);
+            res.setHeader('Cache-Control', 'private, max-age=120');
+            const { Readable } = await import('stream');
+            Readable.fromWeb(direct.body as any).pipe(res);
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // Try all candidate storage paths
+      for (const candidate of buildCandidatePaths(rawStoredValue)) {
+        const served = await tryStoragePath(candidate, ct);
+        if (served) return;
+      }
+    }
+
+    // ── STRATEGY 2: Fall back to the driver record (approved applications have docs copied there) ──
+    // Map application table columns → driver table columns (names differ for hire_and_reward)
+    const APP_TO_DRIVER_COL: Record<string, string> = {
+      profile_picture_url: 'profile_picture_url',
+      driving_licence_front_url: 'driving_licence_front_url',
+      driving_licence_back_url: 'driving_licence_back_url',
+      dbs_certificate_url: 'dbs_certificate_url',
+      goods_in_transit_insurance_url: 'goods_in_transit_insurance_url',
+      hire_and_reward_url: 'hire_reward_insurance_url',
+    };
+    const driverCol = APP_TO_DRIVER_COL[col] || col;
+
+    if ((appRow as any).email) {
       try {
-        const remote = await fetch(signed.signedUrl);
-        if (remote.ok) {
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Cache-Control', 'private, max-age=120');
-          const { Readable } = await import('stream');
-          const readable = Readable.fromWeb(remote.body as any);
-          return readable.pipe(res);
+        const { data: driver } = await sb
+          .from('drivers')
+          .select(`id, ${driverCol}`)
+          .ilike('email', (appRow as any).email)
+          .maybeSingle();
+
+        if (driver) {
+          const driverUrl: string | null = (driver as any)[driverCol];
+          if (driverUrl) {
+            const ct = detectMime(driverUrl);
+            if (driverUrl.startsWith('http')) {
+              try {
+                const direct = await fetch(driverUrl);
+                if (direct.ok) {
+                  res.setHeader('Content-Type', ct);
+                  res.setHeader('Cache-Control', 'private, max-age=120');
+                  const { Readable } = await import('stream');
+                  Readable.fromWeb(direct.body as any).pipe(res);
+                  return;
+                }
+              } catch (_) {}
+            }
+            for (const candidate of buildCandidatePaths(driverUrl)) {
+              const served = await tryStoragePath(candidate, ct);
+              if (served) return;
+            }
+          }
+
+          // Also try driverId-prefixed paths in storage
+          const driverId = (driver as any).id;
+          const fileName = rawStoredValue?.split('/').pop()?.split('?')[0] || '';
+          if (driverId && fileName) {
+            const ct = detectMime(fileName);
+            const driverPaths = [
+              `${driverId}/${fileName}`,
+              `${driverId}/driving_licence/${fileName}`,
+              `${driverId}/document/${fileName}`,
+            ];
+            for (const dp of driverPaths) {
+              const served = await tryStoragePath(dp, ct);
+              if (served) return;
+            }
+          }
         }
       } catch (_) {}
     }
 
-    // 2. Try DRIVER-DOCUMENTS (uppercase) bucket
-    const { data: signed2 } = await sb.storage
-      .from('DRIVER-DOCUMENTS')
-      .createSignedUrl(storagePath, 300);
-
-    if (signed2?.signedUrl) {
-      try {
-        const remote2 = await fetch(signed2.signedUrl);
-        if (remote2.ok) {
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Cache-Control', 'private, max-age=120');
-          const { Readable } = await import('stream');
-          const readable2 = Readable.fromWeb(remote2.body as any);
-          return readable2.pipe(res);
+    // ── STRATEGY 3: Local disk fallbacks ──────────────────────────────────────
+    if (rawStoredValue) {
+      const fileName = rawStoredValue.split('/').pop()?.split('?')[0] || '';
+      const cleanPath = rawStoredValue.startsWith('/') ? rawStoredValue.slice(1) : rawStoredValue;
+      const ct = detectMime(rawStoredValue);
+      const localCandidates = [
+        path.join(process.cwd(), cleanPath),
+        path.join(process.cwd(), 'uploads', 'documents', 'application-pending', fileName),
+        path.join(process.cwd(), 'uploads', 'documents', fileName),
+      ];
+      for (const lp of localCandidates) {
+        if (fs.existsSync(lp)) {
+          res.setHeader('Content-Type', ct);
+          res.setHeader('Content-Disposition', `inline; filename="${path.basename(lp)}"`);
+          return res.sendFile(lp);
         }
-      } catch (_) {}
-    }
-
-    // 3. Fallback: local disk (older applications stored locally before Supabase migration)
-    // Handle paths like '/uploads/documents/application-pending/filename.jpg'
-    const cleanPath = storagePath.startsWith('/') ? storagePath.slice(1) : storagePath;
-    const localExact = path.join(process.cwd(), cleanPath);
-    if (fs.existsSync(localExact)) {
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `inline; filename="${path.basename(localExact)}"`);
-      return res.sendFile(localExact);
-    }
-
-    // 4. Try just the filename in application-pending directory
-    const localName = storagePath.split('/').pop() || storagePath;
-    const localFallback = path.join(process.cwd(), 'uploads', 'documents', 'application-pending', localName);
-    if (fs.existsSync(localFallback)) {
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `inline; filename="${localName}"`);
-      return res.sendFile(localFallback);
+      }
     }
 
     return res.status(404).json({ error: 'Document not found in any storage location' });
