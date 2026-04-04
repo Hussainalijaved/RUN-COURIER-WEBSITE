@@ -1,0 +1,66 @@
+Fix the driver document “View” endpoint returning “not found” after approval.
+
+Problem:
+The admin modal shows approved driver documents correctly, but when clicking View, the route like:
+/api/documents/:id/driving_license/view
+returns “not found”.
+
+Requirements:
+1. Do not change UI styling or approval workflow.
+2. Fix the backend document lookup logic.
+
+Checks to implement:
+- Log the incoming route params:
+  - id
+  - documentType
+- Confirm whether :id is a driverId or a documentId and use it consistently.
+- Do not use a generic type like `driving_license` if the database stores separate document types such as:
+  - driving_licence_front
+  - driving_licence_back
+  - profile_picture
+  - hire_reward_insurance
+  - goods_in_transit_insurance
+
+Backend fix:
+1. The View action in the frontend must pass the exact stored document type for that row.
+   Example:
+   - Driving Licence (Front) -> driving_licence_front
+   - Driving Licence (Back) -> driving_licence_back
+
+2. The API endpoint must query by the exact stored document record, not by a guessed label.
+   Example logic:
+   - find document where driver_id = :id AND document_type = :documentType
+   OR preferably
+   - use document.id directly and fetch by primary key
+
+3. Approval must never overwrite:
+   - document_type
+   - file_path
+   - storage_path
+   - bucket_name
+
+4. Add backend logs:
+   - route params received
+   - SQL query filter values
+   - matched database row
+   - storage path used
+
+5. If the bucket is private, generate a signed URL from the saved storage path.
+   Do not build file URLs manually.
+
+Preferred implementation:
+- Change View to use document.id directly:
+  GET /api/documents/:documentId/view
+- Backend fetches the exact document row by primary key
+- Then reads bucket + file_path from that row
+- Then returns signed URL or streams file
+
+Also verify:
+- documents uploaded before approval
+- documents after approval
+- front/back licence rows
+- insurance rows
+- profile picture row
+
+Expected result:
+Every document row in the modal must open the correct file after approval without returning “not found”.

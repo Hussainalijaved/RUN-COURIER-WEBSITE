@@ -8065,7 +8065,7 @@ export async function registerRoutes(
 
   app.get("/api/documents/:id/view", asyncHandler(async (req, res) => {
     const docId = req.params.id;
-    console.log(`[DocView] Request for doc: ${docId}`);
+    console.log(`[DocView] ── Request ── id=${docId}`);
     try {
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (!supabaseAdmin) return res.status(500).send("Storage service unavailable");
@@ -8120,20 +8120,23 @@ export async function registerRoutes(
 
       const resolveColDoc = async (dId: string, docType: string): Promise<any | null> => {
         const col = COL_MAP[docType];
+        console.log(`[DocView] col- lookup: driverId=${dId} docType=${docType} col=${col || '(no mapping)'}`);
         if (!col || !dId) return null;
         const { data: driverRow } = await supabaseAdmin.from('drivers').select(col).eq('id', dId).maybeSingle();
-        if (driverRow && (driverRow as any)[col]) {
-          const rawUrl: string = (driverRow as any)[col];
-          const storagePath = extractStoragePath(rawUrl) || rawUrl;
-          return { id: docId, driver_id: dId, file_url: rawUrl, storage_path: storagePath, bucket: 'DRIVER-DOCUMENTS', doc_type: docType };
-        }
-        return null;
+        const rawUrl: string = driverRow ? (driverRow as any)[col] || '' : '';
+        console.log(`[DocView] col- resolved url=${rawUrl.substring(0, 100)}`);
+        if (!rawUrl) return null;
+        const storagePath = extractStoragePath(rawUrl) || rawUrl;
+        return { id: docId, driver_id: dId, file_url: rawUrl, storage_path: storagePath, bucket: 'DRIVER-DOCUMENTS', doc_type: docType };
       };
 
       if (docId.startsWith('col-')) {
-        const parts = docId.replace('col-', '').split('-');
-        const docType = parts.pop()!;
-        const dId = parts.join('-');
+        // col-{uuid}-{camelCaseType}: uuid contains 4 hyphens, type is camelCase (no hyphens)
+        const withoutPrefix = docId.slice(4); // remove 'col-'
+        const lastDash = withoutPrefix.lastIndexOf('-');
+        const dId = withoutPrefix.slice(0, lastDash);
+        const docType = withoutPrefix.slice(lastDash + 1);
+        console.log(`[DocView] Parsed col-: dId=${dId} docType=${docType}`);
         doc = await resolveColDoc(dId, docType);
       }
 
@@ -8144,6 +8147,7 @@ export async function registerRoutes(
           if (docId.endsWith(`-${t}`)) {
             const dId = docId.slice(0, docId.length - t.length - 1);
             if (dId.match(/^[0-9a-f-]{36}$/i)) {
+              console.log(`[DocView] Old-format id match: dId=${dId} type=${t}`);
               doc = await resolveColDoc(dId, t);
               if (doc) break;
             }
@@ -8151,20 +8155,74 @@ export async function registerRoutes(
         }
       }
 
+      // Look up by document primary key in Supabase driver_documents
       if (!doc) {
-        const { data: dbDoc } = await supabaseAdmin.from('driver_documents').select('*').eq('id', docId).single();
-        if (dbDoc) doc = dbDoc;
+        console.log(`[DocView] Looking up in Supabase driver_documents id=${docId}`);
+        const { data: dbDoc, error: sbErr } = await supabaseAdmin
+          .from('driver_documents')
+          .select('*')
+          .eq('id', docId)
+          .maybeSingle();
+        if (sbErr) console.log(`[DocView] Supabase lookup error: ${sbErr.message}`);
+        if (dbDoc) {
+          console.log(`[DocView] Found in Supabase: doc_type=${dbDoc.doc_type} file_url=${String(dbDoc.file_url||'').substring(0,80)} storage_path=${String(dbDoc.storage_path||'').substring(0,80)} bucket=${dbDoc.bucket}`);
+          doc = dbDoc;
+        }
+      }
+
+      // PostgreSQL fallback — documents synced during approval or uploaded via web
+      if (!doc) {
+        try {
+          console.log(`[DocView] Looking up in PostgreSQL documents id=${docId}`);
+          const { db } = await import("./db");
+          const { documents: documentsTable } = await import("@shared/schema");
+          const { eq } = await import("drizzle-orm");
+          const [pgDoc] = await db.select().from(documentsTable).where(eq(documentsTable.id, docId));
+          if (pgDoc) {
+            console.log(`[DocView] Found in PostgreSQL: type=${pgDoc.type} fileUrl=${String(pgDoc.fileUrl||'').substring(0,80)}`);
+            doc = {
+              id: pgDoc.id,
+              driver_id: pgDoc.driverId,
+              doc_type: pgDoc.type,
+              file_url: pgDoc.fileUrl,
+              storage_path: (pgDoc as any).storagePath || null,
+              bucket: (pgDoc as any).bucket || 'DRIVER-DOCUMENTS',
+              auth_user_id: null,
+            };
+          }
+        } catch (pgErr: any) {
+          console.log(`[DocView] PostgreSQL lookup failed: ${pgErr?.message}`);
+        }
+      }
+
+      // Memory storage fallback
+      if (!doc) {
+        try {
+          const memDoc = await storage.getDocument(docId);
+          if (memDoc) {
+            console.log(`[DocView] Found in memory storage: type=${memDoc.type} fileUrl=${String(memDoc.fileUrl||'').substring(0,80)}`);
+            doc = {
+              id: memDoc.id,
+              driver_id: memDoc.driverId,
+              doc_type: memDoc.type,
+              file_url: memDoc.fileUrl,
+              storage_path: null,
+              bucket: 'DRIVER-DOCUMENTS',
+              auth_user_id: null,
+            };
+          }
+        } catch (_) {}
       }
 
       if (!doc) {
-        console.log(`[DocView] Doc not found: ${docId}`);
+        console.log(`[DocView] ── Not found in any source: id=${docId}`);
         return res.status(404).send("Document not found");
       }
 
-      const fileUrl: string = doc.file_url || '';
+      const fileUrl: string = doc.file_url || doc.fileUrl || '';
       if (fileUrl.startsWith('text:')) return res.status(400).send("Text-only document");
 
-      console.log(`[DocView] file_url=${fileUrl.substring(0,120)} storage_path=${String(doc.storage_path||'').substring(0,80)} bucket=${doc.bucket}`);
+      console.log(`[DocView] Resolved doc: driver_id=${doc.driver_id} doc_type=${doc.doc_type} file_url=${fileUrl.substring(0,120)} storage_path=${String(doc.storage_path||'').substring(0,80)} bucket=${doc.bucket}`);
 
       // ── 1. Try local disk first (fastest, most reliable for web-uploaded docs) ──
       const localCandidates: string[] = [];
@@ -8175,7 +8233,6 @@ export async function registerRoutes(
         addLocal(path.join(process.cwd(), 'uploads', clean));
         addLocal(path.join(process.cwd(), 'uploads', 'documents', clean.replace(/^documents\//, '')));
       }
-      // Also try extracting filename and searching under uploads/documents/{driverId}/
       const rawFileName = fileUrl.split('/').pop()?.split('?')[0];
       if (rawFileName && doc.driver_id) {
         addLocal(path.join(process.cwd(), 'uploads', 'documents', doc.driver_id, rawFileName));
@@ -8186,32 +8243,40 @@ export async function registerRoutes(
         if (sendFile(lp)) { console.log(`[DocView] Served from disk: ${lp}`); return; }
       }
 
-      // ── 2. Try Supabase Storage (try ALL paths, don't redirect on first hit) ──
-      // Always extract the bare Supabase storage key from doc.storage_path (it may be an API URL)
-      const rawStoragePath = (doc.storage_path
-        ? (extractStoragePath(doc.storage_path) || (doc.storage_path.startsWith('http') ? null : doc.storage_path))
-        : null) || extractStoragePath(fileUrl) || '';
+      // ── 2. Supabase Storage — generate signed URL from all candidate paths ──
+      // Always extract storage path from file_url (Supabase public URLs contain the path).
+      // Never rely on a public Supabase URL directly — bucket may be private.
+      const pathFromUrl = extractStoragePath(fileUrl) || '';
+      // storage_path column may itself be a full URL — strip it too
+      const pathFromStorageCol = doc.storage_path
+        ? (extractStoragePath(doc.storage_path) || (!doc.storage_path.startsWith('http') ? doc.storage_path : ''))
+        : '';
+      const rawStoragePath = pathFromStorageCol || pathFromUrl;
+
       const storagePathsToTry: string[] = [];
+      const addPath = (p: string) => { if (p && !storagePathsToTry.includes(p)) storagePathsToTry.push(p); };
 
       if (rawStoragePath && !rawStoragePath.startsWith('http')) {
-        storagePathsToTry.push(rawStoragePath);
-        if (!rawStoragePath.startsWith('drivers/')) storagePathsToTry.push(`drivers/${rawStoragePath}`);
+        addPath(rawStoragePath);
+        if (!rawStoragePath.startsWith('drivers/')) addPath(`drivers/${rawStoragePath}`);
         const fn = rawStoragePath.split('/').pop();
         if (fn && doc.driver_id) {
-          storagePathsToTry.push(`${doc.driver_id}/${fn}`);
-          storagePathsToTry.push(`drivers/${doc.driver_id}/${doc.doc_type || ''}/${fn}`);
-          storagePathsToTry.push(`drivers/pending/${doc.doc_type || ''}/${fn}`);
+          addPath(`${doc.driver_id}/${fn}`);
+          addPath(`drivers/${doc.driver_id}/${doc.doc_type || ''}/${fn}`);
+          addPath(`drivers/pending/${doc.doc_type || ''}/${fn}`);
         }
         if (fn && doc.auth_user_id && doc.auth_user_id !== doc.driver_id) {
-          storagePathsToTry.push(`${doc.auth_user_id}/${fn}`);
+          addPath(`${doc.auth_user_id}/${fn}`);
         }
       }
 
-      // Also always try {driver_id}/{filename} directly (covers cases where storage_path was wrong)
+      // Always include {driver_id}/{filename} as a fallback path
       const rawFn = (fileUrl || '').split('/').pop()?.split('?')[0];
-      if (rawFn && doc.driver_id && !storagePathsToTry.includes(`${doc.driver_id}/${rawFn}`)) {
-        storagePathsToTry.push(`${doc.driver_id}/${rawFn}`);
+      if (rawFn && doc.driver_id) {
+        addPath(`${doc.driver_id}/${rawFn}`);
       }
+
+      console.log(`[DocView] Storage paths to try (${storagePathsToTry.length}):`, storagePathsToTry);
 
       const buckets = ['DRIVER-DOCUMENTS', 'driver-documents'];
       if (doc.bucket && !buckets.includes(doc.bucket)) buckets.unshift(doc.bucket);
@@ -8220,15 +8285,18 @@ export async function registerRoutes(
         for (const tryPath of storagePathsToTry) {
           try {
             const { data: sd, error: se } = await supabaseAdmin.storage.from(bucket).createSignedUrl(tryPath, 600);
-            if (se || !sd?.signedUrl) continue;
+            if (se || !sd?.signedUrl) {
+              if (se) console.log(`[DocView] signed-url fail: bucket=${bucket} path=${tryPath} err=${se.message}`);
+              continue;
+            }
             const fn = tryPath.split('/').pop() || 'document';
             const ok = await streamUrl(sd.signedUrl, fn);
             if (ok) {
-              console.log(`[DocView] Streamed from Supabase bucket=${bucket} path=${tryPath}`);
-              // Persist the correct path so future requests are faster
+              console.log(`[DocView] ✓ Streamed from Supabase bucket=${bucket} path=${tryPath}`);
+              // Persist the correct storage_path only — never overwrite file_url
               if (doc.id && !doc.id.startsWith('col-')) {
                 await supabaseAdmin.from('driver_documents')
-                  .update({ storage_path: tryPath, bucket, file_url: tryPath })
+                  .update({ storage_path: tryPath, bucket })
                   .eq('id', doc.id).catch(() => {});
               }
               return;
@@ -8237,7 +8305,7 @@ export async function registerRoutes(
         }
       }
 
-      // ── 3. If fileUrl is a direct http URL, stream it directly ──────────────
+      // ── 3. If fileUrl is a direct http URL (e.g. public Supabase), stream it ──
       if (fileUrl.startsWith('http')) {
         const fn = fileUrl.split('/').pop()?.split('?')[0] || 'document';
         console.log(`[DocView] Trying direct URL stream: ${fileUrl.substring(0,80)}`);
@@ -8246,7 +8314,7 @@ export async function registerRoutes(
       }
 
       // ── 4. Nothing worked ────────────────────────────────────────────────────
-      console.log(`[DocView] All strategies failed for ${docId}. fileUrl=${fileUrl.substring(0,120)}`);
+      console.log(`[DocView] ── All strategies failed for id=${docId} file_url=${fileUrl.substring(0,120)}`);
       return res.status(404).send(`Document file not found. (id=${docId})`);
 
     } catch (e: any) {
