@@ -1229,6 +1229,25 @@ export default function AdminApplications() {
                       Approve
                     </Button>
                   </div>
+                ) : selectedApplication.status === 'approved' ? (
+                  <div className="flex flex-wrap items-center gap-2 w-full justify-end">
+                    <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>
+                      Close
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => resendApprovalMutation.mutate(selectedApplication.id)}
+                      disabled={resendingId !== null}
+                      data-testid="button-resend-approval-dialog"
+                    >
+                      {resendingId === selectedApplication.id ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Mail className="h-4 w-4 mr-2" />
+                      )}
+                      Resend Approval Email
+                    </Button>
+                  </div>
                 ) : (selectedApplication.status === 'rejected' || selectedApplication.status === 'corrections_needed') ? (
                   <div className="flex flex-wrap items-center gap-2 w-full justify-end">
                     <Button onClick={() => setIsReviewDialogOpen(false)}>
