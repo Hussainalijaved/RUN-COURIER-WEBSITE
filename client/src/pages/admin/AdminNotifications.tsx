@@ -166,7 +166,7 @@ function SendNotificationTab() {
   const sendMutation = useMutation({
     mutationFn: async (payload: any) => {
       const headers = await getAuthHeaders();
-      const resp = await fetch('/api/notifications', {
+      const resp = await fetch('/api/admin/notifications', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -188,7 +188,7 @@ function SendNotificationTab() {
       setSelectedCustomerName('');
       setDriverSearch('');
       setCustomerSearch('');
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
     },
     onError: (err: Error) => {
       toast({ title: 'Failed to Send', description: err.message, variant: 'destructive' });
@@ -486,10 +486,10 @@ function NotificationLogTab() {
   params.set('limit', '25');
 
   const { data, isLoading, refetch } = useQuery<any>({
-    queryKey: ['/api/notifications', search, filterTargetType, filterNotifType, filterSenderRole, filterFrom, filterTo, page],
+    queryKey: ['/api/admin/notifications', search, filterTargetType, filterNotifType, filterSenderRole, filterFrom, filterTo, page],
     queryFn: async () => {
       const headers = await getAuthHeaders();
-      const resp = await fetch(`/api/notifications?${params.toString()}`, { headers });
+      const resp = await fetch(`/api/admin/notifications?${params.toString()}`, { headers });
       if (!resp.ok) throw new Error('Failed to fetch');
       return resp.json();
     },

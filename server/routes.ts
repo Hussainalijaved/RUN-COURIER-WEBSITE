@@ -17727,8 +17727,8 @@ ON CONFLICT (type) DO NOTHING;
     res.json(data || []);
   }));
 
-  // POST /api/notifications — send a notification (with optional SMS)
-  app.post('/api/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+  // POST /api/admin/notifications — send a notification (with optional SMS)
+  app.post('/api/admin/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { supabaseAdmin: sb } = await import('./supabaseAdmin');
     const { Pool } = await import('pg');
     const pool = new Pool({
@@ -17838,8 +17838,8 @@ ON CONFLICT (type) DO NOTHING;
     }
   }));
 
-  // GET /api/notifications — notification log with filters
-  app.get('/api/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+  // GET /api/admin/notifications — notification log with filters
+  app.get('/api/admin/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { Pool } = await import('pg');
     const pool = new Pool({
       host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
