@@ -78,6 +78,13 @@ function getPgPool(): Pool {
       ssl: { rejectUnauthorized: false },
       max: 3,
     });
+    // Handle idle-client errors (e.g. Neon serverless terminating connections with 57P01)
+    // Without this handler Node.js throws an uncaught error and crashes the process
+    pgPool.on('error', (err: Error) => {
+      console.warn('[PgPool] Idle client error (non-fatal):', err.message);
+      // Null the singleton so the next call recreates the pool with a fresh connection
+      pgPool = null;
+    });
   }
   return pgPool;
 }
@@ -6296,6 +6303,68 @@ export async function registerRoutes(
     }
 
     console.log(`[Account Delete] Account permanently deleted: ${userEmail}`);
+    res.json({ success: true, message: 'Account permanently deleted' });
+  }));
+
+  // Mobile app alias: POST /api/account/delete (same logic as DELETE /api/account)
+  app.post("/api/account/delete", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !authUser) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    const authUUID = authUser.id;
+    const userEmail = authUser.email;
+    console.log(`[Account Delete Mobile] Self-delete for auth UUID: ${authUUID}, email: ${userEmail}`);
+
+    // Soft-delete driver record if this user is a driver
+    try {
+      const { data: driverRow } = await supabaseAdmin.from('drivers').select('id').eq('id', authUUID).maybeSingle();
+      if (driverRow) {
+        await supabaseAdmin.from('drivers').update({
+          is_active: false,
+          online_status: 'offline',
+          deactivated_at: new Date().toISOString(),
+        }).eq('id', authUUID);
+        console.log('[Account Delete Mobile] Soft-deleted driver record');
+      }
+    } catch (e) {
+      console.error('[Account Delete Mobile] Exception soft-deleting driver record:', e);
+    }
+
+    // Delete from Supabase users table
+    try {
+      await supabaseAdmin.from('users').delete().eq('auth_id', authUUID);
+      console.log('[Account Delete Mobile] Removed from users table');
+    } catch (e) {
+      console.error('[Account Delete Mobile] Exception removing from users table:', e);
+    }
+
+    // Delete from storage layer
+    try {
+      await storage.deleteUser(authUUID);
+    } catch (e) {
+      console.error('[Account Delete Mobile] Exception in storage.deleteUser:', e);
+    }
+
+    // Delete from Supabase Auth — broadcasts USER_DELETED event to all connected clients
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(authUUID);
+    if (authDeleteError) {
+      console.error('[Account Delete Mobile] Error deleting from Supabase Auth:', authDeleteError.message);
+      return res.status(500).json({ error: 'Failed to delete account. Please contact support.' });
+    }
+
+    console.log(`[Account Delete Mobile] Account permanently deleted: ${userEmail}`);
     res.json({ success: true, message: 'Account permanently deleted' });
   }));
 

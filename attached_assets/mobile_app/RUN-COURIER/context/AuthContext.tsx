@@ -266,6 +266,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsPasswordRecovery(true);
         }
         
+        // USER_DELETED fires when the account is deleted via admin API (e.g. from web app)
+        // Force immediate sign-out so the mobile app clears instantly
+        if (event === 'USER_DELETED') {
+          console.log('[AUTH] USER_DELETED event received — account removed remotely, signing out');
+          setSession(null);
+          setUser(null);
+          setDriver(null);
+          setCustomerProfile(null);
+          setUserRole(null);
+          setLoading(false);
+          supabase.auth.signOut().catch(() => {});
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -279,6 +293,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setCustomerProfile(null);
           setUserRole(null);
           setLoading(false);
+        } else if (event === 'TOKEN_REFRESHED' && !session) {
+          // Token refresh failed with no session — account likely deleted
+          console.log('[AUTH] TOKEN_REFRESHED with null session — account may have been deleted, signing out');
+          setDriver(null);
+          setCustomerProfile(null);
+          setUserRole(null);
+          setLoading(false);
+          supabase.auth.signOut().catch(() => {});
         } else {
           // For other null session events (transient errors), preserve existing state
           // This prevents the login loop on temporary Supabase hiccups
