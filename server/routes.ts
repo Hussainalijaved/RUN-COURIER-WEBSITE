@@ -6257,7 +6257,22 @@ export async function registerRoutes(
     const userEmail = authUser.email;
     console.log(`[Account Delete] Self-delete requested for auth UUID: ${authUUID}, email: ${userEmail}`);
 
-    // 1. Delete from Supabase users table by auth_id
+    // 1. Soft-delete driver record if this user is a driver (preserve job history)
+    try {
+      const { data: driverRow } = await supabaseAdmin.from('drivers').select('id').eq('id', authUUID).maybeSingle();
+      if (driverRow) {
+        await supabaseAdmin.from('drivers').update({
+          is_active: false,
+          online_status: 'offline',
+          deactivated_at: new Date().toISOString(),
+        }).eq('id', authUUID);
+        console.log('[Account Delete] Soft-deleted driver record');
+      }
+    } catch (e) {
+      console.error('[Account Delete] Exception soft-deleting driver record:', e);
+    }
+
+    // 2. Delete from Supabase users table by auth_id
     try {
       const { error } = await supabaseAdmin.from('users').delete().eq('auth_id', authUUID);
       if (error) console.error('[Account Delete] Error removing from users table:', error.message);
@@ -6266,14 +6281,14 @@ export async function registerRoutes(
       console.error('[Account Delete] Exception removing from users table:', e);
     }
 
-    // 2. Delete from storage layer — SupabaseStorage.deleteUser tries auth_id first
+    // 3. Delete from storage layer — SupabaseStorage.deleteUser tries auth_id first
     try {
       await storage.deleteUser(authUUID);
     } catch (e) {
       console.error('[Account Delete] Exception in storage.deleteUser:', e);
     }
 
-    // 3. Delete from Supabase Auth — this invalidates all sessions immediately
+    // 4. Delete from Supabase Auth — this invalidates all sessions immediately
     const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(authUUID);
     if (authDeleteError) {
       console.error('[Account Delete] Error deleting from Supabase Auth:', authDeleteError.message);
