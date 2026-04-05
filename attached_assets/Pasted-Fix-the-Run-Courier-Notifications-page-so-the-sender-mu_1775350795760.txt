@@ -1,0 +1,83 @@
+Fix the Run Courier Notifications page so the sender must choose the delivery method before sending.
+
+CURRENT PROBLEM
+- SMS works
+- Notification does not work anywhere
+- The current flow is confusing because it mixes notification and SMS
+- I need the sender to choose first whether they want to send:
+  1. Notification only
+  2. SMS only
+- Do not send both unless that option is explicitly selected in the future
+
+IMPORTANT
+- Do not change unrelated features
+- Keep the current dashboard layout and design style
+- Keep the page inside Admin and Supervisor dashboards
+- Admin and Supervisor must have the same feature and permissions
+- Use the existing Supabase backend and current auth system
+
+REQUIRED UI CHANGE
+Add a new required section above the send button called "Delivery Method" with radio buttons or segmented buttons:
+
+- Notification
+- SMS
+
+Make one of them required before the user can send.
+
+RULES
+1. If "Notification" is selected:
+- Send only notification
+- Do not send SMS
+- Save the notification in Supabase
+- Create notification recipient records
+- Show success if saved successfully
+- If push delivery is not configured yet, still save it as an in-app notification and show success
+- Only show failure if the database save fails
+
+2. If "SMS" is selected:
+- Send only SMS
+- Do not create a notification unless explicitly coded for later
+- Keep the existing SMS logic working
+
+3. The send button text must change dynamically:
+- "Send Notification"
+- "Send SMS"
+
+4. Validation:
+- Delivery method is required
+- Recipient type is required
+- Notification type is required only when sending Notification
+- Title is required
+- Message is required
+- Specific recipient is required if specific user option is selected
+
+DEBUG AND FIX NOTIFICATION LOGIC
+- Inspect why notification sending currently fails
+- Check frontend submit logic
+- Check server/API route
+- Check Supabase insert for notifications table
+- Check notification_recipients insert
+- Check column names exactly match database
+- Check RLS policies for Admin and Supervisor
+- Add clear backend logs for failure reason
+
+EXPECTED NOTIFICATION BEHAVIOR
+- If Notification is chosen, create and save notification records successfully
+- Show in Notification Log
+- Do not fail the whole action just because push delivery is missing
+- Treat database save as the primary success
+- Push delivery can be optional after save
+
+EXPECTED SMS BEHAVIOR
+- If SMS is chosen, keep current SMS sending working exactly as now
+
+NOTIFICATION LOG
+- Continue showing notification history from Supabase
+- Only log notifications, not SMS, unless SMS logging already exists separately
+
+FINAL RESULT
+- User must choose Notification or SMS before sending
+- SMS keeps working
+- Notification is fixed to save and work as in-app notification at minimum
+- Admin and Supervisor have exactly the same feature
+- No mixed send flow

@@ -17738,9 +17738,10 @@ ON CONFLICT (type) DO NOTHING;
     res.json(data || []);
   }));
 
-  // POST /api/admin/notifications — send a notification (with optional SMS)
+  // POST /api/admin/notifications — send notification OR sms (delivery_method required)
   app.post('/api/admin/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { supabaseAdmin: sb } = await import('./supabaseAdmin');
+    const { randomUUID } = await import('crypto');
     const { Pool } = await import('pg');
     const pool = new Pool({
       host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
@@ -17749,15 +17750,23 @@ ON CONFLICT (type) DO NOTHING;
     });
 
     try {
-      const { target_type, target_user_id, notification_type, title, message, send_sms } = req.body;
-      if (!target_type || !notification_type || !title || !message) {
-        return res.status(400).json({ error: 'target_type, notification_type, title and message are required' });
+      const { delivery_method, target_type, target_user_id, notification_type, title, message } = req.body;
+
+      // Validate required fields
+      if (!delivery_method || !['notification', 'sms'].includes(delivery_method)) {
+        return res.status(400).json({ error: 'delivery_method must be "notification" or "sms"' });
+      }
+      if (!target_type || !title || !message) {
+        return res.status(400).json({ error: 'target_type, title and message are required' });
+      }
+      if (delivery_method === 'notification' && !notification_type) {
+        return res.status(400).json({ error: 'notification_type is required when sending a notification' });
       }
       if ((target_type === 'specific_driver' || target_type === 'specific_customer') && !target_user_id) {
         return res.status(400).json({ error: 'target_user_id is required for specific recipient' });
       }
 
-      // Determine sender info from the JWT
+      // Resolve sender info from JWT
       const token = (req.headers.authorization || '').replace('Bearer ', '');
       let senderName = 'Admin';
       let senderRole = 'admin';
@@ -17779,7 +17788,7 @@ ON CONFLICT (type) DO NOTHING;
         }
       } catch (_) {}
 
-      // Determine recipients (with phone for SMS)
+      // Resolve recipients (always needed for both paths)
       type Recipient = { id: string; name: string; email: string; role: string; phone?: string };
       let recipients: Recipient[] = [];
       let targetUserName: string | null = null;
@@ -17790,49 +17799,48 @@ ON CONFLICT (type) DO NOTHING;
           recipients = (data || []).map(d => ({ id: d.id, name: d.full_name || '', email: d.email || '', role: 'driver', phone: d.phone || '' }));
         } else if (target_type === 'specific_driver') {
           const { data } = await sb.from('drivers').select('id, full_name, email, phone').eq('id', target_user_id).maybeSingle();
-          if (data) {
-            targetUserName = data.full_name || '';
-            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'driver', phone: data.phone || '' }];
-          }
+          if (data) { targetUserName = data.full_name || ''; recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'driver', phone: data.phone || '' }]; }
         } else if (target_type === 'all_customers') {
           const { data } = await sb.from('users').select('id, full_name, email, phone').in('role', ['customer', 'business_customer']);
           recipients = (data || []).map(u => ({ id: u.id, name: u.full_name || '', email: u.email || '', role: 'customer', phone: u.phone || '' }));
         } else if (target_type === 'specific_customer') {
           const { data } = await sb.from('users').select('id, full_name, email, phone').eq('id', target_user_id).maybeSingle();
-          if (data) {
-            targetUserName = data.full_name || '';
-            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'customer', phone: data.phone || '' }];
-          }
+          if (data) { targetUserName = data.full_name || ''; recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'customer', phone: data.phone || '' }]; }
         }
       }
 
-      // Send SMS if requested
-      let smsSentCount = 0;
-      if (send_sms && recipients.length > 0) {
+      // ── SMS path ────────────────────────────────────────────────────────────
+      if (delivery_method === 'sms') {
+        let smsSentCount = 0;
+        let smsFailCount = 0;
         try {
           const { sendSMS } = await import('./twilioService');
-          const smsBody = `Run Courier: [${(notification_type as string).toUpperCase()}] ${title}\n${message}`;
-          const smsResults = await Promise.allSettled(
-            recipients
-              .filter(r => r.phone && r.phone.trim().length > 7)
-              .map(r => sendSMS(r.phone!, smsBody))
-          );
-          smsSentCount = smsResults.filter(r => r.status === 'fulfilled' && (r.value as any).success).length;
-          console.log(`[Notifications] SMS: ${smsSentCount}/${recipients.filter(r => r.phone && r.phone.trim().length > 7).length} sent`);
+          const smsBody = `Run Courier: ${title}\n${message}`;
+          const eligible = recipients.filter(r => r.phone && r.phone.trim().length > 7);
+          const results = await Promise.allSettled(eligible.map(r => sendSMS(r.phone!, smsBody)));
+          smsSentCount = results.filter(r => r.status === 'fulfilled' && (r.value as any).success).length;
+          smsFailCount = eligible.length - smsSentCount;
+          console.log(`[Notifications] SMS-only: ${smsSentCount} sent, ${smsFailCount} failed`);
         } catch (smsErr: any) {
-          console.warn('[Notifications] SMS sending error:', smsErr?.message);
+          console.warn('[Notifications] SMS error:', smsErr?.message);
+          return res.status(500).json({ error: `SMS failed: ${smsErr?.message}` });
         }
+        return res.json({ success: true, delivery_method: 'sms', recipientCount: recipients.length, smsSentCount, smsFailCount });
       }
 
-      // Insert notification record
+      // ── Notification path ───────────────────────────────────────────────────
+      // Generate explicit UUID because old notifications.id has no DB default
+      const notifId = randomUUID();
+      console.log(`[Notifications] Inserting notification id=${notifId} target=${target_type} type=${notification_type}`);
       const notifResult = await pool.query(
-        `INSERT INTO notifications (sender_id, sender_name, sender_role, target_type, target_user_id, target_user_name, notification_type, title, message, status, sms_sent, sms_sent_count, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'sent',$10,$11,NOW()) RETURNING *`,
-        [senderId, senderName, senderRole, target_type, target_user_id || null, targetUserName, notification_type, title, message, send_sms ? true : false, smsSentCount]
+        `INSERT INTO notifications (id, sender_id, sender_name, sender_role, target_type, target_user_id, target_user_name, notification_type, title, message, status, sms_sent, sms_sent_count, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'sent',false,0,NOW()) RETURNING *`,
+        [notifId, senderId, senderName, senderRole, target_type, target_user_id || null, targetUserName, notification_type, title, message]
       );
       const notification = notifResult.rows[0];
+      console.log(`[Notifications] Saved notification id=${notification.id}`);
 
-      // Insert recipient rows (batched)
+      // Insert recipient rows
       if (recipients.length > 0) {
         const values = recipients.map((_, i) => `($1,$${i*4+2},$${i*4+3},$${i*4+4},$${i*4+5},false,NOW(),NOW())`).join(',');
         const params: any[] = [notification.id];
@@ -17841,9 +17849,10 @@ ON CONFLICT (type) DO NOTHING;
           `INSERT INTO notification_recipients (notification_id, recipient_user_id, recipient_name, recipient_email, recipient_role, is_read, delivered_at, created_at) VALUES ${values}`,
           params
         );
+        console.log(`[Notifications] Inserted ${recipients.length} recipient rows`);
       }
 
-      res.json({ success: true, notification, recipientCount: recipients.length, smsSentCount });
+      return res.json({ success: true, delivery_method: 'notification', notification, recipientCount: recipients.length });
     } finally {
       await pool.end();
     }

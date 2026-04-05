@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Switch } from '@/components/ui/switch';
 import {
   Bell, Send, List, Info, AlertTriangle, Zap,
   Users, User, ChevronLeft, ChevronRight, Search,
@@ -23,6 +22,7 @@ import { format } from 'date-fns';
 
 type TargetType = 'all_drivers' | 'specific_driver' | 'all_customers' | 'specific_customer';
 type NotifType = 'info' | 'alert' | 'urgent';
+type DeliveryMethod = 'notification' | 'sms';
 
 const TARGET_OPTIONS: { value: TargetType; label: string; icon: any }[] = [
   { value: 'all_drivers', label: 'All Drivers', icon: Users },
@@ -44,7 +44,14 @@ const TARGET_LABEL: Record<string, string> = {
   specific_customer: 'Specific Customer',
 };
 
-function PhonePreview({ title, message, notifType, sendSms }: { title: string; message: string; notifType: NotifType; sendSms?: boolean }) {
+function PhonePreview({
+  title, message, notifType, deliveryMethod,
+}: {
+  title: string;
+  message: string;
+  notifType: NotifType;
+  deliveryMethod: DeliveryMethod | null;
+}) {
   const typeConf = NOTIF_TYPES.find(t => t.value === notifType) || NOTIF_TYPES[0];
   const Icon = typeConf.icon;
   const now = new Date();
@@ -61,28 +68,41 @@ function PhonePreview({ title, message, notifType, sendSms }: { title: string; m
           <div className="text-center text-xs text-muted-foreground mt-1">
             {format(now, 'h:mm a')}
           </div>
-          {/* Push notification preview */}
-          <div className={`rounded-xl border p-3 shadow-sm ${typeConf.bg}`}>
-            <div className="flex items-start gap-2">
-              <div className={`mt-0.5 rounded-lg p-1 ${typeConf.bg}`}>
-                <Icon className={`h-3.5 w-3.5 ${typeConf.color}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-xs font-semibold text-foreground truncate">Run Courier</span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">now</span>
+
+          {/* No delivery method selected */}
+          {!deliveryMethod && (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-xs text-muted-foreground text-center px-4">
+                Choose a delivery method to see preview
+              </p>
+            </div>
+          )}
+
+          {/* Notification preview */}
+          {deliveryMethod === 'notification' && (
+            <div className={`rounded-xl border p-3 shadow-sm ${typeConf.bg}`}>
+              <div className="flex items-start gap-2">
+                <div className={`mt-0.5 rounded-lg p-1 ${typeConf.bg}`}>
+                  <Icon className={`h-3.5 w-3.5 ${typeConf.color}`} />
                 </div>
-                <p className="text-xs font-semibold text-foreground mt-0.5 line-clamp-1">
-                  {title || 'Notification Title'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-3">
-                  {message || 'Your notification message will appear here...'}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-semibold text-foreground truncate">Run Courier</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">now</span>
+                  </div>
+                  <p className="text-xs font-semibold text-foreground mt-0.5 line-clamp-1">
+                    {title || 'Notification Title'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-3">
+                    {message || 'Your notification message will appear here...'}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          {/* SMS preview when toggled */}
-          {sendSms && (
+          )}
+
+          {/* SMS preview */}
+          {deliveryMethod === 'sms' && (
             <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 shadow-sm">
               <div className="flex items-start gap-2">
                 <div className="mt-0.5 rounded-lg p-1 bg-green-500/10">
@@ -93,9 +113,9 @@ function PhonePreview({ title, message, notifType, sendSms }: { title: string; m
                     <span className="text-xs font-semibold text-foreground truncate">Run Courier · SMS</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">now</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-4">
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-5 whitespace-pre-line">
                     {title && message
-                      ? `Run Courier: [${notifType.toUpperCase()}] ${title}\n${message}`
+                      ? `Run Courier: ${title}\n${message}`
                       : 'SMS text will appear here...'}
                   </p>
                 </div>
@@ -113,6 +133,7 @@ function PhonePreview({ title, message, notifType, sendSms }: { title: string; m
 
 function SendNotificationTab() {
   const { toast } = useToast();
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod | null>(null);
   const [targetType, setTargetType] = useState<TargetType>('all_drivers');
   const [notifType, setNotifType] = useState<NotifType>('info');
   const [title, setTitle] = useState('');
@@ -124,7 +145,6 @@ function SendNotificationTab() {
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [selectedDriverName, setSelectedDriverName] = useState('');
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
-  const [sendSms, setSendSms] = useState(false);
 
   const { data: drivers = [] } = useQuery<any[]>({
     queryKey: ['/api/notifications/drivers'],
@@ -136,7 +156,6 @@ function SendNotificationTab() {
     staleTime: 60_000,
   });
 
-  // Search drivers by name, email, or driver code (e.g. RC28R)
   const filteredDrivers = useMemo(() =>
     drivers.filter(d => {
       if (!driverSearch) return true;
@@ -173,14 +192,23 @@ function SendNotificationTab() {
       });
       if (!resp.ok) {
         const err = await resp.json();
-        throw new Error(err.error || 'Failed to send notification');
+        throw new Error(err.error || 'Failed to send');
       }
       return resp.json();
     },
     onSuccess: (data) => {
-      const parts: string[] = [`Sent to ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''}`];
-      if (data.smsSentCount > 0) parts.push(`${data.smsSentCount} SMS delivered`);
-      toast({ title: 'Notification Sent', description: parts.join(' · ') + '.' });
+      if (data.delivery_method === 'sms') {
+        toast({
+          title: 'SMS Sent',
+          description: `${data.smsSentCount} of ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''} received the SMS.`,
+        });
+      } else {
+        toast({
+          title: 'Notification Saved',
+          description: `Delivered to ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''}.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
+      }
       setTitle('');
       setMessage('');
       setTargetUserId('');
@@ -188,7 +216,6 @@ function SendNotificationTab() {
       setSelectedCustomerName('');
       setDriverSearch('');
       setCustomerSearch('');
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
     },
     onError: (err: Error) => {
       toast({ title: 'Failed to Send', description: err.message, variant: 'destructive' });
@@ -198,17 +225,24 @@ function SendNotificationTab() {
   const isSpecificDriver = targetType === 'specific_driver';
   const isSpecificCustomer = targetType === 'specific_customer';
 
-  const canSend = targetType && notifType && title.trim() && message.trim() &&
-    (!isSpecificDriver || targetUserId) && (!isSpecificCustomer || targetUserId);
+  const canSend =
+    !!deliveryMethod &&
+    !!targetType &&
+    title.trim().length > 0 &&
+    message.trim().length > 0 &&
+    (deliveryMethod !== 'notification' || !!notifType) &&
+    (!isSpecificDriver || !!targetUserId) &&
+    (!isSpecificCustomer || !!targetUserId);
 
   const handleSend = () => {
+    if (!deliveryMethod) return;
     sendMutation.mutate({
+      delivery_method: deliveryMethod,
       target_type: targetType,
       target_user_id: (isSpecificDriver || isSpecificCustomer) ? targetUserId : null,
-      notification_type: notifType,
+      notification_type: deliveryMethod === 'notification' ? notifType : undefined,
       title: title.trim(),
       message: message.trim(),
-      send_sms: sendSms,
     });
   };
 
@@ -221,6 +255,14 @@ function SendNotificationTab() {
     setCustomerSearch('');
   };
 
+  const sendButtonLabel = sendMutation.isPending
+    ? 'Sending...'
+    : deliveryMethod === 'sms'
+      ? 'Send SMS'
+      : deliveryMethod === 'notification'
+        ? 'Send Notification'
+        : 'Send';
+
   return (
     <div className="flex flex-col xl:flex-row gap-6">
       <Card className="flex-1">
@@ -231,6 +273,46 @@ function SendNotificationTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
+
+          {/* ── Delivery Method (required, must choose first) ── */}
+          <div className="space-y-2">
+            <Label>
+              Delivery Method <span className="text-destructive">*</span>
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setDeliveryMethod('notification')}
+                data-testid="button-delivery-notification"
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-md border text-sm font-medium transition-colors ${
+                  deliveryMethod === 'notification'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-foreground border-border hover-elevate'
+                }`}
+              >
+                <Bell className="h-4 w-4 shrink-0" />
+                Notification
+              </button>
+              <button
+                onClick={() => setDeliveryMethod('sms')}
+                data-testid="button-delivery-sms"
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-md border text-sm font-medium transition-colors ${
+                  deliveryMethod === 'sms'
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-background text-foreground border-border hover-elevate'
+                }`}
+              >
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                SMS
+              </button>
+            </div>
+            {!deliveryMethod && (
+              <p className="text-xs text-muted-foreground">
+                Choose how you want to reach recipients before filling in the details.
+              </p>
+            )}
+          </div>
+
+          {/* ── Recipient Type ── */}
           <div className="space-y-2">
             <Label>Recipient Type</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -256,6 +338,7 @@ function SendNotificationTab() {
             </div>
           </div>
 
+          {/* ── Specific Driver picker ── */}
           {isSpecificDriver && (
             <div className="space-y-2">
               <Label>Select Driver</Label>
@@ -279,7 +362,7 @@ function SendNotificationTab() {
                           autoFocus
                           value={driverSearch}
                           onChange={e => setDriverSearch(e.target.value)}
-                          placeholder="Search by name, email or ID (e.g. RC28R)..."
+                          placeholder="Search by name, email or code (e.g. RC28R)..."
                           className="flex-1 bg-transparent text-sm outline-none"
                           data-testid="input-driver-search"
                         />
@@ -315,6 +398,7 @@ function SendNotificationTab() {
             </div>
           )}
 
+          {/* ── Specific Customer picker ── */}
           {isSpecificCustomer && (
             <div className="space-y-2">
               <Label>Select Customer</Label>
@@ -369,31 +453,35 @@ function SendNotificationTab() {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>Notification Type</Label>
-            <div className="flex gap-2 flex-wrap">
-              {NOTIF_TYPES.map(t => {
-                const Icon = t.icon;
-                const active = notifType === t.value;
-                return (
-                  <button
-                    key={t.value}
-                    onClick={() => setNotifType(t.value)}
-                    data-testid={`button-notif-type-${t.value}`}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-colors ${
-                      active
-                        ? `${t.bg} ${t.color} border-current`
-                        : 'bg-background text-muted-foreground border-border hover-elevate'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {t.label}
-                  </button>
-                );
-              })}
+          {/* ── Notification Type (only for notification delivery) ── */}
+          {deliveryMethod === 'notification' && (
+            <div className="space-y-2">
+              <Label>Notification Type</Label>
+              <div className="flex gap-2 flex-wrap">
+                {NOTIF_TYPES.map(t => {
+                  const Icon = t.icon;
+                  const active = notifType === t.value;
+                  return (
+                    <button
+                      key={t.value}
+                      onClick={() => setNotifType(t.value)}
+                      data-testid={`button-notif-type-${t.value}`}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-colors ${
+                        active
+                          ? `${t.bg} ${t.color} border-current`
+                          : 'bg-background text-muted-foreground border-border hover-elevate'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
+          {/* ── Title ── */}
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label htmlFor="notif-title">Title</Label>
@@ -405,61 +493,61 @@ function SendNotificationTab() {
               id="notif-title"
               value={title}
               onChange={e => setTitle(e.target.value.slice(0, 50))}
-              placeholder="Enter notification title"
+              placeholder="Enter title"
               data-testid="input-notif-title"
             />
           </div>
 
+          {/* ── Message ── */}
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label htmlFor="notif-message">Message</Label>
               <span className={`text-xs ${message.length > 140 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                {message.length}/150
+                {message.length}/{deliveryMethod === 'sms' ? 300 : 150}
               </span>
             </div>
             <Textarea
               id="notif-message"
               value={message}
-              onChange={e => setMessage(e.target.value.slice(0, 150))}
-              placeholder="Enter notification message"
+              onChange={e => setMessage(e.target.value.slice(0, deliveryMethod === 'sms' ? 300 : 150))}
+              placeholder="Enter message"
               className="min-h-[100px] resize-none"
               data-testid="input-notif-message"
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-md border px-4 py-3 bg-muted/30">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Also send as SMS</p>
-                <p className="text-xs text-muted-foreground">Send a text message to recipients with a phone number on file</p>
-              </div>
-            </div>
-            <Switch
-              checked={sendSms}
-              onCheckedChange={setSendSms}
-              data-testid="switch-send-sms"
-            />
-          </div>
-
+          {/* ── Send Button ── */}
           <Button
             onClick={handleSend}
             disabled={!canSend || sendMutation.isPending}
-            className="w-full"
+            className={`w-full ${deliveryMethod === 'sms' ? 'bg-green-600 text-white border-green-600' : ''}`}
             data-testid="button-send-notification"
           >
             {sendMutation.isPending ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : deliveryMethod === 'sms' ? (
+              <MessageSquare className="h-4 w-4 mr-2" />
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            {sendMutation.isPending ? 'Sending...' : (sendSms ? 'Send Notification + SMS' : 'Send Notification')}
+            {sendButtonLabel}
           </Button>
+
+          {!deliveryMethod && (
+            <p className="text-xs text-center text-muted-foreground">
+              Select a delivery method above to enable sending.
+            </p>
+          )}
         </CardContent>
       </Card>
 
       <div className="xl:w-[260px] flex justify-center">
-        <PhonePreview title={title} message={message} notifType={notifType} sendSms={sendSms} />
+        <PhonePreview
+          title={title}
+          message={message}
+          notifType={notifType}
+          deliveryMethod={deliveryMethod}
+        />
       </div>
     </div>
   );
@@ -514,6 +602,7 @@ function NotificationLogTab() {
   const hasFilters = search || filterTargetType || filterNotifType || filterSenderRole || filterFrom || filterTo;
 
   const getTypeBadge = (type: string) => {
+    if (!type) return <span className="text-muted-foreground text-xs">—</span>;
     const conf = NOTIF_TYPES.find(t => t.value === type);
     if (!conf) return <Badge variant="outline">{type}</Badge>;
     const Icon = conf.icon;
@@ -535,18 +624,16 @@ function NotificationLogTab() {
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                placeholder="Search title, message, recipient..."
-                className="flex-1"
+                placeholder="Search title or message..."
                 data-testid="input-log-search"
               />
-              <Button onClick={handleSearch} size="icon" variant="outline" data-testid="button-log-search">
+              <Button onClick={handleSearch} size="default" variant="outline" data-testid="button-log-search">
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-
-            <Select value={filterTargetType || 'all'} onValueChange={v => { setFilterTargetType(v === 'all' ? '' : v); setPage(1); }}>
+            <Select value={filterTargetType} onValueChange={v => { setFilterTargetType(v === 'all' ? '' : v); setPage(1); }}>
               <SelectTrigger className="w-[160px]" data-testid="select-filter-target">
-                <SelectValue placeholder="Recipient Group" />
+                <SelectValue placeholder="Recipient type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Recipients</SelectItem>
@@ -556,8 +643,7 @@ function NotificationLogTab() {
                 <SelectItem value="specific_customer">Specific Customer</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={filterNotifType || 'all'} onValueChange={v => { setFilterNotifType(v === 'all' ? '' : v); setPage(1); }}>
+            <Select value={filterNotifType} onValueChange={v => { setFilterNotifType(v === 'all' ? '' : v); setPage(1); }}>
               <SelectTrigger className="w-[140px]" data-testid="select-filter-type">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -568,25 +654,23 @@ function NotificationLogTab() {
                 <SelectItem value="urgent">Urgent</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={filterSenderRole || 'all'} onValueChange={v => { setFilterSenderRole(v === 'all' ? '' : v); setPage(1); }}>
-              <SelectTrigger className="w-[140px]" data-testid="select-filter-sender">
-                <SelectValue placeholder="Sent By" />
+            <Select value={filterSenderRole} onValueChange={v => { setFilterSenderRole(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-[140px]" data-testid="select-filter-role">
+                <SelectValue placeholder="Sender role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Senders</SelectItem>
+                <SelectItem value="all">All Roles</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="supervisor">Supervisor</SelectItem>
               </SelectContent>
             </Select>
-
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex items-center gap-1">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
                 value={filterFrom}
                 onChange={e => { setFilterFrom(e.target.value); setPage(1); }}
-                className="w-[150px]"
+                className="w-[140px]"
                 data-testid="input-filter-from"
               />
               <span className="text-muted-foreground text-sm">–</span>
@@ -594,130 +678,100 @@ function NotificationLogTab() {
                 type="date"
                 value={filterTo}
                 onChange={e => { setFilterTo(e.target.value); setPage(1); }}
-                className="w-[150px]"
+                className="w-[140px]"
                 data-testid="input-filter-to"
               />
             </div>
-
-            {hasFilters && (
-              <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters">
-                Clear
+            <div className="flex gap-2">
+              {hasFilters && (
+                <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-log">
+                <RefreshCw className="h-4 w-4" />
               </Button>
-            )}
-
-            <Button size="icon" variant="outline" onClick={() => refetch()} data-testid="button-refresh-log">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-6 space-y-3">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
-              <Bell className="h-10 w-10 opacity-30" />
-              <p className="text-sm">No notifications found</p>
-              {hasFilters && <Button variant="outline" size="sm" onClick={clearFilters}>Clear Filters</Button>}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[140px]">Date / Time</TableHead>
-                    <TableHead>Sender</TableHead>
-                    <TableHead>Recipient</TableHead>
-                    <TableHead className="w-[100px]">Type</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead className="w-[80px]">SMS</TableHead>
-                    <TableHead className="w-[80px]">Status</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sent</TableHead>
+                <TableHead>Sender</TableHead>
+                <TableHead>Recipient</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Recipients</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                    ))}
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {notifications.map((n: any) => (
-                    <TableRow key={n.id} data-testid={`row-notification-${n.id}`}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {n.created_at ? format(new Date(n.created_at), 'dd MMM yyyy HH:mm') : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm font-medium">{n.sender_name || 'Admin'}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{n.sender_role || 'admin'}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm">{TARGET_LABEL[n.target_type] || n.target_type}</p>
-                          {n.target_user_name && (
-                            <p className="text-xs text-muted-foreground">{n.target_user_name}</p>
-                          )}
-                          {parseInt(n.recipient_count) > 0 && (
-                            <p className="text-xs text-muted-foreground">{n.recipient_count} recipients</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getTypeBadge(n.notification_type)}</TableCell>
-                      <TableCell className="font-medium text-sm max-w-[160px]">
-                        <span className="line-clamp-2">{n.title}</span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[200px]">
-                        <span className="line-clamp-2">{n.message}</span>
-                      </TableCell>
-                      <TableCell>
-                        {n.sms_sent ? (
-                          <Badge variant="outline" className="text-green-600 border-green-600/30 text-xs gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            {n.sms_sent_count > 0 ? n.sms_sent_count : ''}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-green-600 border-green-600/30 text-xs">
-                          {n.status || 'sent'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                ))
+              ) : notifications.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                    No notifications found
+                  </TableCell>
+                </TableRow>
+              ) : notifications.map((n: any) => (
+                <TableRow key={n.id} data-testid={`row-notification-${n.id}`}>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {n.created_at ? format(new Date(n.created_at), 'dd MMM yyyy HH:mm') : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{n.sender_name || '—'}</span>
+                      <Badge variant="outline" className="text-xs w-fit mt-0.5 capitalize">{n.sender_role || 'admin'}</Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-sm">{TARGET_LABEL[n.target_type] || n.target_type}</span>
+                      {n.target_user_name && (
+                        <span className="text-xs text-muted-foreground">{n.target_user_name}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{getTypeBadge(n.notification_type)}</TableCell>
+                  <TableCell>
+                    <div className="max-w-[260px]">
+                      <p className="text-sm font-medium truncate">{n.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{n.message}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{n.recipient_count ?? '—'}</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {Math.min((page - 1) * 25 + 1, total)}–{Math.min(page * 25, total)} of {total}
+            Showing {((page - 1) * 25) + 1}–{Math.min(page * 25, total)} of {total}
           </p>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              data-testid="button-prev-page"
-            >
+            <Button variant="outline" size="default" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} data-testid="button-prev-page">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="flex items-center text-sm px-2">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              data-testid="button-next-page"
-            >
+            <span className="flex items-center text-sm px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="default" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} data-testid="button-next-page">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -730,34 +784,34 @@ function NotificationLogTab() {
 export default function AdminNotifications() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-md bg-primary/10">
-            <Bell className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Notifications</h1>
-            <p className="text-sm text-muted-foreground">Send notifications to drivers and customers</p>
-          </div>
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Bell className="h-6 w-6" />
+            Notifications
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Send notifications or SMS messages to drivers and customers.
+          </p>
         </div>
 
         <Tabs defaultValue="send">
-          <TabsList className="mb-6">
-            <TabsTrigger value="send" data-testid="tab-send-notification">
+          <TabsList data-testid="tabs-notifications">
+            <TabsTrigger value="send" data-testid="tab-send">
               <Send className="h-4 w-4 mr-2" />
-              Send Notification
+              Send
             </TabsTrigger>
-            <TabsTrigger value="log" data-testid="tab-notification-log">
+            <TabsTrigger value="log" data-testid="tab-log">
               <List className="h-4 w-4 mr-2" />
               Notification Log
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="send">
+          <TabsContent value="send" className="mt-6">
             <SendNotificationTab />
           </TabsContent>
 
-          <TabsContent value="log">
+          <TabsContent value="log" className="mt-6">
             <NotificationLogTab />
           </TabsContent>
         </Tabs>
