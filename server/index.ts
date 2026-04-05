@@ -838,6 +838,51 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Create notifications tables
+  (async () => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          sender_id TEXT,
+          sender_name TEXT,
+          sender_role TEXT,
+          target_type TEXT NOT NULL,
+          target_user_id TEXT,
+          target_user_name TEXT,
+          notification_type TEXT NOT NULL DEFAULT 'info',
+          title TEXT NOT NULL,
+          message TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'sent',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS notification_recipients (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          notification_id UUID NOT NULL,
+          recipient_user_id TEXT,
+          recipient_name TEXT,
+          recipient_email TEXT,
+          recipient_role TEXT,
+          is_read BOOLEAN DEFAULT false,
+          delivered_at TIMESTAMPTZ DEFAULT NOW(),
+          read_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_notification_id ON notification_recipients(notification_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_user_id ON notification_recipients(recipient_user_id)`);
+      try { await db.execute(sql`NOTIFY pgrst, 'reload schema'`); } catch (_) {}
+      console.log("[MIGRATION] Notifications tables created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Notifications tables migration error:", e?.message);
+    }
+  })();
+
   // Backfill job_admin_notes from Supabase (runs once; safe if columns don't exist in Supabase yet)
   (async () => {
     try {

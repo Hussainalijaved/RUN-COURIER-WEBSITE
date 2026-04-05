@@ -17698,5 +17698,175 @@ ON CONFLICT (type) DO NOTHING;
     res.status(501).json({ error: 'not_implemented', message: 'Job cancellation via API is coming soon. Please contact Run Courier directly.' });
   }));
 
+  // ── Notifications Module (Admin + Supervisor) ──────────────────────────────
+
+  // GET /api/notifications/drivers — list active drivers for dropdown
+  app.get('/api/notifications/drivers', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { supabaseAdmin: sb } = await import('./supabaseAdmin');
+    if (!sb) return res.json([]);
+    const { data, error } = await sb
+      .from('drivers')
+      .select('id, full_name, email, vehicle_type, status')
+      .eq('is_active', true)
+      .in('status', ['approved', 'active'])
+      .order('full_name');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  }));
+
+  // GET /api/notifications/customers — list customers for dropdown
+  app.get('/api/notifications/customers', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { supabaseAdmin: sb } = await import('./supabaseAdmin');
+    if (!sb) return res.json([]);
+    const { data, error } = await sb
+      .from('users')
+      .select('id, full_name, email, role')
+      .in('role', ['customer', 'business_customer'])
+      .order('full_name');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  }));
+
+  // POST /api/notifications — send a notification
+  app.post('/api/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { supabaseAdmin: sb } = await import('./supabaseAdmin');
+    const { Pool } = await import('pg');
+    const pool = new Pool({
+      host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
+      ssl: { rejectUnauthorized: false }, max: 3,
+    });
+
+    try {
+      const { target_type, target_user_id, notification_type, title, message } = req.body;
+      if (!target_type || !notification_type || !title || !message) {
+        return res.status(400).json({ error: 'target_type, notification_type, title and message are required' });
+      }
+      if ((target_type === 'specific_driver' || target_type === 'specific_customer') && !target_user_id) {
+        return res.status(400).json({ error: 'target_user_id is required for specific recipient' });
+      }
+
+      // Determine sender info from the JWT
+      const token = (req.headers.authorization || '').replace('Bearer ', '');
+      let senderName = 'Admin';
+      let senderRole = 'admin';
+      let senderId = '';
+      try {
+        const { verifyAccessToken } = await import('./supabaseAdmin');
+        const user = await verifyAccessToken(token);
+        if (user) {
+          senderId = user.id;
+          senderRole = (user as any).role || 'admin';
+          // Try to get sender name
+          if (sb) {
+            const { data: adminData } = await sb.from('users').select('full_name').eq('id', user.id).maybeSingle();
+            if (adminData?.full_name) senderName = adminData.full_name;
+            else {
+              const { data: supData } = await sb.from('supervisors').select('full_name').eq('auth_user_id', user.id).maybeSingle();
+              if (supData?.full_name) senderName = supData.full_name;
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Determine recipients
+      type Recipient = { id: string; name: string; email: string; role: string };
+      let recipients: Recipient[] = [];
+      let targetUserName: string | null = null;
+
+      if (sb) {
+        if (target_type === 'all_drivers') {
+          const { data } = await sb.from('drivers').select('id, full_name, email').eq('is_active', true).in('status', ['approved', 'active']);
+          recipients = (data || []).map(d => ({ id: d.id, name: d.full_name || '', email: d.email || '', role: 'driver' }));
+        } else if (target_type === 'specific_driver') {
+          const { data } = await sb.from('drivers').select('id, full_name, email').eq('id', target_user_id).maybeSingle();
+          if (data) {
+            targetUserName = data.full_name || '';
+            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'driver' }];
+          }
+        } else if (target_type === 'all_customers') {
+          const { data } = await sb.from('users').select('id, full_name, email').in('role', ['customer', 'business_customer']);
+          recipients = (data || []).map(u => ({ id: u.id, name: u.full_name || '', email: u.email || '', role: 'customer' }));
+        } else if (target_type === 'specific_customer') {
+          const { data } = await sb.from('users').select('id, full_name, email').eq('id', target_user_id).maybeSingle();
+          if (data) {
+            targetUserName = data.full_name || '';
+            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'customer' }];
+          }
+        }
+      }
+
+      // Insert notification record
+      const notifResult = await pool.query(
+        `INSERT INTO notifications (sender_id, sender_name, sender_role, target_type, target_user_id, target_user_name, notification_type, title, message, status, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'sent',NOW()) RETURNING *`,
+        [senderId, senderName, senderRole, target_type, target_user_id || null, targetUserName, notification_type, title, message]
+      );
+      const notification = notifResult.rows[0];
+
+      // Insert recipient rows (batched)
+      if (recipients.length > 0) {
+        const values = recipients.map((_, i) => `($1,$${i*4+2},$${i*4+3},$${i*4+4},$${i*4+5},false,NOW(),NOW())`).join(',');
+        const params: any[] = [notification.id];
+        recipients.forEach(r => { params.push(r.id, r.name, r.email, r.role); });
+        await pool.query(
+          `INSERT INTO notification_recipients (notification_id, recipient_user_id, recipient_name, recipient_email, recipient_role, is_read, delivered_at, created_at) VALUES ${values}`,
+          params
+        );
+      }
+
+      res.json({ success: true, notification, recipientCount: recipients.length });
+    } finally {
+      await pool.end();
+    }
+  }));
+
+  // GET /api/notifications — notification log with filters
+  app.get('/api/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
+    const { Pool } = await import('pg');
+    const pool = new Pool({
+      host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
+      ssl: { rejectUnauthorized: false }, max: 3,
+    });
+    try {
+      const { from, to, target_type, notification_type, sender_role, search, page = '1', limit: lim = '25' } = req.query as Record<string, string>;
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let idx = 1;
+      if (from) { conditions.push(`n.created_at >= $${idx++}`); params.push(from); }
+      if (to) { conditions.push(`n.created_at <= $${idx++}`); params.push(to + 'T23:59:59Z'); }
+      if (target_type) { conditions.push(`n.target_type = $${idx++}`); params.push(target_type); }
+      if (notification_type) { conditions.push(`n.notification_type = $${idx++}`); params.push(notification_type); }
+      if (sender_role) { conditions.push(`n.sender_role = $${idx++}`); params.push(sender_role); }
+      if (search) {
+        conditions.push(`(n.title ILIKE $${idx} OR n.message ILIKE $${idx} OR n.target_user_name ILIKE $${idx} OR n.sender_name ILIKE $${idx})`);
+        params.push(`%${search}%`); idx++;
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const pageNum = Math.max(1, parseInt(page));
+      const limitNum = Math.min(100, Math.max(1, parseInt(lim)));
+      const offset = (pageNum - 1) * limitNum;
+
+      const countResult = await pool.query(`SELECT COUNT(*) FROM notifications n ${where}`, params);
+      const total = parseInt(countResult.rows[0].count);
+
+      params.push(limitNum, offset);
+      const rows = await pool.query(
+        `SELECT n.*, 
+          (SELECT COUNT(*) FROM notification_recipients nr WHERE nr.notification_id = n.id) as recipient_count,
+          (SELECT COUNT(*) FROM notification_recipients nr WHERE nr.notification_id = n.id AND nr.is_read = true) as read_count
+         FROM notifications n ${where}
+         ORDER BY n.created_at DESC
+         LIMIT $${idx} OFFSET $${idx+1}`,
+        params
+      );
+
+      res.json({ notifications: rows.rows, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) });
+    } finally {
+      await pool.end();
+    }
+  }));
+
   return httpServer;
 }

@@ -55,6 +55,7 @@ function usePrefetchAllRoutes() {
         import("@/pages/admin/AdminPricing");
         import("@/pages/admin/AdminContracts");
         import("@/pages/admin/AdminNotices");
+        import("@/pages/admin/AdminNotifications");
         import("@/pages/admin/AdminSupervisors");
         import("@/pages/admin/AdminProfile");
         import("@/pages/admin/AdminContacts");
@@ -142,6 +143,7 @@ const AdminInvoices = lazy(() => import("@/pages/admin/AdminInvoices"));
 const AdminPricing = lazy(() => import("@/pages/admin/AdminPricing"));
 const AdminContracts = lazy(() => import("@/pages/admin/AdminContracts"));
 const AdminNotices = lazy(() => import("@/pages/admin/AdminNotices"));
+const AdminNotifications = lazy(() => import("@/pages/admin/AdminNotifications"));
 const AdminSupervisors = lazy(() => import("@/pages/admin/AdminSupervisors"));
 const AdminProfile = lazy(() => import("@/pages/admin/AdminProfile"));
 const AdminContacts = lazy(() => import("@/pages/admin/AdminContacts"));
@@ -370,6 +372,11 @@ function Router() {
         <Route path="/admin/notices">
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminNotices />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/admin/notifications">
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminNotifications />
           </ProtectedRoute>
         </Route>
         <Route path="/admin/supervisors">
@@ -616,6 +623,11 @@ function Router() {
         <Route path="/supervisor/profile">
           <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
             <SupervisorProfile />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/supervisor/notifications">
+          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+            <AdminNotifications />
           </ProtectedRoute>
         </Route>
         <Route path="/supervisor">

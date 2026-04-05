@@ -1,0 +1,156 @@
+Add a new Notifications module to the Run Courier website dashboard for both Admin and Supervisor users.
+
+IMPORTANT:
+- Admin and Supervisor must have exactly the same Notifications feature and permissions.
+- Do not change the existing dashboard layout, routes, auth flow, or any other feature.
+- Keep the current Run Courier design and styling.
+- Build it inside the existing website dashboard only.
+- Use the existing Supabase backend only.
+- Do not create a separate backend.
+- Make it responsive for desktop and mobile.
+
+FEATURE LOCATION
+- Add a new sidebar item called "Notifications" in both:
+  - Admin Dashboard
+  - Supervisor Dashboard
+
+PAGE STRUCTURE
+Create a Notifications page with 2 tabs:
+1. Send Notification
+2. Notification Log
+
+SEND NOTIFICATION TAB
+Add the following fields and behavior:
+
+1. Recipient Type options:
+- All Drivers
+- Specific Driver
+- All Customers
+- Specific Customer
+
+2. Notification Type options:
+- Info
+- Alert
+- Urgent
+
+3. Inputs:
+- Title input with max 50 characters and live counter
+- Message textarea with max 150 characters and live counter
+
+4. Live Preview:
+- Show a phone-style notification preview panel on the right
+- Preview should update live as the user types title and message
+
+5. Button:
+- Send Notification
+
+DYNAMIC RULES
+- If Specific Driver is selected, show a searchable driver dropdown
+- If Specific Customer is selected, show a searchable customer dropdown
+- If All Drivers or All Customers is selected, hide the specific selector
+
+VALIDATION
+- Recipient type required
+- Notification type required
+- Title required
+- Message required
+- If specific user option selected, selected user is required
+
+PERMISSIONS
+- Admin and Supervisor must have exactly the same permissions for this module
+- Both can:
+  - send to all drivers
+  - send to specific driver
+  - send to all customers
+  - send to specific customer
+  - view full notification log
+- Drivers, individual customers, and business customers must not have access to this page
+
+SUPABASE DATABASE
+Create and use these tables if they do not already exist:
+
+Table: notifications
+- id uuid primary key default gen_random_uuid()
+- sender_id uuid
+- sender_role text
+- target_type text
+- target_user_id uuid null
+- notification_type text
+- title text
+- message text
+- status text default 'sent'
+- created_at timestamptz default now()
+
+Table: notification_recipients
+- id uuid primary key default gen_random_uuid()
+- notification_id uuid references notifications(id) on delete cascade
+- recipient_user_id uuid
+- recipient_role text
+- is_read boolean default false
+- delivered_at timestamptz null
+- read_at timestamptz null
+- created_at timestamptz default now()
+
+SENDING LOGIC
+- If sending to all drivers:
+  - create one notification record
+  - create recipient rows for all active drivers
+- If sending to specific driver:
+  - create one notification record
+  - create one recipient row for that driver
+- If sending to all customers:
+  - create one notification record
+  - create recipient rows for all customers
+- If sending to specific customer:
+  - create one notification record
+  - create one recipient row for that customer
+
+NOTIFICATION LOG TAB
+Create a professional log table showing:
+- Date/Time
+- Sender Name
+- Sender Role
+- Recipient Type
+- Specific Recipient Name if applicable
+- Notification Type
+- Title
+- Message preview
+- Status
+
+Add filters:
+- date range
+- recipient group
+- notification type
+- sender role
+
+UX REQUIREMENTS
+- Show loading state while sending
+- Disable send button while processing
+- Show success toast after send
+- Show error toast if send fails
+- Clear form after successful send
+- Keep fast and responsive
+
+DESIGN REQUIREMENTS
+- Match the dark dashboard style
+- Use Run Courier branding
+- Make the layout visually very similar to the provided reference:
+  - left form card
+  - top tab switcher
+  - notification type buttons
+  - live phone preview on the right
+- Keep it clean, modern, and professional
+
+CODE REQUIREMENTS
+- Reuse existing components where possible
+- Use existing Supabase client and auth
+- Use proper role guards
+- Keep code modular and production-ready
+- Do not break any existing Admin or Supervisor functionality
+
+OPTIONAL BUT PREFERRED
+- Add pagination in the notification log
+- Add search by title or recipient name
+- Keep read/unread fields ready for future mobile app notification integration
+
+Build this end-to-end exactly for both Admin and Supervisor.

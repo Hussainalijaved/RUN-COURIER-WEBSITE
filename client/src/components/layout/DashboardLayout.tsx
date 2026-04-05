@@ -86,6 +86,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/admin/payments', label: 'Driver Payments', icon: Wallet },
     { href: '/admin/contracts', label: 'Contracts', icon: FileSignature },
     { href: '/admin/notices', label: 'Driver Notices', icon: Megaphone },
+    { href: '/admin/notifications', label: 'Notifications', icon: Bell },
     { href: '/admin/contacts', label: 'Contacts', icon: BookUser },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/supervisors', label: 'Supervisors', icon: Users },
@@ -140,6 +141,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { href: '/supervisor/invoices', label: 'Invoices', icon: Receipt },
     { href: '/supervisor/contacts', label: 'Contacts', icon: BookUser },
     { href: '/supervisor/track', label: 'Track Order', icon: Search },
+    { href: '/supervisor/notifications', label: 'Notifications', icon: Bell },
   ],
 };
 
