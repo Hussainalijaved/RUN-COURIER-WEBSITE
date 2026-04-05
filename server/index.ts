@@ -843,22 +843,7 @@ async function runBackgroundTasks() {
     try {
       const { db } = await import('./db');
       const { sql } = await import('drizzle-orm');
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS notifications (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          sender_id TEXT,
-          sender_name TEXT,
-          sender_role TEXT,
-          target_type TEXT NOT NULL,
-          target_user_id TEXT,
-          target_user_name TEXT,
-          notification_type TEXT NOT NULL DEFAULT 'info',
-          title TEXT NOT NULL,
-          message TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT 'sent',
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-      `);
+      // Create notification_recipients (completely new table)
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS notification_recipients (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -873,13 +858,35 @@ async function runBackgroundTasks() {
           created_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_notification_id ON notification_recipients(notification_id)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_user_id ON notification_recipients(recipient_user_id)`);
-      // Add SMS columns if missing
-      try { await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent BOOLEAN DEFAULT false`); } catch (_) {}
-      try { await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_count INTEGER DEFAULT 0`); } catch (_) {}
-      try { await db.execute(sql`NOTIFY pgrst, 'reload schema'`); } catch (_) {}
+      // The 'notifications' table may already exist from the old in-app system.
+      // Use ADD COLUMN IF NOT EXISTS to backfill the admin notification columns.
+      const { Pool } = await import('pg');
+      const _pool = new Pool({
+        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false }, max: 2,
+      });
+      const addCols = [
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_id TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_name TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_role TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_type TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_user_id TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_user_name TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS notification_type TEXT DEFAULT 'info'`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message TEXT`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'sent'`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent BOOLEAN DEFAULT false`,
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_count INTEGER DEFAULT 0`,
+      ];
+      for (const colSql of addCols) {
+        try { await _pool.query(colSql); } catch (_) {}
+      }
+      await _pool.end();
+      try { await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC)`); } catch (_) {}
+      try { await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_notification_id ON notification_recipients(notification_id)`); } catch (_) {}
+      try { await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_user_id ON notification_recipients(recipient_user_id)`); } catch (_) {}
       console.log("[MIGRATION] Notifications tables created/verified successfully");
     } catch (e: any) {
       console.warn("[MIGRATION] Notifications tables migration error:", e?.message);
