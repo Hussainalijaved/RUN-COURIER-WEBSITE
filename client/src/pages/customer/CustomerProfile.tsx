@@ -118,8 +118,8 @@ export default function CustomerProfile() {
   };
 
   const deleteAccountMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      return apiRequest('DELETE', `/api/users/${userId}`);
+    mutationFn: async (_userId: string) => {
+      return apiRequest('DELETE', `/api/account`);
     },
     onSuccess: async () => {
       toast({

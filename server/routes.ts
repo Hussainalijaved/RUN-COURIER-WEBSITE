@@ -6235,6 +6235,55 @@ export async function registerRoutes(
     res.json(updatedUser);
   }));
 
+  // Self-service account deletion — authenticated user deletes their OWN account
+  app.delete("/api/account", asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const { supabaseAdmin } = await import('./supabaseAdmin');
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    // Verify the token and get the caller's auth UUID
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !authUser) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    const authUUID = authUser.id;
+    const userEmail = authUser.email;
+    console.log(`[Account Delete] Self-delete requested for auth UUID: ${authUUID}, email: ${userEmail}`);
+
+    // 1. Delete from Supabase users table by auth_id
+    try {
+      const { error } = await supabaseAdmin.from('users').delete().eq('auth_id', authUUID);
+      if (error) console.error('[Account Delete] Error removing from users table:', error.message);
+      else console.log('[Account Delete] Removed from users table');
+    } catch (e) {
+      console.error('[Account Delete] Exception removing from users table:', e);
+    }
+
+    // 2. Delete from storage layer — SupabaseStorage.deleteUser tries auth_id first
+    try {
+      await storage.deleteUser(authUUID);
+    } catch (e) {
+      console.error('[Account Delete] Exception in storage.deleteUser:', e);
+    }
+
+    // 3. Delete from Supabase Auth — this invalidates all sessions immediately
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(authUUID);
+    if (authDeleteError) {
+      console.error('[Account Delete] Error deleting from Supabase Auth:', authDeleteError.message);
+      return res.status(500).json({ error: 'Failed to delete account. Please contact support.' });
+    }
+
+    console.log(`[Account Delete] Account permanently deleted: ${userEmail}`);
+    res.json({ success: true, message: 'Account permanently deleted' });
+  }));
+
   // Delete customer (admin only) - using requireAdminAccessStrict middleware directly
   app.delete("/api/users/:id", requireAdminAccessStrict, asyncHandler(async (req, res) => {
     console.log(`[Users DELETE] Route hit for id: ${req.params.id}, admin verified`);
