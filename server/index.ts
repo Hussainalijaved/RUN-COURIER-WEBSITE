@@ -893,6 +893,91 @@ async function runBackgroundTasks() {
     }
   })();
 
+  // Create driver_application_vehicles sidecar table (stores vehicle data that driver_applications lacks)
+  (async () => {
+    try {
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false }, max: 2,
+      });
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS driver_application_vehicles (
+          application_id VARCHAR(36) PRIMARY KEY,
+          email TEXT,
+          vehicle_registration TEXT,
+          vehicle_make TEXT,
+          vehicle_model TEXT,
+          vehicle_color TEXT,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_dav_email ON driver_application_vehicles(email)`);
+      await pool.end();
+      console.log("[MIGRATION] driver_application_vehicles table created/verified successfully");
+    } catch (e: any) {
+      console.warn("[MIGRATION] driver_application_vehicles migration error:", e?.message);
+    }
+  })();
+
+  // Backfill driver_application_vehicles from approved drivers (once; safe to re-run)
+  setTimeout(async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabaseAdmin');
+      if (!supabaseAdmin) return;
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false }, max: 2,
+      });
+      // Find approved drivers that have vehicle_registration in drivers table
+      const { data: drivers } = await supabaseAdmin
+        .from('drivers')
+        .select('id, email, vehicle_registration, vehicle_make, vehicle_model, vehicle_color')
+        .eq('status', 'approved')
+        .not('vehicle_registration', 'is', null);
+      if (drivers && drivers.length > 0) {
+        let seeded = 0;
+        for (const driver of drivers) {
+          if (!driver.vehicle_registration) continue;
+          // Find the matching application by email (no created_at column in driver_applications)
+          const { data: apps } = await supabaseAdmin
+            .from('driver_applications')
+            .select('id, vehicle_type')
+            .ilike('email', driver.email || '')
+            .in('status', ['approved', 'pending'])
+            .limit(1);
+          if (!apps || apps.length === 0) continue;
+          const appId = apps[0].id;
+          // Only insert if not already present
+          const { rowCount } = await pool.query(
+            `SELECT 1 FROM driver_application_vehicles WHERE application_id = $1 AND vehicle_registration IS NOT NULL LIMIT 1`,
+            [appId]
+          );
+          if (rowCount && rowCount > 0) continue;
+          await pool.query(
+            `INSERT INTO driver_application_vehicles (application_id, email, vehicle_registration, vehicle_make, vehicle_model, vehicle_color, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW())
+             ON CONFLICT (application_id) DO UPDATE SET
+               vehicle_registration = COALESCE(EXCLUDED.vehicle_registration, driver_application_vehicles.vehicle_registration),
+               vehicle_make = COALESCE(EXCLUDED.vehicle_make, driver_application_vehicles.vehicle_make),
+               vehicle_model = COALESCE(EXCLUDED.vehicle_model, driver_application_vehicles.vehicle_model),
+               vehicle_color = COALESCE(EXCLUDED.vehicle_color, driver_application_vehicles.vehicle_color),
+               updated_at = NOW()`,
+            [appId, driver.email, driver.vehicle_registration, driver.vehicle_make || null, driver.vehicle_model || null, driver.vehicle_color || null]
+          );
+          seeded++;
+        }
+        if (seeded > 0) console.log(`[BACKGROUND] Seeded vehicle data for ${seeded} applications from drivers`);
+      }
+      await pool.end();
+    } catch (e: any) {
+      console.warn("[BACKGROUND] driver_application_vehicles backfill error:", e?.message);
+    }
+  }, 12000);
+
   // Backfill job_admin_notes from Supabase (runs once; safe if columns don't exist in Supabase yet)
   (async () => {
     try {

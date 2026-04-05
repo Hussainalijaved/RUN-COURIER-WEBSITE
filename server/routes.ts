@@ -82,6 +82,89 @@ function getPgPool(): Pool {
   return pgPool;
 }
 
+// ── Driver application vehicle sidecar (Neon table: driver_application_vehicles) ─────────────
+// The driver_applications Supabase table is missing vehicle_* columns (schema gap).
+// We store vehicle data in a Neon sidecar table and merge it into every application read.
+
+async function saveAppVehicle(
+  appId: string,
+  email: string,
+  data: { vehicleRegistration?: string | null; vehicleMake?: string | null; vehicleModel?: string | null; vehicleColor?: string | null }
+): Promise<void> {
+  if (!data.vehicleRegistration && !data.vehicleMake && !data.vehicleModel && !data.vehicleColor) return;
+  try {
+    await getPgPool().query(
+      `INSERT INTO driver_application_vehicles
+         (application_id, email, vehicle_registration, vehicle_make, vehicle_model, vehicle_color, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       ON CONFLICT (application_id) DO UPDATE SET
+         email = EXCLUDED.email,
+         vehicle_registration = COALESCE(EXCLUDED.vehicle_registration, driver_application_vehicles.vehicle_registration),
+         vehicle_make        = COALESCE(EXCLUDED.vehicle_make,         driver_application_vehicles.vehicle_make),
+         vehicle_model       = COALESCE(EXCLUDED.vehicle_model,        driver_application_vehicles.vehicle_model),
+         vehicle_color       = COALESCE(EXCLUDED.vehicle_color,        driver_application_vehicles.vehicle_color),
+         updated_at = NOW()`,
+      [appId, email || null, data.vehicleRegistration || null, data.vehicleMake || null, data.vehicleModel || null, data.vehicleColor || null]
+    );
+  } catch (e: any) {
+    console.error('[VehicleSidecar] saveAppVehicle error:', e?.message);
+  }
+}
+
+async function overwriteAppVehicle(
+  appId: string,
+  email: string,
+  data: { vehicleRegistration?: string | null; vehicleMake?: string | null; vehicleModel?: string | null; vehicleColor?: string | null }
+): Promise<void> {
+  try {
+    await getPgPool().query(
+      `INSERT INTO driver_application_vehicles
+         (application_id, email, vehicle_registration, vehicle_make, vehicle_model, vehicle_color, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       ON CONFLICT (application_id) DO UPDATE SET
+         email = EXCLUDED.email,
+         vehicle_registration = EXCLUDED.vehicle_registration,
+         vehicle_make         = EXCLUDED.vehicle_make,
+         vehicle_model        = EXCLUDED.vehicle_model,
+         vehicle_color        = EXCLUDED.vehicle_color,
+         updated_at = NOW()`,
+      [appId, email || null, data.vehicleRegistration || null, data.vehicleMake || null, data.vehicleModel || null, data.vehicleColor || null]
+    );
+  } catch (e: any) {
+    console.error('[VehicleSidecar] overwriteAppVehicle error:', e?.message);
+  }
+}
+
+async function mergeAppVehicles<T extends { id: string; vehicleRegistration: string | null; vehicleMake: string | null; vehicleModel: string | null; vehicleColor: string | null }>(
+  applications: T[]
+): Promise<T[]> {
+  if (!applications.length) return applications;
+  const appIds = applications.map(a => a.id);
+  const placeholders = appIds.map((_, i) => `$${i + 1}`).join(',');
+  try {
+    const { rows } = await getPgPool().query(
+      `SELECT application_id, vehicle_registration, vehicle_make, vehicle_model, vehicle_color
+       FROM driver_application_vehicles WHERE application_id IN (${placeholders})`,
+      appIds
+    );
+    const vehicleMap = new Map(rows.map((r: any) => [r.application_id, r]));
+    return applications.map(app => {
+      const v = vehicleMap.get(app.id);
+      if (!v) return app;
+      return {
+        ...app,
+        vehicleRegistration: app.vehicleRegistration || v.vehicle_registration || null,
+        vehicleMake:  app.vehicleMake  || v.vehicle_make  || null,
+        vehicleModel: app.vehicleModel || v.vehicle_model || null,
+        vehicleColor: app.vehicleColor || v.vehicle_color || null,
+      };
+    });
+  } catch (e: any) {
+    console.error('[VehicleSidecar] mergeAppVehicles error:', e?.message);
+    return applications;
+  }
+}
+
 async function upsertJobMetadata(jobId: string, officeCity?: string | null, createdBy?: string | null): Promise<void> {
   try {
     await getPgPool().query(
@@ -4894,10 +4977,11 @@ export async function registerRoutes(
         if (safeBody.email !== undefined) supabaseUpdateData.email = safeBody.email;
         if (safeBody.phone !== undefined) supabaseUpdateData.phone = safeBody.phone;
         if (safeBody.vehicleType !== undefined) supabaseUpdateData.vehicle_type = safeBody.vehicleType;
-        if (safeBody.vehicleRegistration !== undefined) supabaseUpdateData.vehicle_registration = safeBody.vehicleRegistration;
-        if (safeBody.vehicleMake !== undefined) supabaseUpdateData.vehicle_make = safeBody.vehicleMake;
-        if (safeBody.vehicleModel !== undefined) supabaseUpdateData.vehicle_model = safeBody.vehicleModel;
-        if (safeBody.vehicleColor !== undefined) supabaseUpdateData.vehicle_color = safeBody.vehicleColor;
+        // Null-overwrite protection: only update registration/vehicle fields if new value is non-empty, OR explicitly null/undefined
+        if (safeBody.vehicleRegistration !== undefined && safeBody.vehicleRegistration !== '') supabaseUpdateData.vehicle_registration = safeBody.vehicleRegistration;
+        if (safeBody.vehicleMake !== undefined && safeBody.vehicleMake !== '') supabaseUpdateData.vehicle_make = safeBody.vehicleMake;
+        if (safeBody.vehicleModel !== undefined && safeBody.vehicleModel !== '') supabaseUpdateData.vehicle_model = safeBody.vehicleModel;
+        if (safeBody.vehicleColor !== undefined && safeBody.vehicleColor !== '') supabaseUpdateData.vehicle_color = safeBody.vehicleColor;
         if (safeBody.isAvailable !== undefined) supabaseUpdateData.online_status = safeBody.isAvailable ? 'online' : 'offline';
         if (safeBody.isVerified !== undefined) supabaseUpdateData.status = safeBody.isVerified ? 'approved' : 'applicant';
         if (safeBody.address !== undefined) supabaseUpdateData.address = safeBody.address;
@@ -9973,7 +10057,9 @@ export async function registerRoutes(
     });
     // Exclude draft applications from the default admin list (they are incomplete saves)
     const filtered = status ? applications : applications.filter(a => a.status !== 'draft');
-    res.json(filtered.map(resolveDocUrls));
+    // Merge vehicle data from Neon sidecar (driver_applications lacks vehicle_* columns)
+    const withVehicles = await mergeAppVehicles(filtered);
+    res.json(withVehicles.map(resolveDocUrls));
   }));
 
   app.get("/api/driver-applications/:id", asyncHandler(async (req, res) => {
@@ -9981,7 +10067,9 @@ export async function registerRoutes(
     if (!application) {
       return res.status(404).json({ error: "Application not found" });
     }
-    res.json(resolveDocUrls(application));
+    // Merge vehicle data from Neon sidecar
+    const [withVehicle] = await mergeAppVehicles([application]);
+    res.json(resolveDocUrls(withVehicle));
   }));
 
   app.get("/api/driver-applications/check/:email", asyncHandler(async (req, res) => {
@@ -10060,6 +10148,16 @@ export async function registerRoutes(
       await storage.deleteDriverApplication(existing.id);
     }
     application = await storage.createDriverApplication(draftData as any);
+
+    // Save vehicle data to Neon sidecar (driver_applications lacks vehicle_* columns)
+    if (application?.id && draftData.vehicleRegistration) {
+      saveAppVehicle(application.id, draftData.email, {
+        vehicleRegistration: draftData.vehicleRegistration,
+        vehicleMake: draftData.vehicleMake,
+        vehicleModel: draftData.vehicleModel,
+        vehicleColor: draftData.vehicleColor,
+      }).catch(() => {});
+    }
 
     res.json(application);
   }));
@@ -10206,6 +10304,23 @@ export async function registerRoutes(
       });
     }
 
+    // Save vehicle data to Neon sidecar — driver_applications table lacks these columns
+    if (application?.id) {
+      saveAppVehicle(application.id, data.email, {
+        vehicleRegistration: data.vehicleRegistration?.trim() || null,
+        vehicleMake: data.vehicleMake?.trim() || null,
+        vehicleModel: data.vehicleModel?.trim() || null,
+        vehicleColor: data.vehicleColor?.trim() || null,
+      }).catch(() => {});
+      // Reflect vehicle data in the returned object immediately
+      if (application.vehicleRegistration == null && data.vehicleRegistration) {
+        application.vehicleRegistration = data.vehicleRegistration.trim();
+        application.vehicleMake = data.vehicleMake?.trim() || null;
+        application.vehicleModel = data.vehicleModel?.trim() || null;
+        application.vehicleColor = data.vehicleColor?.trim() || null;
+      }
+    }
+
     sendDriverApplicationNotification(data.fullName, 'New Application Submitted')
       .then(sent => {
         if (sent) console.log(`[Driver Application] Admin notified of new application from ${data.fullName}`);
@@ -10221,6 +10336,23 @@ export async function registerRoutes(
       const application = await storage.updateDriverApplication(req.params.id, req.body);
       if (!application) {
         return res.status(404).json({ error: "Application not found" });
+      }
+      // Keep Neon sidecar in sync if vehicle fields are present in the update
+      const body = req.body;
+      const hasVehicleUpdate = body.vehicleRegistration !== undefined || body.vehicleMake !== undefined ||
+        body.vehicleModel !== undefined || body.vehicleColor !== undefined;
+      if (hasVehicleUpdate && application.id) {
+        overwriteAppVehicle(application.id, application.email || '', {
+          vehicleRegistration: typeof body.vehicleRegistration === 'string' ? body.vehicleRegistration.trim() : (application.vehicleRegistration || null),
+          vehicleMake:  typeof body.vehicleMake  === 'string' ? body.vehicleMake.trim()  : (application.vehicleMake  || null),
+          vehicleModel: typeof body.vehicleModel === 'string' ? body.vehicleModel.trim() : (application.vehicleModel || null),
+          vehicleColor: typeof body.vehicleColor === 'string' ? body.vehicleColor.trim() : (application.vehicleColor || null),
+        }).catch(() => {});
+        // Reflect in response immediately
+        if (body.vehicleRegistration !== undefined) application.vehicleRegistration = body.vehicleRegistration?.trim() || null;
+        if (body.vehicleMake !== undefined) application.vehicleMake = body.vehicleMake?.trim() || null;
+        if (body.vehicleModel !== undefined) application.vehicleModel = body.vehicleModel?.trim() || null;
+        if (body.vehicleColor !== undefined) application.vehicleColor = body.vehicleColor?.trim() || null;
       }
       res.json(application);
     } catch (err: any) {
@@ -10943,6 +11075,14 @@ export async function registerRoutes(
                 console.error(`[Driver Application] Failed doc ${m.type}:`, docErr);
               }
             }));
+          }
+
+          // Merge vehicle data from Neon sidecar in case driver_applications columns are missing
+          if (!application.vehicleRegistration) {
+            try {
+              const [merged] = await mergeAppVehicles([application]);
+              application = merged;
+            } catch (_) {}
           }
 
           if (driver) {

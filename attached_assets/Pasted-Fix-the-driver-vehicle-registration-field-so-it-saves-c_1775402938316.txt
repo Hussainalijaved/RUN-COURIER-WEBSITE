@@ -1,0 +1,41 @@
+Fix the driver vehicle registration field so it saves correctly and stays synced everywhere in the system.
+
+Required behavior:
+1. When a new driver submits an application and enters a vehicle registration number, that value must be saved permanently in the database.
+2. The same registration number must appear consistently in all relevant places:
+   - Driver Applications
+   - Drivers Management table
+   - Driver profile
+   - Admin driver detail view
+   - Any edit form where driver vehicle data is shown
+3. If the driver updates the registration number later, the new value must update everywhere automatically.
+4. Do not allow one page to show blank, old, or different registration values from another page.
+5. The field must not disappear after approval.
+6. The field must still be available after page refresh, logout/login, or app restart.
+
+Technical requirements:
+1. Use one single source of truth for the vehicle registration number in the database.
+2. Make sure all pages read the value from the same saved field, not from temporary form state.
+3. On application submit:
+   - validate the registration field
+   - trim spaces
+   - save it to the correct driver record
+4. On driver approval, do not create a disconnected copy that loses the registration number.
+5. If there is both an “application” table and a “drivers/profile” table, sync the registration number properly during approval so both admin and driver views show the same value.
+6. If the registration number already exists in the application record but not in the driver profile record, backfill it automatically.
+7. Add fallback handling so Drivers Management shows the saved registration number even for newly submitted drivers.
+8. Prevent null overwrite bugs. An empty value from one form must not replace a valid existing registration number.
+9. Make sure the registration number is included in all API responses / queries used by:
+   - admin drivers list
+   - driver profile page
+   - application review page
+
+QA checks:
+1. Submit a new driver application with a registration number → confirm it appears immediately in Drivers Management and Driver Profile.
+2. Approve the driver → confirm the same registration number still appears everywhere.
+3. Edit the registration number later → confirm the new value updates everywhere.
+4. Refresh the page and log out/in → confirm the value persists.
+5. Test with existing drivers whose registration is currently missing and repair them if data exists in application records.
+
+Important:
+Do not change the UI design. Only fix the save, sync, and display logic for vehicle registration across the whole system.
