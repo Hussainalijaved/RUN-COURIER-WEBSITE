@@ -17833,9 +17833,9 @@ ON CONFLICT (type) DO NOTHING;
       const notifId = randomUUID();
       console.log(`[Notifications] Inserting notification id=${notifId} target=${target_type} type=${notification_type}`);
       const notifResult = await pool.query(
-        `INSERT INTO notifications (id, sender_id, sender_name, sender_role, target_type, target_user_id, target_user_name, notification_type, title, message, status, sms_sent, sms_sent_count, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'sent',false,0,NOW()) RETURNING *`,
-        [notifId, senderId, senderName, senderRole, target_type, target_user_id || null, targetUserName, notification_type, title, message]
+        `INSERT INTO notifications (id, user_id, sender_id, sender_name, sender_role, target_type, target_user_id, target_user_name, notification_type, title, message, status, sms_sent, sms_sent_count, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'sent',false,0,NOW()) RETURNING *`,
+        [notifId, senderId || notifId, senderId, senderName, senderRole, target_type, target_user_id || null, targetUserName, notification_type, title, message]
       );
       const notification = notifResult.rows[0];
       console.log(`[Notifications] Saved notification id=${notification.id}`);
