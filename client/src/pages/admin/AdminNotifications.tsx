@@ -203,9 +203,12 @@ function SendNotificationTab() {
           description: `${data.smsSentCount} of ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''} received the SMS.`,
         });
       } else {
+        const parts: string[] = [`Saved for ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''}`];
+        if (data.pushSentCount > 0) parts.push(`${data.pushSentCount} push alert${data.pushSentCount !== 1 ? 's' : ''} delivered`);
+        if (data.pushNoDeviceCount > 0) parts.push(`${data.pushNoDeviceCount} have no device registered`);
         toast({
-          title: 'Notification Saved',
-          description: `Delivered to ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''}.`,
+          title: 'Notification Sent',
+          description: parts.join(' · ') + '.',
         });
         queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
       }

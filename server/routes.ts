@@ -17852,7 +17852,44 @@ ON CONFLICT (type) DO NOTHING;
         console.log(`[Notifications] Inserted ${recipients.length} recipient rows`);
       }
 
-      return res.json({ success: true, delivery_method: 'notification', notification, recipientCount: recipients.length });
+      // ── Expo push notifications to drivers ───────────────────────────────────
+      // Drivers have registered Expo push tokens; customers do not.
+      let pushSentCount = 0;
+      let pushNoDeviceCount = 0;
+      const isDriverTarget = target_type === 'all_drivers' || target_type === 'specific_driver';
+      if (isDriverTarget) {
+        try {
+          const { sendCustomNotificationToDrivers } = await import('./pushNotifications');
+          // Map notification_type to a push title prefix
+          const typePrefix = notification_type === 'urgent' ? '[URGENT] ' : notification_type === 'alert' ? '[ALERT] ' : '';
+          const pushTitle = `${typePrefix}${title}`;
+          let driverIds: string[] | 'all';
+          if (target_type === 'all_drivers') {
+            driverIds = 'all';
+          } else {
+            // specific_driver — target_user_id is the driver's row id
+            driverIds = target_user_id ? [target_user_id] : [];
+          }
+          if (driverIds === 'all' || (Array.isArray(driverIds) && driverIds.length > 0)) {
+            const pushResult = await sendCustomNotificationToDrivers(driverIds, pushTitle, message);
+            pushSentCount = pushResult.sentCount;
+            pushNoDeviceCount = pushResult.noDeviceCount;
+            console.log(`[Notifications] Push: ${pushSentCount} sent, ${pushNoDeviceCount} no device`);
+          }
+        } catch (pushErr: any) {
+          // Push delivery failure is non-fatal — DB save already succeeded
+          console.warn(`[Notifications] Push delivery error (non-fatal): ${pushErr?.message}`);
+        }
+      }
+
+      return res.json({
+        success: true,
+        delivery_method: 'notification',
+        notification,
+        recipientCount: recipients.length,
+        pushSentCount,
+        pushNoDeviceCount,
+      });
     } finally {
       await pool.end();
     }
