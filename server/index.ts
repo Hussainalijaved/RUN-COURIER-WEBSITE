@@ -876,6 +876,9 @@ async function runBackgroundTasks() {
       await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_notification_id ON notification_recipients(notification_id)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_user_id ON notification_recipients(recipient_user_id)`);
+      // Add SMS columns if missing
+      try { await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent BOOLEAN DEFAULT false`); } catch (_) {}
+      try { await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_count INTEGER DEFAULT 0`); } catch (_) {}
       try { await db.execute(sql`NOTIFY pgrst, 'reload schema'`); } catch (_) {}
       console.log("[MIGRATION] Notifications tables created/verified successfully");
     } catch (e: any) {

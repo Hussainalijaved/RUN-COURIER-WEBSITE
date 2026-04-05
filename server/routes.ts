@@ -17706,7 +17706,7 @@ ON CONFLICT (type) DO NOTHING;
     if (!sb) return res.json([]);
     const { data, error } = await sb
       .from('drivers')
-      .select('id, full_name, email, vehicle_type, status')
+      .select('id, full_name, email, vehicle_type, status, driver_code, phone')
       .eq('is_active', true)
       .in('status', ['approved', 'active'])
       .order('full_name');
@@ -17720,14 +17720,14 @@ ON CONFLICT (type) DO NOTHING;
     if (!sb) return res.json([]);
     const { data, error } = await sb
       .from('users')
-      .select('id, full_name, email, role')
+      .select('id, full_name, email, role, phone')
       .in('role', ['customer', 'business_customer'])
       .order('full_name');
     if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
   }));
 
-  // POST /api/notifications — send a notification
+  // POST /api/notifications — send a notification (with optional SMS)
   app.post('/api/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { supabaseAdmin: sb } = await import('./supabaseAdmin');
     const { Pool } = await import('pg');
@@ -17738,7 +17738,7 @@ ON CONFLICT (type) DO NOTHING;
     });
 
     try {
-      const { target_type, target_user_id, notification_type, title, message } = req.body;
+      const { target_type, target_user_id, notification_type, title, message, send_sms } = req.body;
       if (!target_type || !notification_type || !title || !message) {
         return res.status(400).json({ error: 'target_type, notification_type, title and message are required' });
       }
@@ -17757,7 +17757,6 @@ ON CONFLICT (type) DO NOTHING;
         if (user) {
           senderId = user.id;
           senderRole = (user as any).role || 'admin';
-          // Try to get sender name
           if (sb) {
             const { data: adminData } = await sb.from('users').select('full_name').eq('id', user.id).maybeSingle();
             if (adminData?.full_name) senderName = adminData.full_name;
@@ -17769,38 +17768,56 @@ ON CONFLICT (type) DO NOTHING;
         }
       } catch (_) {}
 
-      // Determine recipients
-      type Recipient = { id: string; name: string; email: string; role: string };
+      // Determine recipients (with phone for SMS)
+      type Recipient = { id: string; name: string; email: string; role: string; phone?: string };
       let recipients: Recipient[] = [];
       let targetUserName: string | null = null;
 
       if (sb) {
         if (target_type === 'all_drivers') {
-          const { data } = await sb.from('drivers').select('id, full_name, email').eq('is_active', true).in('status', ['approved', 'active']);
-          recipients = (data || []).map(d => ({ id: d.id, name: d.full_name || '', email: d.email || '', role: 'driver' }));
+          const { data } = await sb.from('drivers').select('id, full_name, email, phone').eq('is_active', true).in('status', ['approved', 'active']);
+          recipients = (data || []).map(d => ({ id: d.id, name: d.full_name || '', email: d.email || '', role: 'driver', phone: d.phone || '' }));
         } else if (target_type === 'specific_driver') {
-          const { data } = await sb.from('drivers').select('id, full_name, email').eq('id', target_user_id).maybeSingle();
+          const { data } = await sb.from('drivers').select('id, full_name, email, phone').eq('id', target_user_id).maybeSingle();
           if (data) {
             targetUserName = data.full_name || '';
-            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'driver' }];
+            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'driver', phone: data.phone || '' }];
           }
         } else if (target_type === 'all_customers') {
-          const { data } = await sb.from('users').select('id, full_name, email').in('role', ['customer', 'business_customer']);
-          recipients = (data || []).map(u => ({ id: u.id, name: u.full_name || '', email: u.email || '', role: 'customer' }));
+          const { data } = await sb.from('users').select('id, full_name, email, phone').in('role', ['customer', 'business_customer']);
+          recipients = (data || []).map(u => ({ id: u.id, name: u.full_name || '', email: u.email || '', role: 'customer', phone: u.phone || '' }));
         } else if (target_type === 'specific_customer') {
-          const { data } = await sb.from('users').select('id, full_name, email').eq('id', target_user_id).maybeSingle();
+          const { data } = await sb.from('users').select('id, full_name, email, phone').eq('id', target_user_id).maybeSingle();
           if (data) {
             targetUserName = data.full_name || '';
-            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'customer' }];
+            recipients = [{ id: data.id, name: data.full_name || '', email: data.email || '', role: 'customer', phone: data.phone || '' }];
           }
+        }
+      }
+
+      // Send SMS if requested
+      let smsSentCount = 0;
+      if (send_sms && recipients.length > 0) {
+        try {
+          const { sendSMS } = await import('./twilioService');
+          const smsBody = `Run Courier: [${(notification_type as string).toUpperCase()}] ${title}\n${message}`;
+          const smsResults = await Promise.allSettled(
+            recipients
+              .filter(r => r.phone && r.phone.trim().length > 7)
+              .map(r => sendSMS(r.phone!, smsBody))
+          );
+          smsSentCount = smsResults.filter(r => r.status === 'fulfilled' && (r.value as any).success).length;
+          console.log(`[Notifications] SMS: ${smsSentCount}/${recipients.filter(r => r.phone && r.phone.trim().length > 7).length} sent`);
+        } catch (smsErr: any) {
+          console.warn('[Notifications] SMS sending error:', smsErr?.message);
         }
       }
 
       // Insert notification record
       const notifResult = await pool.query(
-        `INSERT INTO notifications (sender_id, sender_name, sender_role, target_type, target_user_id, target_user_name, notification_type, title, message, status, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'sent',NOW()) RETURNING *`,
-        [senderId, senderName, senderRole, target_type, target_user_id || null, targetUserName, notification_type, title, message]
+        `INSERT INTO notifications (sender_id, sender_name, sender_role, target_type, target_user_id, target_user_name, notification_type, title, message, status, sms_sent, sms_sent_count, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'sent',$10,$11,NOW()) RETURNING *`,
+        [senderId, senderName, senderRole, target_type, target_user_id || null, targetUserName, notification_type, title, message, send_sms ? true : false, smsSentCount]
       );
       const notification = notifResult.rows[0];
 
@@ -17815,7 +17832,7 @@ ON CONFLICT (type) DO NOTHING;
         );
       }
 
-      res.json({ success: true, notification, recipientCount: recipients.length });
+      res.json({ success: true, notification, recipientCount: recipients.length, smsSentCount });
     } finally {
       await pool.end();
     }

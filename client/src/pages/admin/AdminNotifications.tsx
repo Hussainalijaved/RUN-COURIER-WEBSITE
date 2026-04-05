@@ -13,10 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 import {
   Bell, Send, List, Info, AlertTriangle, Zap,
   Users, User, ChevronLeft, ChevronRight, Search,
-  Filter, Calendar, RefreshCw, Megaphone,
+  Filter, Calendar, RefreshCw, Megaphone, MessageSquare,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -43,7 +44,7 @@ const TARGET_LABEL: Record<string, string> = {
   specific_customer: 'Specific Customer',
 };
 
-function PhonePreview({ title, message, notifType }: { title: string; message: string; notifType: NotifType }) {
+function PhonePreview({ title, message, notifType, sendSms }: { title: string; message: string; notifType: NotifType; sendSms?: boolean }) {
   const typeConf = NOTIF_TYPES.find(t => t.value === notifType) || NOTIF_TYPES[0];
   const Icon = typeConf.icon;
   const now = new Date();
@@ -60,6 +61,7 @@ function PhonePreview({ title, message, notifType }: { title: string; message: s
           <div className="text-center text-xs text-muted-foreground mt-1">
             {format(now, 'h:mm a')}
           </div>
+          {/* Push notification preview */}
           <div className={`rounded-xl border p-3 shadow-sm ${typeConf.bg}`}>
             <div className="flex items-start gap-2">
               <div className={`mt-0.5 rounded-lg p-1 ${typeConf.bg}`}>
@@ -79,6 +81,27 @@ function PhonePreview({ title, message, notifType }: { title: string; message: s
               </div>
             </div>
           </div>
+          {/* SMS preview when toggled */}
+          {sendSms && (
+            <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 shadow-sm">
+              <div className="flex items-start gap-2">
+                <div className="mt-0.5 rounded-lg p-1 bg-green-500/10">
+                  <MessageSquare className="h-3.5 w-3.5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-semibold text-foreground truncate">Run Courier · SMS</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">now</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-4">
+                    {title && message
+                      ? `Run Courier: [${notifType.toUpperCase()}] ${title}\n${message}`
+                      : 'SMS text will appear here...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex justify-center pb-4 z-10">
           <div className="w-24 h-1 rounded-full bg-foreground/20" />
@@ -101,6 +124,7 @@ function SendNotificationTab() {
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [selectedDriverName, setSelectedDriverName] = useState('');
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
+  const [sendSms, setSendSms] = useState(false);
 
   const { data: drivers = [] } = useQuery<any[]>({
     queryKey: ['/api/notifications/drivers'],
@@ -112,13 +136,30 @@ function SendNotificationTab() {
     staleTime: 60_000,
   });
 
+  // Search drivers by name, email, or driver code (e.g. RC28R)
   const filteredDrivers = useMemo(() =>
-    drivers.filter(d => !driverSearch || d.full_name?.toLowerCase().includes(driverSearch.toLowerCase()) || d.email?.toLowerCase().includes(driverSearch.toLowerCase())),
+    drivers.filter(d => {
+      if (!driverSearch) return true;
+      const q = driverSearch.toLowerCase();
+      return (
+        d.full_name?.toLowerCase().includes(q) ||
+        d.email?.toLowerCase().includes(q) ||
+        d.driver_code?.toLowerCase().includes(q)
+      );
+    }),
     [drivers, driverSearch]
   );
 
   const filteredCustomers = useMemo(() =>
-    customers.filter(c => !customerSearch || c.full_name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.email?.toLowerCase().includes(customerSearch.toLowerCase())),
+    customers.filter(c => {
+      if (!customerSearch) return true;
+      const q = customerSearch.toLowerCase();
+      return (
+        c.full_name?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.phone?.includes(customerSearch)
+      );
+    }),
     [customers, customerSearch]
   );
 
@@ -137,10 +178,9 @@ function SendNotificationTab() {
       return resp.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: 'Notification Sent',
-        description: `Successfully sent to ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''}.`,
-      });
+      const parts: string[] = [`Sent to ${data.recipientCount} recipient${data.recipientCount !== 1 ? 's' : ''}`];
+      if (data.smsSentCount > 0) parts.push(`${data.smsSentCount} SMS delivered`);
+      toast({ title: 'Notification Sent', description: parts.join(' · ') + '.' });
       setTitle('');
       setMessage('');
       setTargetUserId('');
@@ -168,6 +208,7 @@ function SendNotificationTab() {
       notification_type: notifType,
       title: title.trim(),
       message: message.trim(),
+      send_sms: sendSms,
     });
   };
 
@@ -238,7 +279,7 @@ function SendNotificationTab() {
                           autoFocus
                           value={driverSearch}
                           onChange={e => setDriverSearch(e.target.value)}
-                          placeholder="Search drivers..."
+                          placeholder="Search by name, email or ID (e.g. RC28R)..."
                           className="flex-1 bg-transparent text-sm outline-none"
                           data-testid="input-driver-search"
                         />
@@ -250,16 +291,21 @@ function SendNotificationTab() {
                       ) : filteredDrivers.slice(0, 50).map(d => (
                         <button
                           key={d.id}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors flex flex-col"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors flex items-center gap-3"
                           onClick={() => {
                             setTargetUserId(d.id);
-                            setSelectedDriverName(d.full_name || d.email);
+                            setSelectedDriverName(d.driver_code ? `${d.driver_code} – ${d.full_name || d.email}` : (d.full_name || d.email));
                             setDriverDropdownOpen(false);
                           }}
                           data-testid={`option-driver-${d.id}`}
                         >
-                          <span className="font-medium">{d.full_name}</span>
-                          <span className="text-muted-foreground text-xs">{d.email}</span>
+                          {d.driver_code && (
+                            <Badge variant="outline" className="text-xs font-mono shrink-0">{d.driver_code}</Badge>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-medium truncate">{d.full_name}</span>
+                            <span className="text-muted-foreground text-xs truncate">{d.email}</span>
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -381,6 +427,21 @@ function SendNotificationTab() {
             />
           </div>
 
+          <div className="flex items-center justify-between rounded-md border px-4 py-3 bg-muted/30">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Also send as SMS</p>
+                <p className="text-xs text-muted-foreground">Send a text message to recipients with a phone number on file</p>
+              </div>
+            </div>
+            <Switch
+              checked={sendSms}
+              onCheckedChange={setSendSms}
+              data-testid="switch-send-sms"
+            />
+          </div>
+
           <Button
             onClick={handleSend}
             disabled={!canSend || sendMutation.isPending}
@@ -392,13 +453,13 @@ function SendNotificationTab() {
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            {sendMutation.isPending ? 'Sending...' : 'Send Notification'}
+            {sendMutation.isPending ? 'Sending...' : (sendSms ? 'Send Notification + SMS' : 'Send Notification')}
           </Button>
         </CardContent>
       </Card>
 
       <div className="xl:w-[260px] flex justify-center">
-        <PhonePreview title={title} message={message} notifType={notifType} />
+        <PhonePreview title={title} message={message} notifType={notifType} sendSms={sendSms} />
       </div>
     </div>
   );
@@ -574,6 +635,7 @@ function NotificationLogTab() {
                     <TableHead className="w-[100px]">Type</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Message</TableHead>
+                    <TableHead className="w-[80px]">SMS</TableHead>
                     <TableHead className="w-[80px]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -606,6 +668,16 @@ function NotificationLogTab() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[200px]">
                         <span className="line-clamp-2">{n.message}</span>
+                      </TableCell>
+                      <TableCell>
+                        {n.sms_sent ? (
+                          <Badge variant="outline" className="text-green-600 border-green-600/30 text-xs gap-1">
+                            <MessageSquare className="h-3 w-3" />
+                            {n.sms_sent_count > 0 ? n.sms_sent_count : ''}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-green-600 border-green-600/30 text-xs">
