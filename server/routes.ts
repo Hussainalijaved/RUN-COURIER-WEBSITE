@@ -8110,12 +8110,23 @@ export async function registerRoutes(
       let doc: any = null;
 
       const COL_MAP: Record<string, string> = {
-        drivingLicenceFront: 'driving_licence_front_url',
-        drivingLicenceBack: 'driving_licence_back_url',
-        dbsCertificate: 'dbs_certificate_url',
-        goodsInTransitInsurance: 'goods_in_transit_insurance_url',
-        hireAndReward: 'hire_reward_insurance_url',
-        profilePicture: 'profile_picture_url',
+        // camelCase (legacy format)
+        drivingLicenceFront:         'driving_licence_front_url',
+        drivingLicenceBack:          'driving_licence_back_url',
+        dbsCertificate:              'dbs_certificate_url',
+        goodsInTransitInsurance:     'goods_in_transit_insurance_url',
+        hireAndReward:               'hire_reward_insurance_url',
+        profilePicture:              'profile_picture_url',
+        // snake_case (used by synthesized col- document IDs)
+        driving_license:             'driving_licence_front_url',
+        driving_licence_front:       'driving_licence_front_url',
+        driving_license_back:        'driving_licence_back_url',
+        driving_licence_back:        'driving_licence_back_url',
+        dbs_certificate:             'dbs_certificate_url',
+        goods_in_transit_insurance:  'goods_in_transit_insurance_url',
+        hire_and_reward_insurance:   'hire_reward_insurance_url',
+        hire_reward_insurance:       'hire_reward_insurance_url',
+        profile_picture:             'profile_picture_url',
       };
 
       const resolveColDoc = async (dId: string, docType: string): Promise<any | null> => {
