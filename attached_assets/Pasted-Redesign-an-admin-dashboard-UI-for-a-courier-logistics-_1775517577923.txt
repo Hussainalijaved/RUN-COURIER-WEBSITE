@@ -1,0 +1,95 @@
+Redesign an admin dashboard UI for a courier/logistics system.
+
+IMPORTANT:
+
+* Do NOT change any features or functionality
+* Only improve design, layout, and user experience
+* The result must look like a professional enterprise system used by large companies (inspired by Uber and Amazon internal dashboards)
+
+STYLE:
+
+* Dark mode
+* Clean, minimal, and highly functional
+* No gradients, no glow effects, no soft UI
+* Use sharp edges, subtle borders, and compact spacing
+* Focus on data density and operational efficiency
+* Professional typography (Inter or Roboto)
+
+LAYOUT STRUCTURE:
+
+* Left sidebar (compact, grouped navigation)
+* Top bar (search + notifications + profile + primary action button)
+* Thin KPI strip (inline stats, not cards)
+* Main content split:
+
+  * 70–75% width: Jobs table
+  * 25–30% width: Live activity panel
+
+SIDEBAR:
+Group items clearly:
+
+* Dashboard
+* OPERATIONS: Jobs, Drivers, Applications
+* CUSTOMERS: Customers
+* FINANCE: Invoices
+* TOOLS: Live Map, Route Planner, Documents
+
+TOP BAR:
+
+* Page title (Dashboard)
+* Global search bar (center)
+* Right side: notifications, user avatar, "+ New Job" button
+
+KPI STRIP:
+Display inline (no cards):
+
+* Jobs Today
+* Active Drivers
+* Revenue Today (£)
+* Pending Jobs
+
+MAIN TABLE (MOST IMPORTANT):
+Design a professional data table for "Recent Jobs"
+
+Columns:
+
+* Order ID
+* Route
+* Driver
+* Vehicle
+* Status
+* Time
+* Amount
+* Actions (menu)
+
+TABLE STYLE:
+
+* Flat design (no cards)
+* Thin dividers between rows
+* Sticky header
+* Row hover highlight (subtle)
+* Right-align currency values
+* Status should be text + small colored dot (not badges)
+
+RIGHT PANEL:
+Replace empty widgets with useful operational data:
+
+Sections:
+
+1. Driver Activity (online/offline/delivering)
+2. Alerts (pending jobs, delays)
+3. Quick Actions (Assign Driver, Create Job)
+
+DESIGN DETAILS:
+
+* Reduce padding and spacing (compact layout)
+* Use subtle borders instead of shadows
+* Maintain consistent alignment
+* Add pagination to table
+* Add filters above table (status, date, driver)
+
+GOAL:
+The dashboard should feel like a real operational control system, not a marketing website. It must look scalable, efficient, and suitable for high-volume courier company operations.
+
+OUTPUT:
+Provide a complete responsive UI using React + Tailwind CSS (or clean HTML/CSS if React is not used).
