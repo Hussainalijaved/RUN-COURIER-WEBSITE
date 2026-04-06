@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, getAuthHeaders } from "@/lib/queryClient";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,18 +50,6 @@ import {
   Calendar,
   Package,
 } from "lucide-react";
-
-function getAuthHeaders(): Record<string, string> {
-  const session = localStorage.getItem("supabase_session");
-  if (session) {
-    try {
-      const parsed = JSON.parse(session);
-      const token = parsed?.access_token;
-      if (token) return { Authorization: `Bearer ${token}` };
-    } catch {}
-  }
-  return {};
-}
 
 interface ApiInvoice {
   id: number;
@@ -151,7 +139,7 @@ export default function AdminApiInvoices() {
     queryFn: async () => {
       const params = statusFilter !== "all" ? `?status=${statusFilter}` : "";
       const res = await fetch(`/api/admin/api-invoices${params}`, {
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
       if (!res.ok) throw new Error("Failed to load invoices");
       return res.json();
@@ -162,7 +150,7 @@ export default function AdminApiInvoices() {
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/admin/api-invoices/${id}/mark-paid`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
       if (!res.ok) throw new Error("Failed to mark as paid");
       return res.json();
@@ -179,7 +167,7 @@ export default function AdminApiInvoices() {
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/admin/api-invoices/${id}/resend`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -195,9 +183,12 @@ export default function AdminApiInvoices() {
     mutationFn: async () => {
       const res = await fetch("/api/admin/api-invoices/run-now", {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
-      if (!res.ok) throw new Error("Invoice run failed");
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Invoice run failed");
+      }
       return res.json();
     },
     onSuccess: (data) => {
@@ -217,7 +208,7 @@ export default function AdminApiInvoices() {
   const openDetail = async (inv: ApiInvoice) => {
     try {
       const res = await fetch(`/api/admin/api-invoices/${inv.id}`, {
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
       if (!res.ok) throw new Error("Failed to load");
       const detail: ApiInvoiceDetail = await res.json();
