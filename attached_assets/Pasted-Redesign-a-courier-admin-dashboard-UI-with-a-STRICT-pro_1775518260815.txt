@@ -1,0 +1,92 @@
+Redesign a courier admin dashboard UI with a STRICT professional enterprise design.
+
+CRITICAL REQUIREMENTS:
+
+* MUST be dark mode (no white backgrounds anywhere)
+* MUST NOT look like a basic admin template
+* MUST NOT use large empty spaces
+* MUST NOT use card-based layout for everything
+* MUST NOT use default styling
+
+DESIGN STYLE:
+
+* Inspired by Uber internal tools and Amazon logistics systems
+* Dense, structured, and data-focused
+* Professional, serious, and operational (not decorative)
+* Flat UI with subtle borders (no glow, no gradients)
+
+LAYOUT (STRICT):
+
+* Full-height layout (no content cut off, must fit screen properly)
+* Fixed sidebar (left)
+* Sticky top bar
+* Main content scrollable
+
+STRUCTURE:
+
+1. Top bar:
+
+   * Left: "Dashboard"
+   * Center: Search bar
+   * Right: Notifications + Profile + "New Job" button
+
+2. KPI strip:
+
+   * Inline (NOT cards)
+   * Small height
+   * Jobs Today | Active Drivers | Revenue | Pending
+
+3. Main content:
+
+   * LEFT (75%): Jobs table
+   * RIGHT (25%): Activity panel
+
+TABLE (VERY IMPORTANT):
+
+* Professional data table (like enterprise systems)
+* Columns:
+  Order ID | Route | Driver | Vehicle | Status | Time | Amount | Actions
+* Sticky header
+* Compact rows
+* Thin separators
+* Hover highlight
+* Currency right-aligned
+* Status = small colored dot + text (NOT badges)
+
+RIGHT PANEL:
+
+* Driver activity (online/offline)
+* Alerts (delays, pending jobs)
+* Quick actions (buttons only)
+
+SIDEBAR:
+
+* Compact
+* Grouped sections (OPERATIONS, FINANCE, TOOLS)
+* Small icons, tight spacing
+
+COLORS:
+
+* Background: very dark (#0B0F14)
+* Panels: #11161D
+* Borders: #1F2933
+* Text: light gray/white
+* Accent: blue only
+
+SPACING:
+
+* Tight and compact (enterprise density)
+* No oversized padding
+
+UX DETAILS:
+
+* Table must have pagination
+* Add filters above table (status, date, driver)
+* Smooth but minimal animations
+* No part of UI should overflow or be cut off
+
+OUTPUT:
+Return a pixel-perfect, production-ready dashboard using React + Tailwind CSS.
+
+IMPORTANT:
+If the design looks simple or like a basic template, redesign it again until it matches a high-end enterprise system.
