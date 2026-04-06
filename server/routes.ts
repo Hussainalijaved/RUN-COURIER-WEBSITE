@@ -17933,7 +17933,7 @@ ON CONFLICT (type) DO NOTHING;
         await logApiRequest({
           apiClientId: client.id, clientName: client.companyName,
           endpoint: `/api/v1/track/${reference}`, method: 'GET',
-          statusCode: 404, success: false, errorMessage: error?.message || 'booking_not_found', ipAddress: ip,
+          statusCode: 404, success: false, errorMessage: 'booking_not_found', ipAddress: ip,
         });
         return res.status(404).json({ error: 'booking_not_found', message: `No booking found with reference: ${reference}` });
       }
