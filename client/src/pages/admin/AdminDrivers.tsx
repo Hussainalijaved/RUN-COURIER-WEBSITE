@@ -79,6 +79,7 @@ import {
   EyeOff,
   Smartphone,
   MessageSquare,
+  Camera,
 } from 'lucide-react';
 import { cn, normalizeDocUrl } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -149,6 +150,8 @@ export default function AdminDrivers() {
   const [nationalitySearch, setNationalitySearch] = useState('');
   const [nationalityOpen, setNationalityOpen] = useState(false);
   const [uploadingDbs, setUploadingDbs] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
   const [driverToDeactivate, setDriverToDeactivate] = useState<Driver | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -170,6 +173,7 @@ export default function AdminDrivers() {
   const [migrationSqlOpen, setMigrationSqlOpen] = useState(false);
   const [migrationSql, setMigrationSql] = useState('');
   const dbsFileInputRef = useRef<HTMLInputElement>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const showMigrationSql = async () => {
@@ -741,6 +745,52 @@ export default function AdminDrivers() {
     }
   };
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedDriver) return;
+
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({ title: 'File too large', description: 'Please upload a file smaller than 10MB', variant: 'destructive' });
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: 'Invalid file type', description: 'Please upload an image file (JPG, PNG, WebP)', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('driverId', selectedDriver.id);
+      formData.append('documentType', 'profile_picture');
+
+      const response = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      setAvatarVersion((v) => v + 1);
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/supabase-drivers'] });
+      toast({ title: 'Profile picture updated', description: 'New photo saved successfully' });
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      toast({ title: 'Upload failed', description: 'Could not upload profile picture. Please try again.', variant: 'destructive' });
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarFileInputRef.current) avatarFileInputRef.current.value = '';
+    }
+  };
+
   const filteredCountries = COUNTRIES.filter((country) =>
     country.toLowerCase().includes(nationalitySearch.toLowerCase())
   );
@@ -1219,18 +1269,45 @@ export default function AdminDrivers() {
 
                 {/* ── Enterprise Profile Header ─────────────────────────────── */}
                 <div className="flex items-start gap-5 bg-muted/40 border rounded-lg p-5">
-                  {/* Avatar with live-indicator dot */}
+                  {/* Avatar with live-indicator dot + edit overlay */}
                   <div className="relative shrink-0">
+                    <input
+                      ref={avatarFileInputRef}
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                      data-testid="input-avatar-file"
+                    />
                     <Avatar className="h-24 w-24 ring-2 ring-primary/20 shadow-sm">
                       <AvatarImage
-                        src={`/api/drivers/${selectedDriver.id}/profile-picture`}
+                        src={`/api/drivers/${selectedDriver.id}/profile-picture?v=${avatarVersion}`}
                         alt={getDriverInfo(selectedDriver).name || 'Driver'}
                       />
                       <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
                         {getDriverInfo(selectedDriver).name?.split(' ').map((n) => n[0]).join('').slice(0, 2) || 'D'}
                       </AvatarFallback>
                     </Avatar>
-                    {selectedDriver.isAvailable && (
+                    {/* Camera overlay — only visible in edit mode */}
+                    {editMode && (
+                      <button
+                        type="button"
+                        onClick={() => avatarFileInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                        data-testid="button-change-avatar"
+                        className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/50 text-white opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                      >
+                        {uploadingAvatar ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Camera className="h-5 w-5" />
+                        )}
+                        <span className="text-[10px] font-medium mt-0.5 leading-tight">
+                          {uploadingAvatar ? 'Saving…' : 'Change'}
+                        </span>
+                      </button>
+                    )}
+                    {!editMode && selectedDriver.isAvailable && (
                       <span className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full" />
                     )}
                   </div>
