@@ -28,6 +28,23 @@ function ScrollToTop() {
   return null;
 }
 
+// Ensures the page captures focus immediately on load (fixes first-click issue in iframe/preview environments)
+function EnsureFocus() {
+  useEffect(() => {
+    try {
+      window.focus();
+      if (document.body && document.activeElement === document.body) {
+        document.body.setAttribute('tabindex', '-1');
+        document.body.focus();
+        document.body.removeAttribute('tabindex');
+      }
+    } catch (_) {
+      // cross-origin restriction — safe to ignore
+    }
+  }, []);
+  return null;
+}
+
 function PageLoader() {
   return (
     <div className="flex items-center justify-center min-h-[50vh]" data-testid="page-loader">
@@ -646,6 +663,7 @@ function AppContent() {
   usePrefetchAllRoutes();
   return (
     <>
+      <EnsureFocus />
       <NavigationProgress />
       <ScrollToTop />
       <Toaster />

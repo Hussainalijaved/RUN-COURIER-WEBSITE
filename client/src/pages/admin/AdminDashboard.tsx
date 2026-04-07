@@ -505,10 +505,10 @@ export default function AdminDashboard() {
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button
-                                  className="flex items-center justify-center rounded opacity-0 transition-all"
-                                  style={{ width: 24, height: 24, color: C.textDim, background: 'none', border: 'none', cursor: 'pointer' }}
-                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = C.border; (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                                  className="flex items-center justify-center rounded transition-all"
+                                  style={{ width: 24, height: 24, color: C.textDim, background: 'none', border: 'none', cursor: 'pointer', opacity: 0.35 }}
+                                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.backgroundColor = C.border; el.style.opacity = '1'; el.style.color = C.textHi; }}
+                                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.backgroundColor = 'transparent'; el.style.opacity = '0.35'; el.style.color = C.textDim; }}
                                   data-testid={`button-job-actions-${job.id}`}
                                 >
                                   <MoreHorizontal style={{ width: 14, height: 14 }} />
