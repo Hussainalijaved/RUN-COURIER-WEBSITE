@@ -99,6 +99,7 @@ interface SupabaseDriver {
   isAvailable?: boolean;
   isVerified?: boolean;
   createdAt: string;
+  profile_picture_url?: string | null;
 }
 
 const COUNTRIES = [
@@ -227,7 +228,7 @@ export default function AdminDrivers() {
           lastLocationUpdate: localDriver?.lastLocationUpdate || null,
           rating: localDriver?.rating || '5.00',
           totalJobs: localDriver?.totalJobs || 0,
-          profilePictureUrl: localDriver?.profilePictureUrl || null,
+          profilePictureUrl: sd.profile_picture_url || localDriver?.profilePictureUrl || null,
           isActive: localDriver?.isActive ?? true,
           deactivatedAt: localDriver?.deactivatedAt || null,
           createdAt: sd.createdAt ? new Date(sd.createdAt) : localDriver?.createdAt || new Date(),
