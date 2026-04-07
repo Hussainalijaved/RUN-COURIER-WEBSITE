@@ -1,17 +1,7 @@
 import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +10,6 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Link } from 'wouter';
-import { useToast } from '@/hooks/use-toast';
 import {
   useJobs,
   useDrivers,
@@ -28,7 +17,6 @@ import {
   usePendingDocuments,
   useReviewDocument,
   useAdminStats,
-  useCustomers,
 } from '@/hooks/useSupabaseData';
 import {
   Package,
@@ -41,164 +29,167 @@ import {
   MapPin,
   FileText,
   ArrowRight,
-  Eye,
   AlertCircle,
-  UserPlus,
   ClipboardCheck,
-  Mail,
-  Building,
   MoreHorizontal,
-  PoundSterling,
-  BarChart3,
-  Minus,
+  Search,
   Plus,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
   Activity,
 } from 'lucide-react';
 import { SiWhatsapp } from 'react-icons/si';
 
+// ─── colour tokens (always dark — override theme) ─────────────────────────────
+const C = {
+  pageBg:   '#0B0F14',
+  panelBg:  '#111820',
+  rowAlt:   '#0E1319',
+  rowHover: '#152032',
+  border:   '#1E2A36',
+  borderHi: '#2A3F54',
+  textHi:   '#EDF2F7',
+  textMid:  '#8FA3B8',
+  textDim:  '#4A6070',
+  blue:     '#3B82F6',
+  teal:     '#14B8A6',
+  emerald:  '#10B981',
+  amber:    '#F59E0B',
+  violet:   '#8B5CF6',
+  rose:     '#F43F5E',
+  sky:      '#38BDF8',
+} as const;
+
+const s = {
+  pageBg:   `bg-[${C.pageBg}]`,
+  panelBg:  `bg-[${C.panelBg}]`,
+  border:   `border-[${C.border}]`,
+  borderHi: `border-[${C.borderHi}]`,
+  textHi:   `text-[${C.textHi}]`,
+  textMid:  `text-[${C.textMid}]`,
+  textDim:  `text-[${C.textDim}]`,
+} as const;
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
-const toNum = (v: string | number | undefined | null): number => {
+const toNum = (v: string | number | undefined | null) => {
   if (v == null) return 0;
   const n = typeof v === 'string' ? parseFloat(v) : v;
   return isNaN(n) ? 0 : n;
 };
+const fmt = (v: number | string | null | undefined) => `£${toNum(v).toFixed(2)}`;
 
-const fmt = (v: number) => `£${v.toFixed(2)}`;
-
-const getWeekBounds = (offset = 0) => {
-  const now = new Date();
-  const dow = (now.getDay() + 6) % 7; // Monday=0
-  const mon = new Date(now);
-  mon.setDate(now.getDate() - dow + offset * 7);
-  mon.setHours(0, 0, 0, 0);
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  sun.setHours(23, 59, 59, 999);
-  return { start: mon, end: sun };
-};
-
-const weekLabel = (offset: number) => {
-  const { start, end } = getWeekBounds(offset);
-  const fmt2 = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  return `${fmt2(start)} – ${fmt2(end)}`;
-};
-
-const formatVehicle = (v: string | undefined | null) =>
+const formatVehicle = (v?: string | null) =>
   v ? v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—';
 
-const formatTime = (dt: string | Date | undefined | null) => {
+const formatTime = (dt?: string | Date | null) => {
   if (!dt) return '—';
   const d = new Date(dt as string);
   if (isNaN(d.getTime())) return '—';
-  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
-// ─── status badges ────────────────────────────────────────────────────────────
-const getStatusBadge = (status: string) => {
-  const map: Record<string, string> = {
-    delivered:            'bg-emerald-500 text-white',
-    on_the_way_delivery:  'bg-sky-500 text-white',
-    on_the_way_pickup:    'bg-sky-500 text-white',
-    collected:            'bg-blue-500 text-white',
-    pending:              'bg-amber-400 text-amber-900',
-    assigned:             'bg-violet-500 text-white',
-    accepted:             'bg-violet-500 text-white',
-    cancelled:            'bg-rose-500 text-white',
-    rejected:             'bg-blue-500 text-white',
-  };
-  const labels: Record<string, string> = {
-    delivered: 'Delivered', on_the_way_delivery: 'En Route',
-    on_the_way_pickup: 'To Pickup', collected: 'Collected',
-    pending: 'Pending', assigned: 'Assigned', accepted: 'Accepted',
-    cancelled: 'Cancelled', rejected: 'Rejected',
-  };
-  return (
-    <Badge
-      className={`font-medium text-[11px] px-2 py-0.5 ${map[status] || 'bg-muted text-muted-foreground'}`}
-      data-testid={`badge-status-${status}`}
-    >
-      {labels[status] ?? status}
-    </Badge>
-  );
+// ─── status config ────────────────────────────────────────────────────────────
+const STATUS: Record<string, { label: string; dot: string; text: string }> = {
+  delivered:            { label: 'Delivered',  dot: C.emerald, text: C.emerald },
+  on_the_way_delivery:  { label: 'En Route',   dot: C.sky,     text: C.sky     },
+  on_the_way_pickup:    { label: 'To Pickup',  dot: C.sky,     text: C.sky     },
+  collected:            { label: 'Collected',  dot: C.blue,    text: C.blue    },
+  pending:              { label: 'Pending',    dot: C.amber,   text: C.amber   },
+  assigned:             { label: 'Assigned',   dot: C.violet,  text: C.violet  },
+  accepted:             { label: 'Accepted',   dot: C.violet,  text: C.violet  },
+  cancelled:            { label: 'Cancelled',  dot: C.rose,    text: C.rose    },
+  rejected:             { label: 'Rejected',   dot: C.blue,    text: C.blue    },
 };
 
-// ─── KPI card ─────────────────────────────────────────────────────────────────
-interface KpiCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
-  accent: string;
-  isLoading?: boolean;
-  href: string;
-}
-function KpiCard({ title, value, icon: Icon, iconBg, iconColor, accent, isLoading, href }: KpiCardProps) {
+function StatusCell({ status }: { status: string }) {
+  const cfg = STATUS[status];
   return (
-    <Link href={href}>
-      <Card className={`cursor-pointer hover-elevate overflow-hidden border-t-2 ${accent}`} data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}>
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{title}</p>
-              {isLoading ? <Skeleton className="h-8 w-24" /> : (
-                <p className="text-2xl font-bold tabular-nums">{value}</p>
-              )}
-            </div>
-            <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-              <Icon className={`h-4.5 w-4.5 ${iconColor}`} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+    <span
+      className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap"
+      style={{ color: cfg?.text ?? C.textMid }}
+      data-testid={`badge-status-${status}`}
+    >
+      <span
+        className="inline-block rounded-full flex-shrink-0"
+        style={{ width: 6, height: 6, backgroundColor: cfg?.dot ?? C.textDim }}
+      />
+      {cfg?.label ?? status}
+    </span>
   );
 }
 
-// ─── financial summary card ───────────────────────────────────────────────────
-interface FinCardProps { title: string; value: number; icon: React.ElementType; iconBg: string; iconColor: string; accent: string; isPositive?: boolean; isLoading?: boolean }
-function FinCard({ title, value, icon: Icon, iconBg, iconColor, accent, isPositive, isLoading }: FinCardProps) {
+// ─── filter tabs ─────────────────────────────────────────────────────────────
+const ALL_STATUSES = [
+  { value: 'all',                 label: 'All' },
+  { value: 'pending',             label: 'Pending' },
+  { value: 'assigned',            label: 'Assigned' },
+  { value: 'accepted',            label: 'Accepted' },
+  { value: 'on_the_way_pickup',   label: 'To Pickup' },
+  { value: 'collected',           label: 'Collected' },
+  { value: 'on_the_way_delivery', label: 'En Route' },
+  { value: 'delivered',           label: 'Delivered' },
+  { value: 'cancelled',           label: 'Cancelled' },
+  { value: 'rejected',            label: 'Rejected' },
+];
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+function PanelHead({ title, extra }: { title: string; extra?: React.ReactNode }) {
   return (
-    <Card className={`overflow-hidden border-t-2 ${accent}`}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{title}</p>
-            {isLoading ? <Skeleton className="h-8 w-28" /> : (
-              <p className={`text-2xl font-bold tabular-nums ${isPositive != null ? (isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500') : ''}`}>
-                {fmt(value)}
-              </p>
-            )}
-          </div>
-          <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-            <Icon className={`h-4 w-4 ${iconColor}`} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div
+      className="flex items-center justify-between px-3 py-2"
+      style={{ borderBottom: `1px solid ${C.border}` }}
+    >
+      <span
+        className="text-[9px] font-bold uppercase tracking-[0.12em]"
+        style={{ color: C.textDim }}
+      >
+        {title}
+      </span>
+      {extra}
+    </div>
   );
 }
 
-// ─── main ─────────────────────────────────────────────────────────────────────
+function KpiItem({
+  label, value, suffix, color, testId,
+}: { label: string; value: string; suffix?: string; color?: string; testId?: string }) {
+  return (
+    <div className="flex items-center gap-2.5 flex-shrink-0" data-testid={testId}>
+      <span className="text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color: C.textDim }}>
+        {label}
+      </span>
+      <span className="text-sm font-bold tabular-nums" style={{ color: color ?? C.textHi }}>
+        {value}
+      </span>
+      {suffix && (
+        <span className="text-xs" style={{ color: C.textDim }}>{suffix}</span>
+      )}
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="h-4 w-px flex-shrink-0" style={{ backgroundColor: C.border }} />;
+}
+
+const JOBS_PER_PAGE = 10;
+
+// ─── main component ───────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const { toast } = useToast();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch]             = useState('');
+  const [page, setPage]                 = useState(1);
 
-  const { data: stats, isLoading: statsLoading } = useAdminStats();
-  const { data: jobs,  isLoading: jobsLoading }  = useJobs({ limit: 200 });
-  const { data: drivers }        = useDrivers();
-  const { data: documents }      = usePendingDocuments();
-  const { data: applications }   = useDriverApplications();
-  const { data: customers,
-          isLoading: custLoading }= useCustomers(10);
+  const { data: stats,      isLoading: statsLoading } = useAdminStats();
+  const { data: jobs,       isLoading: jobsLoading }  = useJobs({ limit: 200 });
+  const { data: drivers }                              = useDrivers();
+  const { data: documents }                            = usePendingDocuments();
+  const { data: applications }                         = useDriverApplications();
 
   const reviewMutation = useReviewDocument();
 
-  const getDriverName = (id: string | null) => {
+  const getDriver = (id: string | null) => {
     if (!id) return '—';
     const d = drivers?.find(x => x.id === id);
     if (d?.fullName) return d.fullName;
@@ -208,467 +199,603 @@ export default function AdminDashboard() {
     return id.startsWith('application-') ? 'Pending' : id.substring(0, 8);
   };
 
-  // ── weekly financial calculations ──────────────────────────────────────────
-  const weeklyStats = useMemo(() => {
-    if (!jobs) return null;
-    const calc = (offset: number) => {
-      const { start, end } = getWeekBounds(offset);
-      const weekJobs = jobs.filter(j => {
-        const d = new Date((j as any).createdAt);
-        return !isNaN(d.getTime()) && d >= start && d <= end && j.status === 'delivered';
-      });
-      const revenue = weekJobs.reduce((s, j) => s + toNum(j.totalPrice), 0);
-      const payouts = weekJobs.reduce((s, j) => s + toNum((j as any).driverPrice), 0);
-      return { revenue, payouts, profit: revenue - payouts };
-    };
-    return { current: calc(0), prev: calc(-1) };
-  }, [jobs]);
+  const filteredJobs = useMemo(() => {
+    if (!jobs) return [];
+    return jobs.filter(job => {
+      if (statusFilter !== 'all' && job.status !== statusFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return (
+          job.trackingNumber?.toLowerCase().includes(q) ||
+          job.pickupPostcode?.toLowerCase().includes(q)  ||
+          job.deliveryPostcode?.toLowerCase().includes(q) ||
+          getDriver(job.driverId ?? null).toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [jobs, statusFilter, search, drivers, applications]);
 
-  const pendingDocCount    = documents?.filter(d => d.status === 'pending').length || 0;
-  const unverifiedDrivers  = drivers?.filter(d => !d.isVerified && d.isActive !== false).length || 0;
-  const pendingApplications = applications?.filter(a => a.status === 'pending').length || 0;
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / JOBS_PER_PAGE));
+  const pagedJobs  = filteredJobs.slice((page - 1) * JOBS_PER_PAGE, page * JOBS_PER_PAGE);
 
-  const finLoading = jobsLoading;
+  const pendingDocs  = documents?.filter(d => d.status === 'pending').length || 0;
+  const pendingApps  = applications?.filter(a => a.status === 'pending').length || 0;
+  const unverified   = drivers?.filter(d => !d.isVerified && d.isActive !== false).length || 0;
+
+  const activeDrivers = drivers?.filter(d => d.isActive !== false) || [];
+  const deliveringIds = new Set(
+    jobs?.filter(j =>
+      ['on_the_way_delivery','on_the_way_pickup','collected','assigned','accepted'].includes(j.status) && j.driverId
+    ).map(j => j.driverId!)
+  );
+  const delivering = activeDrivers.filter(d => deliveringIds.has(d.id));
+  const available  = activeDrivers.filter(d => !deliveringIds.has(d.id));
+  const offline    = drivers?.filter(d => d.isActive === false) || [];
+
+  const alerts = [
+    unverified   > 0 && { label: `${unverified} driver${unverified>1?'s':''} unverified`,          href: '/admin/drivers?filter=unverified', color: C.rose  },
+    pendingApps  > 0 && { label: `${pendingApps} application${pendingApps>1?'s':''} pending`,       href: '/admin/applications',              color: C.amber },
+    pendingDocs  > 0 && { label: `${pendingDocs} document${pendingDocs>1?'s':''} pending review`,   href: '/admin/documents',                 color: C.amber },
+    (stats?.pendingJobs||0)>0 && { label: `${stats?.pendingJobs} job${(stats?.pendingJobs||0)>1?'s':''} unassigned`, href: '/admin/jobs?filter=pending', color: C.blue },
+  ].filter(Boolean) as { label: string; href: string; color: string }[];
+
+  const totalAlerts = pendingDocs + pendingApps + unverified;
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
-      <div className="space-y-5 sm:space-y-6">
+      {/* Full-bleed dark shell */}
+      <div
+        className="-m-3 sm:-m-4 lg:-m-6 flex flex-col"
+        style={{
+          backgroundColor: C.pageBg,
+          minHeight: 'calc(100vh - 3.5rem)',
+          fontFamily: "'Inter', 'Roboto', system-ui, sans-serif",
+        }}
+      >
+        {/* ══ TOP BAR ══════════════════════════════════════════════════════ */}
+        <div
+          className="sticky top-0 z-20 flex items-center gap-4 px-5 flex-shrink-0"
+          style={{
+            height: 48,
+            backgroundColor: C.pageBg,
+            borderBottom: `1px solid ${C.border}`,
+          }}
+        >
+          {/* Title */}
+          <span
+            className="text-sm font-bold whitespace-nowrap tracking-tight"
+            style={{ color: C.textHi }}
+            data-testid="text-page-title"
+          >
+            Dashboard
+          </span>
 
-        {/* page header */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Activity className="h-4.5 w-4.5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight" data-testid="text-page-title">Operations Dashboard</h1>
-              <p className="text-xs text-muted-foreground">Run Courier — Live overview</p>
-            </div>
+          {/* Search */}
+          <div className="relative flex-1 max-w-sm hidden sm:block">
+            <Search
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5"
+              style={{ color: C.textDim }}
+            />
+            <input
+              className="w-full h-8 pl-8 pr-3 text-[12px] rounded-md outline-none transition-colors focus:ring-1"
+              style={{
+                backgroundColor: C.panelBg,
+                border: `1px solid ${C.border}`,
+                color: C.textMid,
+              }}
+              placeholder="Search tracking ID, postcode, driver…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              data-testid="input-global-search"
+              onFocus={e => (e.target.style.borderColor = C.teal)}
+              onBlur={e  => (e.target.style.borderColor = C.border)}
+            />
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs text-muted-foreground font-medium">Live</span>
-          </div>
-        </div>
 
-        {/* action-required alert */}
-        {(pendingApplications > 0 || pendingDocCount > 0 || unverifiedDrivers > 0) && (
-          <Card className="border-amber-400/50 bg-amber-50/70 dark:bg-amber-950/20" data-testid="alert-pending-actions">
-            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
-              <div className="flex items-start gap-3">
-                <div className="h-7 w-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm text-amber-800 dark:text-amber-200">Action Required</p>
-                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-                    {[
-                      pendingApplications > 0 && `${pendingApplications} driver application${pendingApplications>1?'s':''}`,
-                      pendingDocCount > 0 && `${pendingDocCount} document${pendingDocCount>1?'s':''} pending review`,
-                      unverifiedDrivers > 0 && `${unverifiedDrivers} driver${unverifiedDrivers>1?'s':''} unverified`,
-                    ].filter(Boolean).join(' · ')}
-                  </p>
-                </div>
+          {/* Right actions */}
+          <div className="flex items-center gap-3 ml-auto">
+            {totalAlerts > 0 && (
+              <div className="relative cursor-pointer" data-testid="alert-pending-actions">
+                <Bell className="h-4 w-4" style={{ color: C.textMid }} />
+                <span
+                  className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full text-white text-[8px] font-bold flex items-center justify-center leading-none"
+                  style={{ backgroundColor: C.rose }}
+                >
+                  {totalAlerts}
+                </span>
               </div>
-              <div className="flex gap-2 flex-wrap flex-shrink-0">
-                {pendingApplications > 0 && (
-                  <Button size="sm" className="bg-amber-600 text-white h-8 text-xs" asChild data-testid="button-review-applications">
-                    <Link href="/admin/applications"><UserPlus className="mr-1.5 h-3.5 w-3.5" />Applications</Link>
-                  </Button>
-                )}
-                {pendingDocCount > 0 && (
-                  <Button size="sm" variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-300 h-8 text-xs" asChild data-testid="button-review-docs">
-                    <Link href="/admin/documents"><FileText className="mr-1.5 h-3.5 w-3.5" />Review Docs</Link>
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ── KPI CARDS ── */}
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <KpiCard title="Today's Jobs"    value={stats?.todaysJobs || 0}               icon={Package}    iconBg="bg-blue-50 dark:bg-blue-950/50"   iconColor="text-blue-600 dark:text-blue-400"   accent="border-t-blue-500"    isLoading={statsLoading} href="/admin/jobs?filter=today" />
-          <KpiCard title="Active Drivers"  value={`${stats?.activeDrivers||0}/${stats?.totalDrivers||0}`} icon={Truck} iconBg="bg-emerald-50 dark:bg-emerald-950/50" iconColor="text-emerald-600 dark:text-emerald-400" accent="border-t-emerald-500" isLoading={statsLoading} href="/admin/drivers?filter=active" />
-          <KpiCard title="Today's Revenue" value={fmt(toNum(stats?.todayRevenue))}       icon={TrendingUp} iconBg="bg-primary/10"                         iconColor="text-primary"                              accent="border-t-primary"     isLoading={statsLoading} href="/admin/jobs?filter=today" />
-          <KpiCard title="Pending Jobs"    value={stats?.pendingJobs || 0}               icon={Clock}      iconBg="bg-amber-50 dark:bg-amber-950/50"  iconColor="text-amber-600 dark:text-amber-400" accent="border-t-amber-400"   isLoading={statsLoading} href="/admin/jobs?filter=pending" />
-        </div>
-
-        {/* ── FINANCIAL SUMMARY ── */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">This Week's Financial Summary</h2>
-            <span className="text-xs text-muted-foreground ml-1">({weekLabel(0)})</span>
-          </div>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
-            <FinCard
-              title="Revenue This Week"
-              value={weeklyStats?.current.revenue ?? 0}
-              icon={PoundSterling}
-              iconBg="bg-blue-50 dark:bg-blue-950/50"
-              iconColor="text-blue-600 dark:text-blue-400"
-              accent="border-t-blue-500"
-              isLoading={finLoading}
-            />
-            <FinCard
-              title="Driver Payouts This Week"
-              value={weeklyStats?.current.payouts ?? 0}
-              icon={Truck}
-              iconBg="bg-violet-50 dark:bg-violet-950/50"
-              iconColor="text-violet-600 dark:text-violet-400"
-              accent="border-t-violet-500"
-              isLoading={finLoading}
-            />
-            <FinCard
-              title="Net Profit This Week"
-              value={weeklyStats?.current.profit ?? 0}
-              icon={TrendingUp}
-              iconBg="bg-emerald-50 dark:bg-emerald-950/50"
-              iconColor="text-emerald-600 dark:text-emerald-400"
-              accent="border-t-emerald-500"
-              isLoading={finLoading}
-              isPositive={(weeklyStats?.current.profit ?? 0) >= 0}
-            />
+            )}
+            <div className="h-4 w-px" style={{ backgroundColor: C.border }} />
+            <Link href="/admin/jobs/create">
+              <button
+                className="flex items-center gap-1.5 px-3.5 h-8 text-[12px] font-semibold rounded-md text-white transition-colors hover:brightness-110"
+                style={{ backgroundColor: C.blue }}
+                data-testid="button-new-job"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New Job
+              </button>
+            </Link>
           </div>
         </div>
 
-        {/* ── MAIN CONTENT: Table + Right Column ── */}
-        <div className="grid gap-4 sm:gap-5 grid-cols-1 lg:grid-cols-3">
+        {/* ══ KPI STRIP ════════════════════════════════════════════════════ */}
+        <div
+          className="flex flex-wrap items-center gap-x-7 gap-y-2 px-5 flex-shrink-0"
+          style={{
+            height: 44,
+            borderBottom: `1px solid ${C.border}`,
+          }}
+        >
+          {statsLoading ? (
+            [1,2,3,4].map(i => (
+              <div key={i} className="h-3 w-24 rounded animate-pulse" style={{ backgroundColor: C.border }} />
+            ))
+          ) : (
+            <>
+              <KpiItem label="Jobs Today"    value={String(stats?.todaysJobs || 0)}                         testId="stat-card-today's-jobs" />
+              <Divider />
+              <KpiItem
+                label="Active Drivers"
+                value={String(stats?.activeDrivers || 0)}
+                suffix={`/ ${stats?.totalDrivers || 0}`}
+                color={C.teal}
+                testId="stat-card-active-drivers"
+              />
+              <Divider />
+              <KpiItem label="Revenue Today" value={fmt(stats?.todayRevenue)}                               testId="stat-card-today's-revenue" />
+              <Divider />
+              <KpiItem
+                label="Pending"
+                value={String(stats?.pendingJobs || 0)}
+                color={(stats?.pendingJobs || 0) > 0 ? C.amber : undefined}
+                testId="stat-card-pending-jobs"
+              />
+            </>
+          )}
+        </div>
 
-          {/* Recent Jobs + Weekly Breakdown — 2/3 */}
-          <div className="lg:col-span-2 space-y-4">
+        {/* ══ MAIN SPLIT ══════════════════════════════════════════════════ */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
 
-            {/* Recent Jobs table */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
-                    <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">Recent Jobs</CardTitle>
-                    <CardDescription className="text-xs">Latest delivery orders</CardDescription>
-                  </div>
-                </div>
-                <Link href="/admin/jobs">
-                  <Button variant="outline" size="sm" className="h-8 text-xs" data-testid="button-view-all-jobs">
-                    View All <ArrowRight className="ml-1.5 h-3 w-3" />
-                  </Button>
-                </Link>
-              </CardHeader>
-              <CardContent className="p-0">
-                {jobsLoading ? (
-                  <div className="space-y-0">
-                    {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-11 w-full rounded-none" />)}
-                  </div>
-                ) : jobs && jobs.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent bg-muted/20 border-b border-border/40">
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pl-4 py-2.5 whitespace-nowrap">Order ID</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap">Route</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap hidden md:table-cell">Vehicle</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap">Status</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap hidden sm:table-cell">Time</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right pr-4 py-2.5 whitespace-nowrap">Amount</TableHead>
-                        <TableHead className="w-8" />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {jobs.slice(0, 8).map(job => (
-                        <TableRow key={job.id} className="border-b border-border/25 last:border-0 hover:bg-muted/30 transition-colors" data-testid={`row-job-${job.id}`}>
-                          <TableCell className="pl-4 py-2.5">
-                            <span className="font-mono text-[11px] font-semibold bg-muted/50 px-1.5 py-0.5 rounded">
-                              {job.trackingNumber}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-2.5 max-w-[140px]">
-                            <div className="flex items-center gap-1 text-xs">
-                              <span className="font-medium truncate">{job.pickupPostcode}</span>
-                              <ArrowRight className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
-                              <span className="text-muted-foreground truncate">{job.deliveryPostcode}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-2.5 hidden md:table-cell">
-                            <span className="text-xs text-muted-foreground">{formatVehicle(job.vehicleType)}</span>
-                          </TableCell>
-                          <TableCell className="py-2.5">{getStatusBadge(job.status)}</TableCell>
-                          <TableCell className="py-2.5 hidden sm:table-cell">
-                            <span className="text-[11px] text-muted-foreground tabular-nums">{formatTime((job as any).createdAt)}</span>
-                          </TableCell>
-                          <TableCell className="text-right pr-2 py-2.5">
-                            <span className="text-sm font-bold tabular-nums">{fmt(toNum(job.totalPrice))}</span>
-                          </TableCell>
-                          <TableCell className="pr-2 py-2.5">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-6 w-6" data-testid={`button-job-actions-${job.id}`}>
-                                  <MoreHorizontal className="h-3.5 w-3.5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="text-xs">
-                                <DropdownMenuItem onClick={() => window.location.href='/admin/jobs'}>View Details</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.location.href='/admin/jobs'}>Assign Driver</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => window.location.href='/admin/map'}>View on Map</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="h-11 w-11 rounded-2xl bg-muted/40 flex items-center justify-center mb-3">
-                      <Package className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm font-medium">No jobs yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">Jobs will appear here once bookings are made.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Weekly Profit Breakdown */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
-                    <BarChart3 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">Weekly Profit Breakdown</CardTitle>
-                    <CardDescription className="text-xs">Revenue, payouts and net profit by week</CardDescription>
-                  </div>
-                </div>
-                <Link href="/admin/invoices">
-                  <Button variant="outline" size="sm" className="h-8 text-xs" data-testid="button-view-invoices">
-                    Invoices <ArrowRight className="ml-1.5 h-3 w-3" />
-                  </Button>
-                </Link>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent bg-muted/20 border-b border-border/40">
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pl-4 py-2.5">Week</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 text-right">Revenue</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 text-right hidden sm:table-cell">Driver Payouts</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-4 py-2.5 text-right">Net Profit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {finLoading ? (
-                      [1,2].map(i => (
-                        <TableRow key={i} className="border-b border-border/25">
-                          {[1,2,3,4].map(j => <TableCell key={j} className="py-3"><Skeleton className="h-4 w-full" /></TableCell>)}
-                        </TableRow>
-                      ))
-                    ) : (
-                      <>
-                        {/* Current week */}
-                        <TableRow className="border-b border-border/25 hover:bg-muted/20 bg-primary/[0.02]">
-                          <TableCell className="pl-4 py-3">
-                            <div>
-                              <span className="text-xs font-semibold">{weekLabel(0)}</span>
-                              <Badge className="ml-2 text-[9px] bg-primary/10 text-primary border-primary/20 font-medium">Current</Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3 text-right">
-                            <span className="text-sm font-bold tabular-nums">{fmt(weeklyStats?.current.revenue ?? 0)}</span>
-                          </TableCell>
-                          <TableCell className="py-3 text-right hidden sm:table-cell">
-                            <span className="text-sm tabular-nums text-muted-foreground">{fmt(weeklyStats?.current.payouts ?? 0)}</span>
-                          </TableCell>
-                          <TableCell className="pr-4 py-3 text-right">
-                            <span className={`text-sm font-bold tabular-nums ${(weeklyStats?.current.profit??0)>=0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                              {fmt(weeklyStats?.current.profit ?? 0)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                        {/* Previous week */}
-                        <TableRow className="border-b border-border/25 last:border-0 hover:bg-muted/20">
-                          <TableCell className="pl-4 py-3">
-                            <span className="text-xs font-medium text-muted-foreground">{weekLabel(-1)}</span>
-                          </TableCell>
-                          <TableCell className="py-3 text-right">
-                            <span className="text-sm tabular-nums text-muted-foreground">{fmt(weeklyStats?.prev.revenue ?? 0)}</span>
-                          </TableCell>
-                          <TableCell className="py-3 text-right hidden sm:table-cell">
-                            <span className="text-sm tabular-nums text-muted-foreground">{fmt(weeklyStats?.prev.payouts ?? 0)}</span>
-                          </TableCell>
-                          <TableCell className="pr-4 py-3 text-right">
-                            <span className={`text-sm tabular-nums font-medium ${(weeklyStats?.prev.profit??0)>=0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                              {fmt(weeklyStats?.prev.profit ?? 0)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      </>
+          {/* ── TABLE COLUMN (flex-1) ── */}
+          <div
+            className="flex-1 min-w-0 flex flex-col overflow-hidden"
+            style={{ borderRight: `1px solid ${C.border}` }}
+          >
+            {/* Filter tabs */}
+            <div
+              className="flex items-center gap-0 px-4 flex-shrink-0 overflow-x-auto scrollbar-none"
+              style={{
+                height: 40,
+                borderBottom: `1px solid ${C.border}`,
+              }}
+            >
+              {ALL_STATUSES.map(opt => {
+                const active = statusFilter === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setStatusFilter(opt.value); setPage(1); }}
+                    className="relative flex-shrink-0 px-3 h-full text-[11px] font-semibold transition-colors"
+                    style={{ color: active ? C.teal : C.textDim }}
+                    data-testid={`filter-status-${opt.value}`}
+                  >
+                    {opt.label}
+                    {active && (
+                      <span
+                        className="absolute bottom-0 left-0 right-0 h-[2px] rounded-t"
+                        style={{ backgroundColor: C.teal }}
+                      />
                     )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  </button>
+                );
+              })}
+              <span className="ml-auto pl-4 text-[11px] flex-shrink-0 whitespace-nowrap" style={{ color: C.textDim }}>
+                {filteredJobs.length} result{filteredJobs.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-auto">
+              <table className="w-full border-collapse" style={{ fontSize: 12 }}>
+                <thead
+                  className="sticky top-0 z-10"
+                  style={{ backgroundColor: C.pageBg }}
+                >
+                  <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                    {[
+                      { label: 'Order ID',  cls: 'pl-5 w-40' },
+                      { label: 'Route',     cls: '' },
+                      { label: 'Driver',    cls: 'hidden lg:table-cell' },
+                      { label: 'Vehicle',   cls: 'hidden md:table-cell' },
+                      { label: 'Status',    cls: '' },
+                      { label: 'Time',      cls: 'hidden sm:table-cell' },
+                      { label: 'Amount',    cls: 'text-right pr-4' },
+                      { label: '',          cls: 'w-10' },
+                    ].map((h, i) => (
+                      <th
+                        key={i}
+                        className={`py-2.5 px-3 text-left font-bold uppercase whitespace-nowrap ${h.cls}`}
+                        style={{ color: C.textDim, letterSpacing: '0.1em', fontSize: 10 }}
+                      >
+                        {h.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobsLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
+                        {[1,2,3,4,5,6,7,8].map(j => (
+                          <td key={j} className="px-3 py-3">
+                            <div className="h-3 rounded animate-pulse" style={{ backgroundColor: C.border }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : pagedJobs.length > 0 ? (
+                    pagedJobs.map((job, idx) => (
+                      <tr
+                        key={job.id}
+                        className="transition-colors cursor-pointer group"
+                        style={{
+                          borderBottom: `1px solid ${C.border}`,
+                          backgroundColor: idx % 2 === 0 ? C.pageBg : C.rowAlt,
+                        }}
+                        onMouseEnter={e => ((e.currentTarget as HTMLElement).style.backgroundColor = C.rowHover)}
+                        onMouseLeave={e => ((e.currentTarget as HTMLElement).style.backgroundColor = idx % 2 === 0 ? C.pageBg : C.rowAlt)}
+                        data-testid={`row-job-${job.id}`}
+                      >
+                        {/* Order ID */}
+                        <td className="pl-5 pr-3 py-3">
+                          <span
+                            className="font-mono font-bold tracking-tight"
+                            style={{ fontSize: 11, color: C.textHi }}
+                          >
+                            {job.trackingNumber}
+                          </span>
+                        </td>
+
+                        {/* Route */}
+                        <td className="px-3 py-3 max-w-[160px]">
+                          <div className="flex items-center gap-1.5" style={{ color: C.textMid }}>
+                            <span className="font-medium truncate" style={{ fontSize: 12 }}>
+                              {job.pickupPostcode}
+                            </span>
+                            <ArrowRight className="h-2.5 w-2.5 flex-shrink-0" style={{ color: C.textDim }} />
+                            <span className="truncate" style={{ fontSize: 12, color: C.textDim }}>
+                              {job.deliveryPostcode}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Driver */}
+                        <td className="px-3 py-3 hidden lg:table-cell max-w-[130px]">
+                          <span className="truncate block" style={{ fontSize: 12, color: C.textMid }}>
+                            {getDriver(job.driverId ?? null)}
+                          </span>
+                        </td>
+
+                        {/* Vehicle */}
+                        <td className="px-3 py-3 hidden md:table-cell whitespace-nowrap">
+                          <span style={{ fontSize: 12, color: C.textDim }}>
+                            {formatVehicle(job.vehicleType)}
+                          </span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-3 py-3">
+                          <StatusCell status={job.status} />
+                        </td>
+
+                        {/* Time */}
+                        <td className="px-3 py-3 hidden sm:table-cell whitespace-nowrap">
+                          <span className="tabular-nums" style={{ fontSize: 12, color: C.textDim }}>
+                            {formatTime((job as any).createdAt)}
+                          </span>
+                        </td>
+
+                        {/* Amount */}
+                        <td className="px-3 pr-4 py-3 text-right">
+                          <span className="font-bold tabular-nums" style={{ fontSize: 13, color: C.textHi }}>
+                            {fmt(job.totalPrice)}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-2 py-3 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="h-6 w-6 flex items-center justify-center rounded transition-colors opacity-0 group-hover:opacity-100"
+                                style={{ color: C.textDim }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = C.border; }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                                data-testid={`button-job-actions-${job.id}`}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" style={{ fontSize: 12 }}>
+                              <DropdownMenuItem onClick={() => window.location.href = '/admin/jobs'}>View Details</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => window.location.href = '/admin/jobs'}>Assign Driver</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => window.location.href = '/admin/map'}>View on Map</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <Package className="h-8 w-8" style={{ color: C.textDim }} />
+                          <p style={{ fontSize: 13, color: C.textMid }}>No jobs found</p>
+                          {(statusFilter !== 'all' || search) && (
+                            <button
+                              className="underline underline-offset-2"
+                              style={{ fontSize: 12, color: C.teal }}
+                              onClick={() => { setStatusFilter('all'); setSearch(''); }}
+                            >
+                              Clear filters
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div
+              className="flex items-center justify-between px-5 flex-shrink-0"
+              style={{ height: 40, borderTop: `1px solid ${C.border}` }}
+            >
+              <span className="tabular-nums" style={{ fontSize: 11, color: C.textDim }}>
+                {filteredJobs.length === 0
+                  ? '0 results'
+                  : `${(page-1)*JOBS_PER_PAGE+1}–${Math.min(page*JOBS_PER_PAGE, filteredJobs.length)} of ${filteredJobs.length}`
+                }
+              </span>
+              <div className="flex items-center gap-1">
+                <PagBtn onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1} testId="button-page-prev">
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </PagBtn>
+                <span className="px-2 font-semibold tabular-nums" style={{ fontSize: 12, color: C.textMid }}>
+                  {page} / {totalPages}
+                </span>
+                <PagBtn onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages} testId="button-page-next">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </PagBtn>
+              </div>
+            </div>
           </div>
 
-          {/* ── RIGHT COLUMN — 1/3 ── */}
-          <div className="space-y-4">
+          {/* ── RIGHT PANEL ── */}
+          <div
+            className="hidden lg:flex flex-col w-60 xl:w-68 flex-shrink-0 overflow-y-auto"
+            style={{ backgroundColor: C.pageBg }}
+          >
 
-            {/* Recent Customers */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center">
-                    <Users className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+            {/* Driver Activity */}
+            <section style={{ borderBottom: `1px solid ${C.border}` }}>
+              <PanelHead
+                title="Driver Activity"
+                extra={
+                  <Link href="/admin/drivers">
+                    <span className="text-[10px] font-semibold cursor-pointer transition-colors hover:brightness-125" style={{ color: C.teal }}>
+                      View all →
+                    </span>
+                  </Link>
+                }
+              />
+              {/* Stats row */}
+              <div className="grid grid-cols-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+                {[
+                  { n: delivering.length, label: 'Active',    color: C.teal   },
+                  { n: available.length,  label: 'Available', color: C.textHi },
+                  { n: offline.length,    label: 'Offline',   color: C.textDim },
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col items-center py-3 gap-0.5"
+                    style={{ borderRight: i < 2 ? `1px solid ${C.border}` : undefined }}
+                  >
+                    <span className="text-lg font-bold tabular-nums leading-none" style={{ color: item.color }}>{item.n}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: C.textDim }}>{item.label}</span>
                   </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">Recent Customers</CardTitle>
-                    <CardDescription className="text-xs">Latest accounts</CardDescription>
-                  </div>
-                </div>
-                <Link href="/admin/customers">
-                  <Button variant="ghost" size="icon" data-testid="button-view-customers"><Eye className="h-4 w-4" /></Button>
-                </Link>
-              </CardHeader>
-              <CardContent className="px-3 pt-3 pb-3">
-                {custLoading ? (
-                  <div className="space-y-2.5">{[1,2,3].map(i=><Skeleton key={i} className="h-10 w-full"/>)}</div>
-                ) : customers && customers.length > 0 ? (
-                  <div className="space-y-0.5">
-                    {customers.slice(0,5).map(c => (
-                      <div key={c.id} className="flex items-center justify-between p-2 rounded-lg hover-elevate" data-testid={`row-customer-${c.id}`}>
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Users className="h-3.5 w-3.5 text-primary" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-xs truncate">{c.fullName || 'Unknown'}</p>
-                            <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
-                              {c.companyName ? <><Building className="h-2.5 w-2.5"/>{c.companyName}</> : c.email ? <><Mail className="h-2.5 w-2.5"/>{c.email}</> : null}
-                            </p>
-                          </div>
-                        </div>
-                        {c.userType && (
-                          <Badge variant={c.userType==='business'?'default':'secondary'} className="text-[10px] flex-shrink-0">{c.userType}</Badge>
-                        )}
-                      </div>
-                    ))}
-                    <Link href="/admin/customers">
-                      <Button variant="ghost" size="sm" className="w-full mt-1 h-8 text-xs" data-testid="button-view-all-customers">
-                        View All <ArrowRight className="ml-1.5 h-3 w-3" />
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 text-center">
-                    <div className="h-9 w-9 rounded-xl bg-muted/50 flex items-center justify-center mb-2">
-                      <Users className="h-4.5 w-4.5 text-muted-foreground" />
+                ))}
+              </div>
+              {/* Driver list */}
+              <div className="overflow-y-auto max-h-40">
+                {activeDrivers.length === 0 ? (
+                  <p className="py-4 text-center text-[11px]" style={{ color: C.textDim }}>No active drivers</p>
+                ) : activeDrivers.slice(0, 10).map(d => {
+                  const isDelivering = deliveringIds.has(d.id);
+                  return (
+                    <div
+                      key={d.id}
+                      className="flex items-center gap-2.5 px-3 py-2 transition-colors"
+                      style={{ borderBottom: `1px solid ${C.border}` }}
+                    >
+                      <span
+                        className="rounded-full flex-shrink-0"
+                        style={{ width: 6, height: 6, backgroundColor: isDelivering ? C.teal : C.blue }}
+                      />
+                      <span className="text-[11px] truncate flex-1" style={{ color: C.textMid }}>
+                        {d.fullName || d.vehicleRegistration || 'Driver'}
+                      </span>
+                      <span
+                        className="text-[10px] font-medium flex-shrink-0"
+                        style={{ color: isDelivering ? C.teal : C.textDim }}
+                      >
+                        {isDelivering ? 'Active' : 'Avail'}
+                      </span>
                     </div>
-                    <p className="text-xs font-medium">No customers yet</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  );
+                })}
+              </div>
+            </section>
 
-            {/* Pending Documents */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
-                    <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <CardTitle className="text-sm font-semibold">Pending Documents</CardTitle>
+            {/* Alerts */}
+            <section style={{ borderBottom: `1px solid ${C.border}` }}>
+              <PanelHead
+                title="Alerts"
+                extra={alerts.length > 0 ? (
+                  <span
+                    className="h-4 w-4 rounded-full text-white text-[8px] font-bold flex items-center justify-center leading-none"
+                    style={{ backgroundColor: C.rose }}
+                  >
+                    {alerts.length}
+                  </span>
+                ) : undefined}
+              />
+              {alerts.length === 0 ? (
+                <div className="flex flex-col items-center gap-1.5 py-5">
+                  <CheckCircle className="h-4 w-4" style={{ color: C.emerald }} />
+                  <p className="text-[11px]" style={{ color: C.textDim }}>All clear</p>
                 </div>
-                <Link href="/admin/documents">
-                  <Button variant="ghost" size="icon" data-testid="button-view-documents"><Eye className="h-4 w-4" /></Button>
+              ) : alerts.map((a, i) => (
+                <Link href={a.href} key={i}>
+                  <div
+                    className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer transition-colors"
+                    style={{ borderBottom: i < alerts.length - 1 ? `1px solid ${C.border}` : undefined }}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.backgroundColor = C.panelBg)}
+                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')}
+                    data-testid={`alert-item-${i}`}
+                  >
+                    <span
+                      className="rounded-full flex-shrink-0 mt-1.5"
+                      style={{ width: 5, height: 5, backgroundColor: a.color }}
+                    />
+                    <span className="text-[11px] leading-snug flex-1" style={{ color: C.textMid }}>{a.label}</span>
+                    <ArrowRight className="h-2.5 w-2.5 flex-shrink-0 mt-0.5" style={{ color: C.textDim }} />
+                  </div>
                 </Link>
-              </CardHeader>
-              <CardContent className="px-3 pt-3 pb-3">
-                {documents && documents.length > 0 ? (
-                  <div className="space-y-2">
-                    {documents.slice(0,3).map(doc => (
-                      <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30" data-testid={`doc-${doc.id}`}>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-xs truncate">{doc.fileName}</p>
-                          <p className="text-[10px] text-muted-foreground capitalize">{doc.type.replace(/_/g,' ')}</p>
-                        </div>
-                        <div className="flex gap-1 ml-2">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600" data-testid={`button-approve-doc-${doc.id}`}
-                            onClick={() => reviewMutation.mutate({id:doc.id,status:'approved',reviewedBy:'admin'})} disabled={reviewMutation.isPending}>
-                            <CheckCircle className="h-3.5 w-3.5"/>
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500" data-testid={`button-reject-doc-${doc.id}`}
-                            onClick={() => reviewMutation.mutate({id:doc.id,status:'rejected',reviewedBy:'admin',reviewNotes:'Rejected by admin'})} disabled={reviewMutation.isPending}>
-                            <XCircle className="h-3.5 w-3.5"/>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-5 text-center">
-                    <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-2">
-                      <CheckCircle className="h-4.5 w-4.5 text-emerald-500"/>
+              ))}
+            </section>
+
+            {/* Pending Documents inline review */}
+            {pendingDocs > 0 && (
+              <section style={{ borderBottom: `1px solid ${C.border}` }}>
+                <PanelHead title={`Pending Docs (${pendingDocs})`} />
+                <div className="px-3 py-2 space-y-2">
+                  {(documents?.filter(d => d.status === 'pending') || []).slice(0, 3).map(doc => (
+                    <div key={doc.id} className="flex items-center gap-2" data-testid={`doc-${doc.id}`}>
+                      <span className="text-[10px] flex-1 truncate" style={{ color: C.textMid }}>{doc.fileName}</span>
+                      <button
+                        onClick={() => reviewMutation.mutate({ id: doc.id, status: 'approved', reviewedBy: 'admin' })}
+                        disabled={reviewMutation.isPending}
+                        className="h-5 w-5 flex items-center justify-center rounded transition-colors"
+                        style={{ color: C.emerald }}
+                        data-testid={`button-approve-doc-${doc.id}`}
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => reviewMutation.mutate({ id: doc.id, status: 'rejected', reviewedBy: 'admin', reviewNotes: 'Rejected' })}
+                        disabled={reviewMutation.isPending}
+                        className="h-5 w-5 flex items-center justify-center rounded transition-colors"
+                        style={{ color: C.rose }}
+                        data-testid={`button-reject-doc-${doc.id}`}
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    <p className="text-xs font-semibold">All documents reviewed</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">No documents pending.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Quick Actions */}
-            <Card>
-              <CardHeader className="pb-3 border-b border-border/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-muted/60 flex items-center justify-center">
-                    <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-sm font-semibold">Quick Actions</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="px-3 pt-3 pb-3 space-y-1.5">
-                <Link href="/admin/applications">
-                  <Button variant="outline" size="sm" className={`w-full justify-start h-9 text-xs font-medium ${pendingApplications>0?'border-amber-400/50':''}`} data-testid="button-driver-applications">
-                    <ClipboardCheck className={`mr-2 h-3.5 w-3.5 ${pendingApplications>0?'text-amber-500':''}`}/>
-                    Driver Applications
-                    {pendingApplications>0 && <Badge className="ml-auto bg-amber-500 text-white text-[10px] h-4">{pendingApplications}</Badge>}
-                  </Button>
-                </Link>
-                <Link href="/admin/jobs">
-                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-manage-jobs">
-                    <Package className="mr-2 h-3.5 w-3.5"/>Manage Jobs
-                  </Button>
-                </Link>
-                <Link href="/admin/drivers">
-                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-manage-drivers">
-                    <Users className="mr-2 h-3.5 w-3.5"/>Manage Drivers
-                  </Button>
-                </Link>
-                <Link href="/admin/map">
-                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-live-map">
-                    <MapPin className="mr-2 h-3.5 w-3.5"/>Live Map
-                  </Button>
-                </Link>
-                <Link href="/admin/pricing">
-                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-pricing-settings">
-                    <TrendingUp className="mr-2 h-3.5 w-3.5"/>Pricing Settings
-                  </Button>
-                </Link>
+            <section>
+              <PanelHead title="Quick Actions" />
+              <div className="p-2 space-y-1">
+                {[
+                  { href: '/admin/jobs/create',         icon: Plus,           label: 'Create Job',       badge: 0,          testId: 'button-create-job'         },
+                  { href: '/admin/jobs?filter=pending',  icon: Truck,          label: 'Assign Driver',    badge: 0,          testId: 'button-assign-driver'      },
+                  { href: '/admin/applications',         icon: ClipboardCheck, label: 'Applications',     badge: pendingApps,testId: 'button-driver-applications' },
+                  { href: '/admin/map',                  icon: MapPin,         label: 'Live Map',         badge: 0,          testId: 'button-live-map'           },
+                  { href: '/admin/documents',            icon: FileText,       label: 'Documents',        badge: pendingDocs,testId: 'button-review-docs'        },
+                  { href: '/admin/pricing',              icon: TrendingUp,     label: 'Pricing Settings', badge: 0,          testId: 'button-pricing-settings'   },
+                ].map(item => (
+                  <Link href={item.href} key={item.testId}>
+                    <div
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer transition-colors"
+                      style={{ border: `1px solid ${C.border}`, color: C.textMid, fontSize: 12, fontWeight: 500 }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.backgroundColor = C.panelBg;
+                        el.style.borderColor = C.teal + '50';
+                        el.style.color = C.textHi;
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.backgroundColor = 'transparent';
+                        el.style.borderColor = C.border;
+                        el.style.color = C.textMid;
+                      }}
+                      data-testid={item.testId}
+                    >
+                      <item.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge > 0 && (
+                        <span className="text-[9px] font-bold ml-auto" style={{ color: C.amber }}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+
+                {/* WhatsApp */}
                 <a href="https://wa.me/447482527001" target="_blank" rel="noopener noreferrer" data-testid="button-whatsapp">
-                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium border-[#25D366]/40 text-[#25D366] dark:text-[#25D366]">
-                    <SiWhatsapp className="mr-2 h-3.5 w-3.5"/>WhatsApp Support
-                  </Button>
+                  <div
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer transition-colors"
+                    style={{ border: `1px solid ${C.border}`, color: '#25D366', fontSize: 12, fontWeight: 500 }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = C.panelBg;
+                      (e.currentTarget as HTMLElement).style.borderColor = '#25D36650';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                      (e.currentTarget as HTMLElement).style.borderColor = C.border;
+                    }}
+                  >
+                    <SiWhatsapp className="h-3.5 w-3.5 flex-shrink-0" />
+                    WhatsApp Support
+                  </div>
                 </a>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
           </div>
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+// ─── pagination button ────────────────────────────────────────────────────────
+function PagBtn({ onClick, disabled, testId, children }: { onClick: () => void; disabled: boolean; testId: string; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="h-6 w-6 flex items-center justify-center rounded-md transition-colors disabled:opacity-30"
+      style={{ border: `1px solid #1E2A36`, color: '#4A6070' }}
+      onMouseEnter={e => { if (!disabled) { (e.currentTarget as HTMLElement).style.borderColor = '#14B8A6'; (e.currentTarget as HTMLElement).style.color = '#14B8A6'; } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#1E2A36'; (e.currentTarget as HTMLElement).style.color = '#4A6070'; }}
+      data-testid={testId}
+    >
+      {children}
+    </button>
   );
 }

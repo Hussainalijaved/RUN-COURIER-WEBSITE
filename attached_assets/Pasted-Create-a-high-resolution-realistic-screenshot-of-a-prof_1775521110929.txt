@@ -1,0 +1,30 @@
+Create a high-resolution, realistic screenshot of a professional enterprise-grade admin dashboard for "Run Courier", a same-day courier company. The UI must look like premium logistics software used by large courier firms — clean, modern, trustworthy, with excellent visual hierarchy, generous whitespace, and a polished SaaS feel (similar to Onfleet, ShipStation or enterprise fleet management platforms). Not like a simple website.
+
+Use a dark theme with deep navy blue and teal accents, crisp modern sans-serif fonts, subtle elevations/shadows on cards, and refined UI elements.
+
+Show the FULL dashboard without any cropping or cut-off at the top or bottom. Include a realistic laptop screen frame if it fits naturally, but focus mainly on the clean UI.
+
+Keep EVERY feature, section, data, and text EXACTLY as shown in the provided screenshot — do not add, remove, or alter any content:
+
+- Left sidebar navigation (Dashboard highlighted in blue, then Jobs, Drivers, Applications, Customers, Invoices, Business Quote, Live Map, Postcode Map, Route Planner, Documents, Driver Payments, Contracts, Driver Notices, Notifications, Contacts, Analytics, Supervisors). Include "Run Courier Admin" at the bottom.
+
+- Top bar with search field "Search tracking ID, postcode, driver...", "All statuses" filter tabs (Pending, Assigned, Accepted, To Pickup, Collected, En Route, Delivered, Cancelled, Rejected), "24 results", and blue "+ New Job" button.
+
+- Main table with exact columns: ORDER ID, ROUTE, DRIVER, VEHICLE, STATUS, TIME, AMOUNT
+  Use the exact rows and data from the screenshot:
+  - RC2826002BMC | Littlehampton... → Brighton... | ANWAR A... | Motorbike | Rejected | 5 Apr | £46.48
+  - RC2826001NN3 | W8... → HA8... | dac10104 | Motorbike | Delivered | 26 Mar | £30.65
+  - RC2826001V3U | AL2... → NG23... | AMEN AL... | Small Van | Delivered | 23 Mar | £316.50
+  - RC2826001U7ZG | AL2... → TN33... | AMEN AL... | Small Van | Delivered | 19 Mar | £260.21
+  - RC2826001STD | AL2... → NE23... | AMEN AL... | Small Van | Delivered | 18 Mar | £450.00
+  - RC2826001EHL | AL2... → TW20... | AMEN AL... | Small Van | Delivered | 15 Mar | £301.06
+  - RC2826001HXN | W12... → W21D... | dac10104 | Car | Delivered | 14 Mar | £46.70
+  - RC2826001TSK | AL2... → AL1... | AMEN AL... | Small Van | Delivered | 12 Mar | £249.48
+  - RC2826001TXV | AL2... → SE28... | AMEN AL... | Small Van | Delivered | 10 Mar | £207.50
+  - RC2826001ZCF | W8 ... → HA8 ... | dac10104 | Motorbike | Delivered | 9 Mar | £24.10
+
+- Right sidebar: DRIVER ACTIVITY (0 Active, 76 Available, 0 Offline) with driver list (Edinho Rocha, ANWAR ALMASHRIQI, Richar Duarte, Pintokumar), ALERTS (76 drivers unverified), QUICK ACTIONS (Create Job, Assign Driver, Applications, Live Map, Documents, Pricing Settings, WhatsApp Support button).
+
+Make the layout tidy and professional: wider content area, better spacing between elements, improved table readability with clear row hover, polished colored status dots/badges (blue for Rejected, green for Delivered), sharp icons, and overall enterprise polish. Ensure the top of the page (header with search and filters) is fully visible and not cut off.
+
+Ultra-clean, high contrast, modern logistics software aesthetic, perfect alignment, no clutter, trustworthy and scalable appearance.
