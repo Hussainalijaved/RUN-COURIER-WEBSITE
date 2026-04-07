@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -1000,6 +1000,7 @@ export default function AdminDrivers() {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar>
+                              <AvatarImage src={driver.profilePictureUrl || ''} alt={initials} />
                               <AvatarFallback className="bg-primary text-primary-foreground">
                                 {initials}
                               </AvatarFallback>
@@ -1225,6 +1226,10 @@ export default function AdminDrivers() {
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
+                    <AvatarImage
+                      src={selectedDriver.profilePictureUrl || ''}
+                      alt={getDriverInfo(selectedDriver).name || 'Driver'}
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground text-xl">
                       {getDriverInfo(selectedDriver).name?.split(' ').map((n) => n[0]).join('') || 'D'}
                     </AvatarFallback>
@@ -2026,6 +2031,7 @@ export default function AdminDrivers() {
               <div className="py-4">
                 <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                   <Avatar className="h-10 w-10">
+                    <AvatarImage src={driverToDeactivate.profilePictureUrl || ''} alt={getDriverInfo(driverToDeactivate).name || 'Driver'} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {getDriverInfo(driverToDeactivate).name?.split(' ').map((n) => n[0]).join('') || 'D'}
                     </AvatarFallback>
@@ -2087,6 +2093,7 @@ export default function AdminDrivers() {
               <div className="py-4">
                 <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                   <Avatar className="h-10 w-10">
+                    <AvatarImage src={driverToDelete.profilePictureUrl || ''} alt={getDriverInfo(driverToDelete).name || 'Driver'} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {getDriverInfo(driverToDelete).name?.split(' ').map((n) => n[0]).join('') || 'D'}
                     </AvatarFallback>
@@ -2162,6 +2169,7 @@ export default function AdminDrivers() {
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <Avatar>
+                    <AvatarImage src={driverToResetPassword.profilePictureUrl || ''} alt={driverToResetPassword.fullName || 'Driver'} />
                     <AvatarFallback>
                       {(driverToResetPassword.fullName || 'D')?.split(' ').map((n: string) => n[0]).join('') || 'D'}
                     </AvatarFallback>
