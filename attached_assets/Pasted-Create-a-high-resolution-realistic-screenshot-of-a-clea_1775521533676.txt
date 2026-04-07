@@ -1,0 +1,18 @@
+Create a high-resolution, realistic screenshot of a clean, professional enterprise-grade admin dashboard for "Run Courier", a same-day courier logistics company. The UI must look like premium professional software used by large courier companies — modern, trustworthy, with excellent spacing, visual hierarchy, and a polished SaaS feel. Use a dark theme with deep navy blue and teal accents, crisp modern sans-serif fonts, subtle card elevations, and refined UI details.
+
+Show the FULL dashboard from top to bottom with NO cropping at the top or sides. The top portion of the page must be fully visible, including the header, search bar, status filter tabs, and all elements above the main table. Make the layout tidy with generous whitespace and better alignment so it feels like real enterprise logistics software, not a basic website.
+
+Keep EVERY single feature, text, data row, column, button, and sidebar EXACTLY as shown in the provided screenshot — do not add, remove, or change any content or functionality:
+
+- Top navigation area with search bar: "Search tracking ID, postcode, driver..."
+- Status filter tabs exactly as: Pending, Assigned, Accepted, To Pickup, Collected, En Route, Delivered, Cancelled, Rejected (with "23 results" on the right)
+- Main data table with exact columns: ORDER ID (partially visible as ...ER ID), ROUTE, DRIVER, VEHICLE, STATUS, TIME, AMOUNT
+- Use the exact rows and data from the screenshot (including all routes like W8 7QG → HA8 7RJ, AL2 2FL → NG23 6NT, etc., drivers like dac10104 and AMEN ALMASHRIQI, vehicles, green "Delivered" statuses with dot, dates from 26 Mar to 5 Mar, and exact amounts £30.65, £316.50, £260.21, £450.00, £301.06, £46.70, £249.48, £207.50, £24.10, £661.00)
+
+- Left sidebar partially visible with "Dashboard" highlighted
+- Right side of the table area with pagination "1/3" at the bottom
+- A hand cursor hovering over one of the rows (the one with AL2 2FL → AL1 3UJ and £249.48)
+
+Make the overall design much more tidy and professional: wider content area, improved spacing between the filter tabs and the table, cleaner typography, polished status badges with green dots for Delivered, subtle row hover effects, sharp icons, and enterprise-level polish. Ensure the top of the page (search bar and status filter boxes) has proper breathing room and is not crowded or cut off.
+
+Ultra-clean, high contrast, modern logistics software aesthetic, perfect alignment, trustworthy appearance, high detail, sharp UI elements.
