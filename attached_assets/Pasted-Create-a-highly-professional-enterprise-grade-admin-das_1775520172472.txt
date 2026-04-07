@@ -1,0 +1,26 @@
+Create a highly professional, enterprise-grade admin dashboard UI screenshot for "Run Courier" — a same-day courier company. The entire interface must look like premium logistics software used by large courier companies (clean, trustworthy, scalable SaaS style), not a simple website.
+
+Keep EVERY existing feature, layout sections, data, and content exactly as in the original screenshot — do not remove or change anything:
+
+- Left sidebar: Dashboard (highlighted), Jobs, Drivers, Applications, Customers, Invoices, Business Quote, Live Map, Postcode Map, Route Planner, Documents, Driver Payments, Contracts, Driver Notices, Notifications. Include "Run Courier Admin" footer.
+
+- Top KPI cards: Today's Jobs 0, Active Drivers 0/0, Today's Revenue £0.00, Pending Jobs 0.
+
+- Recent Jobs table with the exact 5 rows and data as shown (one rejected, four Delivered with their exact routes, vehicles, status badges, and Amounts).
+
+- Right side panels: Recent Customers "No customers yet", Pending Documents "All documents reviewed", Quick Actions with WhatsApp button.
+
+ADD the following new professional financial sections WITHOUT removing anything else:
+
+1. Right after the top KPI cards, add a new "This Week’s Financial Summary" row of 3 elegant cards:
+   - Total Revenue This Week: £1,057.36 (auto sum of Delivered jobs)
+   - Total Driver Payouts This Week: £[example amount, use £680.00]
+   - Net Profit This Week: £377.36 (green if positive, with clear label)
+
+2. Below the Recent Jobs table, add a new section titled "Weekly Profit Breakdown" with a clean table showing:
+   Week | Revenue | Driver Payouts | Net Profit
+   (show current week example with the numbers above, plus one previous week row for realism)
+
+Use deep navy blue + teal accents, generous whitespace, modern sans-serif fonts, subtle shadows, polished status badges (green for Delivered, blue for rejected). Make it feel like real enterprise software — sharp, minimal, high-end logistics platform.
+
+Show the full dashboard on a realistic laptop screen, ultra-clean, high resolution, perfect alignment, professional and trustworthy appearance.

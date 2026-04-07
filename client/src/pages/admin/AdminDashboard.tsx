@@ -1,7 +1,17 @@
 import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +19,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { Link } from 'wouter';
+import { useToast } from '@/hooks/use-toast';
 import {
   useJobs,
   useDrivers,
@@ -31,67 +41,46 @@ import {
   MapPin,
   FileText,
   ArrowRight,
+  Eye,
   AlertCircle,
+  UserPlus,
   ClipboardCheck,
+  Mail,
+  Building,
   MoreHorizontal,
-  Search,
+  PoundSterling,
+  BarChart3,
+  Minus,
   Plus,
-  ChevronLeft,
-  ChevronRight,
-  Bell,
   Activity,
-  Zap,
-  Circle,
-  Filter,
 } from 'lucide-react';
 import { SiWhatsapp } from 'react-icons/si';
 
-// ─── status config ────────────────────────────────────────────────────────────
-const STATUS_CFG: Record<string, { label: string; dot: string; text: string }> = {
-  delivered:           { label: 'Delivered',  dot: 'bg-emerald-500', text: 'text-emerald-400' },
-  on_the_way_delivery: { label: 'En Route',   dot: 'bg-sky-400',     text: 'text-sky-400'     },
-  on_the_way_pickup:   { label: 'To Pickup',  dot: 'bg-sky-400',     text: 'text-sky-400'     },
-  collected:           { label: 'Collected',  dot: 'bg-blue-400',    text: 'text-blue-400'    },
-  pending:             { label: 'Pending',    dot: 'bg-amber-400',   text: 'text-amber-400'   },
-  assigned:            { label: 'Assigned',   dot: 'bg-violet-400',  text: 'text-violet-400'  },
-  accepted:            { label: 'Accepted',   dot: 'bg-violet-400',  text: 'text-violet-400'  },
-  cancelled:           { label: 'Cancelled',  dot: 'bg-rose-500',    text: 'text-rose-400'    },
-  rejected:            { label: 'Rejected',   dot: 'bg-blue-500',    text: 'text-blue-400'    },
+// ─── helpers ──────────────────────────────────────────────────────────────────
+const toNum = (v: string | number | undefined | null): number => {
+  if (v == null) return 0;
+  const n = typeof v === 'string' ? parseFloat(v) : v;
+  return isNaN(n) ? 0 : n;
 };
 
-function StatusDot({ status }: { status: string }) {
-  const cfg = STATUS_CFG[status];
-  const label = cfg?.label ?? status;
-  const dot   = cfg?.dot   ?? 'bg-gray-500';
-  const text  = cfg?.text  ?? 'text-gray-400';
-  return (
-    <span className={`flex items-center gap-1.5 text-[11px] font-medium ${text}`} data-testid={`badge-status-${status}`}>
-      <span className={`inline-block h-[5px] w-[5px] rounded-full flex-shrink-0 ${dot}`} />
-      {label}
-    </span>
-  );
-}
+const fmt = (v: number) => `£${v.toFixed(2)}`;
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-const ALL_STATUSES = [
-  { value: 'all',                 label: 'All statuses' },
-  { value: 'pending',             label: 'Pending' },
-  { value: 'assigned',            label: 'Assigned' },
-  { value: 'accepted',            label: 'Accepted' },
-  { value: 'on_the_way_pickup',   label: 'To Pickup' },
-  { value: 'collected',           label: 'Collected' },
-  { value: 'on_the_way_delivery', label: 'En Route' },
-  { value: 'delivered',           label: 'Delivered' },
-  { value: 'cancelled',           label: 'Cancelled' },
-  { value: 'rejected',            label: 'Rejected' },
-];
+const getWeekBounds = (offset = 0) => {
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // Monday=0
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - dow + offset * 7);
+  mon.setHours(0, 0, 0, 0);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  sun.setHours(23, 59, 59, 999);
+  return { start: mon, end: sun };
+};
 
-const JOBS_PER_PAGE = 10;
-
-const formatPrice = (v: string | number | undefined | null) => {
-  if (v == null) return '£0.00';
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  return isNaN(n) ? '£0.00' : `£${n.toFixed(2)}`;
+const weekLabel = (offset: number) => {
+  const { start, end } = getWeekBounds(offset);
+  const fmt2 = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `${fmt2(start)} – ${fmt2(end)}`;
 };
 
 const formatVehicle = (v: string | undefined | null) =>
@@ -109,48 +98,107 @@ const formatTime = (dt: string | Date | undefined | null) => {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
-// ─── colour tokens (always dark) ─────────────────────────────────────────────
-const BG_PAGE   = 'bg-[#0B0F14]';
-const BG_PANEL  = 'bg-[#11161D]';
-const BG_ROW    = 'bg-[#0F141A]';
-const BORDER    = 'border-[#1F2933]';
-const TEXT_HI   = 'text-[#F0F4F8]';   // headings / amounts
-const TEXT_MID  = 'text-[#94A3B8]';   // body
-const TEXT_DIM  = 'text-[#5A6A7A]';   // muted
-
-// ─── panel wrapper ────────────────────────────────────────────────────────────
-function Panel({ className = '', children }: { className?: string; children: React.ReactNode }) {
+// ─── status badges ────────────────────────────────────────────────────────────
+const getStatusBadge = (status: string) => {
+  const map: Record<string, string> = {
+    delivered:            'bg-emerald-500 text-white',
+    on_the_way_delivery:  'bg-sky-500 text-white',
+    on_the_way_pickup:    'bg-sky-500 text-white',
+    collected:            'bg-blue-500 text-white',
+    pending:              'bg-amber-400 text-amber-900',
+    assigned:             'bg-violet-500 text-white',
+    accepted:             'bg-violet-500 text-white',
+    cancelled:            'bg-rose-500 text-white',
+    rejected:             'bg-blue-500 text-white',
+  };
+  const labels: Record<string, string> = {
+    delivered: 'Delivered', on_the_way_delivery: 'En Route',
+    on_the_way_pickup: 'To Pickup', collected: 'Collected',
+    pending: 'Pending', assigned: 'Assigned', accepted: 'Accepted',
+    cancelled: 'Cancelled', rejected: 'Rejected',
+  };
   return (
-    <div className={`${BG_PANEL} border ${BORDER} rounded-sm ${className}`}>
-      {children}
-    </div>
+    <Badge
+      className={`font-medium text-[11px] px-2 py-0.5 ${map[status] || 'bg-muted text-muted-foreground'}`}
+      data-testid={`badge-status-${status}`}
+    >
+      {labels[status] ?? status}
+    </Badge>
+  );
+};
+
+// ─── KPI card ─────────────────────────────────────────────────────────────────
+interface KpiCardProps {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+  accent: string;
+  isLoading?: boolean;
+  href: string;
+}
+function KpiCard({ title, value, icon: Icon, iconBg, iconColor, accent, isLoading, href }: KpiCardProps) {
+  return (
+    <Link href={href}>
+      <Card className={`cursor-pointer hover-elevate overflow-hidden border-t-2 ${accent}`} data-testid={`stat-card-${title.toLowerCase().replace(/\s/g, '-')}`}>
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{title}</p>
+              {isLoading ? <Skeleton className="h-8 w-24" /> : (
+                <p className="text-2xl font-bold tabular-nums">{value}</p>
+              )}
+            </div>
+            <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+              <Icon className={`h-4.5 w-4.5 ${iconColor}`} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
-function PanelHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+// ─── financial summary card ───────────────────────────────────────────────────
+interface FinCardProps { title: string; value: number; icon: React.ElementType; iconBg: string; iconColor: string; accent: string; isPositive?: boolean; isLoading?: boolean }
+function FinCard({ title, value, icon: Icon, iconBg, iconColor, accent, isPositive, isLoading }: FinCardProps) {
   return (
-    <div className={`flex items-center justify-between px-3 py-2 border-b ${BORDER}`}>
-      <span className={`text-[10px] font-bold uppercase tracking-widest ${TEXT_DIM}`}>{title}</span>
-      {action}
-    </div>
+    <Card className={`overflow-hidden border-t-2 ${accent}`}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{title}</p>
+            {isLoading ? <Skeleton className="h-8 w-28" /> : (
+              <p className={`text-2xl font-bold tabular-nums ${isPositive != null ? (isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500') : ''}`}>
+                {fmt(value)}
+              </p>
+            )}
+          </div>
+          <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+            <Icon className={`h-4 w-4 ${iconColor}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-// ─── main component ───────────────────────────────────────────────────────────
+// ─── main ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [search, setSearch]             = useState('');
-  const [page, setPage]                 = useState(1);
+  const { toast } = useToast();
 
-  const { data: stats,        isLoading: statsLoading }   = useAdminStats();
-  const { data: jobs,         isLoading: jobsLoading }    = useJobs({ limit: 100 });
-  const { data: drivers }                                  = useDrivers();
-  const { data: documents }                                = usePendingDocuments();
-  const { data: applications }                             = useDriverApplications();
+  const { data: stats, isLoading: statsLoading } = useAdminStats();
+  const { data: jobs,  isLoading: jobsLoading }  = useJobs({ limit: 200 });
+  const { data: drivers }        = useDrivers();
+  const { data: documents }      = usePendingDocuments();
+  const { data: applications }   = useDriverApplications();
+  const { data: customers,
+          isLoading: custLoading }= useCustomers(10);
 
   const reviewMutation = useReviewDocument();
 
-  const getDriver = (id: string | null) => {
+  const getDriverName = (id: string | null) => {
     if (!id) return '—';
     const d = drivers?.find(x => x.id === id);
     if (d?.fullName) return d.fullName;
@@ -160,469 +208,467 @@ export default function AdminDashboard() {
     return id.startsWith('application-') ? 'Pending' : id.substring(0, 8);
   };
 
-  const filteredJobs = useMemo(() => {
-    if (!jobs) return [];
-    return jobs.filter(job => {
-      if (statusFilter !== 'all' && job.status !== statusFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return (
-          job.trackingNumber?.toLowerCase().includes(q) ||
-          job.pickupPostcode?.toLowerCase().includes(q)  ||
-          job.deliveryPostcode?.toLowerCase().includes(q) ||
-          getDriver(job.driverId ?? null).toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [jobs, statusFilter, search, drivers, applications]);
+  // ── weekly financial calculations ──────────────────────────────────────────
+  const weeklyStats = useMemo(() => {
+    if (!jobs) return null;
+    const calc = (offset: number) => {
+      const { start, end } = getWeekBounds(offset);
+      const weekJobs = jobs.filter(j => {
+        const d = new Date((j as any).createdAt);
+        return !isNaN(d.getTime()) && d >= start && d <= end && j.status === 'delivered';
+      });
+      const revenue = weekJobs.reduce((s, j) => s + toNum(j.totalPrice), 0);
+      const payouts = weekJobs.reduce((s, j) => s + toNum((j as any).driverPrice), 0);
+      return { revenue, payouts, profit: revenue - payouts };
+    };
+    return { current: calc(0), prev: calc(-1) };
+  }, [jobs]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / JOBS_PER_PAGE));
-  const pagedJobs  = filteredJobs.slice((page - 1) * JOBS_PER_PAGE, page * JOBS_PER_PAGE);
+  const pendingDocCount    = documents?.filter(d => d.status === 'pending').length || 0;
+  const unverifiedDrivers  = drivers?.filter(d => !d.isVerified && d.isActive !== false).length || 0;
+  const pendingApplications = applications?.filter(a => a.status === 'pending').length || 0;
 
-  const pendingDocs   = documents?.filter(d => d.status === 'pending').length || 0;
-  const pendingApps   = applications?.filter(a => a.status === 'pending').length || 0;
-  const unverified    = drivers?.filter(d => !d.isVerified && d.isActive !== false).length || 0;
+  const finLoading = jobsLoading;
 
-  const activeDrivers  = drivers?.filter(d => d.isActive !== false) || [];
-  const deliveringIds  = new Set(
-    jobs?.filter(j =>
-      ['on_the_way_delivery','on_the_way_pickup','collected','assigned','accepted'].includes(j.status) && j.driverId
-    ).map(j => j.driverId!)
-  );
-  const delivering  = activeDrivers.filter(d => deliveringIds.has(d.id));
-  const available   = activeDrivers.filter(d => !deliveringIds.has(d.id));
-  const offline     = drivers?.filter(d => d.isActive === false) || [];
-
-  const alerts = [
-    pendingApps  > 0 && { label: `${pendingApps} application${pendingApps>1?'s':''} pending`,   href: '/admin/applications',           color: 'text-amber-400' },
-    pendingDocs  > 0 && { label: `${pendingDocs} document${pendingDocs>1?'s':''} pending`,       href: '/admin/documents',              color: 'text-amber-400' },
-    unverified   > 0 && { label: `${unverified} driver${unverified>1?'s':''} unverified`,        href: '/admin/drivers?filter=unverified', color: 'text-rose-400' },
-    (stats?.pendingJobs||0)>0 && { label: `${stats?.pendingJobs} job${(stats?.pendingJobs||0)>1?'s':''} unassigned`, href: '/admin/jobs?filter=pending', color: 'text-blue-400' },
-  ].filter(Boolean) as { label: string; href: string; color: string }[];
-
-  // ── render ───────────────────────────────────────────────────────────────────
+  // ── render ─────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
-      {/* Full-bleed dark wrapper — bleeds over layout padding */}
-      <div
-        className={`${BG_PAGE} -m-3 sm:-m-4 lg:-m-6 min-h-[calc(100vh-3.5rem)] flex flex-col`}
-        style={{ fontFamily: "'Inter', 'Roboto', system-ui, sans-serif" }}
-      >
+      <div className="space-y-5 sm:space-y-6">
 
-        {/* ── TOP BAR ── */}
-        <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 h-11 border-b ${BORDER} ${BG_PAGE} flex-shrink-0`}>
-          <span className={`text-sm font-semibold ${TEXT_HI} whitespace-nowrap`} data-testid="text-page-title">
-            Dashboard
-          </span>
-          <div className="flex-1 max-w-xs hidden sm:block">
-            <div className="relative">
-              <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 ${TEXT_DIM}`} />
-              <input
-                className={`w-full h-7 pl-7 pr-3 text-[11px] ${BG_PANEL} border ${BORDER} rounded-sm ${TEXT_MID} placeholder:${TEXT_DIM} focus:outline-none focus:border-blue-500/60 transition-colors`}
-                placeholder="Search tracking ID, postcode, driver…"
-                value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1); }}
-                data-testid="input-global-search"
-              />
+        {/* page header */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Activity className="h-4.5 w-4.5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight" data-testid="text-page-title">Operations Dashboard</h1>
+              <p className="text-xs text-muted-foreground">Run Courier — Live overview</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            {alerts.length > 0 && (
-              <div className="relative cursor-pointer" data-testid="alert-pending-actions">
-                <Bell className={`h-4 w-4 ${TEXT_MID}`} />
-                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-rose-500 text-white text-[8px] font-bold flex items-center justify-center leading-none">
-                  {alerts.length}
-                </span>
-              </div>
-            )}
-            <div className={`h-4 w-px ${BG_PANEL} border-l ${BORDER}`} />
-            <Link href="/admin/jobs/create">
-              <button
-                className="flex items-center gap-1.5 px-3 h-7 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-sm transition-colors"
-                data-testid="button-new-job"
-              >
-                <Plus className="h-3 w-3" />
-                New Job
-              </button>
-            </Link>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs text-muted-foreground font-medium">Live</span>
           </div>
         </div>
 
-        {/* ── KPI STRIP ── */}
-        <div className={`flex flex-wrap items-center gap-x-6 gap-y-1.5 px-4 py-2 border-b ${BORDER} flex-shrink-0`}>
-          {statsLoading ? (
-            [1,2,3,4].map(i => <Skeleton key={i} className="h-4 w-24 bg-[#1F2933]" />)
-          ) : (
-            <>
-              <KpiItem label="Jobs Today"    value={String(stats?.todaysJobs || 0)}                    testId="stat-card-today's-jobs" />
-              <div className={`h-4 w-px border-l ${BORDER} hidden sm:block`} />
-              <KpiItem
-                label="Active Drivers"
-                value={`${stats?.activeDrivers || 0}`}
-                suffix={`/ ${stats?.totalDrivers || 0}`}
-                valueClass="text-emerald-400"
-                testId="stat-card-active-drivers"
-              />
-              <div className={`h-4 w-px border-l ${BORDER} hidden sm:block`} />
-              <KpiItem label="Revenue Today" value={formatPrice(stats?.todayRevenue || 0)}             testId="stat-card-today's-revenue" />
-              <div className={`h-4 w-px border-l ${BORDER} hidden sm:block`} />
-              <KpiItem
-                label="Pending"
-                value={String(stats?.pendingJobs || 0)}
-                valueClass={(stats?.pendingJobs || 0) > 0 ? 'text-amber-400' : undefined}
-                testId="stat-card-pending-jobs"
-              />
-            </>
-          )}
-        </div>
-
-        {/* ── MAIN SPLIT ── */}
-        <div className="flex gap-0 flex-1 min-h-0 overflow-hidden">
-
-          {/* ── JOBS TABLE (75%) ── */}
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-[#1F2933]">
-
-            {/* Filter bar */}
-            <div className={`flex items-center gap-2 px-4 py-2 border-b ${BORDER} flex-shrink-0`}>
-              <Filter className={`h-3 w-3 ${TEXT_DIM} flex-shrink-0`} />
-              {/* status buttons */}
-              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-                {ALL_STATUSES.map(s => (
-                  <button
-                    key={s.value}
-                    onClick={() => { setStatusFilter(s.value); setPage(1); }}
-                    className={`flex-shrink-0 px-2 py-0.5 rounded-sm text-[10px] font-medium transition-colors ${
-                      statusFilter === s.value
-                        ? 'bg-blue-600 text-white'
-                        : `${TEXT_DIM} hover:text-[#94A3B8] border ${BORDER}`
-                    }`}
-                    data-testid={`filter-status-${s.value}`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+        {/* action-required alert */}
+        {(pendingApplications > 0 || pendingDocCount > 0 || unverifiedDrivers > 0) && (
+          <Card className="border-amber-400/50 bg-amber-50/70 dark:bg-amber-950/20" data-testid="alert-pending-actions">
+            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
+              <div className="flex items-start gap-3">
+                <div className="h-7 w-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-amber-800 dark:text-amber-200">Action Required</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                    {[
+                      pendingApplications > 0 && `${pendingApplications} driver application${pendingApplications>1?'s':''}`,
+                      pendingDocCount > 0 && `${pendingDocCount} document${pendingDocCount>1?'s':''} pending review`,
+                      unverifiedDrivers > 0 && `${unverifiedDrivers} driver${unverifiedDrivers>1?'s':''} unverified`,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
               </div>
-              <span className={`ml-auto text-[10px] ${TEXT_DIM} whitespace-nowrap flex-shrink-0`}>
-                {filteredJobs.length} result{filteredJobs.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-
-            {/* Table */}
-            <div className="flex-1 overflow-auto">
-              <table className="w-full border-collapse text-[11px]">
-                <thead className={`sticky top-0 ${BG_PAGE} z-10`}>
-                  <tr className={`border-b ${BORDER}`}>
-                    {['Order ID','Route','Driver','Vehicle','Status','Time','Amount',''].map((h, i) => (
-                      <th
-                        key={i}
-                        className={`px-3 py-2 text-left font-bold uppercase tracking-widest ${TEXT_DIM} whitespace-nowrap ${
-                          h === 'Amount' ? 'text-right' : ''
-                        } ${h === 'Driver' ? 'hidden lg:table-cell' : ''} ${h === 'Vehicle' ? 'hidden md:table-cell' : ''} ${h === 'Time' ? 'hidden sm:table-cell' : ''}`}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobsLoading ? (
-                    Array.from({ length: 8 }).map((_, i) => (
-                      <tr key={i} className={`border-b ${BORDER}`}>
-                        {[1,2,3,4,5,6,7,8].map(j => (
-                          <td key={j} className="px-3 py-2.5">
-                            <Skeleton className="h-3 w-full bg-[#1F2933]" />
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  ) : pagedJobs.length > 0 ? (
-                    pagedJobs.map((job, idx) => (
-                      <tr
-                        key={job.id}
-                        className={`border-b ${BORDER} transition-colors cursor-pointer ${
-                          idx % 2 === 0 ? `${BG_PAGE}` : `${BG_ROW}`
-                        } hover:bg-[#162030]`}
-                        data-testid={`row-job-${job.id}`}
-                      >
-                        {/* Order ID */}
-                        <td className="px-3 py-2.5">
-                          <span className={`font-mono font-semibold ${TEXT_HI} tracking-tight`}>
-                            {job.trackingNumber}
-                          </span>
-                        </td>
-                        {/* Route */}
-                        <td className="px-3 py-2.5 max-w-[150px]">
-                          <div className={`flex items-center gap-1 ${TEXT_MID}`}>
-                            <span className="truncate font-medium">{job.pickupPostcode}</span>
-                            <ArrowRight className={`h-2.5 w-2.5 ${TEXT_DIM} flex-shrink-0`} />
-                            <span className={`truncate ${TEXT_DIM}`}>{job.deliveryPostcode}</span>
-                          </div>
-                        </td>
-                        {/* Driver */}
-                        <td className={`px-3 py-2.5 hidden lg:table-cell max-w-[120px]`}>
-                          <span className={`${TEXT_MID} truncate block`}>
-                            {getDriver(job.driverId ?? null)}
-                          </span>
-                        </td>
-                        {/* Vehicle */}
-                        <td className="px-3 py-2.5 hidden md:table-cell">
-                          <span className={TEXT_DIM}>{formatVehicle(job.vehicleType)}</span>
-                        </td>
-                        {/* Status */}
-                        <td className="px-3 py-2.5">
-                          <StatusDot status={job.status} />
-                        </td>
-                        {/* Time */}
-                        <td className={`px-3 py-2.5 hidden sm:table-cell ${TEXT_DIM} tabular-nums whitespace-nowrap`}>
-                          {formatTime((job as any).createdAt)}
-                        </td>
-                        {/* Amount */}
-                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${TEXT_HI}`}>
-                          {formatPrice(job.totalPrice)}
-                        </td>
-                        {/* Actions */}
-                        <td className="px-2 py-2.5 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                className={`h-5 w-5 flex items-center justify-center rounded-sm ${TEXT_DIM} hover:text-[#94A3B8] hover:bg-[#1F2933] transition-colors`}
-                                data-testid={`button-job-actions-${job.id}`}
-                              >
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="text-xs">
-                              <DropdownMenuItem onClick={() => window.location.href = '/admin/jobs'}>
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => window.location.href = '/admin/jobs'}>
-                                Assign Driver
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => window.location.href = '/admin/jobs'}>
-                                View on Map
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="py-16 text-center">
-                        <div className="flex flex-col items-center gap-2">
-                          <Package className={`h-8 w-8 ${TEXT_DIM}`} />
-                          <p className={`text-xs ${TEXT_MID}`}>No jobs found</p>
-                          {(statusFilter !== 'all' || search) && (
-                            <button
-                              className="text-[11px] text-blue-400 hover:underline"
-                              onClick={() => { setStatusFilter('all'); setSearch(''); }}
-                            >
-                              Clear filters
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            <div className={`flex items-center justify-between px-4 py-2 border-t ${BORDER} flex-shrink-0`}>
-              <span className={`text-[10px] ${TEXT_DIM} tabular-nums`}>
-                {filteredJobs.length === 0 ? '0 results' : (
-                  `${(page-1)*JOBS_PER_PAGE+1}–${Math.min(page*JOBS_PER_PAGE, filteredJobs.length)} of ${filteredJobs.length}`
+              <div className="flex gap-2 flex-wrap flex-shrink-0">
+                {pendingApplications > 0 && (
+                  <Button size="sm" className="bg-amber-600 text-white h-8 text-xs" asChild data-testid="button-review-applications">
+                    <Link href="/admin/applications"><UserPlus className="mr-1.5 h-3.5 w-3.5" />Applications</Link>
+                  </Button>
                 )}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p-1))}
-                  disabled={page === 1}
-                  className={`h-6 w-6 flex items-center justify-center rounded-sm border ${BORDER} ${TEXT_DIM} disabled:opacity-30 hover:border-blue-500/50 hover:text-blue-400 transition-colors`}
-                  data-testid="button-page-prev"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <span className={`px-2 text-[11px] font-medium ${TEXT_MID} tabular-nums`}>
-                  {page} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p+1))}
-                  disabled={page === totalPages}
-                  className={`h-6 w-6 flex items-center justify-center rounded-sm border ${BORDER} ${TEXT_DIM} disabled:opacity-30 hover:border-blue-500/50 hover:text-blue-400 transition-colors`}
-                  data-testid="button-page-next"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                {pendingDocCount > 0 && (
+                  <Button size="sm" variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-300 h-8 text-xs" asChild data-testid="button-review-docs">
+                    <Link href="/admin/documents"><FileText className="mr-1.5 h-3.5 w-3.5" />Review Docs</Link>
+                  </Button>
+                )}
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── KPI CARDS ── */}
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <KpiCard title="Today's Jobs"    value={stats?.todaysJobs || 0}               icon={Package}    iconBg="bg-blue-50 dark:bg-blue-950/50"   iconColor="text-blue-600 dark:text-blue-400"   accent="border-t-blue-500"    isLoading={statsLoading} href="/admin/jobs?filter=today" />
+          <KpiCard title="Active Drivers"  value={`${stats?.activeDrivers||0}/${stats?.totalDrivers||0}`} icon={Truck} iconBg="bg-emerald-50 dark:bg-emerald-950/50" iconColor="text-emerald-600 dark:text-emerald-400" accent="border-t-emerald-500" isLoading={statsLoading} href="/admin/drivers?filter=active" />
+          <KpiCard title="Today's Revenue" value={fmt(toNum(stats?.todayRevenue))}       icon={TrendingUp} iconBg="bg-primary/10"                         iconColor="text-primary"                              accent="border-t-primary"     isLoading={statsLoading} href="/admin/jobs?filter=today" />
+          <KpiCard title="Pending Jobs"    value={stats?.pendingJobs || 0}               icon={Clock}      iconBg="bg-amber-50 dark:bg-amber-950/50"  iconColor="text-amber-600 dark:text-amber-400" accent="border-t-amber-400"   isLoading={statsLoading} href="/admin/jobs?filter=pending" />
+        </div>
+
+        {/* ── FINANCIAL SUMMARY ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">This Week's Financial Summary</h2>
+            <span className="text-xs text-muted-foreground ml-1">({weekLabel(0)})</span>
+          </div>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+            <FinCard
+              title="Revenue This Week"
+              value={weeklyStats?.current.revenue ?? 0}
+              icon={PoundSterling}
+              iconBg="bg-blue-50 dark:bg-blue-950/50"
+              iconColor="text-blue-600 dark:text-blue-400"
+              accent="border-t-blue-500"
+              isLoading={finLoading}
+            />
+            <FinCard
+              title="Driver Payouts This Week"
+              value={weeklyStats?.current.payouts ?? 0}
+              icon={Truck}
+              iconBg="bg-violet-50 dark:bg-violet-950/50"
+              iconColor="text-violet-600 dark:text-violet-400"
+              accent="border-t-violet-500"
+              isLoading={finLoading}
+            />
+            <FinCard
+              title="Net Profit This Week"
+              value={weeklyStats?.current.profit ?? 0}
+              icon={TrendingUp}
+              iconBg="bg-emerald-50 dark:bg-emerald-950/50"
+              iconColor="text-emerald-600 dark:text-emerald-400"
+              accent="border-t-emerald-500"
+              isLoading={finLoading}
+              isPositive={(weeklyStats?.current.profit ?? 0) >= 0}
+            />
+          </div>
+        </div>
+
+        {/* ── MAIN CONTENT: Table + Right Column ── */}
+        <div className="grid gap-4 sm:gap-5 grid-cols-1 lg:grid-cols-3">
+
+          {/* Recent Jobs + Weekly Breakdown — 2/3 */}
+          <div className="lg:col-span-2 space-y-4">
+
+            {/* Recent Jobs table */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
+                    <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Recent Jobs</CardTitle>
+                    <CardDescription className="text-xs">Latest delivery orders</CardDescription>
+                  </div>
+                </div>
+                <Link href="/admin/jobs">
+                  <Button variant="outline" size="sm" className="h-8 text-xs" data-testid="button-view-all-jobs">
+                    View All <ArrowRight className="ml-1.5 h-3 w-3" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent className="p-0">
+                {jobsLoading ? (
+                  <div className="space-y-0">
+                    {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-11 w-full rounded-none" />)}
+                  </div>
+                ) : jobs && jobs.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent bg-muted/20 border-b border-border/40">
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pl-4 py-2.5 whitespace-nowrap">Order ID</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap">Route</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap hidden md:table-cell">Vehicle</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap">Status</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap hidden sm:table-cell">Time</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right pr-4 py-2.5 whitespace-nowrap">Amount</TableHead>
+                        <TableHead className="w-8" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {jobs.slice(0, 8).map(job => (
+                        <TableRow key={job.id} className="border-b border-border/25 last:border-0 hover:bg-muted/30 transition-colors" data-testid={`row-job-${job.id}`}>
+                          <TableCell className="pl-4 py-2.5">
+                            <span className="font-mono text-[11px] font-semibold bg-muted/50 px-1.5 py-0.5 rounded">
+                              {job.trackingNumber}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-2.5 max-w-[140px]">
+                            <div className="flex items-center gap-1 text-xs">
+                              <span className="font-medium truncate">{job.pickupPostcode}</span>
+                              <ArrowRight className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
+                              <span className="text-muted-foreground truncate">{job.deliveryPostcode}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2.5 hidden md:table-cell">
+                            <span className="text-xs text-muted-foreground">{formatVehicle(job.vehicleType)}</span>
+                          </TableCell>
+                          <TableCell className="py-2.5">{getStatusBadge(job.status)}</TableCell>
+                          <TableCell className="py-2.5 hidden sm:table-cell">
+                            <span className="text-[11px] text-muted-foreground tabular-nums">{formatTime((job as any).createdAt)}</span>
+                          </TableCell>
+                          <TableCell className="text-right pr-2 py-2.5">
+                            <span className="text-sm font-bold tabular-nums">{fmt(toNum(job.totalPrice))}</span>
+                          </TableCell>
+                          <TableCell className="pr-2 py-2.5">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-6 w-6" data-testid={`button-job-actions-${job.id}`}>
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="text-xs">
+                                <DropdownMenuItem onClick={() => window.location.href='/admin/jobs'}>View Details</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => window.location.href='/admin/jobs'}>Assign Driver</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => window.location.href='/admin/map'}>View on Map</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="h-11 w-11 rounded-2xl bg-muted/40 flex items-center justify-center mb-3">
+                      <Package className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">No jobs yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Jobs will appear here once bookings are made.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Weekly Profit Breakdown */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
+                    <BarChart3 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Weekly Profit Breakdown</CardTitle>
+                    <CardDescription className="text-xs">Revenue, payouts and net profit by week</CardDescription>
+                  </div>
+                </div>
+                <Link href="/admin/invoices">
+                  <Button variant="outline" size="sm" className="h-8 text-xs" data-testid="button-view-invoices">
+                    Invoices <ArrowRight className="ml-1.5 h-3 w-3" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent bg-muted/20 border-b border-border/40">
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pl-4 py-2.5">Week</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 text-right">Revenue</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2.5 text-right hidden sm:table-cell">Driver Payouts</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-4 py-2.5 text-right">Net Profit</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {finLoading ? (
+                      [1,2].map(i => (
+                        <TableRow key={i} className="border-b border-border/25">
+                          {[1,2,3,4].map(j => <TableCell key={j} className="py-3"><Skeleton className="h-4 w-full" /></TableCell>)}
+                        </TableRow>
+                      ))
+                    ) : (
+                      <>
+                        {/* Current week */}
+                        <TableRow className="border-b border-border/25 hover:bg-muted/20 bg-primary/[0.02]">
+                          <TableCell className="pl-4 py-3">
+                            <div>
+                              <span className="text-xs font-semibold">{weekLabel(0)}</span>
+                              <Badge className="ml-2 text-[9px] bg-primary/10 text-primary border-primary/20 font-medium">Current</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 text-right">
+                            <span className="text-sm font-bold tabular-nums">{fmt(weeklyStats?.current.revenue ?? 0)}</span>
+                          </TableCell>
+                          <TableCell className="py-3 text-right hidden sm:table-cell">
+                            <span className="text-sm tabular-nums text-muted-foreground">{fmt(weeklyStats?.current.payouts ?? 0)}</span>
+                          </TableCell>
+                          <TableCell className="pr-4 py-3 text-right">
+                            <span className={`text-sm font-bold tabular-nums ${(weeklyStats?.current.profit??0)>=0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                              {fmt(weeklyStats?.current.profit ?? 0)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                        {/* Previous week */}
+                        <TableRow className="border-b border-border/25 last:border-0 hover:bg-muted/20">
+                          <TableCell className="pl-4 py-3">
+                            <span className="text-xs font-medium text-muted-foreground">{weekLabel(-1)}</span>
+                          </TableCell>
+                          <TableCell className="py-3 text-right">
+                            <span className="text-sm tabular-nums text-muted-foreground">{fmt(weeklyStats?.prev.revenue ?? 0)}</span>
+                          </TableCell>
+                          <TableCell className="py-3 text-right hidden sm:table-cell">
+                            <span className="text-sm tabular-nums text-muted-foreground">{fmt(weeklyStats?.prev.payouts ?? 0)}</span>
+                          </TableCell>
+                          <TableCell className="pr-4 py-3 text-right">
+                            <span className={`text-sm tabular-nums font-medium ${(weeklyStats?.prev.profit??0)>=0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                              {fmt(weeklyStats?.prev.profit ?? 0)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      </>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* ── RIGHT PANEL (25%) ── */}
-          <div className={`hidden lg:flex flex-col w-56 xl:w-64 flex-shrink-0 ${BG_PAGE} overflow-y-auto`}>
+          {/* ── RIGHT COLUMN — 1/3 ── */}
+          <div className="space-y-4">
 
-            {/* Driver Activity */}
-            <div className={`border-b ${BORDER}`}>
-              <PanelHeader
-                title="Driver Activity"
-                action={
-                  <Link href="/admin/drivers">
-                    <span className={`text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer`}>All →</span>
-                  </Link>
-                }
-              />
-              {/* 3-col summary */}
-              <div className={`grid grid-cols-3 divide-x ${BORDER}`}>
-                <StatBox n={delivering.length} label="Active"    color="text-emerald-400" />
-                <StatBox n={available.length}  label="Available" color={TEXT_HI} />
-                <StatBox n={offline.length}    label="Offline"   color={TEXT_DIM} />
-              </div>
-              {/* driver list */}
-              <div className="overflow-y-auto max-h-40">
-                {activeDrivers.length === 0 ? (
-                  <p className={`text-[11px] ${TEXT_DIM} px-3 py-3 text-center`}>No active drivers</p>
-                ) : activeDrivers.slice(0, 12).map(d => {
-                  const isDelivering = deliveringIds.has(d.id);
-                  return (
-                    <div key={d.id} className={`flex items-center gap-2 px-3 py-1.5 border-b ${BORDER} last:border-0 hover:bg-[#11161D] transition-colors`}>
-                      <span className={`h-[5px] w-[5px] rounded-full flex-shrink-0 ${isDelivering ? 'bg-emerald-500' : 'bg-blue-400'}`} />
-                      <span className={`text-[11px] ${TEXT_MID} truncate flex-1`}>
-                        {d.fullName || d.vehicleRegistration || 'Driver'}
-                      </span>
-                      <span className={`text-[10px] flex-shrink-0 ${isDelivering ? 'text-emerald-400' : TEXT_DIM}`}>
-                        {isDelivering ? 'Active' : 'Avail'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Alerts */}
-            <div className={`border-b ${BORDER}`}>
-              <PanelHeader
-                title="Alerts"
-                action={alerts.length > 0 ? (
-                  <span className="h-4 w-4 rounded-full bg-rose-500 text-white text-[8px] font-bold flex items-center justify-center leading-none">
-                    {alerts.length}
-                  </span>
-                ) : undefined}
-              />
-              {alerts.length === 0 ? (
-                <div className="flex flex-col items-center gap-1 py-4">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <p className={`text-[11px] ${TEXT_DIM}`}>All clear</p>
-                </div>
-              ) : alerts.map((a, i) => (
-                <Link href={a.href} key={i}>
-                  <div
-                    className={`flex items-start gap-2 px-3 py-2 border-b ${BORDER} last:border-0 hover:bg-[#11161D] transition-colors cursor-pointer`}
-                    data-testid={`alert-item-${i}`}
-                  >
-                    <span className={`h-[5px] w-[5px] mt-1.5 rounded-full flex-shrink-0 ${a.color === 'text-amber-400' ? 'bg-amber-400' : a.color === 'text-rose-400' ? 'bg-rose-400' : 'bg-blue-400'}`} />
-                    <span className={`text-[11px] ${TEXT_MID} leading-snug`}>{a.label}</span>
-                    <ArrowRight className={`h-2.5 w-2.5 ${TEXT_DIM} ml-auto mt-0.5 flex-shrink-0`} />
+            {/* Recent Customers */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center">
+                    <Users className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
                   </div>
-                </Link>
-              ))}
-            </div>
-
-            {/* Pending Documents quick-review */}
-            {pendingDocs > 0 && (
-              <div className={`border-b ${BORDER}`}>
-                <PanelHeader title="Pending Docs" />
-                <div className="px-3 py-2 space-y-1.5">
-                  {(documents?.filter(d => d.status === 'pending') || []).slice(0, 3).map(doc => (
-                    <div key={doc.id} className={`flex items-center gap-2`} data-testid={`doc-${doc.id}`}>
-                      <span className={`text-[10px] ${TEXT_MID} truncate flex-1`}>
-                        {doc.fileName}
-                      </span>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => reviewMutation.mutate({ id: doc.id, status: 'approved', reviewedBy: 'admin' })}
-                          className="h-5 w-5 flex items-center justify-center text-emerald-500 hover:text-emerald-400 transition-colors"
-                          disabled={reviewMutation.isPending}
-                          data-testid={`button-approve-doc-${doc.id}`}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => reviewMutation.mutate({ id: doc.id, status: 'rejected', reviewedBy: 'admin', reviewNotes: 'Rejected' })}
-                          className="h-5 w-5 flex items-center justify-center text-rose-500 hover:text-rose-400 transition-colors"
-                          disabled={reviewMutation.isPending}
-                          data-testid={`button-reject-doc-${doc.id}`}
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Recent Customers</CardTitle>
+                    <CardDescription className="text-xs">Latest accounts</CardDescription>
+                  </div>
                 </div>
-              </div>
-            )}
+                <Link href="/admin/customers">
+                  <Button variant="ghost" size="icon" data-testid="button-view-customers"><Eye className="h-4 w-4" /></Button>
+                </Link>
+              </CardHeader>
+              <CardContent className="px-3 pt-3 pb-3">
+                {custLoading ? (
+                  <div className="space-y-2.5">{[1,2,3].map(i=><Skeleton key={i} className="h-10 w-full"/>)}</div>
+                ) : customers && customers.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {customers.slice(0,5).map(c => (
+                      <div key={c.id} className="flex items-center justify-between p-2 rounded-lg hover-elevate" data-testid={`row-customer-${c.id}`}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-xs truncate">{c.fullName || 'Unknown'}</p>
+                            <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                              {c.companyName ? <><Building className="h-2.5 w-2.5"/>{c.companyName}</> : c.email ? <><Mail className="h-2.5 w-2.5"/>{c.email}</> : null}
+                            </p>
+                          </div>
+                        </div>
+                        {c.userType && (
+                          <Badge variant={c.userType==='business'?'default':'secondary'} className="text-[10px] flex-shrink-0">{c.userType}</Badge>
+                        )}
+                      </div>
+                    ))}
+                    <Link href="/admin/customers">
+                      <Button variant="ghost" size="sm" className="w-full mt-1 h-8 text-xs" data-testid="button-view-all-customers">
+                        View All <ArrowRight className="ml-1.5 h-3 w-3" />
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <div className="h-9 w-9 rounded-xl bg-muted/50 flex items-center justify-center mb-2">
+                      <Users className="h-4.5 w-4.5 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs font-medium">No customers yet</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pending Documents */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-border/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
+                    <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold">Pending Documents</CardTitle>
+                </div>
+                <Link href="/admin/documents">
+                  <Button variant="ghost" size="icon" data-testid="button-view-documents"><Eye className="h-4 w-4" /></Button>
+                </Link>
+              </CardHeader>
+              <CardContent className="px-3 pt-3 pb-3">
+                {documents && documents.length > 0 ? (
+                  <div className="space-y-2">
+                    {documents.slice(0,3).map(doc => (
+                      <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30" data-testid={`doc-${doc.id}`}>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-xs truncate">{doc.fileName}</p>
+                          <p className="text-[10px] text-muted-foreground capitalize">{doc.type.replace(/_/g,' ')}</p>
+                        </div>
+                        <div className="flex gap-1 ml-2">
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600" data-testid={`button-approve-doc-${doc.id}`}
+                            onClick={() => reviewMutation.mutate({id:doc.id,status:'approved',reviewedBy:'admin'})} disabled={reviewMutation.isPending}>
+                            <CheckCircle className="h-3.5 w-3.5"/>
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500" data-testid={`button-reject-doc-${doc.id}`}
+                            onClick={() => reviewMutation.mutate({id:doc.id,status:'rejected',reviewedBy:'admin',reviewNotes:'Rejected by admin'})} disabled={reviewMutation.isPending}>
+                            <XCircle className="h-3.5 w-3.5"/>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-5 text-center">
+                    <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-2">
+                      <CheckCircle className="h-4.5 w-4.5 text-emerald-500"/>
+                    </div>
+                    <p className="text-xs font-semibold">All documents reviewed</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">No documents pending.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Quick Actions */}
-            <div>
-              <PanelHeader title="Quick Actions" />
-              <div className="p-2 space-y-1">
-                {[
-                  { href: '/admin/jobs/create',          icon: Plus,          label: 'Create Job',         testId: 'button-create-job'          },
-                  { href: '/admin/jobs?filter=pending',   icon: Truck,         label: 'Assign Driver',      testId: 'button-assign-driver'       },
-                  { href: '/admin/applications',          icon: ClipboardCheck,label: 'Applications',       testId: 'button-driver-applications', badge: pendingApps > 0 ? pendingApps : 0 },
-                  { href: '/admin/map',                   icon: MapPin,        label: 'Live Map',           testId: 'button-live-map'            },
-                  { href: '/admin/documents',             icon: FileText,      label: 'Documents',          testId: 'button-review-docs',         badge: pendingDocs > 0 ? pendingDocs : 0 },
-                  { href: '/admin/pricing',               icon: TrendingUp,    label: 'Pricing Settings',   testId: 'button-pricing-settings'    },
-                ].map(item => (
-                  <Link href={item.href} key={item.testId}>
-                    <div
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-sm border ${BORDER} ${TEXT_MID} hover:bg-[#11161D] hover:text-[#F0F4F8] hover:border-blue-500/30 transition-colors cursor-pointer text-[11px] font-medium`}
-                      data-testid={item.testId}
-                    >
-                      <item.icon className="h-3 w-3 flex-shrink-0" />
-                      {item.label}
-                      {(item.badge ?? 0) > 0 && (
-                        <span className="ml-auto text-[9px] font-bold text-amber-400">{item.badge}</span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-                <a href="https://wa.me/447482527001" target="_blank" rel="noopener noreferrer" data-testid="button-whatsapp">
-                  <div className={`flex items-center gap-2 px-2 py-1.5 rounded-sm border ${BORDER} text-[#25D366] hover:bg-[#11161D] hover:border-[#25D366]/30 transition-colors cursor-pointer text-[11px] font-medium`}>
-                    <SiWhatsapp className="h-3 w-3 flex-shrink-0" />
-                    WhatsApp Support
+            <Card>
+              <CardHeader className="pb-3 border-b border-border/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-muted/60 flex items-center justify-center">
+                    <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
+                  <CardTitle className="text-sm font-semibold">Quick Actions</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="px-3 pt-3 pb-3 space-y-1.5">
+                <Link href="/admin/applications">
+                  <Button variant="outline" size="sm" className={`w-full justify-start h-9 text-xs font-medium ${pendingApplications>0?'border-amber-400/50':''}`} data-testid="button-driver-applications">
+                    <ClipboardCheck className={`mr-2 h-3.5 w-3.5 ${pendingApplications>0?'text-amber-500':''}`}/>
+                    Driver Applications
+                    {pendingApplications>0 && <Badge className="ml-auto bg-amber-500 text-white text-[10px] h-4">{pendingApplications}</Badge>}
+                  </Button>
+                </Link>
+                <Link href="/admin/jobs">
+                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-manage-jobs">
+                    <Package className="mr-2 h-3.5 w-3.5"/>Manage Jobs
+                  </Button>
+                </Link>
+                <Link href="/admin/drivers">
+                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-manage-drivers">
+                    <Users className="mr-2 h-3.5 w-3.5"/>Manage Drivers
+                  </Button>
+                </Link>
+                <Link href="/admin/map">
+                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-live-map">
+                    <MapPin className="mr-2 h-3.5 w-3.5"/>Live Map
+                  </Button>
+                </Link>
+                <Link href="/admin/pricing">
+                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium" data-testid="button-pricing-settings">
+                    <TrendingUp className="mr-2 h-3.5 w-3.5"/>Pricing Settings
+                  </Button>
+                </Link>
+                <a href="https://wa.me/447482527001" target="_blank" rel="noopener noreferrer" data-testid="button-whatsapp">
+                  <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs font-medium border-[#25D366]/40 text-[#25D366] dark:text-[#25D366]">
+                    <SiWhatsapp className="mr-2 h-3.5 w-3.5"/>WhatsApp Support
+                  </Button>
                 </a>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
           </div>
         </div>
       </div>
     </DashboardLayout>
-  );
-}
-
-// ── sub-components ─────────────────────────────────────────────────────────────
-function KpiItem({
-  label, value, suffix, valueClass, testId
-}: { label: string; value: string; suffix?: string; valueClass?: string; testId?: string }) {
-  return (
-    <div className="flex items-center gap-2 flex-shrink-0" data-testid={testId}>
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-[#5A6A7A]">{label}</span>
-      <span className={`text-sm font-bold tabular-nums text-[#F0F4F8] ${valueClass || ''}`}>{value}</span>
-      {suffix && <span className="text-xs text-[#5A6A7A]">{suffix}</span>}
-    </div>
-  );
-}
-
-function StatBox({ n, label, color }: { n: number; label: string; color: string }) {
-  return (
-    <div className="flex flex-col items-center py-2.5 gap-0.5">
-      <span className={`text-lg font-bold tabular-nums leading-none ${color}`}>{n}</span>
-      <span className="text-[9px] text-[#5A6A7A] uppercase tracking-wider">{label}</span>
-    </div>
   );
 }
