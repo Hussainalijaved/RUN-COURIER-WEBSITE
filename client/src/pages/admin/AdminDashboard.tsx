@@ -1,13 +1,6 @@
 import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import {
   useJobs,
   useDrivers,
@@ -27,7 +20,7 @@ import {
   FileText,
   ArrowRight,
   ClipboardCheck,
-  MoreHorizontal,
+  ExternalLink,
   Search,
   Plus,
   ChevronLeft,
@@ -44,6 +37,7 @@ const C = {
   rowOdd:   '#0E1319',
   rowHover: '#132030',
   border:   '#1E2A36',
+  borderHi: '#2A3F54',
   textHi:   '#EDF2F7',
   textMid:  '#8FA3B8',
   textDim:  '#4A6070',
@@ -173,6 +167,7 @@ const PER_PAGE = 10;
 
 // ─── main ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
+  const [, navigate] = useLocation();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [page,   setPage]   = useState(1);
@@ -500,27 +495,22 @@ export default function AdminDashboard() {
                             <span style={{ fontSize: 13, fontWeight: 700, color: C.textHi, whiteSpace: 'nowrap' }}>{fmt(job.totalPrice)}</span>
                           </td>
 
-                          {/* Actions */}
+                          {/* View action */}
                           <td className="px-2 py-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  className="flex items-center justify-center rounded transition-all"
-                                  style={{ width: 24, height: 24, color: C.textDim, background: 'none', border: 'none', cursor: 'pointer', opacity: 0.35 }}
-                                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.backgroundColor = C.border; el.style.opacity = '1'; el.style.color = C.textHi; }}
-                                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.backgroundColor = 'transparent'; el.style.opacity = '0.35'; el.style.color = C.textDim; }}
-                                  data-testid={`button-job-actions-${job.id}`}
-                                >
-                                  <MoreHorizontal style={{ width: 14, height: 14 }} />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" style={{ fontSize: 12 }}>
-                                <DropdownMenuItem onClick={() => window.location.href = '/admin/jobs'}>View Details</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.location.href = '/admin/jobs'}>Assign Driver</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => window.location.href = '/admin/map'}>View on Map</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/admin/jobs?track=${encodeURIComponent(job.trackingNumber)}`);
+                              }}
+                              className="flex items-center justify-center rounded transition-all"
+                              style={{ width: 28, height: 28, color: C.textDim, background: 'none', border: `1px solid transparent`, cursor: 'pointer', opacity: 0.5 }}
+                              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = C.borderHi; el.style.opacity = '1'; el.style.color = C.teal; el.style.backgroundColor = `${C.teal}15`; }}
+                              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = 'transparent'; el.style.opacity = '0.5'; el.style.color = C.textDim; el.style.backgroundColor = 'transparent'; }}
+                              title="View job details"
+                              data-testid={`button-job-actions-${job.id}`}
+                            >
+                              <ExternalLink style={{ width: 13, height: 13 }} />
+                            </button>
                           </td>
                         </tr>
                       );

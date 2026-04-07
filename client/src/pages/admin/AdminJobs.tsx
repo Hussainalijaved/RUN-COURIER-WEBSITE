@@ -544,7 +544,13 @@ function MultiDropStopsSection({ jobId, isMultiDrop, pickupAddress, pickupPostco
 }
 
 export default function AdminJobs() {
-  const [searchQuery, setSearchQuery] = useState('');
+  // Pre-fill search from URL param ?track=TRACKING_NUMBER (used by dashboard deep-links)
+  const initialSearch = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('track') || '';
+    } catch { return ''; }
+  })();
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>('all');
   const [officeFilter, setOfficeFilter] = useState<string>('all');
