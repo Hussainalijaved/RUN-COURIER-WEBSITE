@@ -10828,6 +10828,75 @@ export async function registerRoutes(
     hireAndReward: 'hire_and_reward_url',
   };
 
+  // ── Driver profile picture serving (no auth — for <img> tags) ────────────
+  app.get("/api/drivers/:id/profile-picture", asyncHandler(async (req, res) => {
+    const driverId = req.params.id;
+    const { supabaseAdmin: sb } = await import('./supabaseAdmin');
+    if (!sb) return res.status(500).json({ error: 'Storage unavailable' });
+
+    // Fetch the stored URL from Supabase drivers table
+    const { data: driverRow } = await sb
+      .from('drivers')
+      .select('profile_picture_url')
+      .eq('id', driverId)
+      .maybeSingle();
+
+    const rawUrl: string | null = driverRow?.profile_picture_url ?? null;
+    if (!rawUrl) return res.status(404).json({ error: 'No profile picture' });
+
+    // Helper: stream a URL directly to the response
+    const streamUrl = async (url: string): Promise<boolean> => {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!r.ok) return false;
+        const ext = (url.split('.').pop() || '').toLowerCase().split('?')[0];
+        const MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+        res.setHeader('Content-Type', MIME[ext] || r.headers.get('content-type') || 'image/jpeg');
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        const { Readable } = await import('stream');
+        Readable.fromWeb(r.body as any).pipe(res);
+        return true;
+      } catch (_) { return false; }
+    };
+
+    // Extract storage path from a full Supabase URL
+    const extractPath = (url: string): string | null => {
+      const markers = [
+        '/object/public/DRIVER-DOCUMENTS/',
+        '/object/public/driver-documents/',
+        '/object/DRIVER-DOCUMENTS/',
+        '/object/driver-documents/',
+      ];
+      for (const m of markers) {
+        const idx = url.indexOf(m);
+        if (idx !== -1) return url.substring(idx + m.length).split('?')[0];
+      }
+      return null;
+    };
+
+    // Strategy 1: try direct fetch of the stored URL
+    if (rawUrl.startsWith('http')) {
+      const ok = await streamUrl(rawUrl);
+      if (ok) return;
+    }
+
+    // Strategy 2: generate a fresh signed URL from storage
+    const storagePath = rawUrl.startsWith('http') ? extractPath(rawUrl) : rawUrl.split('?')[0];
+    if (storagePath) {
+      for (const bucket of ['DRIVER-DOCUMENTS', 'driver-documents']) {
+        try {
+          const { data } = await sb.storage.from(bucket).createSignedUrl(storagePath, 3600);
+          if (data?.signedUrl) {
+            const ok = await streamUrl(data.signedUrl);
+            if (ok) return;
+          }
+        } catch (_) {}
+      }
+    }
+
+    return res.status(404).json({ error: 'Could not serve profile picture' });
+  }));
+
   app.get("/api/application-document/:appId/:field", asyncHandler(async (req, res) => {
     const { appId, field } = req.params;
     const col = APPLICATION_FIELD_MAP[field];
