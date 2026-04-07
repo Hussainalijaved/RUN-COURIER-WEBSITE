@@ -1269,8 +1269,8 @@ export default function AdminDrivers() {
 
                 {/* ── Enterprise Profile Header ─────────────────────────────── */}
                 <div className="flex items-start gap-5 bg-muted/40 border rounded-lg p-5">
-                  {/* Avatar with live-indicator dot + edit overlay */}
-                  <div className="relative shrink-0">
+                  {/* Avatar column: avatar + upload button in edit mode */}
+                  <div className="shrink-0 flex flex-col items-center gap-2">
                     <input
                       ref={avatarFileInputRef}
                       type="file"
@@ -1279,36 +1279,51 @@ export default function AdminDrivers() {
                       className="hidden"
                       data-testid="input-avatar-file"
                     />
-                    <Avatar className="h-24 w-24 ring-2 ring-primary/20 shadow-sm">
-                      <AvatarImage
-                        src={`/api/drivers/${selectedDriver.id}/profile-picture?v=${avatarVersion}`}
-                        alt={getDriverInfo(selectedDriver).name || 'Driver'}
-                      />
-                      <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
-                        {getDriverInfo(selectedDriver).name?.split(' ').map((n) => n[0]).join('').slice(0, 2) || 'D'}
-                      </AvatarFallback>
-                    </Avatar>
-                    {/* Camera overlay — only visible in edit mode */}
+                    <div className="relative">
+                      <Avatar className="h-24 w-24 ring-2 ring-primary/20 shadow-sm">
+                        <AvatarImage
+                          src={`/api/drivers/${selectedDriver.id}/profile-picture?v=${avatarVersion}`}
+                          alt={getDriverInfo(selectedDriver).name || 'Driver'}
+                        />
+                        <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                          {getDriverInfo(selectedDriver).name?.split(' ').map((n) => n[0]).join('').slice(0, 2) || 'D'}
+                        </AvatarFallback>
+                      </Avatar>
+                      {/* Subtle hover overlay on the avatar itself */}
+                      {editMode && (
+                        <button
+                          type="button"
+                          onClick={() => avatarFileInputRef.current?.click()}
+                          disabled={uploadingAvatar}
+                          aria-label="Change profile picture"
+                          className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 text-white opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                        >
+                          <Camera className="h-6 w-6" />
+                        </button>
+                      )}
+                      {!editMode && selectedDriver.isAvailable && (
+                        <span className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full" />
+                      )}
+                    </div>
+
+                    {/* Persistent upload button below avatar — always visible in edit mode */}
                     {editMode && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => avatarFileInputRef.current?.click()}
                         disabled={uploadingAvatar}
                         data-testid="button-change-avatar"
-                        className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/50 text-white opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                        className="text-xs"
                       >
                         {uploadingAvatar ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
                         ) : (
-                          <Camera className="h-5 w-5" />
+                          <Camera className="h-3 w-3 mr-1.5" />
                         )}
-                        <span className="text-[10px] font-medium mt-0.5 leading-tight">
-                          {uploadingAvatar ? 'Saving…' : 'Change'}
-                        </span>
-                      </button>
-                    )}
-                    {!editMode && selectedDriver.isAvailable && (
-                      <span className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full" />
+                        {uploadingAvatar ? 'Uploading…' : 'Upload Photo'}
+                      </Button>
                     )}
                   </div>
 
