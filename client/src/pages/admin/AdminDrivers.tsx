@@ -1210,55 +1210,77 @@ export default function AdminDrivers() {
         {/* Profile Dialog */}
         <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
-                {selectedDriver && getDriverInfo(selectedDriver).driverCode && (
-                  <Badge className="bg-blue-600 text-white font-mono text-lg px-3 py-1">
-                    {getDriverInfo(selectedDriver).driverCode}
-                  </Badge>
-                )}
-                Driver Profile
-              </DialogTitle>
-              <DialogDescription>
-                {selectedDriver && getDriverInfo(selectedDriver).name}
-              </DialogDescription>
-            </DialogHeader>
+            <DialogTitle className="sr-only">Driver Profile</DialogTitle>
+            <DialogDescription className="sr-only">
+              {selectedDriver ? getDriverInfo(selectedDriver).name : 'Driver profile'}
+            </DialogDescription>
             {selectedDriver && (
               <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage
-                      src={`/api/drivers/${selectedDriver.id}/profile-picture`}
-                      alt={getDriverInfo(selectedDriver).name || 'Driver'}
-                    />
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                      {getDriverInfo(selectedDriver).name?.split(' ').map((n) => n[0]).join('') || 'D'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold">{getDriverInfo(selectedDriver).name}</h3>
-                    <div className="flex flex-wrap gap-2 mt-1">
+
+                {/* ── Enterprise Profile Header ─────────────────────────────── */}
+                <div className="flex items-start gap-5 bg-muted/40 border rounded-lg p-5">
+                  {/* Avatar with live-indicator dot */}
+                  <div className="relative shrink-0">
+                    <Avatar className="h-24 w-24 ring-2 ring-primary/20 shadow-sm">
+                      <AvatarImage
+                        src={`/api/drivers/${selectedDriver.id}/profile-picture`}
+                        alt={getDriverInfo(selectedDriver).name || 'Driver'}
+                      />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                        {getDriverInfo(selectedDriver).name?.split(' ').map((n) => n[0]).join('').slice(0, 2) || 'D'}
+                      </AvatarFallback>
+                    </Avatar>
+                    {selectedDriver.isAvailable && (
+                      <span className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full" />
+                    )}
+                  </div>
+
+                  {/* Name + meta */}
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    {getDriverInfo(selectedDriver).driverCode && (
+                      <div className="mb-2">
+                        <Badge className="bg-blue-600 text-white font-mono text-xs">
+                          {getDriverInfo(selectedDriver).driverCode}
+                        </Badge>
+                      </div>
+                    )}
+                    <h2 className="text-2xl font-bold tracking-tight leading-tight">
+                      {getDriverInfo(selectedDriver).name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1 capitalize">
+                      {selectedDriver.vehicleType?.replace(/_/g, ' ')} Driver
+                      {selectedDriver.vehicleRegistration && (
+                        <span className="font-mono ml-1.5">· {selectedDriver.vehicleRegistration}</span>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
                       {selectedDriver.isVerified ? (
-                        <Badge className="bg-green-500 text-white">Verified</Badge>
+                        <Badge className="bg-green-500 text-white">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
                       ) : (
-                        <Badge variant="secondary">Unverified</Badge>
+                        <Badge variant="secondary">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Unverified
+                        </Badge>
                       )}
-                      {selectedDriver.isAvailable && (
-                        <Badge className="bg-blue-500 text-white">Online</Badge>
-                      )}
+                      <Badge className={selectedDriver.isAvailable ? 'bg-blue-500 text-white' : ''} variant={selectedDriver.isAvailable ? 'default' : 'outline'}>
+                        {selectedDriver.isAvailable ? 'Online' : 'Offline'}
+                      </Badge>
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => setEditMode(!editMode)}
+                    className="shrink-0"
                   >
                     <Edit3 className="h-4 w-4 mr-2" />
                     {editMode ? 'Cancel' : 'Edit'}
                   </Button>
                 </div>
-
-                <Separator />
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-4">

@@ -1,0 +1,14 @@
+Create a high-resolution, realistic screenshot of a clean, professional enterprise-grade admin dashboard for "Run Courier", a same-day courier company. The UI must look like premium logistics software used by large courier firms — modern, trustworthy, with excellent spacing, visual hierarchy, subtle shadows, and polished SaaS aesthetics. Use a dark theme with deep navy blue and teal accents, crisp modern sans-serif fonts.
+
+Show the FULL dashboard from top to bottom with no cropping. Focus on the "Drivers Management" section where a modal "Driver Profile" popup is open for the driver "ANWAR ALMASHRIQI".
+
+Keep EVERY feature, text, layout, and data EXACTLY as shown in the provided screenshot — do not add, remove, or change any content or functionality except for the driver avatar:
+
+- Left sidebar with "Drivers Management" section showing 76 Total Drivers and the list of drivers (Edinho Rocha, ANWAR ALMASHRIQI, Richar Duarte, Pintokumar, etc.) with their IDs like RC343, RC348, etc.
+- Central modal titled "Driver Profile" for "ANWAR ALMASHRIQI" with "Verified" and "Online" badges.
+- In the modal, next to the name "ANWAR ALMASHRIQI", there must be a prominent circular blue avatar with the initials "AA" replaced by a clear, realistic photo of a man (South Asian or Middle Eastern appearance, professional driver look, short dark hair, friendly expression, wearing a casual shirt). The photo must be perfectly fitted inside the blue circular frame, high quality, and clearly visible.
+- All other fields remain exactly the same: Contact Information (email almarshriq2010@yahoo.com, phone +44 7964503009, address 112 BRIDGEWATER ROAD, postcode HA4 6LW), Vehicle Information (Small Van, registration KV10Z0Z), Verification & Compliance section with checkboxes.
+
+Make the overall design tidy and enterprise-grade: generous whitespace, improved typography, polished buttons, clean cards, sharp icons, and professional layout so it feels like real courier management software.
+
+Ultra-clean, high detail, sharp UI elements, trustworthy appearance, realistic laptop screen view if it fits naturally.
