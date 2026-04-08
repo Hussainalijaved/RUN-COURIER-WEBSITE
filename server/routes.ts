@@ -24,7 +24,7 @@ import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
 import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification, wrapEmailContent } from "./emailService";
-import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS } from "./twilioService";
+import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS, sendAdminNewBookingAlert } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
 import { geocodeAddress } from "./geocoding";
@@ -9911,6 +9911,14 @@ export async function registerRoutes(
       await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode, job.jobNumber || jobNumber)
         .catch(err => console.error('Failed to send SMS confirmation:', err));
     }
+    // Notify admin numbers of new booking
+    sendAdminNewBookingAlert({
+      jobNumber: String(job.jobNumber || jobNumber),
+      trackingNumber,
+      pickupAddress: jobData.pickupAddress || jobData.pickupPostcode || '',
+      vehicleType: jobData.vehicleType,
+      price: job.totalPrice,
+    }).catch(err => console.error('[Admin SMS] Embedded booking alert failed:', err));
 
     res.json({ 
       success: true, 
@@ -10038,6 +10046,14 @@ export async function registerRoutes(
       await sendBookingConfirmationSMS(bookingData.pickupPhone, trackingNumber, bookingData.pickupAddress || bookingData.pickupPostcode, job.jobNumber || jobNumber)
         .catch(err => console.error('Failed to send SMS confirmation:', err));
     }
+    // Notify admin numbers of new booking
+    sendAdminNewBookingAlert({
+      jobNumber: String(job.jobNumber || jobNumber),
+      trackingNumber,
+      pickupAddress: bookingData.pickupAddress || bookingData.pickupPostcode || '',
+      vehicleType: bookingData.vehicleType,
+      price: job.totalPrice,
+    }).catch(err => console.error('[Admin SMS] Pay-later booking alert failed:', err));
 
     res.json({ 
       success: true, 
@@ -10139,6 +10155,14 @@ export async function registerRoutes(
       await sendBookingConfirmationSMS(pickupPhone, trackingNumber, jobData.pickupAddress || jobData.pickupPostcode, job.jobNumber || jobNumber)
         .catch(err => console.error('Failed to send SMS confirmation:', err));
     }
+    // Notify admin numbers of new booking
+    sendAdminNewBookingAlert({
+      jobNumber: String(job.jobNumber || jobNumber),
+      trackingNumber,
+      pickupAddress: jobData.pickupAddress || jobData.pickupPostcode || '',
+      vehicleType: jobData.vehicleType,
+      price: job.totalPrice,
+    }).catch(err => console.error('[Admin SMS] Stripe booking alert failed:', err));
 
     res.json({ 
       success: true, 

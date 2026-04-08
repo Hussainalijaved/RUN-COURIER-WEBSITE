@@ -153,6 +153,28 @@ export async function sendBookingConfirmationSMS(phone: string, trackingNumber: 
   return sendSMS(phone, message);
 }
 
+// Admin numbers to notify on every new booking
+const ADMIN_ALERT_NUMBERS = ['07956503009', '07377199331'];
+
+// Send new booking alert to admin numbers
+export async function sendAdminNewBookingAlert(opts: {
+  jobNumber: string;
+  trackingNumber: string;
+  pickupAddress: string;
+  vehicleType?: string;
+  price?: number | string;
+}): Promise<void> {
+  const vehicleInfo = opts.vehicleType ? ` | ${opts.vehicleType.replace(/_/g, ' ')}` : '';
+  const priceInfo = opts.price ? ` | £${Number(opts.price).toFixed(2)}` : '';
+  const message = `NEW BOOKING - Run Courier\nJob #${opts.jobNumber} (${opts.trackingNumber})\nPickup: ${opts.pickupAddress}${vehicleInfo}${priceInfo}\nAdmin: runcourier.co.uk/admin/jobs`;
+
+  for (const number of ADMIN_ALERT_NUMBERS) {
+    sendSMS(number, message).catch(err =>
+      console.error(`[Admin SMS] Failed to notify ${number}:`, err)
+    );
+  }
+}
+
 // Send pickup notification to customer
 export async function sendPickupNotificationSMS(phone: string, trackingNumber: string, driverName?: string): Promise<{ success: boolean; error?: string }> {
   const driverInfo = driverName ? ` Driver: ${driverName}.` : '';
