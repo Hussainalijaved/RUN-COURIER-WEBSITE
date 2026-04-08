@@ -102,7 +102,7 @@ function PanelSection({ title, children, badge }: { title: string; children: Rea
   return (
     <section className="border-b border-border">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-        <span className="text-muted-foreground/60 uppercase tracking-widest" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.13em' }}>
+        <span className="text-muted-foreground/80 uppercase tracking-widest" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.13em' }}>
           {title}
         </span>
         {badge != null && badge > 0 && (
@@ -207,9 +207,9 @@ export default function AdminDashboard() {
           </span>
 
           <div className="relative flex-1 max-w-md hidden sm:block">
-            <Search className="absolute text-muted-foreground/60" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13 }} />
+            <Search className="absolute text-muted-foreground/80" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13 }} />
             <input
-              className="w-full bg-card border border-border text-muted-foreground rounded-md outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/40"
+              className="w-full bg-card border border-border text-muted-foreground rounded-md outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
               style={{ height: 34, paddingLeft: 32, paddingRight: 12, fontSize: 12, fontFamily: 'inherit' }}
               placeholder="Search tracking ID, postcode, driver…"
               value={search}
@@ -260,7 +260,7 @@ export default function AdminDashboard() {
                   padding: '0 14px',
                   fontSize: 12,
                   fontWeight: active ? 600 : 500,
-                  color: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.6)',
+                  color: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.8)',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
@@ -280,7 +280,7 @@ export default function AdminDashboard() {
             );
           })}
           <span
-            className="ml-auto pr-5 flex-shrink-0 tabular-nums text-muted-foreground/60"
+            className="ml-auto pr-5 flex-shrink-0 tabular-nums text-muted-foreground/80"
             style={{ fontSize: 11, whiteSpace: 'nowrap' }}
           >
             {filtered.length} result{filtered.length !== 1 ? 's' : ''}
@@ -300,7 +300,7 @@ export default function AdminDashboard() {
                     {(['Order ID', 'Route', 'Driver', 'Vehicle', 'Status', 'Time', 'Amount'] as const).map((label, i) => (
                       <th
                         key={label}
-                        className={`py-3 px-3 whitespace-nowrap text-muted-foreground/60 uppercase bg-background border-b border-border sticky top-0 z-[5] ${label === 'Vehicle' ? 'hidden md:table-cell' : ''} ${label === 'Time' ? 'hidden sm:table-cell' : ''} ${label === 'Amount' ? 'pr-4' : ''} ${label === 'Order ID' ? 'pl-4' : ''}`}
+                        className={`py-3 px-3 whitespace-nowrap text-muted-foreground/80 uppercase bg-background border-b border-border sticky top-0 z-[5] ${label === 'Vehicle' ? 'hidden md:table-cell' : ''} ${label === 'Time' ? 'hidden sm:table-cell' : ''} ${label === 'Amount' ? 'pr-4' : ''} ${label === 'Order ID' ? 'pl-4' : ''}`}
                         style={{ textAlign: label === 'Amount' ? 'right' : 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em' }}
                       >
                         {label}
@@ -344,8 +344,8 @@ export default function AdminDashboard() {
                           <td className="px-3 py-4" style={{ maxWidth: 170 }}>
                             <div className="flex items-center gap-1.5 text-muted-foreground min-w-0">
                               <span className="font-medium truncate flex-shrink" style={{ fontSize: 12 }}>{job.pickupPostcode}</span>
-                              <ArrowRight className="text-muted-foreground/40 flex-shrink-0" style={{ width: 10, height: 10 }} />
-                              <span className="text-muted-foreground/60 truncate flex-shrink" style={{ fontSize: 12 }}>{job.deliveryPostcode}</span>
+                              <ArrowRight className="text-muted-foreground/60 flex-shrink-0" style={{ width: 10, height: 10 }} />
+                              <span className="text-muted-foreground/80 truncate flex-shrink" style={{ fontSize: 12 }}>{job.deliveryPostcode}</span>
                             </div>
                           </td>
 
@@ -356,7 +356,7 @@ export default function AdminDashboard() {
                           </td>
 
                           <td className="px-3 py-4 hidden md:table-cell">
-                            <span className="text-muted-foreground/60 whitespace-nowrap" style={{ fontSize: 12 }}>
+                            <span className="text-muted-foreground/80 whitespace-nowrap" style={{ fontSize: 12 }}>
                               {fmtVehicle(job.vehicleType)}
                             </span>
                           </td>
@@ -366,7 +366,7 @@ export default function AdminDashboard() {
                           </td>
 
                           <td className="px-3 py-4 hidden sm:table-cell">
-                            <span className="text-muted-foreground/60 whitespace-nowrap" style={{ fontSize: 12 }}>{fmtDate((job as any).createdAt)}</span>
+                            <span className="text-muted-foreground/80 whitespace-nowrap" style={{ fontSize: 12 }}>{fmtDate((job as any).createdAt)}</span>
                           </td>
 
                           <td className="px-3 pr-4 py-4 text-right">
@@ -379,7 +379,7 @@ export default function AdminDashboard() {
                                 e.stopPropagation();
                                 navigate(`/admin/jobs?track=${encodeURIComponent(job.trackingNumber)}`);
                               }}
-                              className="flex items-center justify-center rounded border border-transparent text-muted-foreground/40 hover:border-border hover:text-primary hover:bg-primary/10 transition-all"
+                              className="flex items-center justify-center rounded border border-transparent text-muted-foreground/60 hover:border-border hover:text-primary hover:bg-primary/10 transition-all"
                               style={{ width: 28, height: 28, background: 'none', cursor: 'pointer' }}
                               title="View job details"
                               data-testid={`button-job-actions-${job.id}`}
@@ -394,7 +394,7 @@ export default function AdminDashboard() {
                     <tr>
                       <td colSpan={9}>
                         <div className="flex flex-col items-center justify-center py-24 gap-3">
-                          <Package className="text-muted-foreground/40" style={{ width: 32, height: 32 }} />
+                          <Package className="text-muted-foreground/60" style={{ width: 32, height: 32 }} />
                           <p className="text-muted-foreground" style={{ fontSize: 13 }}>No jobs match your filter</p>
                           {(filter !== 'all' || search) && (
                             <button
@@ -415,7 +415,7 @@ export default function AdminDashboard() {
 
             {/* ── Pagination ── */}
             <div className="flex items-center justify-between flex-shrink-0 border-t border-border" style={{ height: 44, padding: '0 20px' }}>
-              <span className="text-muted-foreground/60 tabular-nums" style={{ fontSize: 11 }}>
+              <span className="text-muted-foreground/80 tabular-nums" style={{ fontSize: 11 }}>
                 {filtered.length === 0 ? '0 results' : `${(page-1)*PER_PAGE+1}–${Math.min(page*PER_PAGE,filtered.length)} of ${filtered.length}`}
               </span>
               <div className="flex items-center gap-2">
@@ -462,14 +462,14 @@ export default function AdminDashboard() {
                     >
                       {item.n}
                     </span>
-                    <span className="text-muted-foreground/60 uppercase text-center" style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.09em', marginTop: 3 }}>
+                    <span className="text-muted-foreground/80 uppercase text-center" style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.09em', marginTop: 3 }}>
                       {item.label}
                     </span>
                   </div>
                 ))}
               </div>
               <div className="flex items-center justify-between px-4 py-2.5">
-                <span className="text-muted-foreground/60" style={{ fontSize: 11 }}>Today's Revenue</span>
+                <span className="text-muted-foreground/80" style={{ fontSize: 11 }}>Today's Revenue</span>
                 <span className="text-foreground" style={{ fontSize: 13, fontWeight: 700 }}>{fmt(stats?.todayRevenue)}</span>
               </div>
             </PanelSection>
@@ -494,13 +494,13 @@ export default function AdminDashboard() {
                         color: (item as any).primary
                           ? 'hsl(var(--primary))'
                           : (item as any).dim
-                          ? 'hsl(var(--muted-foreground) / 0.5)'
+                          ? 'hsl(var(--muted-foreground) / 0.7)'
                           : 'hsl(var(--foreground))',
                       }}
                     >
                       {item.n}
                     </span>
-                    <span className="text-muted-foreground/50 uppercase" style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', marginTop: 3 }}>
+                    <span className="text-muted-foreground/70 uppercase" style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', marginTop: 3 }}>
                       {item.label}
                     </span>
                   </div>
@@ -508,7 +508,7 @@ export default function AdminDashboard() {
               </div>
               <div style={{ maxHeight: 180, overflowY: 'auto' }}>
                 {activeDrivers.length === 0 ? (
-                  <p className="text-muted-foreground/50" style={{ padding: '12px 16px', fontSize: 11 }}>No active drivers</p>
+                  <p className="text-muted-foreground/70" style={{ padding: '12px 16px', fontSize: 11 }}>No active drivers</p>
                 ) : activeDrivers.slice(0, 12).map(d => {
                   const active = deliveringIds.has(d.id);
                   return (
@@ -517,11 +517,11 @@ export default function AdminDashboard() {
                       className="flex items-center gap-2.5 border-b border-border"
                       style={{ padding: '8px 16px' }}
                     >
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.4)', flexShrink: 0 }} />
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.6)', flexShrink: 0 }} />
                       <span className="text-muted-foreground flex-1 truncate" style={{ fontSize: 11 }}>
                         {d.fullName || d.vehicleRegistration || 'Driver'}
                       </span>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.4)', flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.6)', flexShrink: 0 }}>
                         {active ? 'Active' : 'Avail'}
                       </span>
                     </div>
@@ -545,14 +545,14 @@ export default function AdminDashboard() {
                   >
                     <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: a.color, flexShrink: 0 }} />
                     <span className="text-muted-foreground flex-1" style={{ fontSize: 11, lineHeight: 1.4 }}>{a.label}</span>
-                    <ArrowRight className="text-muted-foreground/40 flex-shrink-0" style={{ width: 10, height: 10 }} />
+                    <ArrowRight className="text-muted-foreground/60 flex-shrink-0" style={{ width: 10, height: 10 }} />
                   </div>
                 </Link>
               ))}
               {totalAlerts === 0 && (
                 <div className="flex flex-col items-center gap-1.5 py-5">
                   <CheckCircle style={{ width: 16, height: 16, color: '#10B981' }} />
-                  <span className="text-muted-foreground/50" style={{ fontSize: 11 }}>All clear</span>
+                  <span className="text-muted-foreground/70" style={{ fontSize: 11 }}>All clear</span>
                 </div>
               )}
             </PanelSection>
