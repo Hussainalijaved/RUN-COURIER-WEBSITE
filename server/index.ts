@@ -830,6 +830,7 @@ async function runBackgroundTasks() {
         amount NUMERIC(10,2) NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )`);
+      await pool.query(`ALTER TABLE api_invoice_items ADD COLUMN IF NOT EXISTS job_number TEXT`);
 
       await pool.end();
       console.log("[MIGRATION] API integration tables created/verified successfully");

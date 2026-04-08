@@ -72,7 +72,7 @@ export async function runWeeklyApiInvoicingJob(
 
         const { data: byClientId, error: byClientIdErr } = await supabaseAdmin
           .from('jobs')
-          .select('id, tracking_number, pickup_address, delivery_address, vehicle_type, scheduled_pickup_time, total_price, created_at')
+          .select('id, tracking_number, job_number, pickup_address, delivery_address, vehicle_type, scheduled_pickup_time, total_price, created_at')
           .eq('payment_status', 'pay_later')
           .eq('api_client_id', String(client.id));
 
@@ -81,7 +81,7 @@ export async function runWeeklyApiInvoicingJob(
         } else {
           const { data: byCreatedBy, error: byCreatedByErr } = await supabaseAdmin
             .from('jobs')
-            .select('id, tracking_number, pickup_address, delivery_address, vehicle_type, scheduled_pickup_time, total_price, created_at')
+            .select('id, tracking_number, job_number, pickup_address, delivery_address, vehicle_type, scheduled_pickup_time, total_price, created_at')
             .eq('payment_status', 'pay_later')
             .ilike('created_by', `API: ${client.company_name}`);
 
@@ -146,10 +146,10 @@ async function processClientInvoice(
   for (const job of unbilledJobs) {
     await pool.query(
       `INSERT INTO api_invoice_items
-        (invoice_id, job_id, tracking_number, pickup_address, delivery_address, vehicle_type, scheduled_date, amount)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        (invoice_id, job_id, tracking_number, job_number, pickup_address, delivery_address, vehicle_type, scheduled_date, amount)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [
-        invoiceId, String(job.id), job.tracking_number,
+        invoiceId, String(job.id), job.tracking_number, job.job_number || null,
         job.pickup_address || '', job.delivery_address || '',
         job.vehicle_type || '',
         job.scheduled_pickup_time ? new Date(job.scheduled_pickup_time).toISOString().slice(0, 10) : '',

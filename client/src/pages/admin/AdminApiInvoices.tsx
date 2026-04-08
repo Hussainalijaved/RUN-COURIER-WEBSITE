@@ -72,6 +72,7 @@ interface InvoiceItem {
   id: number;
   job_id: string;
   tracking_number: string;
+  job_number?: string | null;
   pickup_address: string;
   delivery_address: string;
   vehicle_type: string;
@@ -487,7 +488,7 @@ export default function AdminApiInvoices() {
                   <TableBody>
                     {(detailInvoice.items ?? []).map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell className="font-mono text-xs">{item.tracking_number}</TableCell>
+                        <TableCell className="font-mono text-xs">{item.job_number || item.tracking_number}</TableCell>
                         <TableCell className="text-sm">{item.scheduled_date || "—"}</TableCell>
                         <TableCell className="text-sm max-w-[160px] truncate">{item.pickup_address || "—"}</TableCell>
                         <TableCell className="text-sm max-w-[160px] truncate">{item.delivery_address || "—"}</TableCell>

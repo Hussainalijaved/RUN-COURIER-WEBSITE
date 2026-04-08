@@ -17695,7 +17695,7 @@ ON CONFLICT (type) DO NOTHING;
       if (!invRows[0]) return res.status(404).json({ error: 'not_found' });
 
       const { rows: items } = await pool.query(
-        `SELECT id, job_id, tracking_number, pickup_address, delivery_address,
+        `SELECT id, job_id, tracking_number, job_number, pickup_address, delivery_address,
                 vehicle_type, scheduled_date, amount, created_at
          FROM api_invoice_items WHERE invoice_id = $1 ORDER BY id`,
         [parseInt(req.params.id)]
