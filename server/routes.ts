@@ -12146,7 +12146,7 @@ export async function registerRoutes(
         console.log(`[Invoices] Enriching ${needsEnrichment.length} invoices, job IDs:`, allMissingIds);
         const { data: missingJobs, error: missingJobsError } = await supabaseAdmin
           .from('jobs')
-          .select('id, tracking_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
+          .select('id, tracking_number, job_number, pickup_address, delivery_address, recipient_name, scheduled_pickup_time, vehicle_type, total_price, is_multi_drop, waiting_time_charge')
           .in('id', allMissingIds);
         console.log(`[Invoices] Job fetch result: ${missingJobs?.length ?? 0} jobs, error:`, missingJobsError?.message ?? 'none');
 
@@ -12187,8 +12187,9 @@ export async function registerRoutes(
               }];
             }
           }
+          const enrichedJob = ensureJobNumber({ id: j.id, jobNumber: (j as any).job_number || null });
           const entry = {
-            jobNumber: j.tracking_number || String(j.id),
+            jobNumber: enrichedJob.jobNumber,
             trackingNumber: j.tracking_number || 'N/A',
             pickupAddress: j.pickup_address || 'N/A',
             deliveryAddress: j.delivery_address || 'N/A',

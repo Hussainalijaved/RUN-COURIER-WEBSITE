@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1472,8 +1472,8 @@ export default function AdminInvoices() {
                           {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => {
                             const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
                             return (
-                              <>
-                              <TableRow key={idx} className="align-top">
+                              <React.Fragment key={idx}>
+                              <TableRow className="align-top">
                                 <TableCell className="font-mono text-sm">{job.jobNumber || job.trackingNumber || 'N/A'}</TableCell>
                                 <TableCell className="text-sm max-w-[300px] break-words">
                                   {isMultiDrop ? (
@@ -1505,7 +1505,7 @@ export default function AdminInvoices() {
                                   <TableCell className="text-right text-xs text-muted-foreground">{formatPrice(job.waitingTimeCharge)}</TableCell>
                                 </TableRow>
                               )}
-                              </>
+                              </React.Fragment>
                             );
                           })}
                         </TableBody>

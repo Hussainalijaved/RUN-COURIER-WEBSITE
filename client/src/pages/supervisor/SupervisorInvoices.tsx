@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -853,8 +853,8 @@ export default function SupervisorInvoices() {
                         {JSON.parse(viewInvoice.job_details).map((job: any, idx: number) => {
                           const isMultiDrop = job.isMultiDrop && job.multiDropStops && job.multiDropStops.length > 0;
                           return (
-                            <>
-                            <TableRow key={idx} className="align-top">
+                            <React.Fragment key={idx}>
+                            <TableRow className="align-top">
                               <TableCell className="font-mono text-sm">
                                 {job.jobNumber || job.trackingNumber || 'N/A'}
                               </TableCell>
@@ -904,7 +904,7 @@ export default function SupervisorInvoices() {
                                 </TableCell>
                               </TableRow>
                             )}
-                            </>
+                            </React.Fragment>
                           );
                         })}
                       </TableBody>
