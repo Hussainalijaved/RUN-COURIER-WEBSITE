@@ -354,6 +354,16 @@ export default function AdminMap() {
         const hasStoredPickup = job.pickupLatitude && job.pickupLongitude;
         const hasStoredDelivery = job.deliveryLatitude && job.deliveryLongitude;
         
+        // Helper: best geocodable string — postcode → extracted UK postcode → full address
+        const ukPostcodeRe = /\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i;
+        const bestGeoStr = (postcode: string | null | undefined, address: string | null | undefined): string | null => {
+          if (postcode?.trim()) return postcode.trim();
+          const extracted = address && ukPostcodeRe.exec(address);
+          if (extracted) return extracted[1].trim();
+          if (address?.trim()) return address.trim();
+          return null;
+        };
+
         let multiDropStops: { lat: number; lng: number; postcode: string; stopOrder: number }[] | undefined;
         
         // For multi-drop jobs, fetch the stops
@@ -364,31 +374,32 @@ export default function AdminMap() {
             if (data.stops && Array.isArray(data.stops)) {
               const sortedStops = data.stops.sort((a: MultiDropStop, b: MultiDropStop) => a.stopOrder - b.stopOrder);
               
-              // Process each stop - use stored coords or geocode from postcode
               const processedStops: { lat: number; lng: number; postcode: string; stopOrder: number }[] = [];
               for (const stop of sortedStops) {
                 if (stop.latitude && stop.longitude) {
-                  // Use stored coordinates
                   processedStops.push({
                     lat: parseFloat(String(stop.latitude)),
                     lng: parseFloat(String(stop.longitude)),
-                    postcode: stop.postcode,
+                    postcode: stop.postcode || stop.address || '',
                     stopOrder: stop.stopOrder,
                   });
-                } else if (stop.postcode) {
-                  // Geocode from postcode
-                  try {
-                    const geocoded = await geocodePostcode(stop.postcode);
-                    if (geocoded) {
-                      processedStops.push({
-                        lat: geocoded.lat,
-                        lng: geocoded.lng,
-                        postcode: stop.postcode,
-                        stopOrder: stop.stopOrder,
-                      });
+                } else {
+                  // Geocode: postcode → extracted postcode from address → full address
+                  const geoStr = bestGeoStr(stop.postcode, stop.address);
+                  if (geoStr) {
+                    try {
+                      const geocoded = await geocodePostcode(geoStr);
+                      if (geocoded) {
+                        processedStops.push({
+                          lat: geocoded.lat,
+                          lng: geocoded.lng,
+                          postcode: stop.postcode || geoStr,
+                          stopOrder: stop.stopOrder,
+                        });
+                      }
+                    } catch (geocodeError) {
+                      console.error(`Failed to geocode stop ${stop.stopOrder}:`, geocodeError);
                     }
-                  } catch (geocodeError) {
-                    console.error(`Failed to geocode stop ${stop.stopOrder}:`, geocodeError);
                   }
                 }
               }
@@ -398,18 +409,6 @@ export default function AdminMap() {
             console.error(`Failed to fetch multi-drop stops for job ${jobIdStr}:`, error);
           }
         }
-        
-        // Helper: best geocodable string for an address — postcode preferred,
-        // falls back to extracting a UK postcode from the full address string,
-        // then falls back to the full address itself (Google can geocode that too).
-        const ukPostcodeRe = /\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i;
-        const bestGeoStr = (postcode: string | null | undefined, address: string | null | undefined): string | null => {
-          if (postcode?.trim()) return postcode.trim();
-          const extracted = address && ukPostcodeRe.exec(address);
-          if (extracted) return extracted[1].trim();
-          if (address?.trim()) return address.trim();
-          return null;
-        };
 
         if (hasStoredPickup && hasStoredDelivery) {
           // Use stored coordinates directly
@@ -645,11 +644,88 @@ export default function AdminMap() {
         existingJobMarkers.polyline.setOptions({
           strokeColor: isPending ? '#F59E0B' : '#3B82F6',
         });
+      } else if (job.isMultiDrop && location.multiDropStops && location.multiDropStops.length > 0) {
+        // ── MULTI-DROP: render identically to the route planner ──────────────
+        // Lettered circle markers (A=pickup, B/C/D=drops), same gradient colours,
+        // single polyline — no separate delivery arrow (last drop IS the delivery).
+        const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const allPoints: { lat: number; lng: number; label: string; postcode: string }[] = [
+          { lat: location.pickupLat, lng: location.pickupLng, label: ALPHA[0], postcode: location.pickupPostcode },
+          ...location.multiDropStops.map((stop, i) => ({
+            lat: stop.lat,
+            lng: stop.lng,
+            label: ALPHA[i + 1] || String(i + 2),
+            postcode: stop.postcode,
+          })),
+        ];
+        const total = allPoints.length;
+        const mdStopColor = (i: number) => i === 0 ? '#16a34a' : i === total - 1 ? '#dc2626' : '#2563eb';
+
+        const routePath = allPoints.map(p => ({ lat: p.lat, lng: p.lng }));
+        const polyline = new google.maps.Polyline({
+          path: routePath,
+          geodesic: true,
+          strokeColor: isPending ? '#F59E0B' : '#2563eb',
+          strokeOpacity: 0.7,
+          strokeWeight: 3,
+          map,
+        });
+
+        const allMarkers: google.maps.Marker[] = [];
+        allPoints.forEach((point, i) => {
+          const marker = new google.maps.Marker({
+            position: { lat: point.lat, lng: point.lng },
+            map,
+            title: point.postcode,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: mdStopColor(i),
+              fillOpacity: 1,
+              strokeColor: '#fff',
+              strokeWeight: 2,
+              scale: 12,
+            },
+            label: { text: point.label, color: '#fff', fontSize: '11px', fontWeight: 'bold' },
+            zIndex: 100 + i,
+          });
+
+          marker.addListener('mouseover', () => {
+            if (!infoWindowRef.current) infoWindowRef.current = new google.maps.InfoWindow();
+            const role = i === 0 ? 'Pickup' : i === total - 1 ? 'Final Drop' : `Drop ${i}`;
+            infoWindowRef.current.setContent(`
+              <div style="padding:8px;font-family:system-ui,-apple-system,sans-serif;min-width:150px">
+                <div style="font-weight:600;font-size:13px;color:${mdStopColor(i)};margin-bottom:4px">${role}</div>
+                <div style="font-size:12px;color:#666">${point.postcode}</div>
+                <div style="font-size:11px;color:#999;margin-top:4px">Job: ${job.trackingNumber || job.id}</div>
+              </div>
+            `);
+            infoWindowRef.current.open(map, marker);
+          });
+          marker.addListener('mouseout', () => { if (infoWindowRef.current) infoWindowRef.current.close(); });
+          marker.addListener('click', () => {
+            setSelectedJob(job);
+            setSelectedDriver(null);
+            const bounds = new google.maps.LatLngBounds();
+            routePath.forEach(p => bounds.extend(p));
+            map.fitBounds(bounds, 100);
+          });
+
+          allMarkers.push(marker);
+        });
+
+        jobMarkersRef.current.set(jobIdStr, {
+          pickup: allMarkers[0],
+          delivery: allMarkers[allMarkers.length - 1],
+          polyline,
+          stopMarkers: allMarkers,
+        });
+
       } else {
+        // ── SINGLE-DELIVERY: green pickup arrow + blue delivery arrow ─────────
         const pickupMarker = new google.maps.Marker({
           position: { lat: location.pickupLat, lng: location.pickupLng },
           map,
-          title: `Pickup: ${job.pickupPostcode}`,
+          title: `Pickup: ${location.pickupPostcode}`,
           icon: {
             path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
             scale: 6,
@@ -664,7 +740,7 @@ export default function AdminMap() {
         const deliveryMarker = new google.maps.Marker({
           position: { lat: location.deliveryLat, lng: location.deliveryLng },
           map,
-          title: `Delivery: ${job.deliveryPostcode}`,
+          title: `Delivery: ${location.deliveryPostcode}`,
           icon: {
             path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
             scale: 6,
@@ -676,20 +752,10 @@ export default function AdminMap() {
           },
         });
 
-        // Build the route path - for multi-drop jobs, include all stops in order
         const routePath: google.maps.LatLngLiteral[] = [
-          { lat: location.pickupLat, lng: location.pickupLng }
+          { lat: location.pickupLat, lng: location.pickupLng },
+          { lat: location.deliveryLat, lng: location.deliveryLng },
         ];
-        
-        // Add multi-drop stops in order if available
-        if (location.multiDropStops && location.multiDropStops.length > 0) {
-          location.multiDropStops.forEach(stop => {
-            routePath.push({ lat: stop.lat, lng: stop.lng });
-          });
-        }
-        
-        // Add final delivery
-        routePath.push({ lat: location.deliveryLat, lng: location.deliveryLng });
 
         const polyline = new google.maps.Polyline({
           path: routePath,
@@ -699,66 +765,11 @@ export default function AdminMap() {
           strokeWeight: 3,
           map,
         });
-        
-        // Create markers for multi-drop stops
-        const stopMarkers: google.maps.Marker[] = [];
-        if (location.multiDropStops && location.multiDropStops.length > 0) {
-          location.multiDropStops.forEach((stop, index) => {
-            const stopMarker = new google.maps.Marker({
-              position: { lat: stop.lat, lng: stop.lng },
-              map,
-              title: `Drop ${stop.stopOrder}: ${stop.postcode}`,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: '#8B5CF6', // Purple for intermediate stops
-                fillOpacity: 1,
-                strokeColor: '#ffffff',
-                strokeWeight: 2,
-              },
-              label: {
-                text: String(stop.stopOrder),
-                color: '#ffffff',
-                fontSize: '10px',
-                fontWeight: 'bold',
-              },
-            });
-            
-            stopMarker.addListener('mouseover', () => {
-              if (!infoWindowRef.current) {
-                infoWindowRef.current = new google.maps.InfoWindow();
-              }
-              infoWindowRef.current.setContent(`
-                <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
-                  <div style="font-weight: 600; font-size: 13px; color: #8B5CF6; margin-bottom: 4px;">Drop ${stop.stopOrder}</div>
-                  <div style="font-size: 12px; color: #666;">${stop.postcode}</div>
-                  <div style="font-size: 11px; color: #999; margin-top: 4px;">Job: ${job.trackingNumber || job.id}</div>
-                </div>
-              `);
-              infoWindowRef.current.open(map, stopMarker);
-            });
-            
-            stopMarker.addListener('mouseout', () => {
-              if (infoWindowRef.current) infoWindowRef.current.close();
-            });
-            
-            stopMarker.addListener('click', () => {
-              setSelectedJob(job);
-              setSelectedDriver(null);
-              const bounds = new google.maps.LatLngBounds();
-              routePath.forEach(point => bounds.extend(point));
-              map.fitBounds(bounds, 100);
-            });
-            
-            stopMarkers.push(stopMarker);
-          });
-        }
 
         const handleMarkerClick = () => {
           setSelectedJob(job);
           setSelectedDriver(null);
           const bounds = new google.maps.LatLngBounds();
-          // Include all route points in bounds for multi-drop jobs
           routePath.forEach(point => bounds.extend(point));
           map.fitBounds(bounds, 100);
         };
@@ -767,48 +778,32 @@ export default function AdminMap() {
         deliveryMarker.addListener('click', handleMarkerClick);
 
         pickupMarker.addListener('mouseover', () => {
-          if (!infoWindowRef.current) {
-            infoWindowRef.current = new google.maps.InfoWindow();
-          }
+          if (!infoWindowRef.current) infoWindowRef.current = new google.maps.InfoWindow();
           infoWindowRef.current.setContent(`
-            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
-              <div style="font-weight: 600; font-size: 13px; color: #22C55E; margin-bottom: 4px;">Pickup Location</div>
-              <div style="font-size: 12px; color: #666;">${job.pickupPostcode}</div>
-              <div style="font-size: 11px; color: #999; margin-top: 4px;">Job: ${job.trackingNumber || job.id}</div>
+            <div style="padding:8px;font-family:system-ui,-apple-system,sans-serif;min-width:150px">
+              <div style="font-weight:600;font-size:13px;color:#22C55E;margin-bottom:4px">Pickup</div>
+              <div style="font-size:12px;color:#666">${location.pickupPostcode}</div>
+              <div style="font-size:11px;color:#999;margin-top:4px">Job: ${job.trackingNumber || job.id}</div>
             </div>
           `);
           infoWindowRef.current.open(map, pickupMarker);
         });
-
-        pickupMarker.addListener('mouseout', () => {
-          if (infoWindowRef.current) infoWindowRef.current.close();
-        });
+        pickupMarker.addListener('mouseout', () => { if (infoWindowRef.current) infoWindowRef.current.close(); });
 
         deliveryMarker.addListener('mouseover', () => {
-          if (!infoWindowRef.current) {
-            infoWindowRef.current = new google.maps.InfoWindow();
-          }
+          if (!infoWindowRef.current) infoWindowRef.current = new google.maps.InfoWindow();
           infoWindowRef.current.setContent(`
-            <div style="padding: 8px; font-family: system-ui, -apple-system, sans-serif; min-width: 150px;">
-              <div style="font-weight: 600; font-size: 13px; color: #EF4444; margin-bottom: 4px;">Delivery Location</div>
-              <div style="font-size: 12px; color: #666;">${job.deliveryPostcode}</div>
-              <div style="font-size: 11px; color: #999; margin-top: 4px;">Job: ${job.trackingNumber || job.id}</div>
+            <div style="padding:8px;font-family:system-ui,-apple-system,sans-serif;min-width:150px">
+              <div style="font-weight:600;font-size:13px;color:#EF4444;margin-bottom:4px">Delivery</div>
+              <div style="font-size:12px;color:#666">${location.deliveryPostcode}</div>
+              <div style="font-size:11px;color:#999;margin-top:4px">Job: ${job.trackingNumber || job.id}</div>
             </div>
           `);
           infoWindowRef.current.open(map, deliveryMarker);
         });
+        deliveryMarker.addListener('mouseout', () => { if (infoWindowRef.current) infoWindowRef.current.close(); });
 
-        deliveryMarker.addListener('mouseout', () => {
-          if (infoWindowRef.current) infoWindowRef.current.close();
-        });
-
-        // Store markers including multi-drop stop markers
-        jobMarkersRef.current.set(jobIdStr, { 
-          pickup: pickupMarker, 
-          delivery: deliveryMarker, 
-          polyline,
-          stopMarkers: stopMarkers.length > 0 ? stopMarkers : undefined,
-        });
+        jobMarkersRef.current.set(jobIdStr, { pickup: pickupMarker, delivery: deliveryMarker, polyline });
       }
     });
 
