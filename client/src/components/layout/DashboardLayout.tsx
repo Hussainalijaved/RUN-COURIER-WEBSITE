@@ -1,4 +1,4 @@
-import { type ReactNode, Suspense } from 'react';
+import { type ReactNode, Suspense, createContext, useContext } from 'react';
 import { useLocation } from 'wouter';
 import { NavigationProgress } from '@/components/NavigationProgress';
 import { useAuth } from '@/context/AuthContext';
@@ -59,6 +59,19 @@ import {
   ScrollText,
 } from 'lucide-react';
 import type { UserRole } from '@shared/schema';
+
+// Context that marks "a DashboardLayout chrome is already mounted higher in the tree."
+// When a Section component in App.tsx mounts a persistent DashboardLayout, all inner
+// DashboardLayout calls inside individual page files become transparent (pass-through).
+const DashboardLayoutActiveContext = createContext(false);
+
+function getCookieSidebarState(): boolean {
+  try {
+    const match = document.cookie.match(/(?:^|; )sidebar_state=([^;]*)/);
+    if (match) return match[1] === 'true';
+  } catch { /* ignore */ }
+  return true;
+}
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -161,6 +174,18 @@ function ContentSkeleton() {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
+  const alreadyActive = useContext(DashboardLayoutActiveContext);
+
+  // If a persistent DashboardLayout is already mounted higher in the tree (added in
+  // App.tsx), skip all chrome here and just forward children into that layout.
+  if (alreadyActive) {
+    return <>{children}</>;
+  }
+
+  return <DashboardLayoutInner>{children}</DashboardLayoutInner>;
+}
+
+function DashboardLayoutInner({ children }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, signOut } = useAuth();
 
@@ -180,8 +205,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     "--sidebar-width-icon": "3.5rem",
   } as React.CSSProperties;
 
+  // Read the user's persisted sidebar preference so it doesn't flash on remount.
+  const defaultSidebarOpen = getCookieSidebarState();
+
   return (
-    <SidebarProvider style={sidebarStyle}>
+    <DashboardLayoutActiveContext.Provider value={true}>
+    <SidebarProvider style={sidebarStyle} defaultOpen={defaultSidebarOpen}>
       <div className="flex h-screen w-full">
         <Sidebar>
           <SidebarHeader className="border-b border-sidebar-border p-4">
@@ -321,5 +350,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </div>
     </SidebarProvider>
+    </DashboardLayoutActiveContext.Provider>
   );
 }

@@ -9,6 +9,7 @@ import { BookingProvider } from "@/context/BookingContext";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 import { FloatingButtons } from "@/components/FloatingButtons";
 import { NavigationProgress } from "@/components/NavigationProgress";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -218,6 +219,146 @@ function ApiPassthrough() {
   return null;
 }
 
+// ─── Persistent section components ──────────────────────────────────────────
+// Each section wraps its sub-routes in a single DashboardLayout that stays
+// mounted across navigation.  Individual page files still call DashboardLayout
+// themselves, but the context deduplication in DashboardLayout.tsx makes those
+// inner instances transparent, so the layout never remounts on navigation.
+
+function AdminSection() {
+  return (
+    <ProtectedRoute allowedRoles={['admin', 'dispatcher']}>
+      <DashboardLayout>
+        <Switch>
+          <Route path="/admin/jobs/create" component={AdminCreateJob} />
+          <Route path="/admin/postcode-map" component={PostcodeMap} />
+          <Route path="/admin/route-planner" component={AdminRoutePlanner} />
+          <Route path="/admin/business-quote" component={AdminBusinessQuote} />
+          <Route path="/admin/api-invoices" component={AdminApiInvoices} />
+          <Route path="/admin/api-requests" component={AdminApiRequests} />
+          <Route path="/admin/api-clients" component={AdminApiClients} />
+          <Route path="/admin/api-logs" component={AdminApiLogs} />
+          <Route path="/admin/notifications" component={AdminNotifications} />
+          <Route path="/admin/supervisors" component={AdminSupervisors} />
+          <Route path="/admin/contracts" component={AdminContracts} />
+          <Route path="/admin/documents" component={AdminDocuments} />
+          <Route path="/admin/analytics" component={AdminDashboard} />
+          <Route path="/admin/payments" component={AdminDriverPayments} />
+          <Route path="/admin/contacts" component={AdminContacts} />
+          <Route path="/admin/invoices" component={AdminInvoices} />
+          <Route path="/admin/pricing" component={AdminPricing} />
+          <Route path="/admin/notices" component={AdminNotices} />
+          <Route path="/admin/profile" component={AdminProfile} />
+          <Route path="/admin/drivers" component={AdminDrivers} />
+          <Route path="/admin/customers" component={AdminCustomers} />
+          <Route path="/admin/applications" component={AdminApplications} />
+          <Route path="/admin/jobs" component={AdminJobs} />
+          <Route path="/admin/map" component={AdminMap} />
+          <Route path="/admin" component={AdminDashboard} />
+        </Switch>
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}
+
+function CustomerSection() {
+  return (
+    <ProtectedRoute allowedRoles={['customer']}>
+      <DashboardLayout>
+        <Switch>
+          <Route path="/customer/delivered" component={DeliveredOrders} />
+          <Route path="/customer/invoices" component={CustomerInvoices} />
+          <Route path="/customer/profile" component={CustomerProfile} />
+          <Route path="/customer/orders" component={CustomerOrders} />
+          <Route path="/customer/track" component={Track} />
+          <Route path="/customer/book" component={Book} />
+          <Route path="/customer" component={CustomerDashboard} />
+        </Switch>
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}
+
+function DriverSection() {
+  return (
+    <ProtectedRoute allowedRoles={['driver']}>
+      <DashboardLayout>
+        <Switch>
+          <Route path="/driver/documents" component={DriverDocuments} />
+          <Route path="/driver/payments" component={DriverPayments} />
+          <Route path="/driver/notices" component={DriverNotices} />
+          <Route path="/driver/profile" component={DriverProfile} />
+          <Route path="/driver/history" component={DriverHistory} />
+          <Route path="/driver/active" component={DriverActive} />
+          <Route path="/driver/jobs" component={DriverJobs} />
+          <Route path="/driver" component={DriverDashboard} />
+        </Switch>
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}
+
+function DispatcherSection() {
+  return (
+    <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
+      <DashboardLayout>
+        <Switch>
+          <Route path="/dispatcher/drivers" component={DispatcherDashboard} />
+          <Route path="/dispatcher/assign" component={DispatcherDashboard} />
+          <Route path="/dispatcher/map" component={AdminMap} />
+          <Route path="/dispatcher/jobs" component={DispatcherDashboard} />
+          <Route path="/dispatcher" component={DispatcherDashboard} />
+        </Switch>
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}
+
+function VendorSection() {
+  return (
+    <ProtectedRoute allowedRoles={['vendor']}>
+      <DashboardLayout>
+        <Switch>
+          <Route path="/vendor/scheduled" component={VendorDashboard} />
+          <Route path="/vendor/orders" component={VendorDashboard} />
+          <Route path="/vendor/upload" component={VendorDashboard} />
+          <Route path="/vendor/api" component={VendorDashboard} />
+          <Route path="/vendor" component={VendorDashboard} />
+        </Switch>
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}
+
+function SupervisorSection() {
+  return (
+    <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
+      <DashboardLayout>
+        <Switch>
+          <Route path="/supervisor/jobs/create" component={SupervisorCreateJob} />
+          <Route path="/supervisor/postcode-map" component={PostcodeMap} />
+          <Route path="/supervisor/route-planner" component={AdminRoutePlanner} />
+          <Route path="/supervisor/track/:trackingNumber" component={Track} />
+          <Route path="/supervisor/notifications" component={AdminNotifications} />
+          <Route path="/supervisor/customers" component={SupervisorCustomers} />
+          <Route path="/supervisor/invoices" component={SupervisorInvoices} />
+          <Route path="/supervisor/contacts" component={AdminContacts} />
+          <Route path="/supervisor/history" component={SupervisorHistory} />
+          <Route path="/supervisor/profile" component={SupervisorProfile} />
+          <Route path="/supervisor/drivers" component={SupervisorDrivers} />
+          <Route path="/supervisor/track" component={Track} />
+          <Route path="/supervisor/quote" component={Quote} />
+          <Route path="/supervisor/jobs" component={SupervisorJobs} />
+          <Route path="/supervisor/map" component={SupervisorMap} />
+          <Route path="/supervisor" component={SupervisorDashboard} />
+        </Switch>
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}
+
+// ─── Router ─────────────────────────────────────────────────────────────────
+
 function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -311,347 +452,20 @@ function Router() {
         <Route path="/blog" component={BlogIndex} />
         <Route path="/blog/:slug" component={BlogPost} />
 
-        <Route path="/admin">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/jobs">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminJobs />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/jobs/create">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminCreateJob />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/drivers">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDrivers />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/applications">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminApplications />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/map">
-          <ProtectedRoute allowedRoles={['admin', 'dispatcher']}>
-            <AdminMap />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/postcode-map">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <PostcodeMap />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/customers">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminCustomers />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/documents">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDocuments />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/payments">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDriverPayments />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/analytics">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/business-quote">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminBusinessQuote />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/invoices">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminInvoices />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/pricing">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminPricing />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/contracts">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminContracts />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/notices">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminNotices />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/notifications">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminNotifications />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/supervisors">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminSupervisors />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/contacts">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminContacts />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/route-planner">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminRoutePlanner />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/api-clients">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminApiClients />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/api-requests">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminApiRequests />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/api-logs">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminApiLogs />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/api-invoices">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminApiInvoices />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/admin/profile">
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminProfile />
-          </ProtectedRoute>
-        </Route>
+        {/* ── Supervisor public routes — must appear before the section catch-all ── */}
+        <Route path="/supervisor/login" component={SupervisorLogin} />
+        <Route path="/supervisor/register" component={SupervisorRegister} />
 
-        <Route path="/customer">
-          <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/customer/orders">
-          <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerOrders />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/customer/delivered">
-          <ProtectedRoute allowedRoles={['customer']}>
-            <DeliveredOrders />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/customer/book">
-          <ProtectedRoute allowedRoles={['customer']}>
-            <Book />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/customer/track">
-          <ProtectedRoute allowedRoles={['customer']}>
-            <Track />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/customer/profile">
-          <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerProfile />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/customer/invoices">
-          <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerInvoices />
-          </ProtectedRoute>
-        </Route>
-
-        <Route path="/driver">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/driver/jobs">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverJobs />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/driver/active">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverActive />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/driver/history">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverHistory />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/driver/documents">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverDocuments />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/driver/notices">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverNotices />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/driver/profile">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverProfile />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/driver/payments">
-          <ProtectedRoute allowedRoles={['driver']}>
-            <DriverPayments />
-          </ProtectedRoute>
-        </Route>
-
-        <Route path="/dispatcher">
-          <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
-            <DispatcherDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dispatcher/jobs">
-          <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
-            <DispatcherDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dispatcher/drivers">
-          <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
-            <DispatcherDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dispatcher/map">
-          <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
-            <AdminMap />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dispatcher/assign">
-          <ProtectedRoute allowedRoles={['dispatcher', 'admin']}>
-            <DispatcherDashboard />
-          </ProtectedRoute>
-        </Route>
-
-        <Route path="/vendor">
-          <ProtectedRoute allowedRoles={['vendor']}>
-            <VendorDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/vendor/orders">
-          <ProtectedRoute allowedRoles={['vendor']}>
-            <VendorDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/vendor/upload">
-          <ProtectedRoute allowedRoles={['vendor']}>
-            <VendorDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/vendor/scheduled">
-          <ProtectedRoute allowedRoles={['vendor']}>
-            <VendorDashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/vendor/api">
-          <ProtectedRoute allowedRoles={['vendor']}>
-            <VendorDashboard />
-          </ProtectedRoute>
-        </Route>
-
-        <Route path="/supervisor/login">
-          <SupervisorLogin />
-        </Route>
-        <Route path="/supervisor/register">
-          <SupervisorRegister />
-        </Route>
-        <Route path="/supervisor/jobs/create">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorCreateJob />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/jobs">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorJobs />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/map">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorMap />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/postcode-map">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <PostcodeMap />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/drivers">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorDrivers />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/customers">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorCustomers />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/invoices">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorInvoices />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/contacts">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <AdminContacts />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/quote">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <Quote />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/history">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorHistory />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/track/:trackingNumber">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <Track />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/track">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <Track />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/route-planner">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <AdminRoutePlanner />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/profile">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorProfile />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor/notifications">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <AdminNotifications />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/supervisor">
-          <ProtectedRoute allowedRoles={['supervisor']} redirectTo="/supervisor/login">
-            <SupervisorDashboard />
-          </ProtectedRoute>
-        </Route>
+        {/* ── Persistent section routes ─────────────────────────────────────────── */}
+        {/* Each section mounts DashboardLayout once and keeps it alive while the   */}
+        {/* user navigates within that section.  Inner DashboardLayout calls inside  */}
+        {/* individual page files become transparent via context deduplication.      */}
+        <Route path="~^/admin(/.*)?$" component={AdminSection} />
+        <Route path="~^/customer(/.*)?$" component={CustomerSection} />
+        <Route path="~^/driver(/.*)?$" component={DriverSection} />
+        <Route path="~^/dispatcher(/.*)?$" component={DispatcherSection} />
+        <Route path="~^/vendor(/.*)?$" component={VendorSection} />
+        <Route path="~^/supervisor(/.*)?$" component={SupervisorSection} />
 
         <Route component={NotFound} />
       </Switch>
