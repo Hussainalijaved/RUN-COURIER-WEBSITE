@@ -646,12 +646,40 @@ export default function AdminMap() {
         });
       } else if (job.isMultiDrop && location.multiDropStops && location.multiDropStops.length > 0) {
         // ── MULTI-DROP: render identically to the route planner ──────────────
-        // Lettered circle markers (A=pickup, B/C/D=drops), same gradient colours,
-        // single polyline — no separate delivery arrow (last drop IS the delivery).
+        // Nearest-neighbour ordering: from pickup, always go to the closest
+        // remaining stop — identical to the route planner's auto-optimise logic.
         const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+        // Haversine distance in km (no external lib needed)
+        const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+          const R = 6371;
+          const dLat = (b.lat - a.lat) * Math.PI / 180;
+          const dLng = (b.lng - a.lng) * Math.PI / 180;
+          const s = Math.sin(dLat / 2) ** 2 +
+            Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) *
+            Math.sin(dLng / 2) ** 2;
+          return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+        };
+
+        // Nearest-neighbour sort: greedy, starting from pickup
+        const rawStops = [...location.multiDropStops];
+        const sortedStops: typeof rawStops = [];
+        let current: { lat: number; lng: number } = { lat: location.pickupLat, lng: location.pickupLng };
+        while (rawStops.length > 0) {
+          let nearestIdx = 0;
+          let nearestDist = haversineKm(current, rawStops[0]);
+          for (let si = 1; si < rawStops.length; si++) {
+            const d = haversineKm(current, rawStops[si]);
+            if (d < nearestDist) { nearestDist = d; nearestIdx = si; }
+          }
+          sortedStops.push(rawStops[nearestIdx]);
+          current = rawStops[nearestIdx];
+          rawStops.splice(nearestIdx, 1);
+        }
+
         const allPoints: { lat: number; lng: number; label: string; postcode: string }[] = [
           { lat: location.pickupLat, lng: location.pickupLng, label: ALPHA[0], postcode: location.pickupPostcode },
-          ...location.multiDropStops.map((stop, i) => ({
+          ...sortedStops.map((stop, i) => ({
             lat: stop.lat,
             lng: stop.lng,
             label: ALPHA[i + 1] || String(i + 2),
