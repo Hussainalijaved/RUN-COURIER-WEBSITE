@@ -11355,9 +11355,15 @@ export async function registerRoutes(
               status: 'approved', updated_at: new Date().toISOString()
             };
             if (application.profilePictureUrl) updateData.profile_picture_url = normalizeDocumentUrl(application.profilePictureUrl) || application.profilePictureUrl;
+            if (application.fullName) updateData.full_name = application.fullName;
+            if (application.phone) updateData.phone = application.phone;
+            if (application.postcode) updateData.postcode = application.postcode;
             if (application.fullAddress) updateData.address = application.fullAddress;
+            if (application.buildingName) updateData.building_name = application.buildingName;
             if (application.nationality) updateData.nationality = application.nationality;
+            if (application.isBritish !== undefined) updateData.is_british = application.isBritish;
             if (application.nationalInsuranceNumber) updateData.national_insurance_number = application.nationalInsuranceNumber;
+            if (application.rightToWorkShareCode) updateData.right_to_work_share_code = application.rightToWorkShareCode;
             if (application.vehicleType) updateData.vehicle_type = application.vehicleType;
             if (application.vehicleRegistration) updateData.vehicle_registration = application.vehicleRegistration;
             if (application.vehicleMake) updateData.vehicle_make = application.vehicleMake;
@@ -11370,14 +11376,30 @@ export async function registerRoutes(
 
             const [updateResult, copiedDocs] = await Promise.all([
               (async () => {
-                let { error: updateError } = await supabaseAdmin.from('drivers').update(updateData).eq('id', driver.id);
-                if (updateError && (updateError.message?.includes('vehicle_registration') || updateError.message?.includes('vehicle_make') || updateError.message?.includes('vehicle_model') || updateError.message?.includes('vehicle_color') || updateError.message?.includes('column'))) {
-                  console.warn(`[Driver Application] Retrying update without vehicle columns for driver ${driver.driver_code}`);
-                  const vehicleReg = updateData.vehicle_registration;
-                  delete updateData.vehicle_registration; delete updateData.vehicle_make; delete updateData.vehicle_model; delete updateData.vehicle_color;
-                  if (vehicleReg && updateData.vehicle_type) updateData.vehicle_type = `${updateData.vehicle_type}|${vehicleReg}`;
-                  const retry = await supabaseAdmin.from('drivers').update(updateData).eq('id', driver.id);
-                  updateError = retry.error;
+                // Smart retry: if a column doesn't exist, parse the exact name from the
+                // Postgres error and skip only that column, then retry — never silently
+                // drop an entire category of fields.
+                let currentData = { ...updateData };
+                const savedVehicleReg = currentData.vehicle_registration;
+                let updateError: any = null;
+                let attempts = 0;
+                while (attempts < 20 && Object.keys(currentData).length > 0) {
+                  const result = await supabaseAdmin.from('drivers').update(currentData).eq('id', driver.id);
+                  updateError = result.error;
+                  if (!updateError) break;
+                  const colMatch = updateError.message?.match(/column "([^"]+)"(?: of relation "[^"]+")? does not exist/);
+                  if (colMatch?.[1]) {
+                    const badCol = colMatch[1];
+                    console.warn(`[Driver Application] Column "${badCol}" missing from drivers, skipping for ${driver.driver_code}`);
+                    // If vehicle_registration is missing, preserve it inside vehicle_type
+                    if (badCol === 'vehicle_registration' && savedVehicleReg && currentData.vehicle_type) {
+                      currentData.vehicle_type = `${currentData.vehicle_type.split('|')[0]}|${savedVehicleReg}`;
+                    }
+                    delete currentData[badCol];
+                    attempts++;
+                    continue;
+                  }
+                  break; // Non-column error — stop retrying
                 }
                 return updateError;
               })(),
@@ -11507,15 +11529,28 @@ export async function registerRoutes(
                   if (doc.col) driverData[doc.col] = doc.fileResult.path;
                 }
 
-                let { error: insertError } = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
-                if (insertError && insertError.message?.includes('column')) {
-                  console.warn(`[Driver Application] Retrying driver creation without problematic columns: ${insertError.message}`);
-                  const vehicleReg = driverData.vehicle_registration;
-                  delete driverData.vehicle_registration; delete driverData.vehicle_make; delete driverData.vehicle_model; delete driverData.vehicle_color;
-                  delete driverData.right_to_work_share_code; delete driverData.must_change_password;
-                  if (vehicleReg && driverData.vehicle_type) driverData.vehicle_type = `${driverData.vehicle_type}|${vehicleReg}`;
-                  const retry = await supabaseAdmin.from('drivers').upsert(driverData, { onConflict: 'id' });
-                  insertError = retry.error;
+                // Smart retry: detect each missing column by name and skip only that
+                // one, so all other fields (postcode, NI, share code, etc.) are saved.
+                let currentInsertData = { ...driverData };
+                const savedVehicleRegNew = currentInsertData.vehicle_registration;
+                let insertError: any = null;
+                let insertAttempts = 0;
+                while (insertAttempts < 20 && Object.keys(currentInsertData).length > 0) {
+                  const result = await supabaseAdmin.from('drivers').upsert(currentInsertData, { onConflict: 'id' });
+                  insertError = result.error;
+                  if (!insertError) break;
+                  const colMatch = insertError.message?.match(/column "([^"]+)"(?: of relation "[^"]+")? does not exist/);
+                  if (colMatch?.[1]) {
+                    const badCol = colMatch[1];
+                    console.warn(`[Driver Application] Column "${badCol}" missing from drivers, skipping for new driver ${driverData.driver_code}`);
+                    if (badCol === 'vehicle_registration' && savedVehicleRegNew && currentInsertData.vehicle_type) {
+                      currentInsertData.vehicle_type = `${currentInsertData.vehicle_type.split('|')[0]}|${savedVehicleRegNew}`;
+                    }
+                    delete currentInsertData[badCol];
+                    insertAttempts++;
+                    continue;
+                  }
+                  break; // Non-column error — stop retrying
                 }
 
                 if (insertError) {

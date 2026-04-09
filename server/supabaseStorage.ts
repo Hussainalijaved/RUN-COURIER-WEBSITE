@@ -841,23 +841,28 @@ export class SupabaseStorage implements IStorage {
       .select()
       .single();
     
-    if (error && (error.message?.includes('vehicle_registration') || error.message?.includes('vehicle_make') || error.message?.includes('vehicle_model') || error.message?.includes('vehicle_color') || error.message?.includes('column'))) {
-      console.warn('[SupabaseStorage] Retrying driver update without vehicle columns:', id);
-      const vehicleReg = dbData.vehicle_registration;
-      delete dbData.vehicle_registration;
-      delete dbData.vehicle_make;
-      delete dbData.vehicle_model;
-      delete dbData.vehicle_color;
-      if (vehicleReg && dbData.vehicle_type) {
-        dbData.vehicle_type = `${dbData.vehicle_type}|${vehicleReg}`;
-      } else if (vehicleReg) {
-        const existing = await supabase.from('drivers').select('vehicle_type').eq('id', id).single();
-        const baseType = existing.data?.vehicle_type?.split('|')[0] || 'car';
-        dbData.vehicle_type = `${baseType}|${vehicleReg}`;
+    // Smart retry: parse the exact missing column from the Postgres error and skip
+    // only that field, so all other fields (postcode, NI, share code, etc.) are saved.
+    const savedVehicleReg = dbData.vehicle_registration;
+    let currentDbData = { ...dbData };
+    let retryAttempts = 0;
+    while (error && retryAttempts < 20 && Object.keys(currentDbData).length > 0) {
+      const colMatch = error.message?.match(/column "([^"]+)"(?: of relation "[^"]+")? does not exist/);
+      if (!colMatch?.[1]) break; // Non-column error — stop retrying
+      const badCol = colMatch[1];
+      console.warn(`[SupabaseStorage] Column "${badCol}" missing from drivers, skipping for ${id}`);
+      if (badCol === 'vehicle_registration' && savedVehicleReg) {
+        const baseType = currentDbData.vehicle_type?.split('|')[0] || (
+          await supabase.from('drivers').select('vehicle_type').eq('id', id).single()
+        ).data?.vehicle_type?.split('|')[0] || 'car';
+        currentDbData.vehicle_type = `${baseType}|${savedVehicleReg}`;
       }
-      const retry = await supabase.from('drivers').update(dbData).eq('id', id).select().single();
+      delete currentDbData[badCol];
+      if (Object.keys(currentDbData).length === 0) break;
+      const retry = await supabase.from('drivers').update(currentDbData).eq('id', id).select().single();
       updated = retry.data;
       error = retry.error;
+      retryAttempts++;
     }
 
     if (error?.code === '23514' && error.message?.includes('vehicle_type_check')) {

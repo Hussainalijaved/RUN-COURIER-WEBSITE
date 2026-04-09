@@ -278,25 +278,47 @@ async function runBackgroundTasks() {
   })();
 
   (async () => {
+    // Probe the drivers table for columns that may have been added after the initial
+    // schema was created.  We cannot run DDL via the REST API, so we SELECT each
+    // column individually and report any that are missing with the exact SQL to add them.
     try {
       const { supabaseAdmin } = await import('./supabaseAdmin');
       if (!supabaseAdmin) return;
-      
-      const { error } = await supabaseAdmin.rpc('exec_sql', {
-        query: `
-          ALTER TABLE drivers ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;
-          ALTER TABLE drivers ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
-          ALTER TABLE drivers ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;
-        `
-      });
-      
-      if (error) {
-        console.warn("[BACKGROUND] Driver columns migration via RPC failed:", error.message);
+
+      const needed: Array<{ col: string; sql: string }> = [
+        { col: 'postcode',                 sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS postcode TEXT;" },
+        { col: 'national_insurance_number',sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS national_insurance_number TEXT;" },
+        { col: 'right_to_work_share_code', sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS right_to_work_share_code TEXT;" },
+        { col: 'vehicle_registration',     sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_registration TEXT;" },
+        { col: 'vehicle_make',             sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_make TEXT;" },
+        { col: 'vehicle_model',            sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_model TEXT;" },
+        { col: 'vehicle_color',            sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_color TEXT;" },
+        { col: 'sort_code',                sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS sort_code TEXT;" },
+        { col: 'must_change_password',     sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;" },
+        { col: 'approved_at',              sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;" },
+        { col: 'stripe_account_id',        sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;" },
+        { col: 'is_british',               sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS is_british BOOLEAN DEFAULT true;" },
+        { col: 'building_name',            sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS building_name TEXT;" },
+      ];
+
+      const missing: string[] = [];
+      for (const { col, sql: colSql } of needed) {
+        const { error } = await supabaseAdmin.from('drivers').select(col).limit(1);
+        if (error?.message?.includes('does not exist') || error?.message?.includes(col)) {
+          missing.push(colSql);
+        }
+      }
+
+      if (missing.length > 0) {
+        console.warn("[MIGRATION] ⚠️  The following columns are missing from the Supabase `drivers` table.");
+        console.warn("[MIGRATION] Run these statements in Supabase Dashboard → SQL Editor:");
+        for (const s of missing) console.warn("[MIGRATION]   " + s);
+        console.warn("[MIGRATION] The server will skip missing columns gracefully, but driver profiles will be incomplete until these are added.");
       } else {
-        console.log("[BACKGROUND] Driver must_change_password and approved_at columns ensured");
+        console.log("[MIGRATION] drivers table column check passed — all required columns present.");
       }
     } catch (e: any) {
-      console.warn("[BACKGROUND] Driver columns migration error:", e?.message);
+      console.warn("[BACKGROUND] Driver columns probe error:", e?.message);
     }
   })();
 
