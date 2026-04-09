@@ -460,18 +460,18 @@ function Router() {
         {/* Each section mounts DashboardLayout once and keeps it alive while the   */}
         {/* user navigates within that section.  Inner DashboardLayout calls inside  */}
         {/* individual page files become transparent via context deduplication.      */}
-        {/* :rest* matches zero-or-more path segments, covering /admin and /admin/* */}
-        <Route path="/admin/:rest*" component={AdminSection} />
+        {/* /* matches one-or-more path segments; bare path matches exact root */}
+        <Route path="/admin/*" component={AdminSection} />
         <Route path="/admin" component={AdminSection} />
-        <Route path="/customer/:rest*" component={CustomerSection} />
+        <Route path="/customer/*" component={CustomerSection} />
         <Route path="/customer" component={CustomerSection} />
-        <Route path="/driver/:rest*" component={DriverSection} />
+        <Route path="/driver/*" component={DriverSection} />
         <Route path="/driver" component={DriverSection} />
-        <Route path="/dispatcher/:rest*" component={DispatcherSection} />
+        <Route path="/dispatcher/*" component={DispatcherSection} />
         <Route path="/dispatcher" component={DispatcherSection} />
-        <Route path="/vendor/:rest*" component={VendorSection} />
+        <Route path="/vendor/*" component={VendorSection} />
         <Route path="/vendor" component={VendorSection} />
-        <Route path="/supervisor/:rest*" component={SupervisorSection} />
+        <Route path="/supervisor/*" component={SupervisorSection} />
         <Route path="/supervisor" component={SupervisorSection} />
 
         <Route component={NotFound} />
