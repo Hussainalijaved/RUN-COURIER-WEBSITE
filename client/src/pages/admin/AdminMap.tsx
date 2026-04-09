@@ -399,6 +399,18 @@ export default function AdminMap() {
           }
         }
         
+        // Helper: best geocodable string for an address — postcode preferred,
+        // falls back to extracting a UK postcode from the full address string,
+        // then falls back to the full address itself (Google can geocode that too).
+        const ukPostcodeRe = /\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i;
+        const bestGeoStr = (postcode: string | null | undefined, address: string | null | undefined): string | null => {
+          if (postcode?.trim()) return postcode.trim();
+          const extracted = address && ukPostcodeRe.exec(address);
+          if (extracted) return extracted[1].trim();
+          if (address?.trim()) return address.trim();
+          return null;
+        };
+
         if (hasStoredPickup && hasStoredDelivery) {
           // Use stored coordinates directly
           setJobLocations(prev => new Map(prev).set(jobIdStr, {
@@ -407,32 +419,37 @@ export default function AdminMap() {
             pickupLng: parseFloat(String(job.pickupLongitude)),
             deliveryLat: parseFloat(String(job.deliveryLatitude)),
             deliveryLng: parseFloat(String(job.deliveryLongitude)),
-            pickupPostcode: job.pickupPostcode || job.pickupAddress?.slice(-8) || '',
-            deliveryPostcode: job.deliveryPostcode || job.deliveryAddress?.slice(-8) || '',
+            pickupPostcode: job.pickupPostcode || '',
+            deliveryPostcode: job.deliveryPostcode || '',
             multiDropStops,
           }));
-        } else if (job.pickupPostcode && job.deliveryPostcode) {
-          // Fall back to geocoding if we have postcodes
-          try {
-            const [pickupResult, deliveryResult] = await Promise.all([
-              geocodePostcode(job.pickupPostcode),
-              geocodePostcode(job.deliveryPostcode)
-            ]);
-            
-            if (pickupResult && deliveryResult) {
-              setJobLocations(prev => new Map(prev).set(jobIdStr, {
-                jobId: jobIdStr,
-                pickupLat: pickupResult.lat,
-                pickupLng: pickupResult.lng,
-                deliveryLat: deliveryResult.lat,
-                deliveryLng: deliveryResult.lng,
-                pickupPostcode: job.pickupPostcode,
-                deliveryPostcode: job.deliveryPostcode,
-                multiDropStops,
-              }));
+        } else {
+          // Geocode from postcode → extracted postcode → full address (any source works)
+          const pickupGeoStr = bestGeoStr(job.pickupPostcode, job.pickupAddress);
+          const deliveryGeoStr = bestGeoStr(job.deliveryPostcode, job.deliveryAddress);
+
+          if (pickupGeoStr && deliveryGeoStr) {
+            try {
+              const [pickupResult, deliveryResult] = await Promise.all([
+                geocodePostcode(pickupGeoStr),
+                geocodePostcode(deliveryGeoStr),
+              ]);
+
+              if (pickupResult && deliveryResult) {
+                setJobLocations(prev => new Map(prev).set(jobIdStr, {
+                  jobId: jobIdStr,
+                  pickupLat: pickupResult.lat,
+                  pickupLng: pickupResult.lng,
+                  deliveryLat: deliveryResult.lat,
+                  deliveryLng: deliveryResult.lng,
+                  pickupPostcode: job.pickupPostcode || pickupGeoStr,
+                  deliveryPostcode: job.deliveryPostcode || deliveryGeoStr,
+                  multiDropStops,
+                }));
+              }
+            } catch (error) {
+              console.error(`Failed to geocode job ${jobIdStr}:`, error);
             }
-          } catch (error) {
-            console.error(`Failed to geocode job ${jobIdStr}:`, error);
           }
         }
       }
