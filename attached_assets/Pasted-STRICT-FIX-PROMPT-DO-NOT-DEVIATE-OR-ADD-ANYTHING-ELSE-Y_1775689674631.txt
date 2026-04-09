@@ -1,0 +1,34 @@
+STRICT FIX PROMPT – DO NOT DEVIATE OR ADD ANYTHING ELSE
+You are an expert iOS/mobile app engineer. The app was rejected again by Apple App Store Review with this exact message:
+Submission ID: e99891a9-dbf4-4b32-a354-73a3b1d95897
+Review date: April 08, 2026
+Review Device: iPad Air 11-inch (M3) – iPadOS 26.4
+Guideline 2.1(a) - Performance - App Completeness
+Issue: The app exhibited one or more bugs that would negatively impact users.
+Bug description: We still found that an error occurs when we attempt to access the payment mechanism on the Orders screen.
+Your only task is to fix this single bug. Nothing more.
+Reproduction steps (must be fixed):
+1.  Sign in as a business account.
+2.  Go to the Orders screen.
+3.  Attempt to access the payment mechanism (e.g., tap to pay for an order, open checkout, or initiate payment from an order).
+4.  An error occurs (this is the rejection reason).
+Hard rules you MUST obey (zero exceptions):
+1.  Scope is 100% frozen. Fix ONLY the access to the payment mechanism from the Orders screen for business users. Do NOT change, refactor, touch, or improve any other part of the app (UI, other screens, personal accounts, onboarding, settings, etc.). If a change is not required to stop the error on the Orders screen for business accounts, do not make it.
+2.  Before writing any code, first provide a clear root-cause analysis:
+	•  Which files and functions are involved when accessing payment from the Orders screen for business users.
+	•  What exact condition, API call, navigation, permission, or logic branch is triggering the error only (or mainly) for business accounts on iPad.
+	•  Why this happens on the review device but possibly not elsewhere (consider timing, profile load, business-specific data, iPad layout/safe area, etc.).
+3.  Provide the minimal targeted fix only. Use diff format with full file paths. Include any business-specific handling needed so accessing payment from Orders succeeds without error.
+4.  The fix must work correctly on iPad (layout, presentation, safe areas, modals, etc.) and must not break iPhone behavior.
+5.  After the fix, you MUST verify and output this exact regression checklist with ✅ or ❌ for each item: ✅ No error when accessing payment mechanism from Orders screen for a business account ✅ Payment access from Orders still works for a personal/non-business account ✅ No crash or new error message appears when accessing payment from Orders ✅ Full payment flow (after accessing from Orders) still completes successfully ✅ Order listing, selection, and related screens still function as before ✅ No regression on iPhone simulators (all supported versions) ✅ No regression on iPad simulators, including iPad Air 11-inch (M3) specs ✅ App shows no error alerts or console errors for business users when accessing payment from Orders ✅ Tested with good network, slow network, and airplane mode where relevant
+6.  Final output structure (exactly in this order, nothing else):
+	•  Section 1: Root-Cause Analysis
+	•  Section 2: Code Changes (diff format with file paths)
+	•  Section 3: Regression Checklist (with ✅/❌ for every item)
+	•  Section 4: Conclusion
+In Section 4 you MUST clearly answer these two questions:
+•  What exactly did you change to fix the error when accessing the payment mechanism from the Orders screen for business accounts?
+•  Are you confident that this fix is enough to resolve the Apple rejection (Guideline 2.1(a)) and that the app should now pass review on the iPad review device without any error when accessing payment from Orders? Answer strictly with “YES – this should fully fix the reported issue” or “NO – still needs more work” and explain why.
+Do not add any extra comments, suggestions, refactors, new features, logging, or “best practices”. Do not touch anything outside the payment access error from the Orders screen for business accounts. Stay extremely focused.
+The goal is to make accessing the payment mechanism from the Orders screen work without any error when signed in as a business, so Apple accepts the update on their iPad review device.
+Begin your response now.

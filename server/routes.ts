@@ -9584,18 +9584,50 @@ export async function registerRoutes(
   }));
 
   app.post("/api/stripe/create-payment-intent", asyncHandler(async (req, res) => {
-    const { jobId, amount, customerEmail, customerId } = req.body;
+    const { jobId, amount, customerEmail, customerId, bookingId, trackingNumber } = req.body;
     
     if (!amount) {
       return res.status(400).json({ error: "Amount is required" });
     }
 
-    let stripeCustomerId = customerId;
-    
-    if (!stripeCustomerId && customerEmail) {
+    // customerId from the mobile app is a Supabase user UUID, not a Stripe cus_... ID.
+    // Resolve to a real Stripe customer ID.
+    let stripeCustomerId: string | null = null;
+
+    if (customerId && String(customerId).startsWith('cus_')) {
+      // Already a Stripe customer ID
+      stripeCustomerId = customerId;
+    } else if (customerId) {
+      // Supabase user UUID — look up their Stripe customer ID
+      const { data: userRow } = await supabaseAdmin
+        .from('users')
+        .select('stripe_customer_id, email, full_name')
+        .eq('id', customerId)
+        .maybeSingle();
+
+      if (userRow?.stripe_customer_id) {
+        stripeCustomerId = userRow.stripe_customer_id;
+      } else {
+        // Create a Stripe customer for this user
+        const email = customerEmail || userRow?.email || `${customerId}@runcourier.co.uk`;
+        const customer = await stripeService.createCustomer(
+          email,
+          jobId || bookingId || customerId,
+          userRow?.full_name || 'Run Courier Customer'
+        );
+        stripeCustomerId = customer.id;
+        // Persist the Stripe customer ID back to the users table
+        if (userRow) {
+          await supabaseAdmin
+            .from('users')
+            .update({ stripe_customer_id: stripeCustomerId })
+            .eq('id', customerId);
+        }
+      }
+    } else if (customerEmail) {
       const customer = await stripeService.createCustomer(
         customerEmail,
-        jobId || 'guest',
+        jobId || bookingId || 'guest',
         'Run Courier Customer'
       );
       stripeCustomerId = customer.id;
@@ -9609,12 +9641,19 @@ export async function registerRoutes(
       Math.round(amount * 100),
       'gbp',
       stripeCustomerId,
-      { jobId: jobId || '' }
+      {
+        jobId: jobId || '',
+        bookingId: bookingId || '',
+        trackingNumber: trackingNumber || '',
+        customerId: customerId || '',
+      }
     );
 
     res.json({ 
       clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id 
+      paymentIntentId: paymentIntent.id,
+      finalAmount: amount,
+      originalAmount: amount,
     });
   }));
 

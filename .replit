@@ -58,6 +58,8 @@ VITE_STRIPE_PUBLISHABLE_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwv
 NODE_ENV = "production"
 APP_URL = "https://runcourier.co.uk"
 INTERNAL_API_KEY = "rc_live_20fa81320da16a617e5ab67cf8d8360f01b7685603209e474dcdb2d11e7ba8c7"
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwvoYu7injdGbDVInDb6W8OawVlcwuO2frMNx3y8IuQoXIh2Erq00wayXGWgW"
+EXPO_PUBLIC_API_URL = "https://runcourier.co.uk"
 
 [postMerge]
 path = "scripts/post-merge.sh"
