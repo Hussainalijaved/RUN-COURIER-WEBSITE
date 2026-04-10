@@ -484,30 +484,21 @@ export default function Track() {
                               </div>
                             );
                           })()}
-                          {/* Delivery stops — sorted by actual delivery time, renumbered 1, 2, 3… */}
-                          {(() => {
-                            const delivered = [...job.multiDropStops]
-                              .filter(s => s.status === 'delivered')
-                              .sort((a, b) =>
-                                new Date(a.deliveredAt!).getTime() - new Date(b.deliveredAt!).getTime()
-                              );
-                            const pending = job.multiDropStops
-                              .filter(s => s.status !== 'delivered')
-                              .sort((a, b) => a.stopOrder - b.stopOrder);
-                            const sorted = [...delivered, ...pending];
-                            return sorted.map((stop, idx) => {
-                              const displayNum = idx + 1;
+                          {/* Delivery stops — always in planned route order (stop_order) */}
+                          {[...job.multiDropStops]
+                            .sort((a, b) => a.stopOrder - b.stopOrder)
+                            .map((stop) => {
                               const stopDone = stop.status === 'delivered';
                               return (
                                 <div key={stop.stopOrder} className="flex flex-col gap-1">
                                   <div className="flex items-start gap-2 text-sm">
                                     <span className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${stopDone ? 'bg-green-600' : 'bg-primary/40'}`}>
-                                      {displayNum}
+                                      {stop.stopOrder}
                                     </span>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <span className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${stopDone ? 'text-green-600' : 'text-muted-foreground'}`}>
-                                          Drop {displayNum}
+                                          Drop {stop.stopOrder}
                                         </span>
                                         {stopDone && (
                                           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-1">
@@ -532,7 +523,7 @@ export default function Track() {
                                         <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
                                           <img
                                             src={stop.podPhotoUrl}
-                                            alt={`POD for drop ${displayNum}`}
+                                            alt={`POD for drop ${stop.stopOrder}`}
                                             className="rounded border border-border h-16 w-auto object-cover cursor-zoom-in"
                                           />
                                         </a>
@@ -541,8 +532,7 @@ export default function Track() {
                                   </div>
                                 </div>
                               );
-                            });
-                          })()}
+                            })}
                         </div>
                       </div>
                     ) : (
