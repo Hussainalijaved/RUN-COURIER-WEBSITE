@@ -484,53 +484,65 @@ export default function Track() {
                               </div>
                             );
                           })()}
-                          {/* Delivery stops — with per-stop status and POD */}
-                          {job.multiDropStops.map((stop) => {
-                            const stopDone = stop.status === 'delivered';
-                            return (
-                              <div key={stop.stopOrder} className="flex flex-col gap-1">
-                                <div className="flex items-start gap-2 text-sm">
-                                  <span className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${stopDone ? 'bg-green-600' : 'bg-primary/40'}`}>
-                                    {stop.stopOrder}
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${stopDone ? 'text-green-600' : 'text-muted-foreground'}`}>
-                                        Drop {stop.stopOrder}
-                                      </span>
-                                      {stopDone && (
-                                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-1">
-                                          <CheckCircle className="h-2.5 w-2.5" /> Delivered
-                                          {stop.deliveredAt && (
-                                            <span className="ml-1 text-green-600">
-                                              {new Date(stop.deliveredAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                          )}
+                          {/* Delivery stops — sorted by actual delivery time, renumbered 1, 2, 3… */}
+                          {(() => {
+                            const delivered = [...job.multiDropStops]
+                              .filter(s => s.status === 'delivered')
+                              .sort((a, b) =>
+                                new Date(a.deliveredAt!).getTime() - new Date(b.deliveredAt!).getTime()
+                              );
+                            const pending = job.multiDropStops
+                              .filter(s => s.status !== 'delivered')
+                              .sort((a, b) => a.stopOrder - b.stopOrder);
+                            const sorted = [...delivered, ...pending];
+                            return sorted.map((stop, idx) => {
+                              const displayNum = idx + 1;
+                              const stopDone = stop.status === 'delivered';
+                              return (
+                                <div key={stop.stopOrder} className="flex flex-col gap-1">
+                                  <div className="flex items-start gap-2 text-sm">
+                                    <span className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${stopDone ? 'bg-green-600' : 'bg-primary/40'}`}>
+                                      {displayNum}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${stopDone ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                          Drop {displayNum}
                                         </span>
+                                        {stopDone && (
+                                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-1">
+                                            <CheckCircle className="h-2.5 w-2.5" /> Delivered
+                                            {stop.deliveredAt && (
+                                              <span className="ml-1 text-green-600">
+                                                {new Date(stop.deliveredAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className={stopDone ? 'line-through text-muted-foreground' : 'text-foreground'}>
+                                        {stop.address && stop.address.trim() ? stop.address : stop.postcode || '—'}
+                                      </span>
+                                      {stopDone && stop.podRecipientName && (
+                                        <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                                          <UserCheck className="h-3 w-3" /> {stop.podRecipientName}
+                                        </p>
+                                      )}
+                                      {stopDone && stop.podPhotoUrl && (
+                                        <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
+                                          <img
+                                            src={stop.podPhotoUrl}
+                                            alt={`POD for drop ${displayNum}`}
+                                            className="rounded border border-border h-16 w-auto object-cover cursor-zoom-in"
+                                          />
+                                        </a>
                                       )}
                                     </div>
-                                    <span className={stopDone ? 'line-through text-muted-foreground' : 'text-foreground'}>
-                                      {stop.address && stop.address.trim() ? stop.address : stop.postcode || '—'}
-                                    </span>
-                                    {stopDone && stop.podRecipientName && (
-                                      <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                                        <UserCheck className="h-3 w-3" /> {stop.podRecipientName}
-                                      </p>
-                                    )}
-                                    {stopDone && stop.podPhotoUrl && (
-                                      <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
-                                        <img
-                                          src={stop.podPhotoUrl}
-                                          alt={`POD for stop ${stop.stopOrder}`}
-                                          className="rounded border border-border h-16 w-auto object-cover cursor-zoom-in"
-                                        />
-                                      </a>
-                                    )}
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     ) : (
