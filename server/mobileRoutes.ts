@@ -2292,7 +2292,28 @@ export function registerMobileRoutes(app: Express): void {
       const totalCount = allStops?.length || 0;
       
       console.log(`[Multi-Drop] Stop ${stopId} completed. Progress: ${completedCount}/${totalCount}`);
-      
+
+      // Broadcast intermediate progress to customers so their tracking page refreshes immediately.
+      // Re-fetch enough job fields to fill the broadcast payload.
+      if (!allCompleted && supabaseAdmin) {
+        const { data: jobMeta } = await supabaseAdmin
+          .from('jobs')
+          .select('id, tracking_number, status, customer_id, driver_id, updated_at')
+          .eq('id', String(jobId))
+          .single();
+        if (jobMeta) {
+          broadcastJobUpdate({
+            id: jobMeta.id,
+            trackingNumber: jobMeta.tracking_number,
+            status: jobMeta.status,
+            previousStatus: jobMeta.status,
+            customerId: jobMeta.customer_id,
+            driverId: jobMeta.driver_id || driver.id,
+            updatedAt: new Date(),
+          });
+        }
+      }
+
       if (allCompleted) {
         console.log(`[Multi-Drop] All ${totalCount} stops delivered for job ${jobId} — auto-completing job`);
 

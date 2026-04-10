@@ -2110,12 +2110,12 @@ export async function registerRoutes(
       
       // Fetch multi-drop stops if applicable
       const isMultiDrop = !!(job as any).is_multi_drop;
-      let multiDropStops: { stopOrder: number; address: string; postcode: string }[] = [];
+      let multiDropStops: { stopOrder: number; address: string; postcode: string; status: string; deliveredAt: string | null; podPhotoUrl: string | null; podRecipientName: string | null }[] = [];
       if (isMultiDrop) {
         const jobIdStr = String(job.id);
         const { data: stops } = await supabaseAdmin
           .from('multi_drop_stops')
-          .select('stop_order, address, postcode')
+          .select('stop_order, address, postcode, status, delivered_at, pod_photo_url, pod_recipient_name')
           .eq('job_id', jobIdStr)
           .order('stop_order', { ascending: true });
         if (stops && stops.length > 0) {
@@ -2126,6 +2126,10 @@ export async function registerRoutes(
               stopOrder: s.stop_order,
               address: addr,
               postcode: normPostcode,
+              status: s.status || 'pending',
+              deliveredAt: s.delivered_at || null,
+              podPhotoUrl: s.pod_photo_url || null,
+              podRecipientName: s.pod_recipient_name || null,
             };
           });
         }
@@ -2137,6 +2141,10 @@ export async function registerRoutes(
             stopOrder: nextOrder,
             address: job.delivery_address || deliveryPostcode,
             postcode: deliveryPostcode,
+            status: 'pending',
+            deliveredAt: null,
+            podPhotoUrl: null,
+            podRecipientName: null,
           });
         }
       }

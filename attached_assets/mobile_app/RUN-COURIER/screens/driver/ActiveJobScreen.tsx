@@ -1230,7 +1230,7 @@ export function ActiveJobScreen({ navigation }: any) {
     }
   };
 
-  const handleStatusUpdate = () => {
+  const handleStatusUpdate = async () => {
     if (!activeJob) return;
     const status = activeJob.status as JobStatus;
     
@@ -1247,6 +1247,23 @@ export function ActiveJobScreen({ navigation }: any) {
         updateJobStatus('on_the_way');
         break;
       case 'on_the_way':
+        // For multi-drop jobs the server may have already auto-completed this job
+        // when the last stop was saved. Check the real DB status before opening the
+        // POD modal — if it's already 'delivered' just refresh the UI.
+        try {
+          const { data: dbJob } = await supabase
+            .from('driver_jobs_view')
+            .select('status')
+            .eq('id', activeJob.id)
+            .single();
+          if (dbJob?.status === 'delivered') {
+            // Job was auto-completed server-side — clear stale state and show done UI
+            await fetchActiveJob();
+            return;
+          }
+        } catch {
+          // Network error — fall through and open the modal anyway
+        }
         setShowPODModal(true);
         break;
     }
