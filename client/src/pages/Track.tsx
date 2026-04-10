@@ -18,6 +18,7 @@ import {
   Radio,
   ImageIcon,
   UserCheck,
+  PenLine,
 } from 'lucide-react';
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept_opt.jpg';
@@ -116,6 +117,7 @@ interface MockJob {
     status: string;
     deliveredAt?: string | null;
     podPhotoUrl?: string | null;
+    podSignatureUrl?: string | null;
     podRecipientName?: string | null;
   }[];
   driverName?: string;
@@ -125,6 +127,7 @@ interface MockJob {
   estimatedDelivery?: string;
   createdAt: string;
   podPhotoUrl?: string;
+  podSignatureUrl?: string;
   podRecipientName?: string;
   recipientName?: string;
   deliveredAt?: string;
@@ -200,6 +203,7 @@ export default function Track() {
           estimatedDelivery: data.estimatedDeliveryTime ? new Date(data.estimatedDeliveryTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined,
           createdAt: data.createdAt,
           podPhotoUrl: data.podPhotoUrl || undefined,
+          podSignatureUrl: data.podSignatureUrl || undefined,
           podRecipientName: data.podRecipientName || undefined,
           recipientName: data.recipientName || undefined,
           deliveredAt: data.deliveredAt || undefined,
@@ -393,7 +397,7 @@ export default function Track() {
               </Card>
 
               {/* Proof of Delivery — shown when delivered */}
-              {job.status === 'delivered' && (job.podPhotoUrl || job.podRecipientName || job.recipientName) && (
+              {job.status === 'delivered' && (job.podPhotoUrl || job.podSignatureUrl || job.podRecipientName || job.recipientName) && (
                 <Card className="mb-8 border-green-200 dark:border-green-800">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2 text-green-700 dark:text-green-400">
@@ -419,6 +423,23 @@ export default function Track() {
                           <p className="text-xs text-muted-foreground">Received by</p>
                           <p className="font-semibold" data-testid="text-pod-recipient">{job.podRecipientName || job.recipientName}</p>
                         </div>
+                      </div>
+                    )}
+                    {job.podSignatureUrl && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                          <PenLine className="h-3 w-3" />
+                          Recipient signature
+                        </p>
+                        <a href={job.podSignatureUrl} target="_blank" rel="noopener noreferrer" className="block" data-testid="link-pod-signature">
+                          <img
+                            src={job.podSignatureUrl}
+                            alt="Recipient signature"
+                            className="rounded-md border border-border bg-white dark:bg-white max-h-36 w-auto object-contain cursor-zoom-in"
+                            data-testid="img-pod-signature"
+                          />
+                        </a>
+                        <p className="text-xs text-muted-foreground mt-1">Click to view full size</p>
                       </div>
                     )}
                     {job.podPhotoUrl && (
@@ -518,6 +539,15 @@ export default function Track() {
                                         <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
                                           <UserCheck className="h-3 w-3" /> {stop.podRecipientName}
                                         </p>
+                                      )}
+                                      {stopDone && stop.podSignatureUrl && (
+                                        <a href={stop.podSignatureUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
+                                          <img
+                                            src={stop.podSignatureUrl}
+                                            alt={`Signature for drop ${stop.stopOrder}`}
+                                            className="rounded border border-border h-12 w-auto object-contain bg-white cursor-zoom-in"
+                                          />
+                                        </a>
                                       )}
                                       {stopDone && stop.podPhotoUrl && (
                                         <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
