@@ -70,7 +70,7 @@ function CheckoutForm({
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [formReady, setFormReady]       = useState(false);
+  const [formLoading, setFormLoading]   = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +109,7 @@ function CheckoutForm({
       } catch {
         setPaymentError('Payment received but confirmation failed. Please contact support.');
       }
-    } else {
+    } else if (paymentIntent) {
       setPaymentError('Payment was not completed. Please try again.');
     }
     setIsProcessing(false);
@@ -127,38 +127,27 @@ function CheckoutForm({
             Enter your card details — Apple Pay &amp; Google Pay also accepted
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {/* Stripe PaymentElement mounts its secure iframe here */}
-          <div style={{ minHeight: '200px', position: 'relative' }}>
-            {!formReady && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                  color: 'var(--muted-foreground)',
-                }}
-              >
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Loading payment form…</span>
-              </div>
-            )}
-            <PaymentElement
-              onReady={() => setFormReady(true)}
-              onLoaderError={() =>
-                setPaymentError('Payment form failed to load. Please refresh and try again.')
-              }
-              options={{
-                layout: { type: 'tabs', defaultCollapsed: false },
-                paymentMethodOrder: ['apple_pay', 'google_pay', 'card'],
-                wallets: { applePay: 'auto', googlePay: 'auto' },
-              }}
-            />
-          </div>
+        <CardContent className="space-y-4">
+          {/* Loading indicator shown ABOVE the form, not overlaid */}
+          {formLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading secure payment form…</span>
+            </div>
+          )}
+
+          {/* Stripe mounts its card iframe here — never hidden or overlaid */}
+          <PaymentElement
+            onReady={() => setFormLoading(false)}
+            onLoaderError={() => {
+              setFormLoading(false);
+              setPaymentError('Payment form failed to load. Please refresh the page and try again.');
+            }}
+            options={{
+              layout: { type: 'tabs', defaultCollapsed: false },
+              wallets: { applePay: 'auto', googlePay: 'auto' },
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -171,7 +160,7 @@ function CheckoutForm({
 
       <Button
         type="submit"
-        disabled={isProcessing || !stripe || !elements || !formReady}
+        disabled={isProcessing || !stripe || !elements}
         className="w-full"
         size="lg"
         data-testid="button-pay-invoice"
