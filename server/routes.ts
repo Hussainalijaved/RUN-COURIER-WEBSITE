@@ -941,6 +941,7 @@ export async function registerRoutes(
   // Invoices — supervisors can send/resend invoices
   app.use('/api/invoices/:id/send', requireAdminOrSupervisorStrict);
   app.use('/api/invoices/:id/resend', requireAdminOrSupervisorStrict);
+  app.use('/api/invoices/:id/send-sms', requireAdminOrSupervisorStrict);
   app.use('/api/invoices/bulk-send', requireAdminOrSupervisorStrict);
   // Protect DELETE invoice route (must be registered before the route)
   app.delete('/api/invoices/:id', requireAdminAccessStrict, asyncHandler(async (req, res) => {
