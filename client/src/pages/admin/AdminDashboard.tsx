@@ -26,8 +26,13 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  Users,
+  PoundSterling,
+  Activity,
+  LayoutGrid,
 } from 'lucide-react';
 import { SiWhatsapp } from 'react-icons/si';
+import { Card, CardContent } from '@/components/ui/card';
 
 const STATUS_COLORS: Record<string, string> = {
   delivered:            '#10B981',
@@ -57,7 +62,11 @@ const toNum = (v: string | number | null | undefined): number => {
   const n = typeof v === 'string' ? parseFloat(v) : (v ?? 0);
   return isNaN(n as number) ? 0 : (n as number);
 };
-const fmt = (v: string | number | null | undefined) => `£${toNum(v).toFixed(2)}`;
+const fmt  = (v: string | number | null | undefined) => `£${toNum(v).toFixed(2)}`;
+const fmtK = (v: string | number | null | undefined) => {
+  const n = toNum(v);
+  return n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${n.toFixed(2)}`;
+};
 
 const fmtVehicle = (v?: string | null) =>
   v ? v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—';
@@ -135,6 +144,50 @@ function PagBtn({ onClick, disabled, children, testId }: {
   );
 }
 
+interface KpiCardProps {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: string;
+  testId?: string;
+}
+
+function KpiCard({ icon: Icon, label, value, sub, accent, testId }: KpiCardProps) {
+  return (
+    <Card data-testid={testId}>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-muted-foreground uppercase tracking-wider" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em' }}>
+              {label}
+            </span>
+            <span
+              className="font-bold leading-none tabular-nums"
+              style={{ fontSize: 26, color: accent ?? 'hsl(var(--foreground))' }}
+            >
+              {value}
+            </span>
+            {sub && (
+              <span className="text-muted-foreground/80" style={{ fontSize: 11 }}>{sub}</span>
+            )}
+          </div>
+          <div
+            className="flex items-center justify-center rounded-lg flex-shrink-0"
+            style={{
+              width: 38,
+              height: 38,
+              background: accent ? `${accent}18` : 'hsl(var(--muted))',
+            }}
+          >
+            <Icon style={{ width: 17, height: 17, color: accent ?? 'hsl(var(--muted-foreground))' }} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const PER_PAGE = 10;
 
 export default function AdminDashboard() {
@@ -185,68 +238,115 @@ export default function AdminDashboard() {
   const unverified  = drivers?.filter(d => !d.isVerified && d.isActive !== false).length ?? 0;
   const totalAlerts = pendingDocs + pendingApps + unverified;
 
-  const activeDrivers = drivers?.filter(d => d.isActive !== false) ?? [];
-  const deliveringIds = new Set(
+  const activeDrivers  = drivers?.filter(d => d.isActive !== false) ?? [];
+  const deliveringIds  = new Set(
     jobs?.filter(j =>
       ['on_the_way_delivery','on_the_way_pickup','collected','assigned','accepted'].includes(j.status) && j.driverId
     ).map(j => j.driverId!)
   );
+  const onJobCount  = activeDrivers.filter(d => deliveringIds.has(d.id)).length;
+  const availCount  = activeDrivers.filter(d => !deliveringIds.has(d.id)).length;
 
   return (
     <DashboardLayout>
       <div className="-m-3 sm:-m-4 lg:-m-6 flex flex-col bg-background" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
 
-        {/* ══ TOOLBAR ════════════════════════════════════════════════════════ */}
-        <div className="sticky top-0 z-30 flex items-center gap-4 px-5 flex-shrink-0 bg-background border-b border-border" style={{ height: 52 }}>
-          <span
-            className="text-foreground whitespace-nowrap"
-            style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em' }}
-            data-testid="text-page-title"
-          >
-            Dashboard
-          </span>
+        {/* ══ KPI CARDS ══════════════════════════════════════════════════════ */}
+        <div className="px-5 pt-5 pb-4 border-b border-border bg-background">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+              <span className="font-semibold text-foreground" style={{ fontSize: 14 }} data-testid="text-page-title">
+                Overview
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {totalAlerts > 0 && (
+                <div
+                  className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                  style={{ backgroundColor: 'rgb(244 63 94 / 0.1)', border: '1px solid rgb(244 63 94 / 0.25)' }}
+                  data-testid="alert-pending-actions"
+                >
+                  <AlertCircle style={{ width: 11, height: 11, color: '#F43F5E' }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#F43F5E' }}>{totalAlerts} action{totalAlerts > 1 ? 's' : ''} needed</span>
+                </div>
+              )}
+              <Link href="/admin/jobs/create">
+                <button
+                  className="flex items-center gap-1.5 rounded-md font-semibold text-primary-foreground bg-primary hover:brightness-110 active:brightness-90 transition-all"
+                  style={{ height: 34, paddingLeft: 14, paddingRight: 14, fontSize: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                  data-testid="button-new-job"
+                >
+                  <Plus style={{ width: 13, height: 13 }} />
+                  New Job
+                </button>
+              </Link>
+            </div>
+          </div>
 
-          <div className="relative flex-1 max-w-md hidden sm:block">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <KpiCard
+              icon={Package}
+              label="Today's Jobs"
+              value={stats?.todaysJobs ?? 0}
+              sub={`${jobs?.filter(j => j.status === 'pending').length ?? 0} pending`}
+              accent="hsl(var(--primary))"
+              testId="kpi-todays-jobs"
+            />
+            <KpiCard
+              icon={Users}
+              label="Active Drivers"
+              value={stats?.activeDrivers ?? 0}
+              sub={`${onJobCount} on job · ${availCount} available`}
+              accent="#10B981"
+              testId="kpi-active-drivers"
+            />
+            <KpiCard
+              icon={PoundSterling}
+              label="Today's Revenue"
+              value={fmtK(stats?.todayRevenue)}
+              sub="customer price total"
+              accent="#8B5CF6"
+              testId="kpi-today-revenue"
+            />
+            <KpiCard
+              icon={Activity}
+              label="Pending Actions"
+              value={totalAlerts}
+              sub={[
+                pendingApps > 0 && `${pendingApps} application${pendingApps > 1 ? 's' : ''}`,
+                pendingDocs > 0 && `${pendingDocs} doc${pendingDocs > 1 ? 's' : ''}`,
+                unverified  > 0 && `${unverified} unverified`,
+              ].filter(Boolean).join(' · ') || 'All clear'}
+              accent={totalAlerts > 0 ? '#F43F5E' : '#10B981'}
+              testId="kpi-pending-actions"
+            />
+          </div>
+        </div>
+
+        {/* ══ TOOLBAR ════════════════════════════════════════════════════════ */}
+        <div className="sticky top-0 z-30 flex items-center gap-4 px-5 flex-shrink-0 bg-background border-b border-border" style={{ height: 48 }}>
+          <span className="text-foreground whitespace-nowrap" style={{ fontSize: 13, fontWeight: 600 }}>
+            Jobs
+          </span>
+          <div className="relative flex-1 max-w-sm hidden sm:block">
             <Search className="absolute text-muted-foreground/80" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13 }} />
             <input
               className="w-full bg-card border border-border text-muted-foreground rounded-md outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
-              style={{ height: 34, paddingLeft: 32, paddingRight: 12, fontSize: 12, fontFamily: 'inherit' }}
+              style={{ height: 32, paddingLeft: 32, paddingRight: 12, fontSize: 12, fontFamily: 'inherit' }}
               placeholder="Search tracking ID, postcode, driver…"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               data-testid="input-global-search"
             />
           </div>
-
           <div className="flex-1" />
-
-          {totalAlerts > 0 && (
-            <div
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
-              style={{ backgroundColor: 'rgb(244 63 94 / 0.1)', border: '1px solid rgb(244 63 94 / 0.3)' }}
-              data-testid="alert-pending-actions"
-            >
-              <AlertCircle style={{ width: 11, height: 11, color: '#F43F5E' }} />
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#F43F5E' }}>{totalAlerts} action{totalAlerts > 1 ? 's' : ''}</span>
-            </div>
-          )}
-
-          <Link href="/admin/jobs/create">
-            <button
-              className="flex items-center gap-1.5 rounded-md font-semibold text-primary-foreground bg-primary hover:brightness-110 active:brightness-90 transition-all"
-              style={{ height: 34, paddingLeft: 14, paddingRight: 14, fontSize: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
-              data-testid="button-new-job"
-            >
-              <Plus style={{ width: 13, height: 13 }} />
-              New Job
-            </button>
-          </Link>
         </div>
 
         {/* ══ FILTER BAR ═════════════════════════════════════════════════════ */}
         <div
           className="sticky z-20 flex items-center flex-shrink-0 overflow-x-auto bg-background border-b border-border"
-          style={{ top: 52, height: 44, paddingLeft: 4 }}
+          style={{ top: 48, height: 44, paddingLeft: 4 }}
         >
           {TABS.map(tab => {
             const active = filter === tab.value;
@@ -296,11 +396,11 @@ export default function AdminDashboard() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'inherit' }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 16 }} />
-                    {(['Order ID', 'Route', 'Driver', 'Vehicle', 'Status', 'Time', 'Amount'] as const).map((label, i) => (
+                    <th style={{ width: 3 }} />
+                    {(['Order ID', 'Route', 'Driver', 'Vehicle', 'Status', 'Date', 'Amount'] as const).map((label) => (
                       <th
                         key={label}
-                        className={`py-3 px-3 whitespace-nowrap text-muted-foreground/80 uppercase bg-background border-b border-border sticky top-0 z-[5] ${label === 'Vehicle' ? 'hidden md:table-cell' : ''} ${label === 'Time' ? 'hidden sm:table-cell' : ''} ${label === 'Amount' ? 'pr-4' : ''} ${label === 'Order ID' ? 'pl-4' : ''}`}
+                        className={`py-3 px-3 whitespace-nowrap text-muted-foreground/80 uppercase bg-background border-b border-border sticky top-0 z-[5] ${label === 'Vehicle' ? 'hidden md:table-cell' : ''} ${label === 'Date' ? 'hidden sm:table-cell' : ''} ${label === 'Amount' ? 'pr-4' : ''} ${label === 'Order ID' ? 'pl-4' : ''}`}
                         style={{ textAlign: label === 'Amount' ? 'right' : 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em' }}
                       >
                         {label}
@@ -433,80 +533,26 @@ export default function AdminDashboard() {
           </div>
 
           {/* ── RIGHT PANEL ──────────────────────────────────────────────────── */}
-          <div className="hidden lg:flex flex-col flex-shrink-0 overflow-y-auto bg-background" style={{ width: 224 }}>
-
-            {/* Stats */}
-            <PanelSection title="Overview">
-              <div className="grid grid-cols-2 border-b border-border">
-                {[
-                  { n: stats?.todaysJobs ?? 0,    label: "Today's Jobs",   hi: false },
-                  { n: stats?.pendingJobs ?? 0,    label: 'Pending',        hi: (stats?.pendingJobs ?? 0) > 0, hiColor: '#F59E0B' },
-                  { n: stats?.activeDrivers ?? 0,  label: 'Active Drivers', primary: true },
-                  { n: stats?.totalDrivers ?? 0,   label: 'Total Drivers',  hi: false },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className={`flex flex-col items-center justify-center py-3 ${i % 2 === 0 ? 'border-r border-border' : ''} ${i < 2 ? 'border-b border-border' : ''}`}
-                  >
-                    <span
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 700,
-                        lineHeight: 1,
-                        color: (item as any).primary
-                          ? 'hsl(var(--primary))'
-                          : (item as any).hi
-                          ? ((item as any).hiColor ?? 'hsl(var(--foreground))')
-                          : 'hsl(var(--foreground))',
-                      }}
-                    >
-                      {item.n}
-                    </span>
-                    <span className="text-muted-foreground/80 uppercase text-center" style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.09em', marginTop: 3 }}>
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center justify-between px-4 py-2.5">
-                <span className="text-muted-foreground/80" style={{ fontSize: 11 }}>Today's Revenue</span>
-                <span className="text-foreground" style={{ fontSize: 13, fontWeight: 700 }}>{fmt(stats?.todayRevenue)}</span>
-              </div>
-            </PanelSection>
+          <div className="hidden lg:flex flex-col flex-shrink-0 overflow-y-auto bg-background" style={{ width: 220 }}>
 
             {/* Driver Activity */}
             <PanelSection title="Driver Activity">
               <div className="grid grid-cols-3 border-b border-border">
                 {[
-                  { n: activeDrivers.filter(d => deliveringIds.has(d.id)).length,  label: 'Active',  primary: true },
-                  { n: activeDrivers.filter(d => !deliveringIds.has(d.id)).length, label: 'Avail.',  hi: false },
-                  { n: (drivers?.filter(d => d.isActive === false) ?? []).length,  label: 'Offline', dim: true },
+                  { n: onJobCount,                                                    label: 'Active',  accent: 'hsl(var(--primary))' },
+                  { n: availCount,                                                    label: 'Avail.',  accent: 'hsl(var(--foreground))' },
+                  { n: (drivers?.filter(d => d.isActive === false) ?? []).length,     label: 'Offline', accent: 'hsl(var(--muted-foreground) / 0.6)' },
                 ].map((item, i) => (
                   <div
                     key={i}
                     className={`flex flex-col items-center py-3 ${i < 2 ? 'border-r border-border' : ''}`}
                   >
-                    <span
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 700,
-                        lineHeight: 1,
-                        color: (item as any).primary
-                          ? 'hsl(var(--primary))'
-                          : (item as any).dim
-                          ? 'hsl(var(--muted-foreground) / 0.7)'
-                          : 'hsl(var(--foreground))',
-                      }}
-                    >
-                      {item.n}
-                    </span>
-                    <span className="text-muted-foreground/70 uppercase" style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', marginTop: 3 }}>
-                      {item.label}
-                    </span>
+                    <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1, color: item.accent }}>{item.n}</span>
+                    <span className="text-muted-foreground/70 uppercase" style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', marginTop: 3 }}>{item.label}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+              <div style={{ maxHeight: 160, overflowY: 'auto' }}>
                 {activeDrivers.length === 0 ? (
                   <p className="text-muted-foreground/70" style={{ padding: '12px 16px', fontSize: 11 }}>No active drivers</p>
                 ) : activeDrivers.slice(0, 12).map(d => {
@@ -515,9 +561,9 @@ export default function AdminDashboard() {
                     <div
                       key={d.id}
                       className="flex items-center gap-2.5 border-b border-border"
-                      style={{ padding: '8px 16px' }}
+                      style={{ padding: '7px 16px' }}
                     >
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.6)', flexShrink: 0 }} />
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.5)', flexShrink: 0 }} />
                       <span className="text-muted-foreground flex-1 truncate" style={{ fontSize: 11 }}>
                         {d.fullName || d.vehicleRegistration || 'Driver'}
                       </span>
@@ -533,9 +579,9 @@ export default function AdminDashboard() {
             {/* Alerts */}
             <PanelSection title="Alerts" badge={totalAlerts}>
               {[
-                unverified  > 0 && { label: `${unverified} driver${unverified>1?'s':''} unverified`,            href: '/admin/drivers',      color: '#F43F5E' },
-                pendingApps > 0 && { label: `${pendingApps} application${pendingApps>1?'s':''} pending`,          href: '/admin/applications', color: '#F59E0B' },
-                pendingDocs > 0 && { label: `${pendingDocs} document${pendingDocs>1?'s':''} pending review`,      href: '/admin/documents',    color: '#F59E0B' },
+                unverified  > 0 && { label: `${unverified} driver${unverified>1?'s':''} unverified`,       href: '/admin/drivers',      color: '#F43F5E' },
+                pendingApps > 0 && { label: `${pendingApps} application${pendingApps>1?'s':''} pending`,    href: '/admin/applications', color: '#F59E0B' },
+                pendingDocs > 0 && { label: `${pendingDocs} document${pendingDocs>1?'s':''} pending review`,href: '/admin/documents',    color: '#F59E0B' },
               ].filter(Boolean).map((a: any, i) => (
                 <Link href={a.href} key={i}>
                   <div
@@ -592,12 +638,12 @@ export default function AdminDashboard() {
             <PanelSection title="Quick Actions">
               <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {[
-                  { href: '/admin/jobs/create',        icon: Plus,           label: 'Create Job',        badge: 0,          id: 'button-create-job'          },
-                  { href: '/admin/jobs?filter=pending', icon: Truck,          label: 'Assign Driver',     badge: 0,          id: 'button-assign-driver'       },
-                  { href: '/admin/applications',        icon: ClipboardCheck, label: 'Applications',      badge: pendingApps, id: 'button-driver-applications' },
-                  { href: '/admin/map',                 icon: MapPin,         label: 'Live Map',          badge: 0,          id: 'button-live-map'            },
-                  { href: '/admin/documents',           icon: FileText,       label: 'Documents',         badge: pendingDocs, id: 'button-review-docs'         },
-                  { href: '/admin/pricing',             icon: TrendingUp,     label: 'Pricing Settings',  badge: 0,          id: 'button-pricing-settings'    },
+                  { href: '/admin/jobs/create',         icon: Plus,           label: 'Create Job',       badge: 0,           id: 'button-create-job'          },
+                  { href: '/admin/jobs?filter=pending',  icon: Truck,          label: 'Assign Driver',    badge: 0,           id: 'button-assign-driver'       },
+                  { href: '/admin/applications',         icon: ClipboardCheck, label: 'Applications',     badge: pendingApps, id: 'button-driver-applications' },
+                  { href: '/admin/map',                  icon: MapPin,         label: 'Live Map',         badge: 0,           id: 'button-live-map'            },
+                  { href: '/admin/documents',            icon: FileText,       label: 'Documents',        badge: pendingDocs, id: 'button-review-docs'         },
+                  { href: '/admin/pricing',              icon: TrendingUp,     label: 'Pricing Settings', badge: 0,           id: 'button-pricing-settings'    },
                 ].map(item => (
                   <Link href={item.href} key={item.id}>
                     <div
