@@ -316,8 +316,8 @@ export default function AdminMap() {
       return;
     }
 
-    // Centre on UK and restrict panning to UK bounds
-    const UK_CENTER = { lat: 54.5, lng: -3.0 };
+    // Start centred on London, restrict panning to UK bounds
+    const LONDON_CENTER = { lat: 51.5074, lng: -0.1278 };
     const UK_BOUNDS = {
       north: 61.0,
       south: 49.5,
@@ -325,8 +325,8 @@ export default function AdminMap() {
       east:   2.5,
     };
     const newMap = new google.maps.Map(mapRef.current, {
-      center: UK_CENTER,
-      zoom: 6,
+      center: LONDON_CENTER,
+      zoom: 10,
       restriction: {
         latLngBounds: UK_BOUNDS,
         strictBounds: false,
