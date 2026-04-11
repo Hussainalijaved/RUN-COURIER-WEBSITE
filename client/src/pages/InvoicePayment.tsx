@@ -122,11 +122,19 @@ export default function InvoicePayment() {
         }
         if (!publishableKey) throw new Error('Payment system is not configured');
 
-        // 4. Initialise Stripe.js — it's already loaded via @stripe/stripe-js in the bundle
-        //    We use the global loadStripe from the package to avoid a second network fetch.
-        const { loadStripe } = await import('@stripe/stripe-js');
-        const stripe = await loadStripe(publishableKey);
-        if (!stripe) throw new Error('Failed to load Stripe');
+        // 4. Use window.Stripe — loaded via the <script src="https://js.stripe.com/v3/"> tag
+        //    in index.html.  Wait up to 10 s for the async script to arrive.
+        const stripeGlobal = await new Promise<any>((resolve, reject) => {
+          if ((window as any).Stripe) { resolve((window as any).Stripe); return; }
+          let waited = 0;
+          const interval = setInterval(() => {
+            waited += 100;
+            if ((window as any).Stripe) { clearInterval(interval); resolve((window as any).Stripe); }
+            else if (waited >= 10000) { clearInterval(interval); reject(new Error('Stripe.js did not load in time')); }
+          }, 100);
+        });
+        const stripe = stripeGlobal(publishableKey);
+        if (!stripe) throw new Error('Failed to initialise Stripe');
         stripeRef.current = stripe;
 
         // 5. Create Elements instance with the clientSecret
