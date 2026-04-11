@@ -373,12 +373,13 @@ export default function AdminInvoices() {
 
   const handleSendSms = () => {
     if (!sendSmsInvoice) return;
-    const number = sendSmsNumber.trim();
-    if (!number) {
+    const digits = sendSmsNumber.replace(/\D/g, '').replace(/^0+/, '');
+    if (!digits) {
       toast({ title: 'Please enter a phone number', variant: 'destructive' });
       return;
     }
-    sendSmsInvoiceMutation.mutate({ invoice: sendSmsInvoice, phoneNumber: number });
+    const fullNumber = `+44${digits}`;
+    sendSmsInvoiceMutation.mutate({ invoice: sendSmsInvoice, phoneNumber: fullNumber });
   };
 
   // Bulk send invoices mutation
@@ -2279,17 +2280,23 @@ export default function AdminInvoices() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="send-sms-number">Mobile Number</Label>
-                <Input
-                  id="send-sms-number"
-                  type="tel"
-                  placeholder="+447700900000"
-                  value={sendSmsNumber}
-                  onChange={(e) => setSendSmsNumber(e.target.value)}
-                  data-testid="input-send-sms-number"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Include the country code (e.g. +44 for UK numbers).
-                </p>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-sm text-muted-foreground select-none">
+                    +44
+                  </span>
+                  <Input
+                    id="send-sms-number"
+                    type="tel"
+                    placeholder="7700900000"
+                    value={sendSmsNumber}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').replace(/^0+/, '');
+                      setSendSmsNumber(val);
+                    }}
+                    className="rounded-l-none"
+                    data-testid="input-send-sms-number"
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>
