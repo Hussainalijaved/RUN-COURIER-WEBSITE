@@ -150,6 +150,10 @@ export default function PostcodeMap() {
       const map = new google.maps.Map(mapRef.current, {
         center: { lat: 54.5, lng: -3.0 },
         zoom: 6,
+        restriction: {
+          latLngBounds: { north: 61.0, south: 49.5, west: -9.0, east: 2.5 },
+          strictBounds: false,
+        },
         mapTypeId: 'roadmap',
         disableDefaultUI: false,
         streetViewControl: false,

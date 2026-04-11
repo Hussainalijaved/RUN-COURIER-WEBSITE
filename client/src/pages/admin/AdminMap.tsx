@@ -316,10 +316,21 @@ export default function AdminMap() {
       return;
     }
 
-    const center = getMapCenter();
+    // Centre on UK and restrict panning to UK bounds
+    const UK_CENTER = { lat: 54.5, lng: -3.0 };
+    const UK_BOUNDS = {
+      north: 61.0,
+      south: 49.5,
+      west:  -9.0,
+      east:   2.5,
+    };
     const newMap = new google.maps.Map(mapRef.current, {
-      center,
-      zoom: 12,
+      center: UK_CENTER,
+      zoom: 6,
+      restriction: {
+        latLngBounds: UK_BOUNDS,
+        strictBounds: false,
+      },
       styles: [
         { featureType: 'poi', stylers: [{ visibility: 'off' }] },
         { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },

@@ -235,8 +235,12 @@ export default function AdminRoutePlanner() {
   const initMap = useCallback(() => {
     if (!mapRef.current || mapsReadyRef.current) return;
     const map = new google.maps.Map(mapRef.current, {
-      center: { lat: 52.5, lng: -1.5 },
+      center: { lat: 54.5, lng: -3.0 },
       zoom: 6,
+      restriction: {
+        latLngBounds: { north: 61.0, south: 49.5, west: -9.0, east: 2.5 },
+        strictBounds: false,
+      },
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: true,

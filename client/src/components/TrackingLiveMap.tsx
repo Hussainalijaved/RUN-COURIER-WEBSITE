@@ -96,8 +96,12 @@ export function TrackingLiveMap({ trackingNumber, jobStatus, pickupAddress }: Tr
     if (!isReady || !mapRef.current || mapInstanceRef.current) return;
     try {
       mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-        zoom: 12,
-        center: { lat: 51.5074, lng: -0.1278 },
+        zoom: 6,
+        center: { lat: 54.5, lng: -3.0 },
+        restriction: {
+          latLngBounds: { north: 61.0, south: 49.5, west: -9.0, east: 2.5 },
+          strictBounds: false,
+        },
         disableDefaultUI: true,
         zoomControl: true,
         gestureHandling: 'cooperative',
