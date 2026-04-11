@@ -12930,6 +12930,45 @@ export async function registerRoutes(
     }
   }));
 
+  // Send invoice payment link via SMS
+  app.post("/api/invoices/:id/send-sms", asyncHandler(async (req, res) => {
+    if (!enforceAdminOrSupervisorAccess(req, res)) return;
+
+    const { data: invoice, error: fetchError } = await supabaseAdmin!
+      .from('invoice_payment_tokens')
+      .select('*')
+      .eq('token', req.params.id)
+      .single();
+
+    if (fetchError || !invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    const { phoneNumber } = req.body;
+    if (!phoneNumber || typeof phoneNumber !== 'string' || !phoneNumber.trim()) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+
+    const appUrl = process.env.APP_URL || 'https://runcourier.co.uk';
+    const paymentUrl = `${appUrl}/invoice-pay/${invoice.token}`;
+    const totalAmount = typeof invoice.amount === 'string'
+      ? parseFloat(invoice.amount)
+      : (invoice.amount || 0);
+
+    const message = `Run Courier Invoice ${invoice.invoice_number} - Amount due: £${totalAmount.toFixed(2)}. Pay securely here: ${paymentUrl}`;
+
+    const { sendSMS } = await import("./twilioService");
+    const result = await sendSMS(phoneNumber.trim(), message);
+
+    if (result.success) {
+      console.log(`[Invoice SMS] Sent invoice ${invoice.invoice_number} to ${phoneNumber.trim()}`);
+      res.json({ success: true, messageId: result.messageId });
+    } else {
+      console.error(`[Invoice SMS] Failed to send to ${phoneNumber.trim()}:`, result.error);
+      res.status(500).json({ error: result.error || "Failed to send SMS" });
+    }
+  }));
+
   // Bulk send invoices by email
   app.post("/api/invoices/bulk-send", asyncHandler(async (req, res) => {
     console.log('[Bulk Send] Starting bulk send request');

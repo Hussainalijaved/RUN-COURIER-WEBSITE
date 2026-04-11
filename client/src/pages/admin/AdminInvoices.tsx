@@ -45,6 +45,7 @@ import {
   Send,
   Eye,
   Mail,
+  MessageSquare,
   Printer,
   Download,
   MoreHorizontal,
@@ -171,6 +172,9 @@ export default function AdminInvoices() {
   const [sendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
   const [sendEmailInvoice, setSendEmailInvoice] = useState<SavedInvoice | null>(null);
   const [sendEmailAddress, setSendEmailAddress] = useState('');
+  const [sendSmsDialogOpen, setSendSmsDialogOpen] = useState(false);
+  const [sendSmsInvoice, setSendSmsInvoice] = useState<SavedInvoice | null>(null);
+  const [sendSmsNumber, setSendSmsNumber] = useState('');
   const { toast } = useToast();
 
   const form = useForm<CreateInvoiceFormData>({
@@ -338,6 +342,43 @@ export default function AdminInvoices() {
       invoice: sendEmailInvoice, 
       overrideEmail: isOverride ? emailToUse : undefined 
     });
+  };
+
+  // Send invoice via SMS mutation
+  const sendSmsInvoiceMutation = useMutation({
+    mutationFn: async ({ invoice, phoneNumber }: { invoice: SavedInvoice; phoneNumber: string }) => {
+      const response = await apiRequest('POST', `/api/invoices/${invoice.id}/send-sms`, { phoneNumber });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'SMS sent successfully', description: `Payment link sent via SMS to ${sendSmsNumber}` });
+      setSendSmsDialogOpen(false);
+      setSendSmsInvoice(null);
+      setSendSmsNumber('');
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to send SMS',
+        description: error?.message || 'Please try again',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const openSendSmsDialog = (invoice: SavedInvoice) => {
+    setSendSmsInvoice(invoice);
+    setSendSmsNumber('');
+    setSendSmsDialogOpen(true);
+  };
+
+  const handleSendSms = () => {
+    if (!sendSmsInvoice) return;
+    const number = sendSmsNumber.trim();
+    if (!number) {
+      toast({ title: 'Please enter a phone number', variant: 'destructive' });
+      return;
+    }
+    sendSmsInvoiceMutation.mutate({ invoice: sendSmsInvoice, phoneNumber: number });
   };
 
   // Bulk send invoices mutation
@@ -1147,6 +1188,20 @@ export default function AdminInvoices() {
                                   <Mail className="h-4 w-4 mr-2" />
                                   Send Email
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    if (fullInvoice) {
+                                      openSendSmsDialog(fullInvoice);
+                                    } else {
+                                      toast({ title: 'Loading invoice...', description: 'Please try again in a moment' });
+                                      refetchInvoices();
+                                    }
+                                  }}
+                                  data-testid={`menu-sms-recent-${index}`}
+                                >
+                                  <MessageSquare className="h-4 w-4 mr-2" />
+                                  Send SMS
+                                </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   onClick={() => {
                                     if (fullInvoice) {
@@ -1334,6 +1389,13 @@ export default function AdminInvoices() {
                               >
                                 <Mail className="h-4 w-4 mr-2" />
                                 Send Email
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => openSendSmsDialog(invoice)}
+                                data-testid={`menu-sms-invoice-${invoice.id}`}
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Send SMS
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => printInvoice(invoice)}
@@ -2196,6 +2258,68 @@ export default function AdminInvoices() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {/* Send SMS Dialog */}
+        <Dialog
+          open={sendSmsDialogOpen}
+          onOpenChange={(open) => {
+            setSendSmsDialogOpen(open);
+            if (!open) {
+              setSendSmsInvoice(null);
+              setSendSmsNumber('');
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Invoice via SMS</DialogTitle>
+              <DialogDescription>
+                {sendSmsInvoice?.invoice_number} — Send the payment link to any mobile number.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="send-sms-number">Mobile Number</Label>
+                <Input
+                  id="send-sms-number"
+                  type="tel"
+                  placeholder="+447700900000"
+                  value={sendSmsNumber}
+                  onChange={(e) => setSendSmsNumber(e.target.value)}
+                  data-testid="input-send-sms-number"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Include the country code (e.g. +44 for UK numbers).
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSendSmsDialogOpen(false);
+                  setSendSmsInvoice(null);
+                  setSendSmsNumber('');
+                }}
+                disabled={sendSmsInvoiceMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSendSms}
+                disabled={sendSmsInvoiceMutation.isPending || !sendSmsNumber.trim()}
+                data-testid="button-confirm-send-sms"
+              >
+                {sendSmsInvoiceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                )}
+                Send SMS
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Send Email Dialog */}
         <Dialog 
           open={sendEmailDialogOpen} 
