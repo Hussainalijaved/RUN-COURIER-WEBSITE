@@ -13348,15 +13348,26 @@ export async function registerRoutes(
       await updateInvoicePaymentToken(token, { status: 'pending' });
     }
     
-    // Return existing PaymentIntent if already created
-    if (invoiceData.payment_intent_id && invoiceData.client_secret) {
-      return res.json({
-        clientSecret: invoiceData.client_secret,
-        paymentIntentId: invoiceData.payment_intent_id,
-      });
-    }
-    
     const stripe = await getUncachableStripeClient();
+
+    // Check if we have a cached PaymentIntent — but verify it's still usable
+    if (invoiceData.payment_intent_id && invoiceData.client_secret) {
+      try {
+        const existingPi = await stripe.paymentIntents.retrieve(invoiceData.payment_intent_id);
+        // Reuse it only if it's still awaiting payment (requires_payment_method or requires_confirmation)
+        const reusableStatuses = ['requires_payment_method', 'requires_confirmation', 'requires_action'];
+        if (reusableStatuses.includes(existingPi.status)) {
+          return res.json({
+            clientSecret: invoiceData.client_secret,
+            paymentIntentId: invoiceData.payment_intent_id,
+          });
+        }
+        // Otherwise fall through to create a fresh one (already paid, cancelled, etc.)
+        console.log(`[InvoicePay] Existing PI ${invoiceData.payment_intent_id} has status '${existingPi.status}', creating a new one`);
+      } catch (piErr: any) {
+        console.warn(`[InvoicePay] Could not retrieve cached PI ${invoiceData.payment_intent_id}: ${piErr.message}. Creating a new one.`);
+      }
+    }
     
     // Create or find Stripe customer
     let stripeCustomerId: string | undefined;
@@ -13375,11 +13386,12 @@ export async function registerRoutes(
       stripeCustomerId = customer.id;
     }
     
-    // Create PaymentIntent
+    // Create PaymentIntent — automatic_payment_methods is required for Stripe Elements
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(invoiceData.amount * 100),
       currency: 'gbp',
       customer: stripeCustomerId,
+      automatic_payment_methods: { enabled: true },
       metadata: {
         type: 'invoice_payment',
         invoiceNumber: invoiceData.invoice_number,
@@ -13391,7 +13403,7 @@ export async function registerRoutes(
       receipt_email: invoiceData.customer_email,
     });
     
-    // Store PaymentIntent details in database
+    // Store new PaymentIntent details in database
     await updateInvoicePaymentToken(token, {
       payment_intent_id: paymentIntent.id,
       client_secret: paymentIntent.client_secret!,

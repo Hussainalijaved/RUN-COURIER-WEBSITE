@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'wouter';
+import { useParams, useSearch } from 'wouter';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -37,12 +37,10 @@ interface InvoiceData {
 
 function PaymentForm({ 
   invoiceData,
-  paymentIntentId,
   token,
   onSuccess 
 }: { 
   invoiceData: InvoiceData;
-  paymentIntentId: string;
   token: string;
   onSuccess: () => void;
 }) {
@@ -55,9 +53,7 @@ function PaymentForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!stripe || !elements) {
-      return;
-    }
+    if (!stripe || !elements) return;
 
     setIsProcessing(true);
     setPaymentError(null);
@@ -65,7 +61,10 @@ function PaymentForm({
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/invoice-pay/${token}/success`,
+        // Redirect back to this same page — the query params Stripe adds
+        // (payment_intent, payment_intent_client_secret, redirect_status) are
+        // detected on mount to show the success state without a separate route.
+        return_url: `${window.location.origin}/invoice-pay/${token}`,
       },
       redirect: 'if_required',
     });
@@ -77,24 +76,7 @@ function PaymentForm({
     }
 
     if (paymentIntent && paymentIntent.status === 'succeeded') {
-      setIsConfirming(true);
-      try {
-        const response = await fetch(`/api/invoice-pay/${token}/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
-        });
-        
-        if (response.ok) {
-          onSuccess();
-        } else {
-          const data = await response.json();
-          setPaymentError(data.error || 'Failed to confirm payment');
-        }
-      } catch (err) {
-        setPaymentError('Failed to confirm payment. Please contact support.');
-      }
-      setIsConfirming(false);
+      await confirmPayment(token, paymentIntent.id, setIsConfirming, setPaymentError, onSuccess);
     } else if (paymentIntent && paymentIntent.status === 'requires_action') {
       setPaymentError('Additional authentication required. Please complete the verification.');
     } else {
@@ -109,7 +91,7 @@ function PaymentForm({
         <CardContent className="pt-6 text-center">
           <Loader2 className="mx-auto h-12 w-12 text-blue-600 animate-spin mb-4" />
           <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">Payment Successful!</h3>
-          <p className="text-blue-700 dark:text-blue-300 mt-2">Confirming your payment...</p>
+          <p className="text-blue-700 dark:text-blue-300 mt-2">Confirming your payment…</p>
         </CardContent>
       </Card>
     );
@@ -159,7 +141,7 @@ function PaymentForm({
         {isProcessing ? (
           <>
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Processing...
+            Processing…
           </>
         ) : (
           <>
@@ -177,45 +159,106 @@ function PaymentForm({
   );
 }
 
+async function confirmPayment(
+  token: string,
+  paymentIntentId: string,
+  setIsConfirming: (v: boolean) => void,
+  setPaymentError: (v: string | null) => void,
+  onSuccess: () => void,
+) {
+  setIsConfirming(true);
+  try {
+    const response = await fetch(`/api/invoice-pay/${token}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentIntentId }),
+    });
+    if (response.ok) {
+      onSuccess();
+    } else {
+      const data = await response.json();
+      setPaymentError(data.error || 'Failed to confirm payment');
+    }
+  } catch {
+    setPaymentError('Failed to confirm payment. Please contact support.');
+  }
+  setIsConfirming(false);
+}
+
 export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
+  const search = useSearch();
+
+  const [invoiceData, setInvoiceData]   = useState<InvoiceData | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading]       = useState(true);
+  const [error, setError]               = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
+  // ── Detect Stripe redirect after 3DS authentication ──────────────────────
   useEffect(() => {
+    if (!token) return;
+    const params  = new URLSearchParams(search);
+    const redirectStatus  = params.get('redirect_status');
+    const paymentIntentId = params.get('payment_intent');
+
+    if (redirectStatus === 'succeeded' && paymentIntentId) {
+      // Customer was redirected back after completing 3DS — confirm the payment
+      setIsLoading(false);
+      setPaymentSuccess(false); // will flip via confirmPayment
+
+      let confirmed = false;
+      confirmPayment(
+        token,
+        paymentIntentId,
+        (v) => { if (!confirmed) setIsLoading(v); },
+        (msg) => { if (msg) setError(msg); },
+        () => { confirmed = true; setPaymentSuccess(true); },
+      );
+      return;
+    }
+
+    if (redirectStatus === 'failed') {
+      setIsLoading(false);
+      setError('Payment authentication failed. Please try again.');
+      return;
+    }
+  }, [token, search]);
+
+  // ── Normal page load: fetch invoice + create payment intent ──────────────
+  useEffect(() => {
+    if (!token) return;
+
+    // If we already handled a redirect above, don't re-fetch
+    const params = new URLSearchParams(search);
+    if (params.get('redirect_status')) return;
+
     const loadInvoice = async () => {
       try {
-        // Run both API calls in parallel for faster loading
         const [invoiceResponse, intentResponse] = await Promise.all([
           fetch(`/api/invoice-pay/${token}`),
           fetch(`/api/invoice-pay/${token}/create-payment-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-          })
+          }),
         ]);
 
         if (!invoiceResponse.ok) {
           const data = await invoiceResponse.json();
           throw new Error(data.error || 'Failed to load invoice');
         }
-        
         if (!intentResponse.ok) {
           const intentData = await intentResponse.json();
-          throw new Error(intentData.error || 'Failed to initialize payment');
+          throw new Error(intentData.error || 'Failed to initialise payment');
         }
 
-        const [invoiceData, intentData] = await Promise.all([
+        const [ivData, piData] = await Promise.all([
           invoiceResponse.json(),
-          intentResponse.json()
+          intentResponse.json(),
         ]);
-        
-        setInvoiceData(invoiceData);
-        setClientSecret(intentData.clientSecret);
-        setPaymentIntentId(intentData.paymentIntentId);
+
+        setInvoiceData(ivData);
+        setClientSecret(piData.clientSecret);
       } catch (err: any) {
         setError(err.message || 'Failed to load invoice');
       } finally {
@@ -224,8 +267,9 @@ export default function InvoicePayment() {
     };
 
     loadInvoice();
-  }, [token]);
+  }, [token, search]);
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 py-8 px-4">
@@ -246,6 +290,7 @@ export default function InvoicePayment() {
     );
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-red-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -260,9 +305,7 @@ export default function InvoicePayment() {
               </div>
             </div>
             <CardTitle className="text-2xl text-red-600">Payment Unavailable</CardTitle>
-            <CardDescription className="text-base mt-2">
-              {error}
-            </CardDescription>
+            <CardDescription className="text-base mt-2">{error}</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
@@ -283,6 +326,7 @@ export default function InvoicePayment() {
     );
   }
 
+  // ── Success ──────────────────────────────────────────────────────────────
   if (paymentSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -302,14 +346,16 @@ export default function InvoicePayment() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-              <p className="text-green-800 dark:text-green-200 font-semibold">
-                Invoice {invoiceData?.invoiceNumber}
-              </p>
-              <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">
-                £{invoiceData?.amount.toFixed(2)} paid
-              </p>
-            </div>
+            {invoiceData && (
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                <p className="text-green-800 dark:text-green-200 font-semibold">
+                  Invoice {invoiceData.invoiceNumber}
+                </p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">
+                  £{invoiceData.amount.toFixed(2)} paid
+                </p>
+              </div>
+            )}
             <p className="text-muted-foreground">
               You will receive a confirmation email shortly with your payment receipt.
             </p>
@@ -322,10 +368,9 @@ export default function InvoicePayment() {
     );
   }
 
-  if (!invoiceData || !clientSecret) {
-    return null;
-  }
+  if (!invoiceData || !clientSecret) return null;
 
+  // ── Payment form ─────────────────────────────────────────────────────────
   const appearance = {
     theme: 'stripe' as const,
     variables: {
@@ -372,7 +417,7 @@ export default function InvoicePayment() {
               <Calendar className="h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Period</p>
-                <p className="font-medium">{invoiceData.periodStart} - {invoiceData.periodEnd}</p>
+                <p className="font-medium">{invoiceData.periodStart} – {invoiceData.periodEnd}</p>
               </div>
             </div>
 
@@ -398,17 +443,12 @@ export default function InvoicePayment() {
           </CardContent>
         </Card>
 
-        <Elements 
-          stripe={stripePromise} 
-          options={{ 
-            clientSecret, 
-            appearance,
-            loader: 'auto',
-          }}
+        <Elements
+          stripe={stripePromise}
+          options={{ clientSecret, appearance, loader: 'auto' }}
         >
-          <PaymentForm 
+          <PaymentForm
             invoiceData={invoiceData}
-            paymentIntentId={paymentIntentId!}
             token={token!}
             onSuccess={() => setPaymentSuccess(true)}
           />
@@ -431,7 +471,7 @@ export default function InvoicePayment() {
         <div className="text-center mt-8 text-sm text-muted-foreground">
           <p>Need help? <a href="mailto:info@runcourier.co.uk" className="text-primary hover:underline">Contact us</a></p>
           <p className="mt-2">
-            Run Courier - Same Day Delivery Across the UK<br />
+            Run Courier — Same Day Delivery Across the UK<br />
             <a href="https://www.runcourier.co.uk" className="text-primary hover:underline">www.runcourier.co.uk</a>
           </p>
         </div>
