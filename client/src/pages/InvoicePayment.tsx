@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearch } from 'wouter';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   PaymentElement,
@@ -23,7 +23,32 @@ import {
   Building2
 } from 'lucide-react';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+// Load Stripe dynamically — try build-time env var first, fall back to the
+// runtime /api/stripe/config endpoint so the key is always available in prod.
+let cachedStripePromise: Promise<Stripe | null> | null = null;
+
+function getStripePromise(): Promise<Stripe | null> {
+  if (cachedStripePromise) return cachedStripePromise;
+
+  cachedStripePromise = (async () => {
+    const buildTimeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+    if (buildTimeKey) {
+      return loadStripe(buildTimeKey);
+    }
+
+    try {
+      const res = await fetch('/api/stripe/config');
+      if (!res.ok) return null;
+      const { publishableKey } = await res.json();
+      if (!publishableKey) return null;
+      return loadStripe(publishableKey);
+    } catch {
+      return null;
+    }
+  })();
+
+  return cachedStripePromise;
+}
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -189,11 +214,21 @@ export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
   const search = useSearch();
 
-  const [invoiceData, setInvoiceData]   = useState<InvoiceData | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isLoading, setIsLoading]       = useState(true);
-  const [error, setError]               = useState<string | null>(null);
+  const [invoiceData, setInvoiceData]       = useState<InvoiceData | null>(null);
+  const [clientSecret, setClientSecret]     = useState<string | null>(null);
+  const [isLoading, setIsLoading]           = useState(true);
+  const [error, setError]                   = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
+  const [stripeLoading, setStripeLoading]   = useState(true);
+
+  // Load Stripe instance on mount
+  useEffect(() => {
+    getStripePromise().then((s) => {
+      setStripeInstance(s);
+      setStripeLoading(false);
+    }).catch(() => setStripeLoading(false));
+  }, []);
 
   // ── Detect Stripe redirect after 3DS authentication ──────────────────────
   useEffect(() => {
@@ -270,7 +305,7 @@ export default function InvoicePayment() {
   }, [token, search]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
-  if (isLoading) {
+  if (isLoading || stripeLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 py-8 px-4">
         <div className="max-w-lg mx-auto">
@@ -370,6 +405,31 @@ export default function InvoicePayment() {
 
   if (!invoiceData || !clientSecret) return null;
 
+  // Stripe failed to load — show a clear error instead of a blank form
+  if (!stripeInstance) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-red-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg text-center">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <XCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl text-red-600">Payment System Unavailable</CardTitle>
+            <CardDescription className="text-base mt-2">
+              We could not initialise the payment form. Please try refreshing the page or contact support.
+            </CardDescription>
+          </CardHeader>
+          <div className="p-6 pt-0 flex justify-center gap-4 flex-wrap">
+            <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
+            <Button asChild><a href="mailto:info@runcourier.co.uk">Contact Support</a></Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   // ── Payment form ─────────────────────────────────────────────────────────
   const appearance = {
     theme: 'stripe' as const,
@@ -444,7 +504,7 @@ export default function InvoicePayment() {
         </Card>
 
         <Elements
-          stripe={stripePromise}
+          stripe={stripeInstance}
           options={{ clientSecret, appearance, loader: 'auto' }}
         >
           <PaymentForm
