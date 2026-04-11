@@ -1,5 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearch } from 'wouter';
+import { loadStripe } from '@stripe/stripe-js';
+import {
+  Elements,
+  PaymentElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -27,28 +34,182 @@ interface InvoiceData {
   notes: string | null;
 }
 
+// ── Stripe publishable key — fetched once, module-level ───────────────────
+let stripePromiseCache: ReturnType<typeof loadStripe> | null = null;
+
+async function getStripePromise(): Promise<ReturnType<typeof loadStripe>> {
+  if (stripePromiseCache) return stripePromiseCache;
+
+  let publishableKey = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) || '';
+  if (!publishableKey) {
+    try {
+      const res = await fetch('/api/stripe/config');
+      if (res.ok) {
+        const cfg = await res.json();
+        publishableKey = cfg.publishableKey || '';
+      }
+    } catch { /* ignore — will fail gracefully below */ }
+  }
+
+  if (!publishableKey) return Promise.resolve(null);
+  stripePromiseCache = loadStripe(publishableKey);
+  return stripePromiseCache;
+}
+
+// ── Inner form (must be a child of <Elements>) ────────────────────────────
+function CheckoutForm({
+  token,
+  invoiceData,
+  onSuccess,
+}: {
+  token: string;
+  invoiceData: InvoiceData;
+  onSuccess: () => void;
+}) {
+  const stripe   = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [formReady, setFormReady]       = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements || isProcessing) return;
+
+    setIsProcessing(true);
+    setPaymentError(null);
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/invoice-pay/${token}`,
+      },
+      redirect: 'if_required',
+    });
+
+    if (error) {
+      setPaymentError(error.message || 'Payment failed. Please try again.');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (paymentIntent?.status === 'succeeded') {
+      try {
+        const r = await fetch(`/api/invoice-pay/${token}/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
+        });
+        if (r.ok) {
+          onSuccess();
+        } else {
+          const d = await r.json();
+          setPaymentError(d.error || 'Payment received but confirmation failed. Please contact support.');
+        }
+      } catch {
+        setPaymentError('Payment received but confirmation failed. Please contact support.');
+      }
+    } else {
+      setPaymentError('Payment was not completed. Please try again.');
+    }
+    setIsProcessing(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CreditCard className="h-5 w-5" />
+            Payment Details
+          </CardTitle>
+          <CardDescription>
+            Enter your card details — Apple Pay &amp; Google Pay also accepted
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Stripe PaymentElement mounts its secure iframe here */}
+          <div style={{ minHeight: '200px', position: 'relative' }}>
+            {!formReady && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  color: 'var(--muted-foreground)',
+                }}
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading payment form…</span>
+              </div>
+            )}
+            <PaymentElement
+              onReady={() => setFormReady(true)}
+              onLoaderError={() =>
+                setPaymentError('Payment form failed to load. Please refresh and try again.')
+              }
+              options={{
+                layout: { type: 'tabs', defaultCollapsed: false },
+                paymentMethodOrder: ['apple_pay', 'google_pay', 'card'],
+                wallets: { applePay: 'auto', googlePay: 'auto' },
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {paymentError && (
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950 p-4">
+          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+          <p className="text-red-700 dark:text-red-300 text-sm">{paymentError}</p>
+        </div>
+      )}
+
+      <Button
+        type="submit"
+        disabled={isProcessing || !stripe || !elements || !formReady}
+        className="w-full"
+        size="lg"
+        data-testid="button-pay-invoice"
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Processing…
+          </>
+        ) : (
+          <>
+            <CreditCard className="mr-2 h-5 w-5" />
+            Pay £{invoiceData.amount.toFixed(2)} Now
+          </>
+        )}
+      </Button>
+
+      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <ShieldCheck className="h-4 w-4" />
+        <span>Secure payment powered by Stripe</span>
+      </div>
+    </form>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
-  const search   = useSearch();
+  const search    = useSearch();
 
-  const [invoiceData, setInvoiceData]       = useState<InvoiceData | null>(null);
-  const [isLoading, setIsLoading]           = useState(true);
-  const [pageError, setPageError]           = useState<string | null>(null);
+  const [invoiceData, setInvoiceData]   = useState<InvoiceData | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
+  const [isLoading, setIsLoading]       = useState(true);
+  const [pageError, setPageError]       = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [isProcessing, setIsProcessing]     = useState(false);
-  const [paymentError, setPaymentError]     = useState<string | null>(null);
-  const [stripeReady, setStripeReady]       = useState(false);
 
-  // Refs for the vanilla Stripe instances so they survive re-renders
-  const stripeRef   = useRef<any>(null);
-  const elementsRef = useRef<any>(null);
-  const mountedRef  = useRef(false);
-
-  // div that Stripe will mount its PaymentElement iframe into
-  const paymentElementRef = useRef<HTMLDivElement>(null);
-
-  // ── Detect Stripe redirect after 3DS ──────────────────────────────────
+  // ── Detect 3DS redirect return ─────────────────────────────────────────
   useEffect(() => {
     if (!token) return;
     const params         = new URLSearchParams(search);
@@ -83,7 +244,7 @@ export default function InvoicePayment() {
     }
   }, [token, search]);
 
-  // ── Fetch invoice details + create PaymentIntent ───────────────────────
+  // ── Fetch invoice + create PaymentIntent ───────────────────────────────
   useEffect(() => {
     if (!token) return;
     const params = new URLSearchParams(search);
@@ -100,7 +261,7 @@ export default function InvoicePayment() {
         const ivData: InvoiceData = await invoiceRes.json();
         setInvoiceData(ivData);
 
-        // 2. Create (or reuse) the PaymentIntent
+        // 2. Create (or reuse) PaymentIntent
         const intentRes = await fetch(`/api/invoice-pay/${token}/create-payment-intent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -109,51 +270,13 @@ export default function InvoicePayment() {
           const d = await intentRes.json();
           throw new Error(d.error || 'Failed to initialise payment');
         }
-        const { clientSecret } = await intentRes.json();
-        if (!clientSecret) throw new Error('No client secret returned from server');
+        const { clientSecret: cs } = await intentRes.json();
+        if (!cs) throw new Error('No client secret returned from server');
+        setClientSecret(cs);
 
-        // 3. Load Stripe publishable key
-        let publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
-        if (!publishableKey) {
-          const cfgRes = await fetch('/api/stripe/config');
-          if (!cfgRes.ok) throw new Error('Could not load payment configuration');
-          const cfg = await cfgRes.json();
-          publishableKey = cfg.publishableKey;
-        }
-        if (!publishableKey) throw new Error('Payment system is not configured');
-
-        // 4. Use window.Stripe — loaded via the <script src="https://js.stripe.com/v3/"> tag
-        //    in index.html.  Wait up to 10 s for the async script to arrive.
-        const stripeGlobal = await new Promise<any>((resolve, reject) => {
-          if ((window as any).Stripe) { resolve((window as any).Stripe); return; }
-          let waited = 0;
-          const interval = setInterval(() => {
-            waited += 100;
-            if ((window as any).Stripe) { clearInterval(interval); resolve((window as any).Stripe); }
-            else if (waited >= 10000) { clearInterval(interval); reject(new Error('Stripe.js did not load in time')); }
-          }, 100);
-        });
-        const stripe = stripeGlobal(publishableKey);
-        if (!stripe) throw new Error('Failed to initialise Stripe');
-        stripeRef.current = stripe;
-
-        // 5. Create Elements instance with the clientSecret
-        const elements = stripe.elements({
-          clientSecret,
-          appearance: {
-            theme: 'stripe',
-            variables: {
-              colorPrimary:     '#007BFF',
-              colorBackground:  '#ffffff',
-              colorText:        '#1a1a1a',
-              colorDanger:      '#ef4444',
-              fontFamily:       'system-ui, sans-serif',
-              borderRadius:     '8px',
-            },
-          },
-          loader: 'auto',
-        });
-        elementsRef.current = elements;
+        // 3. Load Stripe (via official loadStripe helper)
+        const sp = await getStripePromise();
+        setStripePromise(sp);
 
         setIsLoading(false);
       } catch (err: any) {
@@ -163,96 +286,7 @@ export default function InvoicePayment() {
     })();
   }, [token, search]);
 
-  // ── Mount the PaymentElement once the div is in the DOM ───────────────
-  useEffect(() => {
-    if (
-      isLoading ||
-      pageError ||
-      paymentSuccess ||
-      !elementsRef.current ||
-      !paymentElementRef.current ||
-      mountedRef.current
-    ) return;
-
-    mountedRef.current = true;
-
-    const paymentElement = elementsRef.current.create('payment', {
-      layout: {
-        type: 'tabs',
-        defaultCollapsed: false,
-      },
-      wallets: {
-        applePay: 'auto',
-        googlePay: 'auto',
-      },
-      paymentMethodOrder: ['apple_pay', 'google_pay', 'card'],
-    });
-
-    paymentElement.mount(paymentElementRef.current);
-
-    paymentElement.on('ready', () => {
-      setStripeReady(true);
-    });
-
-    paymentElement.on('loaderError', (event: any) => {
-      console.error('[Stripe] PaymentElement loaderError', event);
-      setPaymentError('Payment form failed to load. Please refresh and try again.');
-    });
-
-    return () => {
-      // Unmount cleanly if component is destroyed
-      try { paymentElement.unmount(); } catch { /* ignore */ }
-      mountedRef.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, pageError, paymentSuccess]);
-
-  // ── Handle form submission ─────────────────────────────────────────────
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripeRef.current || !elementsRef.current || isProcessing) return;
-
-    setIsProcessing(true);
-    setPaymentError(null);
-
-    const { error, paymentIntent } = await stripeRef.current.confirmPayment({
-      elements: elementsRef.current,
-      confirmParams: {
-        return_url: `${window.location.origin}/invoice-pay/${token}`,
-      },
-      redirect: 'if_required',
-    });
-
-    if (error) {
-      setPaymentError(error.message || 'Payment failed. Please try again.');
-      setIsProcessing(false);
-      return;
-    }
-
-    if (paymentIntent?.status === 'succeeded') {
-      setIsProcessing(false);
-      try {
-        const r = await fetch(`/api/invoice-pay/${token}/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
-        });
-        if (r.ok) {
-          setPaymentSuccess(true);
-        } else {
-          const d = await r.json();
-          setPaymentError(d.error || 'Payment received but confirmation failed. Please contact support.');
-        }
-      } catch {
-        setPaymentError('Payment received but confirmation failed. Please contact support.');
-      }
-    } else {
-      setPaymentError('Payment was not completed. Please try again.');
-      setIsProcessing(false);
-    }
-  };
-
-  // ── Loading ───────────────────────────────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 py-8 px-4">
@@ -276,7 +310,7 @@ export default function InvoicePayment() {
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────────
+  // ── Error ──────────────────────────────────────────────────────────────
   if (pageError) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-red-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -308,7 +342,7 @@ export default function InvoicePayment() {
     );
   }
 
-  // ── Success ───────────────────────────────────────────────────────────
+  // ── Success ────────────────────────────────────────────────────────────
   if (paymentSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -346,7 +380,24 @@ export default function InvoicePayment() {
     );
   }
 
-  // ── Payment page ──────────────────────────────────────────────────────
+  // ── Payment page ───────────────────────────────────────────────────────
+  const elementsOptions = clientSecret
+    ? {
+        clientSecret,
+        appearance: {
+          theme: 'stripe' as const,
+          variables: {
+            colorPrimary:    '#007BFF',
+            colorBackground: '#ffffff',
+            colorText:       '#1a1a1a',
+            colorDanger:     '#ef4444',
+            fontFamily:      'system-ui, sans-serif',
+            borderRadius:    '8px',
+          },
+        },
+      }
+    : undefined;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 py-8 px-4">
       <div className="max-w-lg mx-auto">
@@ -412,72 +463,23 @@ export default function InvoicePayment() {
           </Card>
         )}
 
-        {/* Payment form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* Card for payment element */}
+        {/* Payment form — wrapped in <Elements> so hooks work */}
+        {stripePromise && elementsOptions && invoiceData ? (
+          <Elements stripe={stripePromise} options={elementsOptions}>
+            <CheckoutForm
+              token={token!}
+              invoiceData={invoiceData}
+              onSuccess={() => setPaymentSuccess(true)}
+            />
+          </Elements>
+        ) : (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CreditCard className="h-5 w-5" />
-                Payment Details
-              </CardTitle>
-              <CardDescription>
-                Enter your card details — Apple Pay &amp; Google Pay also accepted
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Stripe mounts its iframe here */}
-              <div
-                ref={paymentElementRef}
-                id="payment-element"
-                style={{ minHeight: '160px' }}
-              />
-
-              {/* Show a subtle spinner while Stripe's iframe loads */}
-              {!stripeReady && (
-                <div className="flex items-center justify-center gap-2 pt-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Loading payment form…</span>
-                </div>
-              )}
+            <CardContent className="pt-6 flex items-center justify-center gap-2 text-muted-foreground py-12">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Preparing payment form…</span>
             </CardContent>
           </Card>
-
-          {/* Payment error */}
-          {paymentError && (
-            <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950 p-4">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-              <p className="text-red-700 dark:text-red-300 text-sm">{paymentError}</p>
-            </div>
-          )}
-
-          {/* Pay button */}
-          <Button
-            type="submit"
-            disabled={isProcessing || !stripeReady}
-            className="w-full"
-            size="lg"
-            data-testid="button-pay-invoice"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Processing…
-              </>
-            ) : (
-              <>
-                <CreditCard className="mr-2 h-5 w-5" />
-                Pay £{invoiceData?.amount.toFixed(2)} Now
-              </>
-            )}
-          </Button>
-
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Secure payment powered by Stripe</span>
-          </div>
-        </form>
+        )}
 
         {/* Bank transfer alternative */}
         {invoiceData && (
