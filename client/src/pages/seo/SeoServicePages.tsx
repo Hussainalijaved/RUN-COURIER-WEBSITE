@@ -359,6 +359,108 @@ export function BusinessCourierServices() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   PAGE 5 — /courier-service-london
+═══════════════════════════════════════════════════════════════════ */
+export function CourierServiceLondon() {
+  return (
+    <SeoPage
+      title="Courier Service London | Run Courier – Professional & Reliable"
+      metaDescription="Looking for a reliable courier service in London? Run Courier provides professional same day and scheduled courier services across London for businesses and individuals."
+      canonicalPath="/courier-service-london"
+      h1="Courier Service London"
+      heroSubtitle="Professional courier services across London for businesses and individuals. Same day collection, direct delivery, and live GPS tracking — from your door to theirs."
+      heroImage={businessHeroImage}
+      heroOverlay="bg-gradient-to-r from-[#1e3a5f]/80 via-[#0077B6]/65 to-[#0096C7]/55"
+      features={[
+        { icon: Truck,      text: 'Full Fleet Available' },
+        { icon: MapPin,     text: 'Live GPS Tracking' },
+        { icon: Clock,      text: 'Same Day Service' },
+        { icon: Shield,     text: 'Fully Insured' },
+        { icon: FileText,   text: 'Proof of Delivery' },
+        { icon: Headphones, text: '24/7 Available' },
+      ]}
+      sections={[
+        {
+          heading: 'The Courier Service London Businesses Rely On',
+          body: 'Run Courier is a professional courier service based in London, delivering for businesses and individuals across the capital and the wider UK. Whether you need an urgent same day delivery, a scheduled next-day collection, or a regular courier run to multiple London addresses, our service is built around speed, reliability, and complete transparency. Every booking includes a professional, DBS-checked driver, live GPS tracking, and digital proof of delivery — giving you confidence at every stage of the delivery journey.',
+        },
+        {
+          heading: 'Same Day Courier Service Across All London Areas',
+          body: 'Our courier service covers every London postcode — Central London, North London, South London, East London, and West London. From the City and Canary Wharf in the east, to Heathrow and Southall in the west, from Barnet and Enfield in the north to Croydon and Bromley in the south — Run Courier operates across every borough. We also offer a fast same day delivery London service extending beyond the M25 for inter-city consignments, connecting London businesses with clients and partners throughout the UK.',
+        },
+        {
+          heading: 'A Courier Service Near Me — Available Wherever You Are in London',
+          body: 'Finding a reliable courier service near me in London shouldn\'t be complicated. Run Courier\'s network of professional drivers is distributed across all London zones, meaning there\'s always a driver close to you — regardless of your postcode. Our dispatch system automatically assigns the nearest available driver to your collection address, ensuring the fastest possible response time. In central London, drivers typically arrive within 30 to 45 minutes. In outer boroughs, collection times are typically under 60 minutes.',
+        },
+        {
+          heading: 'Delivery Service London — Packages, Documents, and Specialist Freight',
+          body: 'Run Courier\'s delivery service in London handles a wide variety of consignments. We regularly deliver legal documents, business parcels, retail orders, medical specimens, pharmaceutical supplies, IT equipment, and large freight. Our fleet includes motorbikes for urgent document runs, cars for small parcels and time-critical items, small vans for standard business deliveries, and Luton vans with tail-lifts for larger freight. Whatever you need to send, we have the right vehicle and the right driver for the job.',
+        },
+        {
+          heading: 'Transparent Pricing for London Courier Services',
+          body: 'Run Courier believes in clear, upfront pricing. Use our online quote tool to enter your collection and delivery postcodes, select your preferred vehicle type, and receive an instant fixed-price quote — no hidden extras, no fuel surcharges, no surprises. Business customers with regular courier volumes can apply for a business account with weekly invoice billing and volume-based pricing. Individual customers can book and pay online in seconds using any major credit or debit card.',
+        },
+      ]}
+      ctaHeading="Book a Courier Service in London Today"
+      ctaBody="Get an instant online quote in seconds. Professional drivers across all London areas — same day collection, direct delivery, live tracking."
+      ctaBookLabel="Book a Delivery"
+      ctaQuoteLabel="Get Instant Quote"
+    />
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PAGE 6 — /urgent-courier-london
+═══════════════════════════════════════════════════════════════════ */
+export function UrgentCourierLondon() {
+  return (
+    <SeoPage
+      title="Urgent Courier London | Run Courier – Dispatched in Minutes"
+      metaDescription="Need an urgent courier in London? Run Courier dispatches a dedicated driver within minutes. Fast same-day courier service across London, available 24/7."
+      canonicalPath="/urgent-courier-london"
+      h1="Urgent Courier London"
+      heroSubtitle="London's fastest courier — a dedicated driver dispatched within minutes, direct to your recipient, no stops, no delays. Available around the clock."
+      heroImage={urgentHeroImage}
+      heroOverlay="bg-gradient-to-r from-[#7c2d12]/80 via-[#c2410c]/65 to-[#ea580c]/55"
+      features={[
+        { icon: Zap,        text: 'Dispatched in Minutes' },
+        { icon: Timer,      text: 'Dedicated Driver' },
+        { icon: MapPin,     text: 'Live GPS Tracking' },
+        { icon: Shield,     text: 'Fully Insured' },
+        { icon: Phone,      text: 'Book by Phone or App' },
+        { icon: Headphones, text: '24/7 Available' },
+      ]}
+      sections={[
+        {
+          heading: 'Urgent Courier London – Fast Same-Day Courier When It Matters Most',
+          body: 'Run Courier\'s urgent courier London service is designed for situations where time is the priority. Whether you\'re a law firm with a court deadline, a hospital needing urgent medication, or a business with a time-critical document to sign — we dispatch a dedicated driver to your door within minutes of booking. Our urgent courier service covers all of London: Central London, North London, South London, East London, and West London. There are no third-party handoffs, no sorting hubs, and no shared vehicle stops — just a single driver focused entirely on your delivery.',
+        },
+        {
+          heading: 'Fast Same-Day Courier in London — Across Every Borough',
+          body: 'As an urgent courier service in London, we operate across every postcode zone. From EC and WC in the City of London, to SE, SW, N, NW, E, and W — our driver network ensures rapid response wherever you are. Typical collection times in Zone 1 and Zone 2 are 15 to 30 minutes. Outer London boroughs including Croydon, Barnet, Ealing, Bexley, Havering, and Hillingdon are served within 45 to 60 minutes. For truly critical situations, call our team directly and we\'ll identify the nearest driver immediately.',
+        },
+        {
+          heading: 'Urgent Document Courier — Legal, Financial, and Corporate',
+          body: 'Many of London\'s most urgent courier requests are for time-sensitive documents. Law firms use Run Courier to meet hard deadlines at the Royal Courts of Justice, the Court of Appeal, HMCTS tribunals, and the Companies House filing centre. Property solicitors rely on our urgent courier for same-day contract exchanges where timing is legally binding. Corporate finance teams use our service for physical instruction letters, authorisation forms, and signed board resolutions. Every urgent document delivery includes chain-of-custody records and digital signature capture.',
+        },
+        {
+          heading: 'Urgent Courier Service London — Medical and Pharmaceutical',
+          body: 'Healthcare is one of the most time-critical sectors for urgent courier London services. Run Courier supports hospitals, GP surgeries, pharmacies, and clinical laboratories with rapid medical courier services. We transport urgent medications to patients who cannot travel, pathology samples between clinical sites, blood products to operating theatres, and emergency medical devices to acute care teams. Our medically-trained couriers are available 24 hours a day, 7 days a week — because urgent healthcare deliveries cannot wait for business hours.',
+        },
+        {
+          heading: 'Book Your Urgent Courier in London — Online or by Phone, 24/7',
+          body: 'Booking Run Courier\'s urgent courier London service takes under 60 seconds. Enter your collection and delivery postcodes on our website, select the urgent option, and receive an instant price. A driver is dispatched automatically and you receive live GPS tracking the moment they set off. For the most time-critical situations, call our operations team directly — we operate 24 hours a day, 365 days a year. No voicemail, no hold queues during emergencies — just immediate dispatch of your urgent courier.',
+        },
+      ]}
+      ctaHeading="Book an Urgent Courier in London Right Now"
+      ctaBody="Instant quotes, driver dispatched within minutes, live tracking included. Available 24/7 across all of London and the UK."
+      ctaBookLabel="Book Urgent Courier"
+      ctaQuoteLabel="Get Instant Quote"
+    />
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    PAGE 4 — /urgent-delivery-london
 ═══════════════════════════════════════════════════════════════════ */
 export function UrgentDeliveryLondon() {

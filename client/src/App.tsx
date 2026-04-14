@@ -143,6 +143,8 @@ const SameDayCourierLondon = lazy(() => import("@/pages/seo/SeoServicePages").th
 const MedicalCourierPage = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.MedicalCourierPage })));
 const BusinessCourierServices = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.BusinessCourierServices })));
 const UrgentDeliveryLondon = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.UrgentDeliveryLondon })));
+const CourierServiceLondon = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.CourierServiceLondon })));
+const UrgentCourierLondon = lazy(() => import("@/pages/seo/SeoServicePages").then(m => ({ default: m.UrgentCourierLondon })));
 
 const BlogIndex = lazy(() => import("@/pages/blog/Blog").then(m => ({ default: m.BlogIndex })));
 const BlogPost = lazy(() => import("@/pages/blog/Blog").then(m => ({ default: m.BlogPost })));
@@ -449,6 +451,8 @@ function Router() {
         <Route path="/medical-courier" component={MedicalCourierPage} />
         <Route path="/business-courier-services" component={BusinessCourierServices} />
         <Route path="/urgent-delivery-london" component={UrgentDeliveryLondon} />
+        <Route path="/courier-service-london" component={CourierServiceLondon} />
+        <Route path="/urgent-courier-london" component={UrgentCourierLondon} />
         <Route path="/blog" component={BlogIndex} />
         <Route path="/blog/:slug" component={BlogPost} />
 

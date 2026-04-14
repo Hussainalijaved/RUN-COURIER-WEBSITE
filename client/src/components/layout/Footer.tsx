@@ -1,5 +1,5 @@
 import { Link } from 'wouter';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import { SiFacebook, SiTrustpilot, SiAppstore, SiGoogle } from 'react-icons/si';
 import { SmoothImage } from '@/components/ui/smooth-image';
 import logoImage from '@assets/run_courier_logo_opt.png';
@@ -12,6 +12,8 @@ const footerLinks = {
     { href: '/services/multi-drop', label: 'Multi-Drop' },
     { href: '/services/return-trip', label: 'Return Trip' },
     { href: '/same-day-courier-london', label: 'Same Day Courier London' },
+    { href: '/urgent-courier-london', label: 'Urgent Courier London' },
+    { href: '/courier-service-london', label: 'Courier Service London' },
     { href: '/urgent-delivery-london', label: 'Urgent Delivery London' },
     { href: '/medical-courier', label: 'Medical Courier London' },
     { href: '/business-courier-services', label: 'Business Courier Services' },
@@ -75,7 +77,11 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
-                <span className="font-medium">112 Bridgwater Road, Ruislip</span>
+                <span className="font-medium">112 Bridgwater Road, Ruislip, London HA4 6LW</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <Clock className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                <span className="font-medium">24/7 — 365 Days a Year</span>
               </div>
             </div>
             

@@ -1,0 +1,131 @@
+You are an expert SEO engineer and senior web developer.
+
+Your task is to fully optimize my website https://runcourier.co.uk to rank on Google for:
+
+PRIMARY KEYWORDS:
+- courier London
+- same day courier London
+- urgent courier London
+
+SECONDARY KEYWORDS:
+- delivery service London
+- same day delivery London
+- courier service near me
+
+-------------------------------------
+
+1. HOMEPAGE SEO STRUCTURE
+
+Update homepage:
+
+TITLE:
+Run Courier | Same Day Courier London | Fast & Reliable Delivery
+
+META DESCRIPTION:
+Run Courier offers fast, reliable same day courier services across London. Book urgent deliveries with real-time tracking and professional drivers.
+
+H1:
+Run Courier – Same Day Courier London
+
+Add H2 sections:
+- Same Day Courier Services in London
+- Fast & Reliable Delivery Across London
+- Why Choose Run Courier
+
+-------------------------------------
+
+2. LANDING PAGES (VERY IMPORTANT)
+
+Create separate SEO pages:
+
+/same-day-courier-london
+/urgent-courier-london
+/courier-service-london
+
+Each page must include:
+- Unique title
+- Unique meta description
+- 500–800 words content
+- Strong keyword usage (natural, not spam)
+- CTA (Call Now / Book Delivery)
+
+-------------------------------------
+
+3. CONTENT (THIS IS HOW YOU WIN)
+
+Write high-quality content that includes:
+
+- London areas (important for SEO):
+  Central London, North London, South London, East London, West London
+
+- Use phrases like:
+  “fast same-day courier in London”
+  “urgent delivery service London”
+  “reliable courier company London”
+
+-------------------------------------
+
+4. INTERNAL LINKING
+
+Add links between pages:
+- Homepage → service pages
+- Service pages → homepage
+
+-------------------------------------
+
+5. STRUCTURED DATA
+
+Add LocalBusiness schema:
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "Run Courier",
+  "image": "https://runcourier.co.uk/logo.png",
+  "url": "https://runcourier.co.uk",
+  "telephone": "+44 7311 121217",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "112 Bridgwater Road",
+    "addressLocality": "Ruislip",
+    "addressRegion": "London",
+    "postalCode": "HA4 6LW",
+    "addressCountry": "UK"
+  }
+}
+</script>
+
+-------------------------------------
+
+6. SPEED + MOBILE
+
+Ensure:
+- Fast loading
+- Mobile responsive
+- Optimized images
+
+-------------------------------------
+
+7. GOOGLE SIGNALS
+
+Add:
+- Proper alt text for images
+- Footer with business info
+- Clear contact section
+
+-------------------------------------
+
+8. BLOG (POWERFUL FOR RANKING)
+
+Create blog section with articles:
+- “How Same Day Courier Works in London”
+- “Best Courier Service in London”
+- “Urgent Delivery Tips”
+
+-------------------------------------
+
+IMPORTANT:
+- Do NOT break design
+- Focus on SEO + structure
+- Show me all created pages and code changes
