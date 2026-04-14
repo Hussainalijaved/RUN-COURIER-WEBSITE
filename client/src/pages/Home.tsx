@@ -265,12 +265,12 @@ export default function Home() {
   const [trackingNumber, setTrackingNumber] = useState('');
 
   useEffect(() => {
-    document.title = 'Same Day Courier London | Run Courier – Fast & Reliable Delivery';
-    const desc = 'Run Courier provides fast, reliable same-day courier services across London and the UK. Book urgent and scheduled deliveries with real-time tracking.';
+    document.title = 'Run Courier | Same Day Courier London';
+    const desc = 'Run Courier provides fast, reliable same-day courier services across London. Book urgent deliveries with real-time tracking.';
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute('content', desc);
-    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', 'Same Day Courier London | Run Courier – Fast & Reliable Delivery');
-    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', desc);
+    (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.setAttribute('content', 'Run Courier | Same Day Courier London');
+    (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.setAttribute('content', 'Fast & reliable same-day courier services across London.');
     (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', 'https://runcourier.co.uk/');
     (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', 'https://runcourier.co.uk/');
   }, []);
@@ -292,8 +292,8 @@ export default function Home() {
         <div className="flex-1 flex items-center justify-center px-4 py-20">
           <div className="max-w-4xl mx-auto text-center text-white">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
-              Fast. Reliable. Same-Day
-              <span className="block">Delivery Across the UK.</span>
+              Run Courier –
+              <span className="block">Same Day Courier London</span>
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-10 max-w-2xl mx-auto">
               Professional courier services trusted by thousands of businesses. Collection within 60 minutes, real-time tracking, and guaranteed same-day delivery.
