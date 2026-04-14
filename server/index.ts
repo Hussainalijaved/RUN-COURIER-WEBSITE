@@ -72,6 +72,18 @@ if (!envCheck.valid && IS_PROD) {
 const app = express();
 const httpServer = createServer(app);
 
+// www redirect — enforce canonical www.runcourier.co.uk in production
+app.use((req, res, next) => {
+  if (IS_PROD) {
+    const host = req.headers.host || '';
+    if (host && !host.startsWith('www.') && !host.includes('localhost') && !host.includes('replit')) {
+      const wwwUrl = `https://www.${host}${req.originalUrl}`;
+      return res.redirect(301, wwwUrl);
+    }
+  }
+  next();
+});
+
 // Health checks - ALWAYS available, FIRST
 app.get("/health", (req, res) => res.status(200).send("OK"));
 app.get("/api/health", (req, res) => res.status(200).json({ 
