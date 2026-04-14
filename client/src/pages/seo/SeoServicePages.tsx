@@ -45,6 +45,8 @@ function setPageMeta(title: string, description: string, canonicalPath: string) 
 interface FeatureItem { icon: typeof Clock; text: string }
 interface SectionBlock { heading: string; body: string }
 
+interface RelatedLink { href: string; label: string; desc: string }
+
 interface SeoPageProps {
   title: string;
   metaDescription: string;
@@ -59,6 +61,7 @@ interface SeoPageProps {
   ctaBody: string;
   ctaBookLabel?: string;
   ctaQuoteLabel?: string;
+  relatedLinks?: RelatedLink[];
 }
 
 function SeoPage({
@@ -75,6 +78,7 @@ function SeoPage({
   ctaBody,
   ctaBookLabel = 'Book a Delivery',
   ctaQuoteLabel = 'Get a Quote',
+  relatedLinks = [],
 }: SeoPageProps) {
   useEffect(() => {
     setPageMeta(title, metaDescription, canonicalPath);
@@ -172,12 +176,40 @@ function SeoPage({
         </div>
       </section>
 
+      {/* ── Related Services ── */}
+      {relatedLinks.length > 0 && (
+        <section className="py-16 border-t border-border">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-2xl font-bold mb-8 text-center">Explore More Services</h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                {relatedLinks.map((link) => (
+                  <Link key={link.href} href={link.href}>
+                    <Card className="hover-elevate cursor-pointer h-full">
+                      <CardContent className="p-5 flex items-start gap-4">
+                        <div className="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <ArrowRight className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm mb-1">{link.label}</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">{link.desc}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── CTA ── */}
       <section className="py-20 bg-gradient-to-br from-[#0077B6] via-[#0096C7] to-[#00B4D8] text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">{ctaHeading}</h2>
           <p className="text-white/85 mb-8 max-w-2xl mx-auto leading-relaxed">{ctaBody}</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
             <Link href="/book">
               <Button
                 size="lg"
@@ -188,6 +220,16 @@ function SeoPage({
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
+            <a href="tel:+447311121217">
+              <Button
+                size="lg"
+                className="bg-white/20 text-white border-2 border-white/50 hover:bg-white/30 font-semibold px-8 gap-2 backdrop-blur-sm"
+                data-testid="seo-cta-phone"
+              >
+                <Phone className="h-4 w-4" />
+                Call +44 7311 121217
+              </Button>
+            </a>
             <Link href="/contact">
               <Button
                 size="lg"
@@ -252,6 +294,12 @@ export function SameDayCourierLondon() {
       ctaBody="Get an instant online quote in seconds. Collection within 60 minutes, direct delivery, and live tracking included on every booking."
       ctaBookLabel="Book Now"
       ctaQuoteLabel="Get Instant Quote"
+      relatedLinks={[
+        { href: '/urgent-courier-london', label: 'Urgent Courier London', desc: 'Need a driver dispatched within minutes? Our dedicated urgent courier service is available 24/7 across London.' },
+        { href: '/courier-service-london', label: 'Courier Service London', desc: 'Looking for a reliable everyday courier service in London? Professional drivers across all London zones.' },
+        { href: '/business-courier-services', label: 'Business Courier Services', desc: 'Business accounts with weekly invoice billing, volume pricing, and dedicated account management.' },
+        { href: '/urgent-delivery-london', label: 'Urgent Delivery London', desc: 'Direct, non-stop delivery for time-critical consignments — documents, medical, and retail.' },
+      ]}
     />
   );
 }
@@ -405,6 +453,12 @@ export function CourierServiceLondon() {
       ctaBody="Get an instant online quote in seconds. Professional drivers across all London areas — same day collection, direct delivery, live tracking."
       ctaBookLabel="Book a Delivery"
       ctaQuoteLabel="Get Instant Quote"
+      relatedLinks={[
+        { href: '/same-day-courier-london', label: 'Same Day Courier London', desc: 'Collection within 60 minutes, direct delivery, and live GPS tracking across every London postcode.' },
+        { href: '/urgent-courier-london', label: 'Urgent Courier London', desc: 'A dedicated driver dispatched within minutes — no stops, no delays, available 24/7.' },
+        { href: '/business-courier-services', label: 'Business Courier Services', desc: 'Business accounts with consolidated invoice billing and volume-based pricing for regular courier runs.' },
+        { href: '/medical-courier', label: 'Medical Courier London', desc: 'Specialist healthcare logistics with chain-of-custody records, DBS-checked drivers, and 24/7 availability.' },
+      ]}
     />
   );
 }
@@ -456,6 +510,12 @@ export function UrgentCourierLondon() {
       ctaBody="Instant quotes, driver dispatched within minutes, live tracking included. Available 24/7 across all of London and the UK."
       ctaBookLabel="Book Urgent Courier"
       ctaQuoteLabel="Get Instant Quote"
+      relatedLinks={[
+        { href: '/same-day-courier-london', label: 'Same Day Courier London', desc: 'Collection within 60 minutes, direct delivery, live GPS tracking — across all London postcodes.' },
+        { href: '/courier-service-london', label: 'Courier Service London', desc: 'Professional courier services for businesses and individuals across Central, North, South, East & West London.' },
+        { href: '/urgent-delivery-london', label: 'Urgent Delivery London', desc: 'Dedicated direct delivery — your job is the driver\'s sole priority from collection to drop-off.' },
+        { href: '/business-courier-services', label: 'Business Courier Services', desc: 'Business accounts with weekly invoice billing, dedicated support, and volume pricing.' },
+      ]}
     />
   );
 }

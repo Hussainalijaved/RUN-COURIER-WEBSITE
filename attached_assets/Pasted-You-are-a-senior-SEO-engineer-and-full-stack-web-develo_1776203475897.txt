@@ -1,0 +1,140 @@
+You are a senior SEO engineer and full-stack web developer.
+
+I have a live website: https://runcourier.co.uk
+
+Your task is to fully optimize my website for SEO and local ranking in London WITHOUT breaking the current design or functionality.
+
+-------------------------------------
+MAIN GOAL:
+Rank for:
+- same day courier London
+- urgent courier London
+- courier service London
+
+-------------------------------------
+
+1. CREATE SEO LANDING PAGES
+
+Create the following pages:
+
+/same-day-courier-london
+/urgent-courier-london
+/courier-service-london
+
+Each page must include:
+
+- Unique <title> (keyword + Run Courier)
+- Meta description (clear, professional)
+- H1 with keyword
+- 600–1000 words high-quality content
+- Mention London areas: Central, North, South, East, West
+- Include services:
+  - Same day delivery
+  - Urgent delivery
+  - Scheduled delivery
+  - Multi-drop delivery
+- Add CTA: Call +44 7311 121217 or Book Now
+
+-------------------------------------
+
+2. HOMEPAGE IMPROVEMENT
+
+Update homepage:
+
+- Ensure <title>:
+Run Courier | Same Day Courier London
+
+- Add H1:
+Run Courier – Same Day Courier London
+
+- Add sections:
+  - Same Day Courier London
+  - Why Choose Run Courier
+  - Our Services
+  - Areas We Cover
+
+- Add internal links to:
+  /same-day-courier-london
+  /urgent-courier-london
+  /courier-service-london
+
+-------------------------------------
+
+3. INTERNAL LINKING
+
+- Link all service pages to each other
+- Add links from homepage to service pages
+- Ensure no broken links
+
+-------------------------------------
+
+4. FIX INDEXING ISSUES
+
+- Remove links to deleted pages (faq, terms, old services)
+- Ensure all active pages return 200 status
+- Ensure deleted pages return 404
+
+-------------------------------------
+
+5. ROBOTS.TXT
+
+Ensure robots.txt contains:
+
+User-agent: *
+Allow: /
+
+-------------------------------------
+
+6. SITEMAP
+
+Generate sitemap.xml including:
+
+- homepage
+- all service pages
+
+-------------------------------------
+
+7. STRUCTURED DATA (IMPORTANT)
+
+Add LocalBusiness schema:
+
+- name: Run Courier
+- phone: +44 7311 121217
+- address: 112 Bridgwater Road, Ruislip, London, HA4 6LW
+- website: https://runcourier.co.uk
+
+-------------------------------------
+
+8. PERFORMANCE
+
+- Optimize images
+- Ensure mobile responsiveness
+- Keep layout unchanged
+
+-------------------------------------
+
+9. CONSISTENCY
+
+Ensure "Run Courier" is used consistently across:
+- titles
+- headings
+- meta tags
+- footer
+
+-------------------------------------
+
+IMPORTANT RULES:
+
+- DO NOT break existing UI
+- DO NOT remove existing working features
+- ONLY enhance SEO and structure
+- Show all created pages and updated code
+
+-------------------------------------
+
+FINAL STEP:
+
+After implementation:
+- List all new pages created
+- Show updated <head> for homepage
+- Confirm no errors

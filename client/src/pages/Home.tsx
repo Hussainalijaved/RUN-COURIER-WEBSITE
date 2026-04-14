@@ -638,6 +638,75 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Areas We Cover ── */}
+      <section className="py-20 bg-card border-t border-border">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold mb-3">Areas We Cover in London</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Run Courier operates across every London postcode. Our driver network spans all five zones of the capital — from the City centre to the outer boroughs.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 max-w-5xl mx-auto mb-10">
+            {[
+              {
+                area: 'Central London',
+                postcodes: 'EC, WC, W1, SW1, SE1',
+                desc: 'City of London, Westminster, Soho, Holborn, Southbank',
+              },
+              {
+                area: 'North London',
+                postcodes: 'N1–N22, NW1–NW11',
+                desc: 'Islington, Camden, Hackney, Barnet, Haringey',
+              },
+              {
+                area: 'South London',
+                postcodes: 'SE1–SE28, SW1–SW20',
+                desc: 'Southwark, Lambeth, Croydon, Bromley, Wandsworth',
+              },
+              {
+                area: 'East London',
+                postcodes: 'E1–E18, IG, RM',
+                desc: 'Canary Wharf, Stratford, Newham, Waltham Forest',
+              },
+              {
+                area: 'West London',
+                postcodes: 'W, TW, UB, HA',
+                desc: 'Hammersmith, Ealing, Harrow, Hounslow, Hillingdon',
+              },
+            ].map((zone) => (
+              <div key={zone.area} className="bg-background rounded-xl border border-border p-5 text-center">
+                <h3 className="font-bold text-sm mb-1">{zone.area}</h3>
+                <p className="text-xs font-mono text-primary mb-2">{zone.postcodes}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{zone.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground mb-4">
+              Also serving all UK destinations — Edinburgh to Exeter, Manchester to Milton Keynes.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Link href="/same-day-courier-london">
+                <Button variant="outline" size="sm" className="gap-1.5" data-testid="areas-cta-sameday">
+                  Same Day Courier London
+                </Button>
+              </Link>
+              <Link href="/urgent-courier-london">
+                <Button variant="outline" size="sm" className="gap-1.5" data-testid="areas-cta-urgent">
+                  Urgent Courier London
+                </Button>
+              </Link>
+              <Link href="/courier-service-london">
+                <Button variant="outline" size="sm" className="gap-1.5" data-testid="areas-cta-service">
+                  Courier Service London
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Latest from the Blog ── */}
       <section className="py-20 border-t border-border">
         <div className="container mx-auto px-4">
