@@ -9,7 +9,7 @@ declare module "http" {
   interface IncomingMessage { rawBody: unknown; }
 }
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 5000;
 const IS_PROD = process.env.NODE_ENV === "production";
 
 console.log(`[BOOT] Mode: ${IS_PROD ? 'PRODUCTION' : 'DEVELOPMENT'}, Port: ${PORT}`);
