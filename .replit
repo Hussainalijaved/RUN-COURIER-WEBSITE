@@ -8,7 +8,7 @@ packages = ["unzip", "nodejs"]
 
 [deployment]
 deploymentTarget = "vm"
-run = ["node", "start.js"]
+run = ["node", "start.cjs"]
 build = ["npm", "run", "build"]
 
 [[ports]]
