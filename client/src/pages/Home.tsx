@@ -179,7 +179,7 @@ export default function Home() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <a href="tel:+447311121217">
+              <a href="tel:+442046346100">
                 <Button
                   size="lg"
                   variant="outline"
@@ -409,7 +409,7 @@ export default function Home() {
                 Book Now
               </Button>
             </Link>
-            <a href="tel:+447311121217">
+            <a href="tel:+442046346100">
               <Button
                 size="lg"
                 variant="outline"
@@ -417,7 +417,7 @@ export default function Home() {
                 data-testid="cta-call"
               >
                 <Phone className="h-4 w-4" />
-                +44 7311 121217
+                +44 20 4634 6100
               </Button>
             </a>
           </div>
