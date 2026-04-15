@@ -220,14 +220,14 @@ function SeoPage({
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-            <a href="tel:+442046346100">
+            <a href="tel:+447311121217">
               <Button
                 size="lg"
                 className="bg-white/20 text-white border-2 border-white/50 hover:bg-white/30 font-semibold px-8 gap-2 backdrop-blur-sm"
                 data-testid="seo-cta-phone"
               >
                 <Phone className="h-4 w-4" />
-                Call +44 20 4634 6100
+                Call +44 7311 121217
               </Button>
             </a>
             <Link href="/contact">

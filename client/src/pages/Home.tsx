@@ -179,7 +179,7 @@ export default function Home() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <a href="tel:+442046346100">
+              <a href="tel:+447311121217">
                 <Button
                   size="lg"
                   variant="outline"
@@ -409,7 +409,7 @@ export default function Home() {
                 Book Now
               </Button>
             </Link>
-            <a href="tel:+442046346100">
+            <a href="tel:+447311121217">
               <Button
                 size="lg"
                 variant="outline"
@@ -417,9 +417,57 @@ export default function Home() {
                 data-testid="cta-call"
               >
                 <Phone className="h-4 w-4" />
-                +44 20 4634 6100
+                +44 7311 121217
               </Button>
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SEO TEXT (minimal, for Google) ── */}
+      <section className="py-12 border-t border-border" aria-label="About Run Courier same day courier services">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto grid md:grid-cols-2 gap-6">
+            <div>
+              <h2 className="text-sm font-bold mb-2 flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-[#0077B6]" />
+                Same Day Courier London
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Collection within 60 minutes, direct delivery, and live GPS tracking across every London postcode. Available 24/7.{' '}
+                <Link href="/same-day-courier-london" className="text-[#0077B6] hover:underline font-medium">Learn more</Link>
+              </p>
+            </div>
+            <div>
+              <h2 className="text-sm font-bold mb-2 flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-[#0077B6]" />
+                Urgent Courier London
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Driver dispatched within minutes. Your job is the driver's sole priority from collection to drop-off.{' '}
+                <Link href="/urgent-courier-london" className="text-[#0077B6] hover:underline font-medium">Learn more</Link>
+              </p>
+            </div>
+            <div>
+              <h2 className="text-sm font-bold mb-2 flex items-center gap-1.5">
+                <Heart className="h-4 w-4 text-[#0077B6]" />
+                Medical Courier London
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Specialist healthcare logistics with chain-of-custody records and DBS-checked drivers for NHS trusts and clinics.{' '}
+                <Link href="/medical-courier" className="text-[#0077B6] hover:underline font-medium">Learn more</Link>
+              </p>
+            </div>
+            <div>
+              <h2 className="text-sm font-bold mb-2 flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-[#0077B6]" />
+                Courier Service London
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Professional drivers across Central, North, South, East &amp; West London. Upfront pricing, real-time tracking included.{' '}
+                <Link href="/courier-service-london" className="text-[#0077B6] hover:underline font-medium">Learn more</Link>
+              </p>
+            </div>
           </div>
         </div>
       </section>
