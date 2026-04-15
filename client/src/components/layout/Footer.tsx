@@ -46,7 +46,7 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="bg-[#0a1628] text-white">
+    <footer className="bg-blue-50 border-t border-blue-100">
 
       {/* ── Main grid ── */}
       <div className="container mx-auto px-4 py-14">
@@ -62,35 +62,35 @@ export function Footer() {
                 wrapperClassName="h-9 w-9 flex-shrink-0 rounded-lg overflow-hidden"
                 data-testid="footer-logo-image"
               />
-              <span className="font-bold text-base tracking-tight text-white">
-                RUN COURIER<sup className="text-xs ml-0.5 opacity-70">™</sup>
+              <span className="font-bold text-base tracking-tight text-foreground">
+                RUN COURIER<sup className="text-xs ml-0.5 opacity-50">™</sup>
               </span>
             </Link>
 
-            <p className="text-sm text-white/60 mb-6 max-w-xs leading-relaxed">
+            <p className="text-sm text-muted-foreground mb-6 max-w-xs leading-relaxed">
               Fast, reliable same-day courier services across London and the UK. Available 24/7, 365 days a year.
             </p>
 
             <ul className="space-y-3 mb-6">
               <li className="flex items-center gap-3 text-sm">
-                <Phone className="h-4 w-4 text-[#48cae4] flex-shrink-0" />
-                <a href="tel:+442046346100" className="text-white/80 hover:text-white transition-colors font-medium">
+                <Phone className="h-4 w-4 text-primary flex-shrink-0" />
+                <a href="tel:+442046346100" className="text-foreground hover:text-primary transition-colors font-medium">
                   +44 20 4634 6100
                 </a>
               </li>
               <li className="flex items-center gap-3 text-sm">
-                <Mail className="h-4 w-4 text-[#48cae4] flex-shrink-0" />
-                <a href="mailto:info@runcourier.co.uk" className="text-white/80 hover:text-white transition-colors">
+                <Mail className="h-4 w-4 text-primary flex-shrink-0" />
+                <a href="mailto:info@runcourier.co.uk" className="text-foreground hover:text-primary transition-colors">
                   info@runcourier.co.uk
                 </a>
               </li>
               <li className="flex items-start gap-3 text-sm">
-                <MapPin className="h-4 w-4 text-[#48cae4] flex-shrink-0 mt-0.5" />
-                <span className="text-white/60">112 Bridgwater Road, Ruislip, London HA4 6LW</span>
+                <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                <span className="text-muted-foreground">112 Bridgwater Road, Ruislip, London HA4 6LW</span>
               </li>
               <li className="flex items-center gap-3 text-sm">
-                <Clock className="h-4 w-4 text-[#48cae4] flex-shrink-0" />
-                <span className="text-white/60">24/7 — 365 Days a Year</span>
+                <Clock className="h-4 w-4 text-primary flex-shrink-0" />
+                <span className="text-muted-foreground">24/7 — 365 Days a Year</span>
               </li>
             </ul>
 
@@ -99,7 +99,7 @@ export function Footer() {
               <a
                 href="https://www.facebook.com/profile.php?id=61576739843460"
                 target="_blank" rel="noopener noreferrer"
-                className="text-white/40 hover:text-[#1877F2] transition-colors"
+                className="text-muted-foreground hover:text-[#1877F2] transition-colors"
                 aria-label="Facebook"
                 data-testid="footer-facebook"
               >
@@ -108,7 +108,7 @@ export function Footer() {
               <a
                 href="https://uk.trustpilot.com/review/runcourier.co.uk"
                 target="_blank" rel="noopener noreferrer"
-                className="text-white/40 hover:text-[#00b67a] transition-colors"
+                className="text-muted-foreground hover:text-[#00b67a] transition-colors"
                 aria-label="Trustpilot"
                 data-testid="footer-trustpilot"
               >
@@ -117,7 +117,7 @@ export function Footer() {
               <a
                 href="https://www.google.com/maps/place/RUN+COURIER/@51.5597064,-0.4078805,17z"
                 target="_blank" rel="noopener noreferrer"
-                className="text-white/40 hover:text-[#4285F4] transition-colors"
+                className="text-muted-foreground hover:text-[#4285F4] transition-colors"
                 aria-label="Google Maps"
                 data-testid="footer-google"
               >
@@ -126,7 +126,7 @@ export function Footer() {
               <a
                 href="https://apps.apple.com/app/run-courier-driver/id6756506175"
                 target="_blank" rel="noopener noreferrer"
-                className="text-white/40 hover:text-white transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="App Store"
                 data-testid="footer-appstore"
               >
@@ -137,11 +137,11 @@ export function Footer() {
 
           {/* Services */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-4">Services</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Services</h4>
             <ul className="space-y-2.5">
               {footerLinks.services.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-white/60 hover:text-white transition-colors">
+                  <Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {l.label}
                   </Link>
                 </li>
@@ -151,21 +151,21 @@ export function Footer() {
 
           {/* London Pages */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-4">London</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">London</h4>
             <ul className="space-y-2.5 mb-6">
               {footerLinks.seo.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-white/60 hover:text-white transition-colors">
+                  <Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {l.label}
                   </Link>
                 </li>
               ))}
             </ul>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-4">Portals</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Portals</h4>
             <ul className="space-y-2.5">
               {footerLinks.portals.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-white/60 hover:text-white transition-colors">
+                  <Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {l.label}
                   </Link>
                 </li>
@@ -175,21 +175,21 @@ export function Footer() {
 
           {/* Company + Legal */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-4">Company</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Company</h4>
             <ul className="space-y-2.5 mb-6">
               {footerLinks.company.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-white/60 hover:text-white transition-colors">
+                  <Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {l.label}
                   </Link>
                 </li>
               ))}
             </ul>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-4">Legal</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Legal</h4>
             <ul className="space-y-2.5">
               {footerLinks.legal.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-white/60 hover:text-white transition-colors">
+                  <Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {l.label}
                   </Link>
                 </li>
@@ -201,19 +201,19 @@ export function Footer() {
       </div>
 
       {/* ── Bottom bar ── */}
-      <div className="border-t border-white/10">
+      <div className="border-t border-blue-100">
         <div className="container mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} Run Courier Ltd. All rights reserved.
           </p>
-          <div className="flex items-center gap-1 text-xs text-white/40">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <span>Registered in England & Wales</span>
             <span className="mx-2">·</span>
-            <Link href="/terms" className="hover:text-white/70 transition-colors">Terms</Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
             <span className="mx-2">·</span>
-            <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacy</Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
             <span className="mx-2">·</span>
-            <Link href="/pricing-policy" className="hover:text-white/70 transition-colors">Pricing Policy</Link>
+            <Link href="/pricing-policy" className="hover:text-foreground transition-colors">Pricing Policy</Link>
           </div>
         </div>
       </div>
