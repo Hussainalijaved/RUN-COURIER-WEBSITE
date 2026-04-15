@@ -202,19 +202,10 @@ export function Footer() {
 
       {/* ── Bottom bar ── */}
       <div className="border-t border-blue-100">
-        <div className="container mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 flex-wrap">
+        <div className="container mx-auto px-4 py-5 flex items-center justify-center">
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} Run Courier Ltd. All rights reserved.
           </p>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span>Registered in England & Wales</span>
-            <span className="mx-2">·</span>
-            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-            <span className="mx-2">·</span>
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-            <span className="mx-2">·</span>
-            <Link href="/pricing-policy" className="hover:text-foreground transition-colors">Pricing Policy</Link>
-          </div>
         </div>
       </div>
 
