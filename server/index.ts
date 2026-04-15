@@ -72,6 +72,15 @@ if (!envCheck.valid && IS_PROD) {
 const app = express();
 const httpServer = createServer(app);
 
+// Health checks — MUST be first, before any redirect or middleware
+// Replit autoscale pings these to verify the server is alive
+app.get("/health", (_req, res) => res.status(200).send("OK"));
+app.get("/api/health", (_req, res) => res.status(200).json({
+  status: "ok",
+  mode: IS_PROD ? "production" : "development",
+  timestamp: new Date().toISOString()
+}));
+
 // www redirect — enforce canonical www.runcourier.co.uk in production
 app.use((req, res, next) => {
   if (IS_PROD) {
@@ -83,14 +92,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-// Health checks - ALWAYS available, FIRST
-app.get("/health", (req, res) => res.status(200).send("OK"));
-app.get("/api/health", (req, res) => res.status(200).json({ 
-  status: "ok", 
-  mode: IS_PROD ? "production" : "development",
-  timestamp: new Date().toISOString() 
-}));
 
 // CORS - safe, always needed
 app.use((req, res, next) => {
