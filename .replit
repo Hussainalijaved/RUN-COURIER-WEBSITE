@@ -9,7 +9,7 @@ packages = ["unzip", "nodejs"]
 [deployment]
 deploymentTarget = "vm"
 build = ["npm", "run", "build"]
-run = ["bash", "-c", "NODE_ENV=production node dist/index.cjs"]
+run = ["node", "start.js"]
 
 [[ports]]
 localPort = 5000
