@@ -251,16 +251,16 @@ if (IS_PROD) {
         res.status(status).json({ message });
       });
 
+      httpServer.listen({ port: PORT, host: "0.0.0.0" }, () => {
+        log(`serving on port ${PORT}`);
+        console.log("[BOOT] Server accepting connections");
+      });
+
       console.log("[BOOT] Setting up Vite...");
       const { setupVite } = await import("./vite");
       await setupVite(httpServer, app);
       console.log("[BOOT] Vite ready");
-
-      httpServer.listen({ port: PORT, host: "0.0.0.0" }, () => {
-        log(`serving on port ${PORT}`);
-        console.log("[BOOT] Server accepting connections");
-        runBackgroundTasks();
-      });
+      runBackgroundTasks();
       
     } catch (error: any) {
       console.error("[BOOT] FATAL:", error?.message || error);
