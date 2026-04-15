@@ -10257,7 +10257,7 @@ export async function registerRoutes(
     return resolved;
   }
 
-  app.get("/api/driver-applications", asyncHandler(async (req, res) => {
+  app.get("/api/driver-applications", requireAdminAccessStrict, asyncHandler(async (req, res) => {
     const { status } = req.query;
     const applications = await storage.getDriverApplications({
       status: status as DriverApplicationStatus | undefined,
