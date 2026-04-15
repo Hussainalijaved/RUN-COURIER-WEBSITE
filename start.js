@@ -1,26 +1,35 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { existsSync } from "fs";
 
-const builtFile = "dist/index.cjs";
-const hasBuild = existsSync(builtFile);
+const BUILT = "dist/index.cjs";
 
-if (!hasBuild) {
-  console.error("[start.js] dist/index.cjs not found — run 'npm run build' first");
-  process.exit(1);
+// If the compiled server doesn't exist yet, build it first
+if (!existsSync(BUILT)) {
+  console.log("[start] dist/index.cjs not found — building now...");
+  try {
+    execSync("npm run build", { stdio: "inherit" });
+    console.log("[start] Build complete.");
+  } catch (err) {
+    console.error("[start] Build failed:", err.message);
+    process.exit(1);
+  }
+} else {
+  console.log("[start] dist/index.cjs found, skipping build.");
 }
 
-console.log("[start.js] Starting production server...");
+console.log("[start] Launching production server...");
 
-const child = spawn("node", [builtFile], {
+const server = spawn("node", [BUILT], {
   stdio: "inherit",
   env: { ...process.env, NODE_ENV: "production" },
 });
 
-child.on("error", (err) => {
-  console.error("[start.js] Failed to start server:", err.message);
+server.on("error", (err) => {
+  console.error("[start] Server failed to start:", err.message);
   process.exit(1);
 });
 
-child.on("exit", (code) => {
+server.on("exit", (code) => {
+  console.log("[start] Server exited with code:", code);
   process.exit(code ?? 0);
 });
