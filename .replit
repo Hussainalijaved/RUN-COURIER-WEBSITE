@@ -7,7 +7,7 @@ channel = "stable-24_05"
 packages = ["unzip", "nodejs"]
 
 [deployment]
-deploymentTarget = "autoscale"
+deploymentTarget = "vm"
 build = ["npm", "run", "build"]
 run = ["npm", "start"]
 
