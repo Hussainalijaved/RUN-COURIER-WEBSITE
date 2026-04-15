@@ -9,7 +9,7 @@ packages = ["unzip", "nodejs"]
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = ["node", "server.js"]
+run = ["node", "dist/index.cjs"]
 
 [[ports]]
 localPort = 5000
