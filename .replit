@@ -8,8 +8,8 @@ packages = ["unzip", "nodejs"]
 
 [deployment]
 deploymentTarget = "vm"
-build = ["npm", "run", "build"]
 run = ["node", "start.js"]
+build = ["npm", "run", "build"]
 
 [[ports]]
 localPort = 5000
