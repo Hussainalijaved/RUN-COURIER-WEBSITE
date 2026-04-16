@@ -6,7 +6,7 @@ run = "node dist/index.cjs"
 channel = "stable-24_05"
 
 [deployment]
-run = ["node", "server.cjs"]
+run = ["node", "dist/index.cjs"]
 build = ["npm", "run", "build"]
 deploymentTarget = "autoscale"
 
