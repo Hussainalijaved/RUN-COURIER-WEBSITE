@@ -6,13 +6,17 @@ run = "node dist/index.cjs"
 channel = "stable-24_05"
 
 [deployment]
-run = ["node", "server.js"]
+run = ["node", "server.cjs"]
 build = ["npm", "run", "build"]
 deploymentTarget = "autoscale"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5050
+externalPort = 3000
 
 [env]
 PORT = "5000"
