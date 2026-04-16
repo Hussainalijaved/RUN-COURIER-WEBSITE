@@ -7,7 +7,7 @@ channel = "stable-24_05"
 
 [deployment]
 run = ["node", "dist/index.cjs"]
-build = ["sh", "-c", " npm start"]
+build = ["npm", "run", "build"]
 deploymentTarget = "autoscale"
 
 [[ports]]
