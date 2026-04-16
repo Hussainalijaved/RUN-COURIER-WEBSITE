@@ -3566,6 +3566,15 @@ export async function registerRoutes(
     } else {
       console.log(`[Email] No customer email available for job ${job.trackingNumber} - skipping customer confirmation`);
     }
+    // Notify admin numbers of new booking via SMS
+    console.log(`[Admin SMS] Sending admin new booking alert for job #${jobNumber} (${job.trackingNumber})`);
+    sendAdminNewBookingAlert({
+      jobNumber: String(jobNumber),
+      trackingNumber: job.trackingNumber,
+      pickupAddress: (job as any).pickupAddress || (job as any).pickupPostcode || '',
+      vehicleType: (job as any).vehicleType,
+      price: (job as any).totalPrice,
+    }).catch(err => console.error('[Admin SMS] Admin-created booking alert failed:', err));
     res.status(201).json(finalJob);
   }));
 
