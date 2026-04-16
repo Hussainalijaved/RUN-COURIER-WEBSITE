@@ -1,0 +1,98 @@
+You are a senior full-stack engineer.
+
+I have an existing project that was incorrectly built as a mobile app (Expo / React Native), but I need it to work as a fully functional web application.
+
+Your task is to CONVERT and RESTRUCTURE the project into a proper web app using React + Vite, while keeping all business logic, features, and structure.
+
+IMPORTANT RULES:
+
+* Do NOT create a new project from scratch
+* Reuse all existing logic, API calls, Supabase integration, and data models
+* Remove all Expo and React Native dependencies completely
+* Replace all React Native components with web equivalents
+
+CONVERSION REQUIREMENTS:
+
+1. PROJECT SETUP
+
+* Convert project to Vite (React)
+* Ensure package.json uses:
+
+  * "dev": "vite"
+  * "build": "vite build"
+  * "preview": "vite preview"
+
+2. REMOVE MOBILE DEPENDENCIES
+
+* Remove:
+  expo
+  react-native
+  expo-router
+  react-native-screens
+  react-native-safe-area-context
+* Clean package.json
+
+3. REPLACE COMPONENTS
+   Convert all React Native components to web:
+
+* View → div
+* Text → p / span
+* TouchableOpacity → button
+* ScrollView → div with overflow
+* Image → img
+
+4. NAVIGATION
+
+* Replace Expo Router with React Router DOM
+* Create proper routes:
+  /login
+  /dashboard
+  /admin
+  /driver
+  /booking
+
+5. STYLING
+
+* Convert styles to CSS or Tailwind
+* Ensure responsive design (mobile + desktop)
+
+6. ENVIRONMENT
+
+* Keep Supabase integration exactly the same
+* Ensure environment variables work in Vite
+
+7. BUILD SYSTEM
+
+* Ensure project builds successfully with:
+  npm install
+  npm run build
+
+8. FIX ERRORS
+
+* Automatically detect and fix all errors related to:
+
+  * missing modules
+  * mobile-only APIs
+  * broken imports
+
+9. OUTPUT STRUCTURE
+
+* Ensure final project has:
+  index.html
+  src/
+  package.json
+  vite.config.js
+
+10. DEPLOYMENT READY
+
+* Ensure the project can be deployed as a static website
+* Output build into /dist
+
+FINAL GOAL:
+The result must be a fully working web application that runs with:
+npm run dev
+
+And builds with:
+npm run build
+
+Do NOT stop until all errors are fixed and the app runs successfully in the browser.
