@@ -1282,7 +1282,25 @@ export class SupabaseStorage implements IStorage {
     const updateData: Partial<Job> = { status };
     if (rejectionReason) updateData.rejectionReason = rejectionReason;
     if (status === 'delivered') updateData.deliveredAt = new Date();
-    return this.updateJob(id, updateData);
+    const result = await this.updateJob(id, updateData);
+
+    // Keep job_assignments.status in sync with jobs.status for terminal states.
+    // Without this, drivers still see the job under "assigned/active" even after
+    // the job (especially auto-completed multi-drop) has been marked delivered.
+    if (status === 'delivered' || status === 'cancelled' || status === 'failed') {
+      try {
+        const supabase = this.checkSupabase();
+        const assignmentStatus = status === 'delivered' ? 'completed' : status;
+        await supabase
+          .from('job_assignments')
+          .update({ status: assignmentStatus, updated_at: new Date().toISOString() })
+          .eq('job_id', String(id))
+          .in('status', ['pending', 'sent', 'offered', 'assigned', 'accepted']);
+      } catch (err: any) {
+        console.error('[updateJobStatus] Failed to sync job_assignments status:', err?.message);
+      }
+    }
+    return result;
   }
 
   async assignDriver(id: string, driverId: string, dispatcherId?: string): Promise<Job | undefined> {
