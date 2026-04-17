@@ -2412,6 +2412,79 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
 
+    // Inline multi-drop stops so every consumer of /api/jobs/:id sees the full
+    // routed list (admin, customer, dispatcher, supervisor, track, etc.)
+    if ((job as any).isMultiDrop && supabaseAdmin) {
+      try {
+        const { data: stopsRows } = await supabaseAdmin
+          .from('multi_drop_stops')
+          .select('id, stop_order, postcode, address, recipient_name, recipient_phone, instructions, status, completed_at, latitude, longitude, pod_photo_url, pod_signature_url, pod_recipient_name')
+          .eq('job_id', String(req.params.id))
+          .order('stop_order', { ascending: true });
+
+        let stops = (stopsRows || []).map((stop: any) => ({
+          id: String(stop.id),
+          stopOrder: stop.stop_order,
+          stop_order: stop.stop_order,
+          order: stop.stop_order,
+          address: stop.address,
+          postcode: stop.postcode,
+          recipientName: stop.recipient_name,
+          recipient_name: stop.recipient_name,
+          recipientPhone: stop.recipient_phone,
+          recipient_phone: stop.recipient_phone,
+          instructions: stop.instructions,
+          status: stop.status || 'pending',
+          completedAt: stop.completed_at,
+          completed_at: stop.completed_at,
+          latitude: stop.latitude?.toString() || null,
+          longitude: stop.longitude?.toString() || null,
+          podPhotoUrl: stop.pod_photo_url,
+          podSignatureUrl: stop.pod_signature_url,
+          podRecipientName: stop.pod_recipient_name,
+        }));
+
+        // Append the job's main delivery address as the final stop if not already in the list
+        const deliveryAddr = (job as any).deliveryAddress;
+        if (deliveryAddr) {
+          const normalizedAddr = String(deliveryAddr).trim().toLowerCase();
+          const deliveryPc = (job as any).deliveryPostcode || '';
+          const alreadyIncluded = stops.some((s: any) =>
+            (s.address && String(s.address).trim().toLowerCase() === normalizedAddr) ||
+            (s.postcode && deliveryPc && String(s.postcode).trim().toLowerCase() === String(deliveryPc).trim().toLowerCase())
+          );
+          if (!alreadyIncluded) {
+            stops = [...stops, {
+              id: `final-${(job as any).id}`,
+              stopOrder: stops.length + 1,
+              stop_order: stops.length + 1,
+              order: stops.length + 1,
+              address: deliveryAddr,
+              postcode: deliveryPc,
+              recipientName: (job as any).recipientName || '',
+              recipient_name: (job as any).recipientName || '',
+              recipientPhone: (job as any).recipientPhone || '',
+              recipient_phone: (job as any).recipientPhone || '',
+              instructions: '',
+              status: 'pending',
+              completedAt: null,
+              completed_at: null,
+              latitude: (job as any).deliveryLatitude?.toString() || null,
+              longitude: (job as any).deliveryLongitude?.toString() || null,
+              podPhotoUrl: null,
+              podSignatureUrl: null,
+              podRecipientName: null,
+            }];
+          }
+        }
+
+        (job as any).multiDropStops = stops;
+        (job as any).stops = stops;
+      } catch (err: any) {
+        console.error('[API Job] Error fetching multi-drop stops:', err.message);
+      }
+    }
+
     // Merge office_city and created_by from job_admin_notes (PGHOST)
     try {
       const metaResult = await getPgPool().query(
