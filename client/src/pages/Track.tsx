@@ -24,6 +24,7 @@ import { SmoothBackground } from '@/components/ui/smooth-image';
 import trackingHeroImage from '@assets/generated_images/courier_tracking_van_gps_concept_opt.jpg';
 import type { JobStatus } from '@shared/schema';
 import { TrackingLiveMap } from '@/components/TrackingLiveMap';
+import { supabase } from '@/lib/supabase';
 
 const statusSteps: { status: JobStatus; label: string; icon: any }[] = [
   { status: 'pending', label: 'Order Placed', icon: Package },
@@ -272,6 +273,49 @@ export default function Track() {
       }
     };
   }, [initialId, fetchTrackingData, startLiveTracking]);
+
+  // INSTANT live updates: subscribe to Supabase realtime for this job's row
+  // and any of its multi-drop stops. As soon as the driver/admin updates the
+  // status (or ticks off a stop), we re-fetch immediately — no 10s polling wait.
+  useEffect(() => {
+    if (!job?.id && !job?.trackingNumber) return;
+    const ref = (job.trackingNumber || '').toUpperCase();
+    if (!ref) return;
+
+    const channel = supabase
+      .channel(`track-${ref}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'jobs',
+          filter: `tracking_number=eq.${ref}`,
+        },
+        () => {
+          console.log('[Track] Live update — refreshing job');
+          fetchTrackingData(ref, true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'multi_drop_stops',
+          filter: `job_id=eq.${job.id}`,
+        },
+        () => {
+          console.log('[Track] Live stop update — refreshing job');
+          fetchTrackingData(ref, true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [job?.id, job?.trackingNumber, fetchTrackingData]);
 
   const currentStepIndex = job ? getStatusIndex(job.status) : -1;
 
