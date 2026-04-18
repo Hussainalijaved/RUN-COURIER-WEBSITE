@@ -1,18 +1,22 @@
-modules = ["nodejs-20"]
-
-run = "node server/index.ts"
+modules = ["nodejs-20", "web", "bun", "postgresql-16"]
+run = "npm run dev"
+hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["unzip", "nodejs"]
 
-toscale"
+[deployment]
+deploymentTarget = "vm"
+build = ["npm", "run", "build"]
+run = ["npm", "start"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 5050
+localPort = 5904
 externalPort = 3000
 
 [env]
@@ -41,3 +45,22 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[agent]
+integrations = ["stripe:1.0.0", "resend:1.0.0", "javascript_stripe:1.0.0", "twilio:1.0.0", "javascript_database:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+TESTING_VITE_STRIPE_PUBLIC_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwvoYu7injdGbDVInDb6W8OawVlcwuO2frMNx3y8IuQoXIh2Erq00wayXGWgW"
+TESTING_STRIPE_SECRET_KEY = "sk_live_...sak1"
+VITE_STRIPE_PUBLISHABLE_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwvoYu7injdGbDVInDb6W8OawVlcwuO2frMNx3y8IuQoXIh2Erq00wayXGWgW"
+NODE_ENV = "production"
+APP_URL = "https://runcourier.co.uk"
+INTERNAL_API_KEY = "rc_live_20fa81320da16a617e5ab67cf8d8360f01b7685603209e474dcdb2d11e7ba8c7"
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY = "pk_live_51SblufKGNzGzHvUvpwDtXkaKAjaxcfkVRUX7TRwvoYu7injdGbDVInDb6W8OawVlcwuO2frMNx3y8IuQoXIh2Erq00wayXGWgW"
+EXPO_PUBLIC_API_URL = "https://runcourier.co.uk"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
