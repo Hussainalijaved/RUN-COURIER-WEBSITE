@@ -1,14 +1,11 @@
 modules = ["nodejs-20"]
 
-run = "node dist/index.cjs"
+run = "node server/index.ts"
 
 [nix]
 channel = "stable-24_05"
 
-[deployment]
-run = ["node", "dist/index.cjs"]
-build = ["sh", "-c", " npm start"]
-deploymentTarget = "autoscale"
+toscale"
 
 [[ports]]
 localPort = 5000
