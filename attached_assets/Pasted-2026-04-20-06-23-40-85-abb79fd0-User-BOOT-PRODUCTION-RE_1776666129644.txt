@@ -1,0 +1,124 @@
+2026-04-20 06:23:40.85
+abb79fd0
+User
+[BOOT] PRODUCTION READY
+2026-04-20 06:23:40.91
+abb79fd0
+User
+[SupabaseStorage] Loaded pricing settings from database
+2026-04-20 06:23:41.22
+abb79fd0
+User
+[SupabaseStorage] Loaded 6 vehicles from database
+2026-04-20 06:24:01.43
+abb79fd0
+User
+1:24:01 AM [realtime] Hydrated location cache with 47 driver locations
+2026-04-20 06:24:21.36
+abb79fd0
+User
+1:24:21 AM [realtime] Hydrated location cache with 47 driver locations
+2026-04-20 06:24:41.36
+abb79fd0
+User
+1:24:41 AM [realtime] Hydrated location cache with 47 driver locations
+2026-04-20 06:25:01.44
+abb79fd0
+User
+1:25:01 AM [realtime] Hydrated location cache with 47 driver locations
+2026-04-20 11:16:59.53
+5c235445
+System
+starting up user application
+2026-04-20 11:16:59.53
+5c235445
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-04-20 11:16:59.53
+5c235445
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-04-20 11:17:00.62
+5c235445
+User
+[BOOT] Mode: PRODUCTION, Port: 5000
+2026-04-20 11:17:00.62
+5c235445
+User
+🔥 SERVER ENTRY LOADED
+2026-04-20 11:17:00.62
+5c235445
+User
+[ENV] All environment variables validated
+2026-04-20 11:17:00.63
+5c235445
+User
+[BOOT] PRODUCTION MODE - Full API enabled
+2026-04-20 11:17:00.63
+5c235445
+User
+[BOOT] Registering routes...
+2026-04-20 11:17:00.83
+5c235445
+User
+[Storage] Using Supabase storage
+2026-04-20 11:17:00.84
+5c235445
+User
+[PaymentLinks] BASE_URL: https://runcourier.co.uk APP_URL env: https://runcourier.co.uk
+2026-04-20 11:17:01.03
+5c235445
+User
+[MIGRATION] contacts table created/verified successfully
+2026-04-20 11:17:01.03
+5c235445
+User
+[BOOT] Setting up realtime...
+2026-04-20 11:17:01.03
+5c235445
+User
+[BOOT] Routes registered
+2026-04-20 11:17:01.22
+5c235445
+User
+[BOOT] Realtime done
+2026-04-20 11:17:01.22
+5c235445
+User
+[BOOT] Serving from dist/public
+2026-04-20 11:17:01.22
+5c235445
+User
+6:17:01 AM [realtime] WebSocket server initialized on /ws/realtime
+2026-04-20 11:17:01.22
+5c235445
+User
+6:17:01 AM [express] serving on port 5000
+2026-04-20 11:17:01.22
+5c235445
+User
+[BOOT] PRODUCTION READY
+2026-04-20 11:17:01.44
+5c235445
+User
+[SupabaseStorage] Loaded pricing settings from database
+2026-04-20 11:17:01.77
+5c235445
+User
+[SupabaseStorage] Loaded 6 vehicles from database
+2026-04-20 11:17:21.70
+5c235445
+User
+6:17:21 AM [realtime] Hydrated location cache with 47 driver locations
+2026-04-20 11:17:41.51
+5c235445
+User
+6:17:41 AM [realtime] Hydrated location cache with 47 driver locations
+2026-04-20 11:18:01.69
+5c235445
+User
+6:18:01 AM [realtime] Hydrated location cache with 47 driver locations
+2026-04-20 11:18:21.69
+5c235445
+User
+6:18:21 AM [realtime] Hydrated location cache with 47 driver locations
