@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
-import { SiFacebook, SiTrustpilot, SiAppstore, SiGoogle } from 'react-icons/si';
+import { SiFacebook, SiTrustpilot, SiAppstore, SiGoogle, SiGoogleplay } from 'react-icons/si';
 import { SmoothImage } from '@/components/ui/smooth-image';
 import logoImage from '@assets/run_courier_logo_opt.png';
 
@@ -120,8 +120,19 @@ export function Footer() {
                 rel="noopener noreferrer"
                 className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
                 data-testid="appstore-link-top"
+                aria-label="Download driver app on the App Store"
               >
                 <SiAppstore className="h-5 w-5" />
+              </a>
+              <a
+                href="https://play.google.com/store/apps/details?id=com.runcourier.driver"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
+                data-testid="playstore-link-top"
+                aria-label="Get driver app on Google Play"
+              >
+                <SiGoogleplay className="h-5 w-5" />
               </a>
             </div>
           </div>
