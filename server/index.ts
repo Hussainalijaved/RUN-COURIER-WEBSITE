@@ -72,6 +72,16 @@ if (!envCheck.valid && IS_PROD) {
 const app = express();
 const httpServer = createServer(app);
 
+// Health checks - ALWAYS available, FIRST (before any redirect middleware)
+// Deployment promote checks rely on these returning 200 immediately.
+app.get("/health", (req, res) => res.status(200).send("OK"));
+app.get("/healthz", (req, res) => res.status(200).send("OK"));
+app.get("/api/health", (req, res) => res.status(200).json({ 
+  status: "ok", 
+  mode: IS_PROD ? "production" : "development",
+  timestamp: new Date().toISOString() 
+}));
+
 // www redirect — enforce canonical www.runcourier.co.uk in production
 app.use((req, res, next) => {
   if (IS_PROD) {
@@ -83,14 +93,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-// Health checks - ALWAYS available, FIRST
-app.get("/health", (req, res) => res.status(200).send("OK"));
-app.get("/api/health", (req, res) => res.status(200).json({ 
-  status: "ok", 
-  mode: IS_PROD ? "production" : "development",
-  timestamp: new Date().toISOString() 
-}));
 
 // CORS - safe, always needed
 app.use((req, res, next) => {
@@ -131,7 +133,14 @@ if (IS_PROD) {
   console.log("[BOOT] PRODUCTION MODE - Full API enabled");
   
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-  
+
+  // Start listening IMMEDIATELY so /health responds during deploy promote checks.
+  // Routes/realtime/static are wired up asynchronously below.
+  httpServer.listen({ port: PORT, host: "0.0.0.0" }, () => {
+    log(`serving on port ${PORT}`);
+    console.log("[BOOT] Listening (early) - health checks ready");
+  });
+
   (async () => {
     try {
       console.log("[BOOT] Registering routes...");
@@ -212,11 +221,8 @@ if (IS_PROD) {
         });
       }
 
-      httpServer.listen({ port: PORT, host: "0.0.0.0" }, () => {
-        log(`serving on port ${PORT}`);
-        console.log("[BOOT] PRODUCTION READY");
-        runBackgroundTasks();
-      });
+      console.log("[BOOT] PRODUCTION READY");
+      runBackgroundTasks();
       
     } catch (error: any) {
       console.error("[BOOT] FATAL:", error?.message || error);
