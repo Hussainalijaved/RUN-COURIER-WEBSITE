@@ -82,15 +82,9 @@ app.get("/api/health", (req, res) => res.status(200).json({
   timestamp: new Date().toISOString() 
 }));
 
-// www redirect — enforce canonical www.runcourier.co.uk in production
+// www redirect removed — Render handles the canonical host (non-www).
+// Forcing www here was causing a redirect loop with Render's redirect rules.
 app.use((req, res, next) => {
-  if (IS_PROD) {
-    const host = req.headers.host || '';
-    if (host && !host.startsWith('www.') && !host.includes('localhost') && !host.includes('replit')) {
-      const wwwUrl = `https://www.${host}${req.originalUrl}`;
-      return res.redirect(301, wwwUrl);
-    }
-  }
   next();
 });
 
