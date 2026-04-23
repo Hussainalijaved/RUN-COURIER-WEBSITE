@@ -67,7 +67,7 @@ export function useDriver() {
         vehicleModel: data.vehicle_model,
         vehicleColor: data.vehicle_color,
         // Supabase uses online_status column ('online'/'offline') not is_available boolean
-        isAvailable: data.online_status === 'online',
+        isAvailable: data.is_available === true,
         isVerified: data.is_verified,
         currentLatitude: data.current_latitude,
         currentLongitude: data.current_longitude,
