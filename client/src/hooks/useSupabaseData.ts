@@ -399,7 +399,7 @@ export function useAdminStats() {
 
       const [jobsData, driversData] = await Promise.all([
         supabase.from('jobs').select('id, status, total_price, created_at'),
-        supabase.from('drivers').select('id, is_available, is_verified'),
+        supabase.from('drivers').select('id, online_status, is_verified'),
       ]);
 
       const jobs = jobsData.data || [];
@@ -421,7 +421,7 @@ export function useAdminStats() {
 
       return {
         todaysJobs,
-        activeDrivers: drivers.filter((d) => d.is_available).length,
+        activeDrivers: drivers.filter((d) => d.online_status === 'online').length,
         totalDrivers: drivers.length,
         pendingJobs,
         completedToday,

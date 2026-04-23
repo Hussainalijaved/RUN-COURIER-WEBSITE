@@ -18,7 +18,7 @@ export async function listDrivers(filters: DriverFilters = {}): Promise<Driver[]
     .order('created_at', { ascending: false });
 
   if (filters.isAvailable !== undefined) {
-    query = query.eq('is_available', filters.isAvailable);
+    query = query.eq('online_status', filters.isAvailable ? 'online' : 'offline');
   }
   if (filters.isVerified !== undefined) {
     query = query.eq('is_verified', filters.isVerified);
@@ -89,7 +89,7 @@ export async function getDriverByCode(driverCode: string): Promise<Driver | null
 export async function updateDriver(id: string, updates: Partial<Driver>): Promise<Driver | null> {
   const dbUpdates: Record<string, unknown> = {};
   
-  if (updates.isAvailable !== undefined) dbUpdates.is_available = updates.isAvailable;
+  if (updates.isAvailable !== undefined) dbUpdates.online_status = updates.isAvailable ? 'online' : 'offline';
   if (updates.isVerified !== undefined) dbUpdates.is_verified = updates.isVerified;
   if (updates.currentLatitude !== undefined) dbUpdates.current_latitude = updates.currentLatitude;
   if (updates.currentLongitude !== undefined) dbUpdates.current_longitude = updates.currentLongitude;
@@ -153,7 +153,7 @@ export async function updateDriverAvailability(
 ): Promise<Driver | null> {
   const { data, error } = await supabase
     .from('drivers')
-    .update({ is_available: isAvailable })
+    .update({ online_status: isAvailable ? 'online' : 'offline' })
     .eq('id', id)
     .select()
     .single();
@@ -172,7 +172,7 @@ export async function deactivateDriver(id: string): Promise<Driver | null> {
     .update({
       is_active: false,
       deactivated_at: new Date().toISOString(),
-      is_available: false,
+      online_status: 'offline',
     })
     .eq('id', id)
     .select()
@@ -227,7 +227,7 @@ function mapDriverFromDb(row: Record<string, unknown>): Driver {
     vehicleMake: row.vehicle_make as string | null,
     vehicleModel: row.vehicle_model as string | null,
     vehicleColor: row.vehicle_color as string | null,
-    isAvailable: row.is_available as boolean,
+    isAvailable: (row.online_status === 'online' || row.is_available === true),
     isVerified: row.is_verified as boolean,
     currentLatitude: row.current_latitude as string | null,
     currentLongitude: row.current_longitude as string | null,
