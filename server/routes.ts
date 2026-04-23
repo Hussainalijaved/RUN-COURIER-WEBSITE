@@ -881,33 +881,61 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
   const { supabaseAdmin } = await import('./supabaseAdmin');
   if (!supabaseAdmin) return jobs;
 
-  const BUCKET = 'driver-documents';
+  // The mobile app uploads POD images and signatures to 'pod-images'
+  // Driver personal documents (licenses, etc) are in 'driver-documents'
+  const POD_BUCKET = 'pod-images';
+  const DOC_BUCKET = 'driver-documents';
 
   return Promise.all(jobs.map(async (job) => {
+    // Return a shallow copy so we don't mutate original objects if cached
     const resolved = { ...job };
 
-    if (job.podPhotoUrl && !job.podPhotoUrl.startsWith('http')) {
+    const resolveUrl = async (path: string, primaryBucket: string = POD_BUCKET): Promise<string> => {
+      if (!path || path.startsWith('http')) return path;
+      
       try {
-        const { data } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(job.podPhotoUrl, 3600);
-        if (data?.signedUrl) resolved.podPhotoUrl = data.signedUrl;
-      } catch {}
+        // Try the primary bucket first
+        const { data, error } = await supabaseAdmin.storage.from(primaryBucket).createSignedUrl(path, 3600);
+        if (data?.signedUrl) return data.signedUrl;
+        
+        // Fallback to driver-documents if pod-images fails and we're not already checking it
+        if (primaryBucket !== DOC_BUCKET) {
+           const { data: fallbackData } = await supabaseAdmin.storage.from(DOC_BUCKET).createSignedUrl(path, 3600);
+           if (fallbackData?.signedUrl) return fallbackData.signedUrl;
+        }
+      } catch (err) {
+        console.warn(`[POD Resolver] Failed to resolve URL for path ${path}:`, err);
+      }
+      return path;
+    };
+
+    // Resolve main job POD items
+    if (job.podPhotoUrl) {
+      resolved.podPhotoUrl = await resolveUrl(job.podPhotoUrl);
     }
 
     if (Array.isArray(job.podPhotos) && job.podPhotos.length > 0) {
       resolved.podPhotos = await Promise.all(job.podPhotos.map(async (photoPath: string) => {
-        if (photoPath.startsWith('http')) return photoPath;
-        try {
-          const { data } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(photoPath, 3600);
-          return data?.signedUrl || photoPath;
-        } catch { return photoPath; }
+        return await resolveUrl(photoPath);
       }));
     }
 
-    if (job.podSignatureUrl && !job.podSignatureUrl.startsWith('http')) {
-      try {
-        const { data } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(job.podSignatureUrl, 3600);
-        if (data?.signedUrl) resolved.podSignatureUrl = data.signedUrl;
-      } catch {}
+    if (job.podSignatureUrl) {
+      resolved.podSignatureUrl = await resolveUrl(job.podSignatureUrl);
+    }
+
+    // CRITICAL: Resolve POD URLs for multi-drop stops
+    if (Array.isArray(resolved.multiDropStops) && resolved.multiDropStops.length > 0) {
+      resolved.multiDropStops = await Promise.all(resolved.multiDropStops.map(async (stop: any) => {
+        const resolvedStop = { ...stop };
+        if (stop.podPhotoUrl) {
+          resolvedStop.podPhotoUrl = await resolveUrl(stop.podPhotoUrl);
+        }
+        if (stop.podSignatureUrl) {
+          resolvedStop.podSignatureUrl = await resolveUrl(stop.podSignatureUrl);
+        }
+        return resolvedStop;
+      }));
     }
 
     return resolved;
@@ -1799,7 +1827,7 @@ export async function registerRoutes(
           try {
             const { data: stops } = await supabaseAdmin
               .from('multi_drop_stops')
-              .select('job_id, stop_order, postcode, address, recipient_name, recipient_phone, instructions')
+              .select('job_id, stop_order, postcode, address, recipient_name, recipient_phone, instructions, status, delivered_at, pod_photo_url, pod_signature_url, pod_recipient_name')
               .in('job_id', multiDropJobIds)
               .order('stop_order', { ascending: true });
             
@@ -1814,6 +1842,11 @@ export async function registerRoutes(
                   recipientName: stop.recipient_name,
                   recipientPhone: stop.recipient_phone,
                   instructions: stop.instructions,
+                  status: stop.status || 'pending',
+                  deliveredAt: stop.delivered_at,
+                  podPhotoUrl: stop.pod_photo_url,
+                  podSignatureUrl: stop.pod_signature_url,
+                  podRecipientName: stop.pod_recipient_name,
                 });
               }
               for (const job of resolvedJobs) {
