@@ -891,16 +891,32 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
     const resolved = { ...job };
 
     const resolveUrl = async (path: string, primaryBucket: string = POD_BUCKET): Promise<string> => {
-      if (!path || path.startsWith('http')) return path;
+      if (!path) return path;
+      
+      let storagePath = path;
+      let targetBucket = primaryBucket;
+
+      // If it's a full SUPABASE public URL
+      if (path.startsWith('http')) {
+        // Extract bucket and storage path from the Supabase public storage URL
+        const match = path.match(/\/storage\/v1\/object\/public\/([^\/]+)\/(.+)$/);
+        if (match) {
+          targetBucket = match[1];
+          storagePath = match[2];
+        } else {
+          // It's some other completely generic external URL, return it
+          return path;
+        }
+      }
       
       try {
-        // Try the primary bucket first
-        const { data, error } = await supabaseAdmin.storage.from(primaryBucket).createSignedUrl(path, 3600);
+        // Try the primary/target bucket first with a signed URL to bypass any RLS/private bucket issues
+        const { data, error } = await supabaseAdmin.storage.from(targetBucket).createSignedUrl(storagePath, 3600);
         if (data?.signedUrl) return data.signedUrl;
         
-        // Fallback to driver-documents if pod-images fails and we're not already checking it
-        if (primaryBucket !== DOC_BUCKET) {
-           const { data: fallbackData } = await supabaseAdmin.storage.from(DOC_BUCKET).createSignedUrl(path, 3600);
+        // Fallback to driver-documents if the previous attempt failed and we aren't already targeting it
+        if (targetBucket !== DOC_BUCKET) {
+           const { data: fallbackData } = await supabaseAdmin.storage.from(DOC_BUCKET).createSignedUrl(storagePath, 3600);
            if (fallbackData?.signedUrl) return fallbackData.signedUrl;
         }
       } catch (err) {
