@@ -69,15 +69,27 @@ async function generateUniqueDriverCode(supabaseAdmin: any): Promise<string> {
 let pgPool: Pool | null = null;
 function getPgPool(): Pool {
   if (!pgPool) {
-    pgPool = new Pool({
-      host: process.env.PGHOST,
-      user: process.env.PGUSER,
-      password: process.env.PGPASSWORD,
-      database: process.env.PGDATABASE,
-      port: parseInt(process.env.PGPORT || '5432'),
-      ssl: { rejectUnauthorized: false },
-      max: 3,
-    });
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
+      let connString = process.env.DATABASE_URL;
+      if (!connString.includes('sslmode=')) {
+        connString += connString.includes('?') ? '&sslmode=require' : '?sslmode=require';
+      }
+      pgPool = new Pool({
+        connectionString: connString,
+        max: 3,
+      });
+    } else {
+      pgPool = new Pool({
+        host: process.env.PGHOST,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false },
+        max: 3,
+      });
+    }
+    
     // Handle idle-client errors (e.g. Neon serverless terminating connections with 57P01)
     // Without this handler Node.js throws an uncaught error and crashes the process
     pgPool.on('error', (err: Error) => {
