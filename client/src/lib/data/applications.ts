@@ -6,7 +6,7 @@ export async function listDriverApplications(status?: DriverApplicationStatus): 
   let query = supabase
     .from('driver_applications')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('submitted_at', { ascending: false });
 
   if (status) {
     query = query.eq('status', status);
@@ -136,7 +136,7 @@ function mapApplicationFromDb(row: Record<string, unknown>): DriverApplication {
     status: row.status as DriverApplicationStatus,
     reviewedBy: row.reviewed_by as string | null,
     reviewNotes: row.review_notes as string | null,
-    createdAt: row.created_at as string,
+    createdAt: (row.submitted_at || row.created_at) as string,
     reviewedAt: row.reviewed_at as string | null,
   };
 }
