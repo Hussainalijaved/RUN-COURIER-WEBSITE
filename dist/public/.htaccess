@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Never rewrite /api/* — pass through to the backend server
+  RewriteRule ^api/ - [L]
+
+  # If the requested file or directory exists, serve it directly
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # All other routes → React app
+  RewriteRule ^ index.html [L]
+</IfModule>
