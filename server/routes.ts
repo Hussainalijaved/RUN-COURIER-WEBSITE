@@ -7525,7 +7525,6 @@ export async function registerRoutes(
     const finalFilename = `${safeDocumentType}_${timestamp}_${safeOrigName}`;
 
     const isPendingApplication = rawDriverId === 'application-pending';
-    const BUCKET = isPendingApplication ? 'driver-documents' : 'DRIVER-DOCUMENTS';
     const storagePath = isPendingApplication
       ? `drivers/pending/${safeDocumentType}/${finalFilename}`
       : `${rawDriverId}/${safeDocumentType}_${timestamp}_${safeOrigName}`;
@@ -7535,33 +7534,44 @@ export async function registerRoutes(
 
     const { supabaseAdmin } = await import('./supabaseAdmin');
     if (!supabaseAdmin) {
-      return res.status(500).json({ error: "Storage service unavailable" });
+      console.error('[Documents] supabaseAdmin is NULL - check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars');
+      return res.status(500).json({ error: "Storage service unavailable - Supabase not configured" });
     }
 
+    // Try both bucket names since Supabase bucket names are case-sensitive
+    const BUCKET_CANDIDATES = ['driver-documents', 'DRIVER-DOCUMENTS'];
     let supabaseUploadSuccess = false;
-    const maxRetries = 2;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const { error: uploadErr } = await supabaseAdmin.storage
-          .from(BUCKET)
-          .upload(storagePath, fileBuffer, { contentType, upsert: true });
+    let usedBucket = BUCKET_CANDIDATES[0];
 
-        if (!uploadErr) {
-          supabaseUploadSuccess = true;
-          console.log(`[Documents] Uploaded to Supabase Storage: ${BUCKET}/${storagePath} (attempt ${attempt})`);
-          break;
-        } else {
-          console.error(`[Documents] Supabase upload error (attempt ${attempt}/${maxRetries}):`, uploadErr.message);
+    for (const bucketName of BUCKET_CANDIDATES) {
+      const maxRetries = 2;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const { error: uploadErr } = await supabaseAdmin.storage
+            .from(bucketName)
+            .upload(storagePath, fileBuffer, { contentType, upsert: true });
+
+          if (!uploadErr) {
+            supabaseUploadSuccess = true;
+            usedBucket = bucketName;
+            console.log(`[Documents] Uploaded to Supabase Storage: ${bucketName}/${storagePath} (attempt ${attempt})`);
+            break;
+          } else {
+            console.error(`[Documents] Supabase upload error bucket=${bucketName} (attempt ${attempt}/${maxRetries}):`, uploadErr.message);
+          }
+        } catch (supaErr: any) {
+          console.error(`[Documents] Supabase upload failed bucket=${bucketName} (attempt ${attempt}/${maxRetries}):`, supaErr?.message || supaErr);
         }
-      } catch (supaErr) {
-        console.error(`[Documents] Supabase upload failed (attempt ${attempt}/${maxRetries}):`, supaErr);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 500));
+        }
       }
-      if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, 500));
-      }
+      if (supabaseUploadSuccess) break;
+      console.log(`[Documents] Bucket '${bucketName}' failed, trying next candidate...`);
     }
 
     if (!supabaseUploadSuccess) {
+      console.error('[Documents] ALL bucket candidates failed for upload. Check Supabase Storage buckets exist.');
       return res.status(500).json({ error: "Failed to upload document to storage. Please try again." });
     }
 
@@ -7572,7 +7582,7 @@ export async function registerRoutes(
         success: true,
         fileUrl: storagePath,
         storagePath,
-        bucket: BUCKET,
+        bucket: usedBucket,
         fileName: file.originalname,
         type: safeDocumentType,
         message: "Document uploaded successfully for application"
@@ -7593,7 +7603,7 @@ export async function registerRoutes(
       uploadedAt,
       expiryDate,
       storagePath,
-      bucket: BUCKET,
+      bucket: usedBucket,
     };
 
     res.status(201).json(immediateResponse);
@@ -7611,7 +7621,7 @@ export async function registerRoutes(
           auth_user_id: rawDriverId,
           doc_type: safeDocumentType,
           file_url: storagePath,
-          bucket: BUCKET,
+          bucket: usedBucket,
           storage_path: storagePath,
           file_name: file.originalname,
           mime_type: contentType,
