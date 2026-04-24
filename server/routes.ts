@@ -77,6 +77,7 @@ function getPgPool(): Pool {
       pgPool = new Pool({
         connectionString: connString,
         max: 3,
+        ssl: { rejectUnauthorized: false },
       });
     } else {
       throw new Error('[getPgPool] DATABASE_URL is missing. Cannot connect to Supabase.');
@@ -17201,7 +17202,7 @@ ON CONFLICT (type) DO NOTHING;
       if (!connStr.includes('sslmode=')) {
         connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
-      return new Pool({ connectionString: connStr, max: 3 });
+      return new Pool({ connectionString: connStr, max: 3, ssl: { rejectUnauthorized: false } });
     }
 
     throw new Error('[getApiPool] DATABASE_URL is missing. Cannot connect to Supabase API tables.');
@@ -18409,7 +18410,7 @@ ON CONFLICT (type) DO NOTHING;
       if (!connStr.includes('sslmode=')) {
         connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
-      pool = new Pool({ connectionString: connStr, max: 3 });
+      pool = new Pool({ connectionString: connStr, max: 3, ssl: { rejectUnauthorized: false } });
     } else {
       throw new Error('[Notifications] DATABASE_URL is missing. Cannot connect to Supabase.');
     }
@@ -18570,7 +18571,7 @@ ON CONFLICT (type) DO NOTHING;
       if (!connStr.includes('sslmode=')) {
         connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
-      pool = new Pool({ connectionString: connStr, max: 3 });
+      pool = new Pool({ connectionString: connStr, max: 3, ssl: { rejectUnauthorized: false } });
     } else {
       throw new Error('[Notifications List] DATABASE_URL is missing. Cannot connect to Supabase.');
     }

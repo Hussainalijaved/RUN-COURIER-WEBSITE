@@ -46,7 +46,10 @@ function initDb() {
   }
   
   try {
-    pool = new Pool({ connectionString });
+    pool = new Pool({ 
+      connectionString,
+      ssl: { rejectUnauthorized: false }
+    });
     dbInstance = drizzle(pool, { schema });
     console.log('[DB] Database connection initialized');
     return dbInstance;

@@ -275,7 +275,11 @@ export async function getApiPool() {
     if (!connStr.includes('sslmode=')) {
       connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
     }
-    return new Pool({ connectionString: connStr, max: 3 });
+    return new Pool({ 
+      connectionString: connStr,
+      max: 3,
+      ssl: { rejectUnauthorized: false }
+    });
   }
 
   // Fallback to individual vars if needed, but throw error if both are missing
