@@ -265,9 +265,20 @@ export function requireApiPermission(permission: ApiPermission) {
   };
 }
 
-/** Shared Neon/PG pool factory for API-integration tables */
+/** Shared Neon/PG/Supabase pool factory for API-integration tables */
 export async function getApiPool() {
   const { Pool } = await import('pg');
+  
+  // Use connection string if available
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
+    let connStr = process.env.DATABASE_URL;
+    if (!connStr.includes('sslmode=')) {
+      connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
+    }
+    return new Pool({ connectionString: connStr, max: 3 });
+  }
+
+  // Fallback to individual vars
   return new Pool({
     host: process.env.PGHOST,
     user: process.env.PGUSER,

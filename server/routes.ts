@@ -17202,6 +17202,16 @@ ON CONFLICT (type) DO NOTHING;
 
   async function getApiPool() {
     const { Pool } = await import('pg');
+    const connectionString = process.env.DATABASE_URL;
+    
+    if (connectionString && connectionString.startsWith('postgresql://')) {
+      let connStr = connectionString;
+      if (!connStr.includes('sslmode=')) {
+        connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
+      }
+      return new Pool({ connectionString: connStr, max: 3 });
+    }
+
     return new Pool({
       host: process.env.PGHOST,
       user: process.env.PGUSER,
@@ -18408,11 +18418,21 @@ ON CONFLICT (type) DO NOTHING;
     const { supabaseAdmin: sb } = await import('./supabaseAdmin');
     const { randomUUID } = await import('crypto');
     const { Pool } = await import('pg');
-    const pool = new Pool({
-      host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
-      database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
-      ssl: { rejectUnauthorized: false }, max: 3,
-    });
+    const connectionString = process.env.DATABASE_URL;
+    let pool;
+    if (connectionString && connectionString.startsWith('postgresql://')) {
+      let connStr = connectionString;
+      if (!connStr.includes('sslmode=')) {
+        connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
+      }
+      pool = new Pool({ connectionString: connStr, max: 3 });
+    } else {
+      pool = new Pool({
+        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false }, max: 3,
+      });
+    }
 
     try {
       const { delivery_method, target_type, target_user_id, notification_type, title, message } = req.body;
@@ -18563,11 +18583,21 @@ ON CONFLICT (type) DO NOTHING;
   // GET /api/admin/notifications — notification log with filters
   app.get('/api/admin/notifications', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const { Pool } = await import('pg');
-    const pool = new Pool({
-      host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
-      database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
-      ssl: { rejectUnauthorized: false }, max: 3,
-    });
+    const connectionString = process.env.DATABASE_URL;
+    let pool;
+    if (connectionString && connectionString.startsWith('postgresql://')) {
+      let connStr = connectionString;
+      if (!connStr.includes('sslmode=')) {
+        connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
+      }
+      pool = new Pool({ connectionString: connStr, max: 3 });
+    } else {
+      pool = new Pool({
+        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
+        ssl: { rejectUnauthorized: false }, max: 3,
+      });
+    }
     try {
       const { from, to, target_type, notification_type, sender_role, search, page = '1', limit: lim = '25' } = req.query as Record<string, string>;
       const conditions: string[] = [];
