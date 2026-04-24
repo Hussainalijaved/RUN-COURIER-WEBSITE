@@ -4693,15 +4693,15 @@ export async function registerRoutes(
     }
     
     const existingPhotos = Array.isArray(job.podPhotos) ? [...job.podPhotos] : [];
-    const updatedPhotos = existingPhotos.filter(url => url !== photoUrl);
+    const updatedPhotos = existingPhotos.filter(url => url !== photoUrl && !photoUrl.includes(url));
     
     const newPodPhotoUrl = updatedPhotos.length > 0 ? updatedPhotos[updatedPhotos.length - 1] : null;
     
     const updatedJob = await storage.updateJobPOD(
       jobId,
-      newPodPhotoUrl || undefined,
-      job.podSignatureUrl || undefined,
-      job.podRecipientName || undefined,
+      newPodPhotoUrl,
+      job.podSignatureUrl,
+      job.podRecipientName,
       updatedPhotos
     );
     

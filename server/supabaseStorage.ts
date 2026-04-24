@@ -1359,11 +1359,11 @@ export class SupabaseStorage implements IStorage {
 
   async updateJobPOD(
     id: string, 
-    podPhotoUrl?: string, 
-    podSignatureUrl?: string, 
-    podRecipientName?: string,
-    podPhotos?: string[],
-    podNotes?: string
+    podPhotoUrl?: string | null, 
+    podSignatureUrl?: string | null, 
+    podRecipientName?: string | null,
+    podPhotos?: string[] | null,
+    podNotes?: string | null
   ): Promise<Job | undefined> {
     const updates: any = {};
     if (podPhotoUrl !== undefined) updates.podPhotoUrl = podPhotoUrl;
