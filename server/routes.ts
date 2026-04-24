@@ -908,32 +908,41 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
       let storagePath = path;
       let targetBucket = primaryBucket;
 
-      // If it's a full SUPABASE public URL
+      // If it's a full Supabase URL (public, signed, or authenticated)
       if (path.startsWith('http')) {
-        // Extract bucket and storage path from the Supabase public storage URL
-        const match = path.match(/\/storage\/v1\/object\/public\/([^\/]+)\/(.+)$/);
+        // Match /storage/v1/object/(public|sign|authenticated)/{bucket}/{storagePath}
+        const match = path.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^\/]+)\/(.+?)(?:\?.*)?$/);
         if (match) {
           targetBucket = match[1];
-          storagePath = match[2];
+          // Strip any query parameters (e.g. expired tokens) from the storage path
+          storagePath = match[2].split('?')[0];
         } else {
-          // It's some other completely generic external URL, return it
+          // It's some other completely generic external URL, return it as-is
           return path;
         }
       }
-      
-      try {
-        // Try the primary/target bucket first with a signed URL to bypass any RLS/private bucket issues
-        const { data, error } = await supabaseAdmin.storage.from(targetBucket).createSignedUrl(storagePath, 3600);
-        if (data?.signedUrl) return data.signedUrl;
-        
-        // Fallback to driver-documents if the previous attempt failed and we aren't already targeting it
-        if (targetBucket !== DOC_BUCKET) {
-           const { data: fallbackData } = await supabaseAdmin.storage.from(DOC_BUCKET).createSignedUrl(storagePath, 3600);
-           if (fallbackData?.signedUrl) return fallbackData.signedUrl;
-        }
-      } catch (err) {
-        console.warn(`[POD Resolver] Failed to resolve URL for path ${path}:`, err);
+
+      // Also strip any leftover query parameters from non-URL paths
+      if (storagePath.includes('?')) {
+        storagePath = storagePath.split('?')[0];
       }
+      
+      // Buckets to try: target bucket first, then known POD buckets, then driver-documents
+      const bucketsToTry = [targetBucket];
+      if (targetBucket !== 'pod') bucketsToTry.push('pod');
+      if (targetBucket !== POD_BUCKET) bucketsToTry.push(POD_BUCKET);
+      if (targetBucket !== DOC_BUCKET) bucketsToTry.push(DOC_BUCKET);
+
+      for (const bucket of bucketsToTry) {
+        try {
+          const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600);
+          if (data?.signedUrl) return data.signedUrl;
+        } catch (err) {
+          // Try next bucket
+        }
+      }
+
+      console.warn(`[POD Resolver] Could not resolve URL for path ${path} in any bucket`);
       return path;
     };
 
