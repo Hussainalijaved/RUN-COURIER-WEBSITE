@@ -74,6 +74,7 @@ function getPgPool(): Pool {
       if (!connString.includes('sslmode=')) {
         connString += connString.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
+      console.log('[PgPool] Initializing with SSL fix...');
       pgPool = new Pool({
         connectionString: connString,
         max: 3,

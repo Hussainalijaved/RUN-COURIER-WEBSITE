@@ -46,6 +46,7 @@ function initDb() {
   }
   
   try {
+    console.log('[DB] Initializing with SSL fix...');
     pool = new Pool({ 
       connectionString,
       ssl: { rejectUnauthorized: false }
