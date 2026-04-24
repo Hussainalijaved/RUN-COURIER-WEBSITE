@@ -79,15 +79,7 @@ function getPgPool(): Pool {
         max: 3,
       });
     } else {
-      pgPool = new Pool({
-        host: process.env.PGHOST,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false },
-        max: 3,
-      });
+      throw new Error('[getPgPool] DATABASE_URL is missing. Cannot connect to Supabase.');
     }
     
     // Handle idle-client errors (e.g. Neon serverless terminating connections with 57P01)
@@ -17212,15 +17204,7 @@ ON CONFLICT (type) DO NOTHING;
       return new Pool({ connectionString: connStr, max: 3 });
     }
 
-    return new Pool({
-      host: process.env.PGHOST,
-      user: process.env.PGUSER,
-      password: process.env.PGPASSWORD,
-      database: process.env.PGDATABASE,
-      port: parseInt(process.env.PGPORT || '5432'),
-      ssl: { rejectUnauthorized: false },
-      max: 3,
-    });
+    throw new Error('[getApiPool] DATABASE_URL is missing. Cannot connect to Supabase API tables.');
   }
 
   // ── PUBLIC: Submit API Integration Request form ───────────────────────────
@@ -18427,11 +18411,7 @@ ON CONFLICT (type) DO NOTHING;
       }
       pool = new Pool({ connectionString: connStr, max: 3 });
     } else {
-      pool = new Pool({
-        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false }, max: 3,
-      });
+      throw new Error('[Notifications] DATABASE_URL is missing. Cannot connect to Supabase.');
     }
 
     try {
@@ -18592,11 +18572,7 @@ ON CONFLICT (type) DO NOTHING;
       }
       pool = new Pool({ connectionString: connStr, max: 3 });
     } else {
-      pool = new Pool({
-        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false }, max: 3,
-      });
+      throw new Error('[Notifications List] DATABASE_URL is missing. Cannot connect to Supabase.');
     }
     try {
       const { from, to, target_type, notification_type, sender_role, search, page = '1', limit: lim = '25' } = req.query as Record<string, string>;

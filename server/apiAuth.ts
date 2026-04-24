@@ -278,7 +278,11 @@ export async function getApiPool() {
     return new Pool({ connectionString: connStr, max: 3 });
   }
 
-  // Fallback to individual vars
+  // Fallback to individual vars if needed, but throw error if both are missing
+  if (!process.env.PGHOST) {
+    throw new Error('[getApiPool] DATABASE_URL is missing and no fallback PGHOST provided.');
+  }
+
   return new Pool({
     host: process.env.PGHOST,
     user: process.env.PGUSER,
