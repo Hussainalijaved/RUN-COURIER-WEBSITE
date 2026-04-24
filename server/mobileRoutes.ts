@@ -178,6 +178,13 @@ async function uploadToSupabaseStorage(
   filename: string,
   contentType: string
 ): Promise<string | null> {
+  const bufferLength = buffer?.length || 0;
+  console.log(`[POD Upload] Starting upload for ${filename}, size: ${bufferLength} bytes, type: ${contentType}`);
+  
+  if (bufferLength === 0) {
+    console.warn(`[POD Upload] WARNING: Attempting to upload an empty (0-byte) file: ${filename}`);
+  }
+
   if (!supabaseAdmin) {
     console.error('[POD Upload] Supabase admin client not initialized');
     return null;
