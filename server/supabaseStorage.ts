@@ -2631,37 +2631,18 @@ export class SupabaseStorage implements IStorage {
   }
 
   private _contractsPool: any = null;
-
-  private async getContractsPool() {
-    if (this._contractsPool) return this._contractsPool;
-    const pgModule = await import('pg');
-    let connStr = '';
-    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
-      connStr = process.env.DATABASE_URL;
-    } else if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
-      const host = process.env.PGHOST;
-      const port = process.env.PGPORT || '5432';
-      const user = process.env.PGUSER;
-      const password = process.env.PGPASSWORD;
-      const database = process.env.PGDATABASE;
-      connStr = `postgresql://${user}:${password}@${host}:${port}/${database}`;
-    }
-    if (!connStr.includes('sslmode=')) {
-      connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
-    }
-    this._contractsPool = new pgModule.Pool({ connectionString: connStr, max: 3 });
-    return this._contractsPool;
-  }
-
-  private async pgQuery(text: string, params: any[] = []): Promise<any[]> {
-    const pool = await this.getContractsPool();
-    const result = await pool.query(text, params);
-    return result.rows;
-  }
+  // Note: PostgreSQL pool methods removed as migration to Supabase API is complete.
 
   async getContractTemplates(): Promise<any[]> {
     try {
-      return await this.pgQuery('SELECT * FROM contract_templates ORDER BY created_at DESC');
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('contract_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
     } catch (e: any) {
       console.error('[Contracts] getContractTemplates error:', e.message);
       return [];
@@ -2670,8 +2651,15 @@ export class SupabaseStorage implements IStorage {
 
   async getContractTemplate(id: string): Promise<any | undefined> {
     try {
-      const rows = await this.pgQuery('SELECT * FROM contract_templates WHERE id = $1', [id]);
-      return rows[0] || undefined;
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('contract_templates')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return data || undefined;
     } catch (e: any) {
       console.error('[Contracts] getContractTemplate error:', e.message);
       return undefined;
@@ -2679,30 +2667,43 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createContractTemplate(templateData: { title: string; content: string }): Promise<any> {
-    const rows = await this.pgQuery(
-      'INSERT INTO contract_templates (title, content) VALUES ($1, $2) RETURNING *',
-      [templateData.title, templateData.content]
-    );
-    return rows[0];
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase
+      .from('contract_templates')
+      .insert({ title: templateData.title, content: templateData.content })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async updateContractTemplate(id: string, templateData: { title?: string; content?: string }): Promise<any | undefined> {
-    const sets: string[] = ['updated_at = NOW()'];
-    const params: any[] = [];
-    let paramIdx = 1;
-    if (templateData.title !== undefined) { sets.push(`title = $${paramIdx++}`); params.push(templateData.title); }
-    if (templateData.content !== undefined) { sets.push(`content = $${paramIdx++}`); params.push(templateData.content); }
-    params.push(id);
-    const rows = await this.pgQuery(
-      `UPDATE contract_templates SET ${sets.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
-      params
-    );
-    return rows[0] || undefined;
+    const supabase = this.checkSupabase();
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (templateData.title !== undefined) updateData.title = templateData.title;
+    if (templateData.content !== undefined) updateData.content = templateData.content;
+    
+    const { data, error } = await supabase
+      .from('contract_templates')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data || undefined;
   }
 
   async deleteContractTemplate(id: string): Promise<boolean> {
     try {
-      await this.pgQuery('DELETE FROM contract_templates WHERE id = $1', [id]);
+      const supabase = this.checkSupabase();
+      const { error } = await supabase
+        .from('contract_templates')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
       return true;
     } catch {
       return false;
@@ -2711,14 +2712,16 @@ export class SupabaseStorage implements IStorage {
 
   async getDriverContracts(filters?: { driverId?: string; status?: string; templateId?: string }): Promise<any[]> {
     try {
-      const conditions: string[] = [];
-      const params: any[] = [];
-      let paramIdx = 1;
-      if (filters?.driverId) { conditions.push(`driver_id = $${paramIdx++}`); params.push(filters.driverId); }
-      if (filters?.status) { conditions.push(`status = $${paramIdx++}`); params.push(filters.status); }
-      if (filters?.templateId) { conditions.push(`template_id = $${paramIdx++}`); params.push(filters.templateId); }
-      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
-      return await this.pgQuery(`SELECT * FROM driver_contracts${where} ORDER BY created_at DESC`, params);
+      const supabase = this.checkSupabase();
+      let query = supabase.from('driver_contracts').select('*');
+      
+      if (filters?.driverId) query = query.eq('driver_id', filters.driverId);
+      if (filters?.status) query = query.eq('status', filters.status);
+      if (filters?.templateId) query = query.eq('template_id', filters.templateId);
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     } catch (e: any) {
       console.error('[Contracts] getDriverContracts error:', e.message);
       return [];
@@ -2727,8 +2730,15 @@ export class SupabaseStorage implements IStorage {
 
   async getDriverContract(id: string): Promise<any | undefined> {
     try {
-      const rows = await this.pgQuery('SELECT * FROM driver_contracts WHERE id = $1', [id]);
-      return rows[0] || undefined;
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('driver_contracts')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return data || undefined;
     } catch (e: any) {
       console.error('[Contracts] getDriverContract error:', e.message);
       return undefined;
@@ -2737,8 +2747,15 @@ export class SupabaseStorage implements IStorage {
 
   async getDriverContractByToken(token: string): Promise<any | undefined> {
     try {
-      const rows = await this.pgQuery('SELECT * FROM driver_contracts WHERE token = $1', [token]);
-      return rows[0] || undefined;
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('driver_contracts')
+        .select('*')
+        .eq('token', token)
+        .single();
+      
+      if (error) throw error;
+      return data || undefined;
     } catch (e: any) {
       console.error('[Contracts] getDriverContractByToken error:', e.message);
       return undefined;
@@ -2746,55 +2763,71 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createDriverContract(contractData: { templateId: string; driverId: string; driverName: string; driverEmail?: string; contractContent: string; token: string; status: string; sentAt?: string }): Promise<any> {
-    const rows = await this.pgQuery(
-      `INSERT INTO driver_contracts (template_id, driver_id, driver_name, driver_email, contract_content, token, status, sent_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [
-        contractData.templateId,
-        contractData.driverId,
-        contractData.driverName,
-        contractData.driverEmail || null,
-        contractData.contractContent,
-        contractData.token,
-        contractData.status,
-        contractData.sentAt || null,
-      ]
-    );
-    return rows[0];
+    const supabase = this.checkSupabase();
+    const { data, error } = await supabase
+      .from('driver_contracts')
+      .insert({
+        template_id: contractData.templateId,
+        driver_id: contractData.driverId,
+        driver_name: contractData.driverName,
+        driver_email: contractData.driverEmail || null,
+        contract_content: contractData.contractContent,
+        token: contractData.token,
+        status: contractData.status,
+        sent_at: contractData.sentAt || null,
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async updateDriverContract(id: string, updateData: Partial<any>): Promise<any | undefined> {
-    const sets: string[] = [];
-    const params: any[] = [];
-    let paramIdx = 1;
-    if (updateData.status !== undefined) { sets.push(`status = $${paramIdx++}`); params.push(updateData.status); }
-    if (updateData.signed_at !== undefined) { sets.push(`signed_at = $${paramIdx++}`); params.push(updateData.signed_at); }
-    if (updateData.signature_data !== undefined) { sets.push(`signature_data = $${paramIdx++}`); params.push(updateData.signature_data); }
-    if (updateData.signed_name !== undefined) { sets.push(`signed_name = $${paramIdx++}`); params.push(updateData.signed_name); }
-    if (updateData.sent_at !== undefined) { sets.push(`sent_at = $${paramIdx++}`); params.push(updateData.sent_at); }
-    if (sets.length === 0) return undefined;
-    params.push(id);
-    const rows = await this.pgQuery(
-      `UPDATE driver_contracts SET ${sets.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
-      params
-    );
-    return rows[0] || undefined;
+    const supabase = this.checkSupabase();
+    const dbData: any = {};
+    if (updateData.status !== undefined) dbData.status = updateData.status;
+    if (updateData.signed_at !== undefined) dbData.signed_at = updateData.signed_at;
+    if (updateData.signature_data !== undefined) dbData.signature_data = updateData.signature_data;
+    if (updateData.signed_name !== undefined) dbData.signed_name = updateData.signed_name;
+    if (updateData.sent_at !== undefined) dbData.sent_at = updateData.sent_at;
+    
+    const { data, error } = await supabase
+      .from('driver_contracts')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data || undefined;
   }
 
   async deleteDriverContract(id: string): Promise<boolean> {
     try {
-      await this.pgQuery('DELETE FROM driver_contracts WHERE id = $1', [id]);
+      const supabase = this.checkSupabase();
+      const { error } = await supabase
+        .from('driver_contracts')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
       return true;
-    } catch (e: any) {
-      console.error('[Contracts] deleteDriverContract error:', e.message);
+    } catch {
       return false;
     }
   }
 
   async getAllNoticeRecipientDriverIds(): Promise<string[]> {
     try {
-      const rows = await this.pgQuery('SELECT DISTINCT driver_id FROM driver_notice_recipients');
-      return rows.map((r: any) => r.driver_id);
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('driver_notice_recipients')
+        .select('driver_id');
+      
+      if (error) throw error;
+      // Get unique driver IDs
+      return [...new Set(data.map((r: any) => r.driver_id))];
     } catch (e: any) {
       console.error('[Notices] getAllNoticeRecipientDriverIds error:', e.message);
       return [];
@@ -2803,13 +2836,15 @@ export class SupabaseStorage implements IStorage {
 
   async getNoticeTemplates(filters?: { category?: string; isActive?: boolean }): Promise<any[]> {
     try {
-      const conditions: string[] = [];
-      const params: any[] = [];
-      let idx = 1;
-      if (filters?.category) { conditions.push(`category = $${idx++}`); params.push(filters.category); }
-      if (filters?.isActive !== undefined) { conditions.push(`is_active = $${idx++}`); params.push(filters.isActive); }
-      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
-      return await this.pgQuery(`SELECT * FROM notice_templates${where} ORDER BY created_at DESC`, params);
+      const supabase = this.checkSupabase();
+      let query = supabase.from('notice_templates').select('*');
+      
+      if (filters?.category) query = query.eq('category', filters.category);
+      if (filters?.isActive !== undefined) query = query.eq('is_active', filters.isActive);
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     } catch (e: any) {
       console.error('[Notices] getNoticeTemplates error:', e.message);
       return [];
@@ -2818,8 +2853,15 @@ export class SupabaseStorage implements IStorage {
 
   async getNoticeTemplate(id: string): Promise<any | undefined> {
     try {
-      const rows = await this.pgQuery('SELECT * FROM notice_templates WHERE id = $1', [id]);
-      return rows[0] || undefined;
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('notice_templates')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return data || undefined;
     } catch (e: any) {
       console.error('[Notices] getNoticeTemplate error:', e.message);
       return undefined;
@@ -2827,42 +2869,69 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createNoticeTemplate(data: { title: string; subject: string; message: string; category: string; requires_acknowledgement: boolean; created_by?: string }): Promise<any> {
-    const rows = await this.pgQuery(
-      'INSERT INTO notice_templates (title, subject, message, category, requires_acknowledgement, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [data.title, data.subject, data.message, data.category, data.requires_acknowledgement, data.created_by || null]
-    );
-    return rows[0];
+    const supabase = this.checkSupabase();
+    const { data: inserted, error } = await supabase
+      .from('notice_templates')
+      .insert({
+        title: data.title,
+        subject: data.subject,
+        message: data.message,
+        category: data.category,
+        requires_acknowledgement: data.requires_acknowledgement,
+        created_by: data.created_by || null
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return inserted;
   }
 
   async updateNoticeTemplate(id: string, data: Partial<any>): Promise<any | undefined> {
-    const sets: string[] = ['updated_at = NOW()'];
-    const params: any[] = [];
-    let idx = 1;
-    if (data.title !== undefined) { sets.push(`title = $${idx++}`); params.push(data.title); }
-    if (data.subject !== undefined) { sets.push(`subject = $${idx++}`); params.push(data.subject); }
-    if (data.message !== undefined) { sets.push(`message = $${idx++}`); params.push(data.message); }
-    if (data.category !== undefined) { sets.push(`category = $${idx++}`); params.push(data.category); }
-    if (data.requires_acknowledgement !== undefined) { sets.push(`requires_acknowledgement = $${idx++}`); params.push(data.requires_acknowledgement); }
-    if (data.is_active !== undefined) { sets.push(`is_active = $${idx++}`); params.push(data.is_active); }
-    params.push(id);
-    const rows = await this.pgQuery(
-      `UPDATE notice_templates SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
-      params
-    );
-    return rows[0] || undefined;
+    const supabase = this.checkSupabase();
+    const dbData: any = { updated_at: new Date().toISOString() };
+    if (data.title !== undefined) dbData.title = data.title;
+    if (data.subject !== undefined) dbData.subject = data.subject;
+    if (data.message !== undefined) dbData.message = data.message;
+    if (data.category !== undefined) dbData.category = data.category;
+    if (data.requires_acknowledgement !== undefined) dbData.requires_acknowledgement = data.requires_acknowledgement;
+    if (data.is_active !== undefined) dbData.is_active = data.is_active;
+    
+    const { data: updated, error } = await supabase
+      .from('notice_templates')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return updated || undefined;
   }
 
   async deleteNoticeTemplate(id: string): Promise<boolean> {
     try {
-      await this.pgQuery('DELETE FROM notice_templates WHERE id = $1', [id]);
+      const supabase = this.checkSupabase();
+      const { error } = await supabase
+        .from('notice_templates')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
       return true;
     } catch { return false; }
   }
 
   async deleteDriverNotice(id: string): Promise<boolean> {
     try {
-      await this.pgQuery('DELETE FROM driver_notice_recipients WHERE notice_id = $1', [id]);
-      await this.pgQuery('DELETE FROM driver_notices WHERE id = $1', [id]);
+      const supabase = this.checkSupabase();
+      // Notice recipients have ON DELETE CASCADE usually, but if not we delete manually
+      await supabase.from('driver_notice_recipients').delete().eq('notice_id', id);
+      const { error } = await supabase
+        .from('driver_notices')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
       return true;
     } catch (e: any) {
       console.error('[Notices] deleteDriverNotice error:', e.message);
@@ -2872,20 +2941,32 @@ export class SupabaseStorage implements IStorage {
 
   async getDriverNotices(filters?: { status?: string }): Promise<any[]> {
     try {
-      const conditions: string[] = [];
-      const params: any[] = [];
-      let idx = 1;
-      if (filters?.status) { conditions.push(`status = $${idx++}`); params.push(filters.status); }
-      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
-      const notices = await this.pgQuery(`SELECT * FROM driver_notices${where} ORDER BY sent_at DESC NULLS LAST, id DESC`, params);
+      const supabase = this.checkSupabase();
+      let query = supabase.from('driver_notices').select('*');
+      
+      if (filters?.status) query = query.eq('status', filters.status);
+      
+      const { data: notices, error } = await query.order('sent_at', { ascending: false, nullsFirst: false });
+      if (error) throw error;
+      
+      if (!notices) return [];
+
       for (const notice of notices) {
-        const stats = await this.pgQuery(
-          `SELECT COUNT(*) as total, COUNT(viewed_at) as viewed, COUNT(acknowledged_at) as acknowledged FROM driver_notice_recipients WHERE notice_id = $1`,
-          [notice.id]
-        );
-        notice.recipient_count = parseInt(stats[0]?.total || '0');
-        notice.viewed_count = parseInt(stats[0]?.viewed || '0');
-        notice.acknowledged_count = parseInt(stats[0]?.acknowledged || '0');
+        // Fetch recipient stats
+        const { data: stats, error: statsError } = await supabase
+          .from('driver_notice_recipients')
+          .select('viewed_at, acknowledged_at', { count: 'exact' })
+          .eq('notice_id', notice.id);
+        
+        if (!statsError && stats) {
+          notice.recipient_count = stats.length;
+          notice.viewed_count = stats.filter(s => s.viewed_at).length;
+          notice.acknowledged_count = stats.filter(s => s.acknowledged_at).length;
+        } else {
+          notice.recipient_count = 0;
+          notice.viewed_count = 0;
+          notice.acknowledged_count = 0;
+        }
       }
       return notices;
     } catch (e: any) {
@@ -2896,16 +2977,27 @@ export class SupabaseStorage implements IStorage {
 
   async getDriverNotice(id: string): Promise<any | undefined> {
     try {
-      const rows = await this.pgQuery('SELECT * FROM driver_notices WHERE id = $1', [id]);
-      if (!rows[0]) return undefined;
-      const notice = rows[0];
-      const stats = await this.pgQuery(
-        `SELECT COUNT(*) as total, COUNT(viewed_at) as viewed, COUNT(acknowledged_at) as acknowledged FROM driver_notice_recipients WHERE notice_id = $1`,
-        [id]
-      );
-      notice.recipient_count = parseInt(stats[0]?.total || '0');
-      notice.viewed_count = parseInt(stats[0]?.viewed || '0');
-      notice.acknowledged_count = parseInt(stats[0]?.acknowledged || '0');
+      const supabase = this.checkSupabase();
+      const { data: notice, error } = await supabase
+        .from('driver_notices')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      if (!notice) return undefined;
+
+      const { data: stats, error: statsError } = await supabase
+        .from('driver_notice_recipients')
+        .select('viewed_at, acknowledged_at')
+        .eq('notice_id', id);
+
+      if (!statsError && stats) {
+        notice.recipient_count = stats.length;
+        notice.viewed_count = stats.filter(s => s.viewed_at).length;
+        notice.acknowledged_count = stats.filter(s => s.acknowledged_at).length;
+      }
+
       return notice;
     } catch (e: any) {
       console.error('[Notices] getDriverNotice error:', e.message);
@@ -2914,32 +3006,58 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createDriverNotice(data: { template_id?: string; title: string; subject: string; message: string; category: string; sent_by?: string; sent_at?: string; target_type: string; requires_acknowledgement: boolean; status: string }): Promise<any> {
-    const rows = await this.pgQuery(
-      `INSERT INTO driver_notices (template_id, title, subject, message, category, sent_by, sent_at, target_type, requires_acknowledgement, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [data.template_id || null, data.title, data.subject, data.message, data.category, data.sent_by || null, data.sent_at || null, data.target_type, data.requires_acknowledgement, data.status]
-    );
-    return rows[0];
+    const supabase = this.checkSupabase();
+    const { data: inserted, error } = await supabase
+      .from('driver_notices')
+      .insert({
+        template_id: data.template_id || null,
+        title: data.title,
+        subject: data.subject,
+        message: data.message,
+        category: data.category,
+        sent_by: data.sent_by || null,
+        sent_at: data.sent_at || null,
+        target_type: data.target_type,
+        requires_acknowledgement: data.requires_acknowledgement,
+        status: data.status
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return inserted;
   }
 
   async updateDriverNotice(id: string, data: Partial<any>): Promise<any | undefined> {
-    const sets: string[] = [];
-    const params: any[] = [];
-    let idx = 1;
-    if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
-    if (data.sent_at !== undefined) { sets.push(`sent_at = $${idx++}`); params.push(data.sent_at); }
-    if (sets.length === 0) return undefined;
-    params.push(id);
-    const rows = await this.pgQuery(
-      `UPDATE driver_notices SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
-      params
-    );
-    return rows[0] || undefined;
+    const supabase = this.checkSupabase();
+    const dbData: any = {};
+    if (data.status !== undefined) dbData.status = data.status;
+    if (data.sent_at !== undefined) dbData.sent_at = data.sent_at;
+    
+    if (Object.keys(dbData).length === 0) return undefined;
+    
+    const { data: updated, error } = await supabase
+      .from('driver_notices')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return updated || undefined;
   }
 
   async getNoticeRecipients(noticeId: string): Promise<any[]> {
     try {
-      return await this.pgQuery('SELECT * FROM driver_notice_recipients WHERE notice_id = $1 ORDER BY sent_at DESC', [noticeId]);
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('driver_notice_recipients')
+        .select('*')
+        .eq('notice_id', noticeId)
+        .order('sent_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
     } catch (e: any) {
       console.error('[Notices] getNoticeRecipients error:', e.message);
       return [];
@@ -2947,40 +3065,79 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createNoticeRecipient(data: { notice_id: string; driver_id: string; driver_email?: string; delivery_channel: string }): Promise<any> {
-    const rows = await this.pgQuery(
-      'INSERT INTO driver_notice_recipients (notice_id, driver_id, driver_email, delivery_channel) VALUES ($1, $2, $3, $4) RETURNING *',
-      [data.notice_id, data.driver_id, data.driver_email || null, data.delivery_channel]
-    );
-    return rows[0];
+    const supabase = this.checkSupabase();
+    const { data: inserted, error } = await supabase
+      .from('driver_notice_recipients')
+      .insert({
+        notice_id: data.notice_id,
+        driver_id: data.driver_id,
+        driver_email: data.driver_email || null,
+        delivery_channel: data.delivery_channel
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return inserted;
   }
 
   async updateNoticeRecipient(id: string, data: Partial<any>): Promise<any | undefined> {
-    const sets: string[] = [];
-    const params: any[] = [];
-    let idx = 1;
-    if (data.viewed_at !== undefined) { sets.push(`viewed_at = $${idx++}`); params.push(data.viewed_at); }
-    if (data.acknowledged_at !== undefined) { sets.push(`acknowledged_at = $${idx++}`); params.push(data.acknowledged_at); }
-    if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
-    if (sets.length === 0) return undefined;
-    params.push(id);
-    const rows = await this.pgQuery(
-      `UPDATE driver_notice_recipients SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
-      params
-    );
-    return rows[0] || undefined;
+    const supabase = this.checkSupabase();
+    const dbData: any = {};
+    if (data.viewed_at !== undefined) dbData.viewed_at = data.viewed_at;
+    if (data.acknowledged_at !== undefined) dbData.acknowledged_at = data.acknowledged_at;
+    if (data.status !== undefined) dbData.status = data.status;
+    
+    if (Object.keys(dbData).length === 0) return undefined;
+    
+    const { data: updated, error } = await supabase
+      .from('driver_notice_recipients')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return updated || undefined;
   }
 
   async getDriverNoticeRecipients(driverId: string): Promise<any[]> {
     try {
-      return await this.pgQuery(
-        `SELECT r.*, n.title, n.subject, n.message, n.category, n.requires_acknowledgement,
-                n.sent_by, n.sent_at as notice_sent_at, n.status as notice_status
-         FROM driver_notice_recipients r
-         JOIN driver_notices n ON r.notice_id = n.id
-         WHERE r.driver_id = $1 AND n.status != 'draft'
-         ORDER BY r.sent_at DESC`,
-        [driverId]
-      );
+      const supabase = this.checkSupabase();
+      // Complex join: select from recipients and join with notices
+      const { data, error } = await supabase
+        .from('driver_notice_recipients')
+        .select(`
+          *,
+          notice:notice_id (
+            title,
+            subject,
+            message,
+            category,
+            requires_acknowledgement,
+            sent_by,
+            sent_at,
+            status
+          )
+        `)
+        .eq('driver_id', driverId)
+        .neq('notice.status', 'draft')
+        .order('sent_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Flatten the result to match the expected format (where notice fields are at top level)
+      return (data || []).map((r: any) => ({
+        ...r,
+        title: r.notice?.title,
+        subject: r.notice?.subject,
+        message: r.notice?.message,
+        category: r.notice?.category,
+        requires_acknowledgement: r.notice?.requires_acknowledgement,
+        sent_by: r.notice?.sent_by,
+        notice_sent_at: r.notice?.sent_at,
+        notice_status: r.notice?.status
+      }));
     } catch (e: any) {
       console.error('[Notices] getDriverNoticeRecipients error:', e.message);
       return [];
@@ -2989,11 +3146,16 @@ export class SupabaseStorage implements IStorage {
 
   async deleteNoticeRecipient(id: string, driverId: string): Promise<boolean> {
     try {
-      const rows = await this.pgQuery(
-        'DELETE FROM driver_notice_recipients WHERE id = $1 AND driver_id = $2 RETURNING id',
-        [id, driverId]
-      );
-      return rows.length > 0;
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('driver_notice_recipients')
+        .delete()
+        .eq('id', id)
+        .eq('driver_id', driverId)
+        .select('id');
+      
+      if (error) throw error;
+      return (data?.length || 0) > 0;
     } catch (e: any) {
       console.error('[Notices] deleteNoticeRecipient error:', e.message);
       return false;
@@ -3002,11 +3164,16 @@ export class SupabaseStorage implements IStorage {
 
   async getDriverNoticeRecipient(noticeId: string, driverId: string): Promise<any | undefined> {
     try {
-      const rows = await this.pgQuery(
-        'SELECT * FROM driver_notice_recipients WHERE notice_id = $1 AND driver_id = $2',
-        [noticeId, driverId]
-      );
-      return rows[0] || undefined;
+      const supabase = this.checkSupabase();
+      const { data, error } = await supabase
+        .from('driver_notice_recipients')
+        .select('*')
+        .eq('notice_id', noticeId)
+        .eq('driver_id', driverId)
+        .single();
+      
+      if (error) throw error;
+      return data || undefined;
     } catch (e: any) {
       console.error('[Notices] getDriverNoticeRecipient error:', e.message);
       return undefined;
