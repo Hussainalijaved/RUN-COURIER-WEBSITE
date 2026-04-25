@@ -931,8 +931,9 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
         try {
           const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600);
           if (data?.signedUrl) return data.signedUrl;
-        } catch (err) {
-          // Try next bucket
+          if (error) console.error(`[POD Resolver] createSignedUrl error for bucket ${bucket}:`, error.message);
+        } catch (err: any) {
+          console.error(`[POD Resolver] Exception for bucket ${bucket}:`, err.message || err);
         }
       }
 
