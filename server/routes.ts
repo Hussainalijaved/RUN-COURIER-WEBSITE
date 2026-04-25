@@ -69,26 +69,37 @@ async function generateUniqueDriverCode(supabaseAdmin: any): Promise<string> {
 let pgPool: Pool | null = null;
 function getPgPool(): Pool {
   if (!pgPool) {
-    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
-      let connString = process.env.DATABASE_URL;
+    let connString = process.env.DATABASE_URL;
+    
+    // Fallback to individual PG variables if DATABASE_URL is missing or local
+    if (!connString || connString.includes('localhost') || connString.includes('127.0.0.1')) {
+      if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
+        const port = process.env.PGPORT || '5432';
+        connString = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${port}/${process.env.PGDATABASE}`;
+        console.log(`[PgPool] Using individual PG variables for connectivity to ${process.env.PGHOST}`);
+      }
+    }
+
+    if (connString && connString.startsWith('postgresql://')) {
       if (!connString.includes('sslmode=')) {
         connString += connString.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
-      console.log('[PgPool] Initializing with SSL fix...');
+      console.log(`[PgPool] Initializing connection to ${connString.split('@')[1] || 'database'}...`);
       pgPool = new Pool({
         connectionString: connString,
         max: 3,
         ssl: { rejectUnauthorized: false },
       });
     } else {
-      throw new Error('[getPgPool] DATABASE_URL is missing. Cannot connect to Supabase.');
+      console.error('[getPgPool] No valid database configuration found (DATABASE_URL or PG* variables)');
+      throw new Error('[getPgPool] Database configuration missing.');
     }
     
-    // Handle idle-client errors (e.g. Neon serverless terminating connections with 57P01)
-    // Without this handler Node.js throws an uncaught error and crashes the process
     pgPool.on('error', (err: Error) => {
-      console.warn('[PgPool] Idle client error (non-fatal):', err.message);
-      // Null the singleton so the next call recreates the pool with a fresh connection
+      console.warn('[PgPool] Idle client error:', err.message);
+      if (err.message.includes('authentication failed')) {
+        console.error('[PgPool] CRITICAL: Database authentication failed. Check PGUSER/PGPASSWORD.');
+      }
       pgPool = null;
     });
   }
@@ -2880,7 +2891,7 @@ export async function registerRoutes(
     const timestamp = Date.now();
     const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `stop_${stopId}_${timestamp}${ext}`;
-    const BUCKET = 'driver-documents';
+    const BUCKET = 'pod-images';
     const storagePath = `pod/${jobId}/${finalFilename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     const fileBuffer = req.file.buffer;
@@ -3269,7 +3280,7 @@ export async function registerRoutes(
     const timestamp = Date.now();
     const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `stop_${stopId}_${timestamp}${ext}`;
-    const BUCKET = 'driver-documents';
+    const BUCKET = 'pod-images';
     const storagePath = `pod/${jobId}/${finalFilename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     const fileBuffer = req.file.buffer;
@@ -4598,7 +4609,7 @@ export async function registerRoutes(
     const timestamp = Date.now();
     const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `pod_${timestamp}${ext}`;
-    const BUCKET = 'driver-documents';
+    const BUCKET = 'pod-images';
     const storagePath = `pod/${jobId}/${finalFilename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     const fileBuffer = req.file.buffer;
@@ -4729,7 +4740,7 @@ export async function registerRoutes(
     const resolvedDeletePhotos = [...updatedPhotos];
     if (supabaseAdmin) {
       try {
-        const POD_BUCKET = 'driver-documents';
+        const POD_BUCKET = 'pod-images';
         if (resolvedPodPhotoUrl && !resolvedPodPhotoUrl.startsWith('http')) {
           const { data } = await supabaseAdmin.storage.from(POD_BUCKET).createSignedUrl(resolvedPodPhotoUrl, 3600);
           if (data?.signedUrl) resolvedPodPhotoUrl = data.signedUrl;
