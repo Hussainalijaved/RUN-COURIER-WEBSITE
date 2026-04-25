@@ -909,11 +909,14 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
         if (match) {
           targetBucket = match[1];
           // Strip any query parameters (e.g. expired tokens) from the storage path
-          storagePath = match[2].split('?')[0];
+          storagePath = decodeURIComponent(match[2].split('?')[0]);
         } else {
           // It's some other completely generic external URL, return it as-is
           return path;
         }
+      } else {
+        // Not an HTTP URL, just a raw path
+        storagePath = decodeURIComponent(storagePath);
       }
 
       // Also strip any leftover query parameters from non-URL paths

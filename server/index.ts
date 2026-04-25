@@ -4,6 +4,10 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { createServer } from "http";
 import fs from "fs";
+import dns from "dns";
+
+// Fix Node 17+ resolving IPv6 first when it shouldn't, causing ECONNREFUSED with Supabase PostGres and Fetch
+dns.setDefaultResultOrder("ipv4first");
 
 declare module "http" {
   interface IncomingMessage { rawBody: unknown; }
