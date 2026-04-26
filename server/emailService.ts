@@ -21,6 +21,9 @@ export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'sales@runcourier.com';
 export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'sales@runcourier.com';
 export const INFO_EMAIL = process.env.INFO_EMAIL || 'sales@runcourier.com';
 
+// VERIFIED SENDER - Must be from a domain verified in Resend (runcourier.co.uk)
+export const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL || 'Run Courier <info@send.runcourier.co.uk>';
+
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
   return `
@@ -94,7 +97,7 @@ async function getResendCredentials() {
     console.log('[Email] Using RESEND_API_KEY from environment');
     return {
       apiKey: process.env.RESEND_API_KEY,
-      fromEmail: process.env.RESEND_FROM_EMAIL || `RUN COURIER <${INFO_EMAIL}>`
+      fromEmail: SENDER_EMAIL
     };
   }
 
@@ -133,7 +136,7 @@ async function getResendCredentials() {
     console.log('[Email] Using Resend credentials from Replit connector');
     return {
       apiKey: connectionSettings.settings.api_key,
-      fromEmail: connectionSettings.settings.from_email || `RUN COURIER <${INFO_EMAIL}>`
+      fromEmail: connectionSettings.settings.from_email || SENDER_EMAIL
     };
   } catch (error) {
     console.error('[Email] Failed to fetch Resend credentials:', error);
@@ -265,7 +268,7 @@ export async function sendQuoteNotification(data: {
     `Quote Request: ${data.pickupPostcode} → ${data.deliveryPostcode} (£${data.totalPrice.toFixed(2)})`,
     htmlContent,
     textContent,
-    `RUN COURIER <${INFO_EMAIL}>`
+    SENDER_EMAIL
   );
 }
 
