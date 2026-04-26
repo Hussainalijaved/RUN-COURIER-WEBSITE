@@ -23,7 +23,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification, wrapEmailContent } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification, wrapEmailContent, ADMIN_EMAIL, INFO_EMAIL } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS, sendAdminNewBookingAlert } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
@@ -9421,7 +9421,7 @@ export async function registerRoutes(
                   <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
                 </div>`,
                 message,
-                'RUN COURIER <info@runcourier.co.uk>'
+                `RUN COURIER <${INFO_EMAIL}>`
               );
             } catch (emailErr: any) {
               console.warn(`[Notices] Failed to email ${driver.email}:`, emailErr.message);
@@ -9490,7 +9490,7 @@ export async function registerRoutes(
                 <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
               </div>`,
               notice.message,
-              'RUN COURIER <info@runcourier.co.uk>'
+              `RUN COURIER <${INFO_EMAIL}>`
             );
             sentCount++;
           } catch (e: any) { console.warn(`[Notices] Resend email failed for ${r.driver_email}`); }

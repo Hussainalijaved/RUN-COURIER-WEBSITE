@@ -16,6 +16,11 @@ const APP_STORE_URL = process.env.APP_STORE_URL || 'https://apps.apple.com/us/ap
 const GOOGLE_PLAY_BADGE_URL = 'https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png';
 const APP_STORE_BADGE_URL = 'https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83';
 
+// Primary notification emails - Centralized configuration
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'sales@runcourier.com';
+export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'sales@runcourier.com';
+export const INFO_EMAIL = process.env.INFO_EMAIL || 'sales@runcourier.com';
+
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
   return `
@@ -89,7 +94,7 @@ async function getResendCredentials() {
     console.log('[Email] Using RESEND_API_KEY from environment');
     return {
       apiKey: process.env.RESEND_API_KEY,
-      fromEmail: process.env.RESEND_FROM_EMAIL || 'RUN COURIER <info@runcourier.co.uk>'
+      fromEmail: process.env.RESEND_FROM_EMAIL || `RUN COURIER <${INFO_EMAIL}>`
     };
   }
 
@@ -128,7 +133,7 @@ async function getResendCredentials() {
     console.log('[Email] Using Resend credentials from Replit connector');
     return {
       apiKey: connectionSettings.settings.api_key,
-      fromEmail: connectionSettings.settings.from_email || 'RUN COURIER <info@runcourier.co.uk>'
+      fromEmail: connectionSettings.settings.from_email || `RUN COURIER <${INFO_EMAIL}>`
     };
   } catch (error) {
     console.error('[Email] Failed to fetch Resend credentials:', error);
@@ -191,7 +196,7 @@ export async function sendAdminNotification(
   htmlContent: string,
   textContent?: string
 ): Promise<boolean> {
-  return sendEmailNotification('info@runcourier.co.uk', subject, htmlContent, textContent);
+  return sendEmailNotification(ADMIN_EMAIL, subject, htmlContent, textContent);
 }
 
 export async function sendQuoteNotification(data: {
@@ -256,11 +261,11 @@ export async function sendQuoteNotification(data: {
   const textContent = `New Quote Request\nPickup: ${data.pickupPostcode}\nDelivery: ${data.deliveryPostcode}\nVehicle: ${vehicle}\n${data.weight && Number(data.weight) > 0 ? `Weight: ${data.weight}kg\n` : ''}Distance: ${data.distance.toFixed(1)} miles\nDate: ${dateStr} ${timeStr}\nService Level: ${serviceLevelDisplay}\nQuoted Price: £${data.totalPrice.toFixed(2)}`;
 
   return sendEmailNotification(
-    'info@runcourier.co.uk',
+    ADMIN_EMAIL,
     `Quote Request: ${data.pickupPostcode} → ${data.deliveryPostcode} (£${data.totalPrice.toFixed(2)})`,
     htmlContent,
     textContent,
-    'RUN COURIER <info@runcourier.co.uk>'
+    `RUN COURIER <${INFO_EMAIL}>`
   );
 }
 
@@ -871,7 +876,7 @@ export async function sendCustomerBookingConfirmation(customerEmail: string, job
       <p style="color: #333; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
       <p style="color: #333; margin: 0; font-size: 14px;">
         Call us: <a href="tel:+447311121217" style="color: #007BFF; font-weight: bold;">+44 7311 121 217</a><br>
-        Email: <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a>
+        Email: <a href="mailto:${INFO_EMAIL}" style="color: #007BFF;">${INFO_EMAIL}</a>
       </p>
     </div>
   `;
@@ -912,7 +917,7 @@ Payment Status: ${jobDetails.paymentStatus === 'paid' ? 'CONFIRMED' : jobDetails
 
 Track your delivery: ${BASE_URL}/track?ref=${jobDetails.trackingNumber}
 
-Need help? Call +44 7311 121 217 or email info@runcourier.co.uk
+Need help? Call +44 7311 121 217 or email ${INFO_EMAIL}
 
 Run Courier - Same Day Delivery Across the UK
 runcourier.co.uk`;
@@ -1073,12 +1078,12 @@ export async function sendInvoiceToCustomer(
       <p style="color: #333; margin-bottom: 10px; font-weight: bold;">Option 2: Pay by Card (Stripe)</p>
       <p style="color: #333; margin: 0;">Pay securely online via Stripe at <a href="https://runcourier.co.uk/pay" style="color: #0066cc; text-decoration: underline;">runcourier.co.uk/pay</a></p>
     </div>
-    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
+    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:${INFO_EMAIL}" style="color: #007BFF;">${INFO_EMAIL}</a></p>
     <p style="color: #333; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Invoice');
-  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}PAYMENT METHODS\n\nOption 1: Bank Transfer\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nOption 2: Pay by Card (Stripe)\nPay securely online at: https://runcourier.co.uk/pay\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  const textContent = `Invoice from Run Courier\n\nDear ${customerName},\n\nPlease find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nAmount Due: £${amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n\n${notes ? `Notes: ${notes}\n\n` : ''}PAYMENT METHODS\n\nOption 1: Bank Transfer\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nOption 2: Pay by Card (Stripe)\nPay securely online at: https://runcourier.co.uk/pay\n\nIf you have any questions, please contact us at ${INFO_EMAIL}\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
@@ -1268,7 +1273,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       </table>
     </div>
     
-    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
+    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a></p>
     <p style="color: #333; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
@@ -1279,7 +1284,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       `- ${job.trackingNumber}: ${job.pickupAddress.substring(0, 30)}... to ${job.deliveryAddress ? job.deliveryAddress.substring(0, 30) + '...' : job.recipientName || 'N/A'} (${job.scheduledDate}) - £${job.price.toFixed(2)}`
     ).join('\n')}\n` : '';
   
-  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\nPAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\nPAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at INFO_EMAIL\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
@@ -1321,12 +1326,12 @@ export async function sendPaymentReceivedConfirmation(
     </div>
     
     <p style="color: #333; font-size: 14px;">This email serves as your payment receipt. Please keep it for your records.</p>
-    <p style="color: #333; font-size: 14px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a></p>
+    <p style="color: #333; font-size: 14px;">If you have any questions, please contact us at <a href="mailto:${INFO_EMAIL}" style="color: #007BFF;">${INFO_EMAIL}</a></p>
     <p style="color: #333; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Payment Confirmation');
-  const textContent = `Payment Received - Thank You!\n\nDear ${customerName},\n\nWe have received your payment. Thank you for your business!\n\nPayment Details:\nInvoice Number: ${invoiceNumber}\nAmount Paid: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPayment Reference: ${paymentReference}\n\nThis email serves as your payment receipt. Please keep it for your records.\n\nIf you have any questions, please contact us at info@runcourier.co.uk\n\nThank you for choosing Run Courier.`;
+  const textContent = `Payment Received - Thank You!\n\nDear ${customerName},\n\nWe have received your payment. Thank you for your business!\n\nPayment Details:\nInvoice Number: ${invoiceNumber}\nAmount Paid: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPayment Reference: ${paymentReference}\n\nThis email serves as your payment receipt. Please keep it for your records.\n\nIf you have any questions, please contact us at ${INFO_EMAIL}\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Payment Received - Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
@@ -1572,11 +1577,11 @@ export async function sendApplicationCorrectionEmail(
       </div>
       <p style="color: #333;">Please visit <a href="https://runcourier.co.uk/apply" style="color: #007BFF;">runcourier.co.uk/apply</a> to resubmit your application with the required corrections.</p>
     </div>
-    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call +44 20 4634 6100.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a> or call +44 20 4634 6100.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Corrections Required');
-  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. After reviewing your submission, we need you to make some corrections.\n\nWhat needs to be fixed:\n${feedback}\n\nPlease visit runcourier.co.uk/apply to resubmit your application.\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. After reviewing your submission, we need you to make some corrections.\n\nWhat needs to be fixed:\n${feedback}\n\nPlease visit runcourier.co.uk/apply to resubmit your application.\n\nIf you have questions, contact INFO_EMAIL or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Application Corrections Required - Run Courier', htmlContent, textContent);
 }
@@ -1597,11 +1602,11 @@ export async function sendDocumentRequestEmail(
       </div>
       <p style="color: #333;">Please reply to this email with the requested documents, or contact us if you have any questions.</p>
     </div>
-    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a> or call +44 20 4634 6100.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a> or call +44 20 4634 6100.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Documents Required');
-  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. We need you to upload some additional documents before we can complete your review.\n\nMessage from our team:\n${message}\n\nPlease reply to this email with the requested documents, or contact us if you have any questions.\n\nIf you have questions, contact info@runcourier.co.uk or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. We need you to upload some additional documents before we can complete your review.\n\nMessage from our team:\n${message}\n\nPlease reply to this email with the requested documents, or contact us if you have any questions.\n\nIf you have questions, contact INFO_EMAIL or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Documents Required - Run Courier', htmlContent, textContent);
 }
@@ -1649,7 +1654,7 @@ export async function sendContactFormSubmission(
   const htmlContent = wrapEmailContent(content, 'Contact Form');
   const textContent = `New Contact Form Submission\n\nName: ${name}\nEmail: ${email}\n${phone ? `Phone: ${phone}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`;
 
-  return sendEmailNotification('support@runcourier.co.uk', `Contact Form: ${subject}`, htmlContent, textContent);
+  return sendEmailNotification(SUPPORT_EMAIL, `Contact Form: ${subject}`, htmlContent, textContent);
 }
 
 export interface PaymentLinkEmailData {
@@ -1965,7 +1970,7 @@ Please contact the customer manually or resend the link from the admin panel.
 
 Run Courier - https://runcourier.co.uk`;
 
-  return sendEmailNotification('info@runcourier.co.uk', `Payment Link Email Failed - ${data.trackingNumber}`, htmlContent, textContent);
+  return sendEmailNotification(ADMIN_EMAIL, `Payment Link Email Failed - ${data.trackingNumber}`, htmlContent, textContent);
 }
 
 export async function sendBusinessQuoteEmail(
@@ -2143,7 +2148,7 @@ export async function sendBusinessQuoteEmail(
       <a href="tel:+442046346100" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block; margin: 5px;">
         Call Now
       </a>
-      <a href="mailto:info@runcourier.co.uk?subject=Business%20Quote%20-%20${data.companyName || 'Enquiry'}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block; margin: 5px;">
+      <a href="mailto:${INFO_EMAIL}?subject=Business%20Quote%20-%20${data.companyName || 'Enquiry'}" style="background-color: #007BFF; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block; margin: 5px;">
         Email Us
       </a>
     </div>
@@ -2190,7 +2195,7 @@ ${data.notes ? `NOTES: ${data.notes}` : ''}
 
 Ready to book? Contact us to confirm your delivery:
 - Phone: +44 20 4634 6100
-- Email: info@runcourier.co.uk
+- Email: ${INFO_EMAIL}
 
 This quote is valid for 7 days. Prices may vary based on actual pickup time and conditions.
 
@@ -2503,7 +2508,7 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
       <p style="color: #333; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
       <p style="color: #333; margin: 0; font-size: 14px;">
         Call us: <a href="tel:+447311121217" style="color: #007BFF; font-weight: bold;">+44 7311 121 217</a><br>
-        Email: <a href="mailto:info@runcourier.co.uk" style="color: #007BFF;">info@runcourier.co.uk</a>
+        Email: <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a>
       </p>
     </div>
   `;
