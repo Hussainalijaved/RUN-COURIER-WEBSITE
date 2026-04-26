@@ -22,7 +22,7 @@ export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'sales@runcourier.com'
 export const INFO_EMAIL = process.env.INFO_EMAIL || 'sales@runcourier.com';
 
 // VERIFIED SENDER - Must be from a domain verified in Resend (runcourier.co.uk)
-export const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL || 'Run Courier <info@send.runcourier.co.uk>';
+export const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL || 'Run Courier <info@runcourier.co.uk>';
 
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
