@@ -53,6 +53,7 @@ const contactInfo: {
     title: 'Email',
     details: [
       { text: 'info@runcourier.co.uk' },
+      { text: 'sales@runcourier.co.uk' },
     ],
     subtext: 'Response within 2 hours',
   },
