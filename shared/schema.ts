@@ -198,6 +198,8 @@ export const jobs = pgTable("jobs", {
   barcodeVerifiedAtDelivery: boolean("barcode_verified_at_delivery").default(false),
   pickupBarcodeScanTime: timestamp("pickup_barcode_scan_time"),
   deliveryBarcodeScanTime: timestamp("delivery_barcode_scan_time"),
+  apiClientId: text("api_client_id"),
+  paymentMethod: text("payment_method"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

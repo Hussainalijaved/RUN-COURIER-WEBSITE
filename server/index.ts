@@ -277,165 +277,27 @@ if (IS_PROD) {
   })();
 }
 
-async function runBackgroundTasks() {
-  if (IS_PROD) return;
-  
-  console.log("[BACKGROUND] Starting background tasks...");
-  
-  (async () => {
+async function runMigrations() {
+  try {
+    const { getDb } = await import('./db');
+    const db = getDb();
+    if (!db) {
+      console.warn("[MIGRATION] Database not available for migrations");
+      return;
+    }
+    const { sql } = await import('drizzle-orm');
+
+    console.log("[MIGRATION] Starting unified sequence...");
+
+    // 1. Drizzle-based migrations (these use our fixed Pool from db.ts)
     try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
       await db.execute(sql`
         ALTER TABLE jobs 
         ADD COLUMN IF NOT EXISTS driver_hidden BOOLEAN DEFAULT false,
         ADD COLUMN IF NOT EXISTS driver_hidden_at TIMESTAMP,
         ADD COLUMN IF NOT EXISTS driver_hidden_by VARCHAR(36)
       `);
-      console.log("[BACKGROUND] Migrations done");
-    } catch (e: any) {
-      console.warn("[BACKGROUND] Migration error:", e?.message);
-    }
-  })();
-
-  (async () => {
-    // Probe the drivers table for columns that may have been added after the initial
-    // schema was created.  We cannot run DDL via the REST API, so we SELECT each
-    // column individually and report any that are missing with the exact SQL to add them.
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (!supabaseAdmin) return;
-
-      const needed: Array<{ col: string; sql: string }> = [
-        { col: 'postcode',                 sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS postcode TEXT;" },
-        { col: 'national_insurance_number',sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS national_insurance_number TEXT;" },
-        { col: 'right_to_work_share_code', sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS right_to_work_share_code TEXT;" },
-        { col: 'vehicle_registration',     sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_registration TEXT;" },
-        { col: 'vehicle_make',             sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_make TEXT;" },
-        { col: 'vehicle_model',            sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_model TEXT;" },
-        { col: 'vehicle_color',            sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS vehicle_color TEXT;" },
-        { col: 'sort_code',                sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS sort_code TEXT;" },
-        { col: 'must_change_password',     sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;" },
-        { col: 'approved_at',              sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;" },
-        { col: 'stripe_account_id',        sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;" },
-        { col: 'is_british',               sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS is_british BOOLEAN DEFAULT true;" },
-        { col: 'building_name',            sql: "ALTER TABLE drivers ADD COLUMN IF NOT EXISTS building_name TEXT;" },
-      ];
-
-      const missing: string[] = [];
-      for (const { col, sql: colSql } of needed) {
-        const { error } = await supabaseAdmin.from('drivers').select(col).limit(1);
-        if (error?.message?.includes('does not exist') || error?.message?.includes(col)) {
-          missing.push(colSql);
-        }
-      }
-
-      if (missing.length > 0) {
-        console.warn("[MIGRATION] ⚠️  The following columns are missing from the Supabase `drivers` table.");
-        console.warn("[MIGRATION] Run these statements in Supabase Dashboard → SQL Editor:");
-        for (const s of missing) console.warn("[MIGRATION]   " + s);
-        console.warn("[MIGRATION] The server will skip missing columns gracefully, but driver profiles will be incomplete until these are added.");
-      } else {
-        console.log("[MIGRATION] drivers table column check passed — all required columns present.");
-      }
-    } catch (e: any) {
-      console.warn("[BACKGROUND] Driver columns probe error:", e?.message);
-    }
-  })();
-
-  (async () => {
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (!supabaseAdmin) return;
-      const { data, error: colCheck } = await supabaseAdmin.from('jobs').select('customer_email').limit(1);
-      if (colCheck?.message?.includes('customer_email')) {
-        console.log("[MIGRATION] customer_email column missing from jobs table.");
-        console.log("[MIGRATION] Please run in Supabase SQL Editor: ALTER TABLE jobs ADD COLUMN IF NOT EXISTS customer_email TEXT;");
-        console.log("[MIGRATION] Booking emails will still work using request data as fallback.");
-      } else {
-        console.log("[MIGRATION] customer_email column exists on jobs table");
-      }
-    } catch (e: any) {
-      console.warn("[MIGRATION] customer_email column check:", e?.message);
-    }
-  })();
-
-  (async () => {
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (!supabaseAdmin) return;
-      const { error: wmCheck } = await supabaseAdmin.from('jobs').select('waiting_time_minutes').limit(1);
-      if (wmCheck?.message?.includes('waiting_time_minutes')) {
-        console.warn("[MIGRATION] ⚠️  waiting_time_minutes column missing from Supabase jobs table.");
-        console.warn("[MIGRATION] Run in Supabase SQL Editor:");
-        console.warn("[MIGRATION]   ALTER TABLE jobs ADD COLUMN IF NOT EXISTS waiting_time_minutes INTEGER DEFAULT 0;");
-        console.warn("[MIGRATION]   NOTIFY pgrst, 'reload schema';");
-        console.warn("[MIGRATION] Until this is run, waiting time minutes will not be persisted (charge still saves correctly).");
-      } else {
-        console.log("[MIGRATION] waiting_time_minutes column exists on jobs table");
-      }
-    } catch (e: any) {
-      console.warn("[MIGRATION] waiting_time_minutes column check:", e?.message);
-    }
-  })();
-
-  (async () => {
-    try {
-      const { Pool } = await import('pg');
-      const pool = new Pool({
-        host: process.env.PGHOST,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false },
-        max: 2,
-      });
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS driver_locations (
-          id BIGSERIAL PRIMARY KEY,
-          driver_id UUID NOT NULL,
-          job_id UUID,
-          latitude DOUBLE PRECISION NOT NULL,
-          longitude DOUBLE PRECISION NOT NULL,
-          speed REAL,
-          heading REAL,
-          accuracy REAL,
-          is_moving BOOLEAN DEFAULT false,
-          recorded_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-      `);
-      await pool.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_driver_locations_driver_id
-          ON driver_locations (driver_id)
-      `);
-      await pool.query(`
-        CREATE OR REPLACE FUNCTION update_driver_locations_updated_at()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          NEW.updated_at = NOW();
-          RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql
-      `);
-      await pool.query(`
-        CREATE OR REPLACE TRIGGER trigger_driver_locations_updated_at
-        BEFORE UPDATE ON driver_locations
-        FOR EACH ROW
-        EXECUTE FUNCTION update_driver_locations_updated_at()
-      `);
-      await pool.end();
-      console.log("[MIGRATION] driver_locations table created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] driver_locations table creation:", e?.message);
-    }
-  })();
-
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
+      
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS contract_templates (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -445,6 +307,7 @@ async function runBackgroundTasks() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
+
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS driver_contracts (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -462,20 +325,7 @@ async function runBackgroundTasks() {
           created_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_contracts_driver_id ON driver_contracts(driver_id)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_contracts_token ON driver_contracts(token)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_contracts_status ON driver_contracts(status)`);
-      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
-      console.log("[MIGRATION] Contract tables created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Contract tables migration error:", e?.message);
-    }
-  })();
 
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS notice_templates (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -490,6 +340,7 @@ async function runBackgroundTasks() {
           is_active BOOLEAN NOT NULL DEFAULT true
         )
       `);
+
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS driver_notices (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -505,6 +356,7 @@ async function runBackgroundTasks() {
           status TEXT NOT NULL DEFAULT 'draft'
         )
       `);
+
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS driver_notice_recipients (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -518,117 +370,7 @@ async function runBackgroundTasks() {
           status TEXT NOT NULL DEFAULT 'sent'
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notice_recipients_notice_id ON driver_notice_recipients(notice_id)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notice_recipients_driver_id ON driver_notice_recipients(driver_id)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_notices_status ON driver_notices(status)`);
-      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
-      console.log("[MIGRATION] Notice tables created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Notice tables migration error:", e?.message);
-    }
-  })();
 
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT DEFAULT 'flexible'`);
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_percent DECIMAL(5,2) DEFAULT 0`);
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_amount DECIMAL(10,2) DEFAULT 0`);
-      await db.execute(sql`ALTER TABLE pricing_settings ADD COLUMN IF NOT EXISTS service_type_pricing JSONB DEFAULT '{"flexible":0,"urgent":15}'::jsonb`);
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by TEXT`);
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS admin_notes TEXT`);
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS waiting_time_minutes INTEGER DEFAULT 0`);
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS customer_hidden BOOLEAN DEFAULT FALSE`);
-      // Reload PostgREST schema cache so Supabase JS client picks up new columns
-      try { await db.execute(sql`NOTIFY pgrst, 'reload schema'`); } catch (_) {}
-      console.log("[MIGRATION] Service type columns created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Service type columns migration error:", e?.message);
-    }
-  })();
-
-  // Update Urgent service type from 25% to 15% in live pricing_settings
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
-      await db.execute(sql`
-        UPDATE pricing_settings
-        SET service_type_pricing = jsonb_set(
-          COALESCE(service_type_pricing, '{}'),
-          '{urgent}',
-          '15'
-        )
-        WHERE (service_type_pricing->>'urgent')::numeric = 25
-           OR service_type_pricing IS NULL
-      `);
-      console.log("[MIGRATION] Urgent service type updated to 15%");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Urgent service type update error:", e?.message);
-    }
-  })();
-
-  // Fix rush hour afternoon window to 14:00–19:00 (was 17:00–19:00) and weight surcharges
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
-      // Update afternoon rush hour start from 17:00 → 14:00
-      await db.execute(sql`
-        UPDATE pricing_settings
-        SET rush_hour_start_evening = '14:00'
-        WHERE rush_hour_start_evening = '17:00' OR rush_hour_start_evening IS NULL
-      `);
-      // Update weight surcharges to official spec
-      await db.execute(sql`
-        UPDATE pricing_settings
-        SET weight_surcharges = '{"10-20":10,"20-30":15,"30-50":20,"50-100":40,"100-400":50,"400-1200":70}'::jsonb
-        WHERE weight_surcharges IS NOT NULL
-      `);
-      console.log("[MIGRATION] Pricing: rush hour afternoon and weight surcharges updated to official spec");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Pricing spec update error:", e?.message);
-    }
-  })();
-
-  // Fix motorbike per-mile rates in vehicles table to match official spec
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
-      await db.execute(sql`
-        UPDATE vehicles SET per_mile_rate = 1.30, rush_hour_rate = 1.60
-        WHERE type = 'motorbike'
-          AND (per_mile_rate > 2 OR rush_hour_rate > 2)
-      `);
-      console.log("[MIGRATION] Motorbike rates corrected to £1.30/mile standard, £1.60/mile rush");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Motorbike rate fix error:", e?.message);
-    }
-  })();
-
-  // Migrate vehicles table to support new vehicle types (lwb_van, luton_van)
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
-      // Drop the old restrictive type check and add a new one covering all vehicle types
-      await db.execute(sql`ALTER TABLE vehicles DROP CONSTRAINT IF EXISTS vehicles_type_check`);
-      await db.execute(sql`
-        ALTER TABLE vehicles ADD CONSTRAINT vehicles_type_check
-        CHECK (type IN ('motorbike', 'car', 'small_van', 'medium_van', 'lwb_van', 'luton_van', 'large_van', 'flatbed'))
-      `);
-      console.log("[MIGRATION] Vehicles type constraint updated successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Vehicles type constraint migration error:", e?.message);
-    }
-  })();
-
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS supervisors (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -647,26 +389,7 @@ async function runBackgroundTasks() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_email ON supervisors(email)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_status ON supervisors(status)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_supervisors_invite_token ON supervisors(invite_token)`);
-      // Add city column if missing (idempotent)
-      await db.execute(sql`ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS city TEXT`);
-      // Add office_city to jobs if missing
-      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS office_city TEXT`);
-      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
-      console.log("[MIGRATION] Supervisors table created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Supervisors table migration error:", e?.message);
-    }
-  })();
 
-  // Auto-migrate driver_devices table (required for push notifications)
-  // Also runs against Supabase via exec_sql RPC to ensure it exists there too
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS driver_devices (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -680,72 +403,81 @@ async function runBackgroundTasks() {
           UNIQUE(driver_id, push_token)
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_devices_driver_id ON driver_devices(driver_id)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_devices_token ON driver_devices(push_token)`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_driver_devices_last_seen ON driver_devices(last_seen_at)`);
-      await db.execute(sql`NOTIFY pgrst, 'reload schema'`);
-      console.log("[MIGRATION] driver_devices table created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] driver_devices table migration error:", e?.message);
-    }
-  })();
 
-  // Ensure driver_devices UNIQUE constraint exists in Supabase
-  (async () => {
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (!supabaseAdmin) return;
-      const { error } = await supabaseAdmin.rpc('exec_sql', {
-        query: `
-          CREATE TABLE IF NOT EXISTS driver_devices (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            driver_id TEXT NOT NULL,
-            push_token TEXT NOT NULL,
-            platform TEXT NOT NULL DEFAULT 'android',
-            app_version TEXT,
-            device_info TEXT,
-            last_seen_at TIMESTAMPTZ DEFAULT NOW(),
-            created_at TIMESTAMPTZ DEFAULT NOW()
-          );
-          DO $$
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1 FROM pg_constraint
-              WHERE conname = 'driver_devices_driver_id_push_token_key'
-                AND conrelid = 'driver_devices'::regclass
-            ) THEN
-              ALTER TABLE driver_devices ADD CONSTRAINT driver_devices_driver_id_push_token_key UNIQUE (driver_id, push_token);
-            END IF;
-          END $$;
-          CREATE INDEX IF NOT EXISTS idx_driver_devices_driver_id ON driver_devices(driver_id);
-          CREATE INDEX IF NOT EXISTS idx_driver_devices_token ON driver_devices(push_token);
-          CREATE INDEX IF NOT EXISTS idx_driver_devices_last_seen ON driver_devices(last_seen_at);
-        `
-      });
-      if (error && !error.message?.includes('schema cache')) {
-        console.warn("[MIGRATION] Supabase driver_devices constraint migration failed:", error.message);
-      } else if (!error) {
-        console.log("[MIGRATION] Supabase driver_devices UNIQUE constraint ensured");
-      }
-    } catch (e: any) {
-      // Non-critical: table likely already exists in Supabase with correct structure
-    }
-  })();
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT DEFAULT 'flexible'`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_percent DECIMAL(5,2) DEFAULT 0`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type_amount DECIMAL(10,2) DEFAULT 0`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS admin_notes TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS waiting_time_minutes INTEGER DEFAULT 0`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS customer_hidden BOOLEAN DEFAULT FALSE`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS office_city TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS api_client_id TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_method TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_barcode TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_barcode TEXT`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS barcode_scanned_at_pickup BOOLEAN DEFAULT FALSE`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS barcode_verified_at_delivery BOOLEAN DEFAULT FALSE`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_barcode_scan_time TIMESTAMPTZ`);
+      await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_barcode_scan_time TIMESTAMPTZ`);
+      await db.execute(sql`ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS city TEXT`);
 
-  (async () => {
+      console.log("[MIGRATION] Essential structural updates complete");
+    } catch (e: any) {
+      console.warn("[MIGRATION] Drizzle migration warning:", e?.message);
+    }
+
+    // 2. PG Pool sessions (for tables requiring more complex SQL or IF NOT EXISTS)
+    const { Pool } = await import('pg');
+    const poolOptions = {
+      host: process.env.PGHOST,
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE,
+      port: parseInt(process.env.PGPORT || '5432'),
+      ssl: { rejectUnauthorized: false },
+      max: 2,
+      //@ts-ignore
+      lookup: forceIPv4Lookup
+    };
+    
+    const pool = new Pool(poolOptions);
+
     try {
-      const { Pool } = await import('pg');
-      const pool = new Pool({
-        host: process.env.PGHOST,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false },
-        max: 2,
-        //@ts-ignore
-        lookup: forceIPv4Lookup
-      });
+      // driver_locations
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS driver_locations (
+          id BIGSERIAL PRIMARY KEY,
+          driver_id UUID NOT NULL,
+          job_id UUID,
+          latitude DOUBLE PRECISION NOT NULL,
+          longitude DOUBLE PRECISION NOT NULL,
+          speed REAL,
+          heading REAL,
+          accuracy REAL,
+          is_moving BOOLEAN DEFAULT false,
+          recorded_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_driver_locations_driver_id ON driver_locations (driver_id)`);
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_driver_locations_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await pool.query(`
+        CREATE OR REPLACE TRIGGER trigger_driver_locations_updated_at
+        BEFORE UPDATE ON driver_locations
+        FOR EACH ROW
+        EXECUTE FUNCTION update_driver_locations_updated_at()
+      `);
+
+      // job_admin_notes
       await pool.query(`
         CREATE TABLE IF NOT EXISTS job_admin_notes (
           job_id TEXT NOT NULL PRIMARY KEY,
@@ -755,28 +487,8 @@ async function runBackgroundTasks() {
       `);
       await pool.query(`ALTER TABLE job_admin_notes ADD COLUMN IF NOT EXISTS office_city TEXT`);
       await pool.query(`ALTER TABLE job_admin_notes ADD COLUMN IF NOT EXISTS created_by TEXT`);
-      await pool.end();
-      console.log("[MIGRATION] job_admin_notes table created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] job_admin_notes migration error:", e?.message);
-    }
-  })();
 
-  // ── API Integration tables ───────────────────────────────────────────────
-  (async () => {
-    try {
-      const { Pool } = await import('pg');
-      const pool = new Pool({
-        host: process.env.PGHOST,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false },
-        max: 2,
-        //@ts-ignore
-        lookup: forceIPv4Lookup
-      });
+      // API clients
       await pool.query(`
         CREATE TABLE IF NOT EXISTS api_clients (
           id SERIAL PRIMARY KEY,
@@ -797,9 +509,67 @@ async function runBackgroundTasks() {
           notes TEXT,
           last_used_at TIMESTAMPTZ,
           request_count INTEGER NOT NULL DEFAULT 0,
+          payment_mode TEXT NOT NULL DEFAULT 'instant',
+          stripe_customer_id TEXT,
+          invoice_cycle TEXT NOT NULL DEFAULT 'weekly',
+          account_status TEXT NOT NULL DEFAULT 'active',
+          credit_limit NUMERIC(10,2),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS payment_mode TEXT NOT NULL DEFAULT 'instant'`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS invoice_cycle TEXT NOT NULL DEFAULT 'weekly'`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'active'`);
+      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(10,2)`);
+
+      // Contacts table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS contacts (
+          id BIGSERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          email TEXT NOT NULL,
+          company_name TEXT,
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      // API invoices
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS api_invoices (
+          id SERIAL PRIMARY KEY,
+          invoice_number TEXT NOT NULL UNIQUE,
+          api_client_id INTEGER NOT NULL,
+          company_name TEXT NOT NULL,
+          billing_email TEXT NOT NULL,
+          period_start DATE NOT NULL,
+          period_end DATE NOT NULL,
+          total_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+          job_count INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'sent',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          sent_at TIMESTAMPTZ,
+          paid_at TIMESTAMPTZ,
+          notes TEXT
+        )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS driver_application_vehicles (
+          application_id VARCHAR(36) PRIMARY KEY,
+          email TEXT,
+          vehicle_registration TEXT,
+          vehicle_make TEXT,
+          vehicle_model TEXT,
+          vehicle_color TEXT,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+
+      // API integration requests
       await pool.query(`
         CREATE TABLE IF NOT EXISTS api_integration_requests (
           id SERIAL PRIMARY KEY,
@@ -818,6 +588,11 @@ async function runBackgroundTasks() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
+      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS linked_api_client_id INTEGER`);
+      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent_at TIMESTAMPTZ`);
+
+      // API logs
       await pool.query(`
         CREATE TABLE IF NOT EXISTS api_logs (
           id SERIAL PRIMARY KEY,
@@ -835,64 +610,26 @@ async function runBackgroundTasks() {
           ip_address TEXT
         )
       `);
-      // Add columns that may be missing from older deployments
-      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS linked_api_client_id INTEGER`);
-      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent BOOLEAN DEFAULT false`);
-      await pool.query(`ALTER TABLE api_integration_requests ADD COLUMN IF NOT EXISTS api_access_email_sent_at TIMESTAMPTZ`);
-      // Payment mode columns for API clients
-      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS payment_mode TEXT NOT NULL DEFAULT 'instant'`);
-      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
-      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS invoice_cycle TEXT NOT NULL DEFAULT 'weekly'`);
-      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'active'`);
-      await pool.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(10,2)`);
 
-      // api_invoices table for weekly billing
-      await pool.query(`CREATE TABLE IF NOT EXISTS api_invoices (
-        id SERIAL PRIMARY KEY,
-        invoice_number TEXT NOT NULL UNIQUE,
-        api_client_id INTEGER NOT NULL,
-        company_name TEXT NOT NULL,
-        billing_email TEXT NOT NULL,
-        period_start DATE NOT NULL,
-        period_end DATE NOT NULL,
-        total_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
-        job_count INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'sent',
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        sent_at TIMESTAMPTZ,
-        paid_at TIMESTAMPTZ,
-        notes TEXT
-      )`);
-
-      // line-item rows for each invoice
-      await pool.query(`CREATE TABLE IF NOT EXISTS api_invoice_items (
-        id SERIAL PRIMARY KEY,
-        invoice_id INTEGER NOT NULL REFERENCES api_invoices(id) ON DELETE CASCADE,
-        job_id TEXT NOT NULL,
-        tracking_number TEXT NOT NULL,
-        pickup_address TEXT,
-        delivery_address TEXT,
-        vehicle_type TEXT,
-        scheduled_date TEXT,
-        amount NUMERIC(10,2) NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      )`);
+      // API invoice items
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS api_invoice_items (
+          id SERIAL PRIMARY KEY,
+          invoice_id INTEGER NOT NULL REFERENCES api_invoices(id) ON DELETE CASCADE,
+          job_id TEXT NOT NULL,
+          tracking_number TEXT NOT NULL,
+          pickup_address TEXT,
+          delivery_address TEXT,
+          vehicle_type TEXT,
+          scheduled_date TEXT,
+          amount NUMERIC(10,2) NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
       await pool.query(`ALTER TABLE api_invoice_items ADD COLUMN IF NOT EXISTS job_number TEXT`);
 
-      await pool.end();
-      console.log("[MIGRATION] API integration tables created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] API integration tables migration error:", e?.message);
-    }
-  })();
-
-  // Create notifications tables
-  (async () => {
-    try {
-      const { db } = await import('./db');
-      const { sql } = await import('drizzle-orm');
-      // Create notification_recipients (completely new table)
-      await db.execute(sql`
+      // Notification recipients
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS notification_recipients (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           notification_id UUID NOT NULL,
@@ -906,68 +643,36 @@ async function runBackgroundTasks() {
           created_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
-      // The 'notifications' table may already exist from the old in-app system.
-      // Use ADD COLUMN IF NOT EXISTS to backfill the admin notification columns.
-      const { Pool } = await import('pg');
-      const _pool = new Pool({
-        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false }, max: 2,
-      });
-      const addCols = [
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_id TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_name TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_role TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_type TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_user_id TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_user_name TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS notification_type TEXT DEFAULT 'info'`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message TEXT`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'sent'`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent BOOLEAN DEFAULT false`,
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_count INTEGER DEFAULT 0`,
-      ];
-      for (const colSql of addCols) {
-        try { await _pool.query(colSql); } catch (_) {}
-      }
-      await _pool.end();
-      try { await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC)`); } catch (_) {}
-      try { await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_notification_id ON notification_recipients(notification_id)`); } catch (_) {}
-      try { await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notification_recipients_user_id ON notification_recipients(recipient_user_id)`); } catch (_) {}
-      console.log("[MIGRATION] Notifications tables created/verified successfully");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Notifications tables migration error:", e?.message);
-    }
-  })();
 
-  // Create driver_application_vehicles sidecar table (stores vehicle data that driver_applications lacks)
-  (async () => {
-    try {
-      const { Pool } = await import('pg');
-      const pool = new Pool({
-        host: process.env.PGHOST, user: process.env.PGUSER, password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE, port: parseInt(process.env.PGPORT || '5432'),
-        ssl: { rejectUnauthorized: false }, max: 2,
-      });
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS driver_application_vehicles (
-          application_id VARCHAR(36) PRIMARY KEY,
-          email TEXT,
-          vehicle_registration TEXT,
-          vehicle_make TEXT,
-          vehicle_model TEXT,
-          vehicle_color TEXT,
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-      `);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_dav_email ON driver_application_vehicles(email)`);
-      await pool.end();
-      console.log("[MIGRATION] driver_application_vehicles table created/verified successfully");
+      console.log("[MIGRATION] Persistent tables ensured successfully");
+
     } catch (e: any) {
-      console.warn("[MIGRATION] driver_application_vehicles migration error:", e?.message);
+      console.warn("[MIGRATION] Pool migration warning:", e?.message);
+    } finally {
+      await pool.end();
     }
-  })();
+
+    console.log("[MIGRATION] All migrations finished.");
+  } catch (e: any) {
+    console.error("[MIGRATION] Critical error in runner:", e?.message);
+  }
+}
+
+async function runBackgroundTasks() {
+  // Always run migrations first
+  await runMigrations();
+  
+
+
+
+
+
+
+
+
+
+
+
 
   // Backfill driver_application_vehicles from approved drivers (once; safe to re-run)
   setTimeout(async () => {
@@ -1639,48 +1344,7 @@ async function runBackgroundTasks() {
     }
   }, 25000);
 
-  // Ensure api_client_id and payment_method columns exist on Supabase jobs table
-  (async () => {
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (!supabaseAdmin) return;
-      await supabaseAdmin.rpc('exec_sql', {
-        query: `
-          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS api_client_id TEXT;
-          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_method TEXT;
-        `
-      });
-      console.log("[BACKGROUND] jobs.api_client_id and jobs.payment_method ensured");
-    } catch (e: any) {
-      console.warn("[BACKGROUND] jobs api_client_id/payment_method migration:", e?.message);
-    }
-  })();
 
-  // Ensure parcel barcode fields exist on Supabase jobs table
-  (async () => {
-    try {
-      const { supabaseAdmin } = await import('./supabaseAdmin');
-      if (!supabaseAdmin) return;
-      const cols = [
-        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_barcode TEXT`,
-        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_barcode TEXT`,
-        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS barcode_scanned_at_pickup BOOLEAN DEFAULT FALSE`,
-        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS barcode_verified_at_delivery BOOLEAN DEFAULT FALSE`,
-        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_barcode_scan_time TIMESTAMPTZ`,
-        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_barcode_scan_time TIMESTAMPTZ`,
-      ];
-      for (const col of cols) {
-        try {
-          await supabaseAdmin.rpc('exec_sql', { query: col });
-        } catch (_e) {
-          // Column may already exist or RPC unavailable — not fatal
-        }
-      }
-      console.log("[MIGRATION] Parcel barcode columns ensured on jobs table");
-    } catch (e: any) {
-      console.warn("[MIGRATION] Barcode columns migration:", e?.message);
-    }
-  })();
 
   // Start weekly API invoicing scheduler
   (async () => {

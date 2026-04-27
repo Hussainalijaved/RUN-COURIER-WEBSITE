@@ -1,6 +1,12 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import dns from 'dns';
 import * as schema from '@shared/schema';
+
+// Helper to force IPv4 lookup for database hosts
+const forceIPv4Lookup = (hostname: string, opts: any, cb: any) => {
+  return dns.lookup(hostname, { family: 4 }, cb);
+};
 
 let pool: Pool | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
@@ -49,7 +55,9 @@ function initDb() {
     console.log('[DB] Initializing with SSL fix...');
     pool = new Pool({ 
       connectionString,
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: false },
+      //@ts-ignore
+      lookup: forceIPv4Lookup
     });
     dbInstance = drizzle(pool, { schema });
     console.log('[DB] Database connection initialized');

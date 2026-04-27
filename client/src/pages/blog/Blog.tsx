@@ -4,24 +4,15 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowRight, Clock, Calendar, ChevronRight, Tag } from 'lucide-react';
+import { setPageMeta } from '@/lib/seo';
+
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import heroImage from '@assets/WhatsApp_Image_2025-09-06_at_20.08.04_32824ae2_1764877551595.jpg';
 import article1Image from '@assets/WhatsApp_Image_2025-11-10_at_20.06.18_8ff558b5_1764877634513.jpg';
 import article2Image from '@assets/WhatsApp_Image_2025-11-10_at_20.19.15_47cde5e4_1764877777467.jpg';
 import article3Image from '@assets/WhatsApp_Image_2025-09-03_at_19.11.49_c1dbfbad_1764877241699.jpg';
 
-function setPageMeta(title: string, description: string, canonicalPath: string) {
-  document.title = title;
-  const meta = document.querySelector('meta[name="description"]');
-  if (meta) meta.setAttribute('content', description);
-  const og = document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null;
-  if (og) og.setAttribute('content', title);
-  const ogDesc = document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null;
-  if (ogDesc) ogDesc.setAttribute('content', description);
-  const url = `https://runcourier.co.uk${canonicalPath}`;
-  (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', url);
-  (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', url);
-}
+
 
 /* ─────────────────────────────── Article content components ──── */
 

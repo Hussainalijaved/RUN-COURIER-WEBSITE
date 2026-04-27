@@ -17114,24 +17114,6 @@ export async function registerRoutes(
   }));
 
   // ─── CONTACTS (admin + supervisor) ───────────────────────────────────────
-  // Migrate contacts table on first use
-  try {
-    await getPgPool().query(`
-      CREATE TABLE IF NOT EXISTS contacts (
-        id BIGSERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        email TEXT NOT NULL,
-        company_name TEXT,
-        notes TEXT,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-    console.log('[MIGRATION] contacts table created/verified successfully');
-  } catch (e) {
-    console.warn('[MIGRATION] contacts table migration failed:', e);
-  }
 
   app.get('/api/contacts', requireAdminOrSupervisorStrict, asyncHandler(async (req, res) => {
     const result = await getPgPool().query(

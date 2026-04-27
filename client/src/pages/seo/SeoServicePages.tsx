@@ -21,6 +21,8 @@ import {
   Timer,
   Headphones,
 } from 'lucide-react';
+import { setPageMeta } from '@/lib/seo';
+
 import { SmoothBackground } from '@/components/ui/smooth-image';
 import sameDayHeroImage from '@assets/WhatsApp_Image_2025-11-10_at_20.06.18_8ff558b5_1764877634513.jpg';
 import medicalHeroImage from '@assets/WhatsApp_Image_2025-09-03_at_19.11.49_c1dbfbad_1764877241699.jpg';
@@ -29,18 +31,7 @@ import urgentHeroImage from '@assets/WhatsApp_Image_2025-09-06_at_20.08.04_32824
 
 /* ─────────────────────────────────────────────────────── helpers ──── */
 
-function setPageMeta(title: string, description: string, canonicalPath: string) {
-  document.title = title;
-  const meta = document.querySelector('meta[name="description"]');
-  if (meta) meta.setAttribute('content', description);
-  let og = document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null;
-  if (og) og.setAttribute('content', title);
-  let ogDesc = document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null;
-  if (ogDesc) ogDesc.setAttribute('content', description);
-  const url = `https://runcourier.co.uk${canonicalPath}`;
-  (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.setAttribute('href', url);
-  (document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null)?.setAttribute('content', url);
-}
+
 
 interface FeatureItem { icon: typeof Clock; text: string }
 interface SectionBlock { heading: string; body: string }
