@@ -17233,8 +17233,9 @@ ON CONFLICT (type) DO NOTHING;
 
   async function getApiPool() {
     const { Pool } = await import('pg');
-    const connectionString = process.env.DATABASE_URL;
     
+    // First try DATABASE_URL
+    const connectionString = process.env.DATABASE_URL;
     if (connectionString && connectionString.startsWith('postgresql://')) {
       let connStr = connectionString;
       if (!connStr.includes('sslmode=')) {
@@ -17243,7 +17244,19 @@ ON CONFLICT (type) DO NOTHING;
       return new Pool({ connectionString: connStr, max: 3, ssl: { rejectUnauthorized: false } });
     }
 
-    throw new Error('[getApiPool] DATABASE_URL is missing. Cannot connect to Supabase API tables.');
+    // Fallback to individual PG variables
+    if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
+      const host = process.env.PGHOST;
+      const port = process.env.PGPORT || '5432';
+      const user = process.env.PGUSER;
+      const password = process.env.PGPASSWORD;
+      const database = process.env.PGDATABASE;
+      
+      const connStr = `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
+      return new Pool({ connectionString: connStr, max: 3, ssl: { rejectUnauthorized: false } });
+    }
+
+    throw new Error('[getApiPool] Database connection details (DATABASE_URL or PG* vars) are missing.');
   }
 
   // ── PUBLIC: Submit API Integration Request form ───────────────────────────
