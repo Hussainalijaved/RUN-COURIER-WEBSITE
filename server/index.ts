@@ -9,6 +9,11 @@ import dns from "dns";
 // Fix Node 17+ resolving IPv6 first when it shouldn't, causing ECONNREFUSED with Supabase PostGres and Fetch
 dns.setDefaultResultOrder("ipv4first");
 
+// Helper to force IPv4 lookup for database hosts
+const forceIPv4Lookup = (hostname: string, opts: any, cb: any) => {
+  return dns.lookup(hostname, { family: 4 }, cb);
+};
+
 declare module "http" {
   interface IncomingMessage { rawBody: unknown; }
 }
@@ -738,6 +743,8 @@ async function runBackgroundTasks() {
         port: parseInt(process.env.PGPORT || '5432'),
         ssl: { rejectUnauthorized: false },
         max: 2,
+        //@ts-ignore
+        lookup: forceIPv4Lookup
       });
       await pool.query(`
         CREATE TABLE IF NOT EXISTS job_admin_notes (
@@ -767,6 +774,8 @@ async function runBackgroundTasks() {
         port: parseInt(process.env.PGPORT || '5432'),
         ssl: { rejectUnauthorized: false },
         max: 2,
+        //@ts-ignore
+        lookup: forceIPv4Lookup
       });
       await pool.query(`
         CREATE TABLE IF NOT EXISTS api_clients (
