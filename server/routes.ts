@@ -69,29 +69,31 @@ async function generateUniqueDriverCode(supabaseAdmin: any): Promise<string> {
 let pgPool: Pool | null = null;
 function getPgPool(): Pool {
   if (!pgPool) {
-    let connString = process.env.DATABASE_URL;
+    let connString: string | undefined;
     
-    // Fallback to individual PG variables if DATABASE_URL is missing or local
-    if (!connString || connString.includes('localhost') || connString.includes('127.0.0.1')) {
-      if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
-        const port = process.env.PGPORT || '5432';
-        connString = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${port}/${process.env.PGDATABASE}`;
-        console.log(`[PgPool] Using individual PG variables for connectivity to ${process.env.PGHOST}`);
-      }
+    // Prioritize individual PG variables as they are easier to update in hosting panels
+    if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
+      const port = process.env.PGPORT || '5432';
+      connString = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${port}/${process.env.PGDATABASE}`;
+      console.log(`[PgPool] Using individual PG variables for connectivity to ${process.env.PGHOST}`);
+    } 
+    // Fallback to DATABASE_URL if individual variables are missing
+    else if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
+      connString = process.env.DATABASE_URL;
+      console.log('[PgPool] Using DATABASE_URL for connectivity');
     }
 
-    if (connString && connString.startsWith('postgresql://')) {
+    if (connString) {
       if (!connString.includes('sslmode=')) {
         connString += connString.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
-      console.log(`[PgPool] Initializing connection to ${connString.split('@')[1] || 'database'}...`);
       pgPool = new Pool({
         connectionString: connString,
         max: 3,
         ssl: { rejectUnauthorized: false },
       });
     } else {
-      console.error('[getPgPool] No valid database configuration found (DATABASE_URL or PG* variables)');
+      console.error('[getPgPool] No valid database configuration found (PG* variables or DATABASE_URL)');
       throw new Error('[getPgPool] Database configuration missing.');
     }
     
@@ -17233,30 +17235,26 @@ ON CONFLICT (type) DO NOTHING;
 
   async function getApiPool() {
     const { Pool } = await import('pg');
+    let connString: string | undefined;
     
-    // First try DATABASE_URL
-    const connectionString = process.env.DATABASE_URL;
-    if (connectionString && connectionString.startsWith('postgresql://')) {
-      let connStr = connectionString;
-      if (!connStr.includes('sslmode=')) {
-        connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
-      }
-      return new Pool({ connectionString: connStr, max: 3, ssl: { rejectUnauthorized: false } });
-    }
-
-    // Fallback to individual PG variables
+    // Prioritize individual PG variables
     if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
-      const host = process.env.PGHOST;
       const port = process.env.PGPORT || '5432';
-      const user = process.env.PGUSER;
-      const password = process.env.PGPASSWORD;
-      const database = process.env.PGDATABASE;
-      
-      const connStr = `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
-      return new Pool({ connectionString: connStr, max: 3, ssl: { rejectUnauthorized: false } });
+      connString = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${port}/${process.env.PGDATABASE}`;
+    } 
+    // Fallback to DATABASE_URL
+    else if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
+      connString = process.env.DATABASE_URL;
     }
 
-    throw new Error('[getApiPool] Database connection details (DATABASE_URL or PG* vars) are missing.');
+    if (connString) {
+      if (!connString.includes('sslmode=')) {
+        connString += connString.includes('?') ? '&sslmode=require' : '?sslmode=require';
+      }
+      return new Pool({ connectionString: connString, max: 3, ssl: { rejectUnauthorized: false } });
+    }
+
+    throw new Error('[getApiPool] Database connection details (PG* vars or DATABASE_URL) are missing.');
   }
 
   // ── PUBLIC: Submit API Integration Request form ───────────────────────────
