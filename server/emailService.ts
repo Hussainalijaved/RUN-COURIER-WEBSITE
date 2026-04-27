@@ -19,10 +19,10 @@ const APP_STORE_BADGE_URL = 'https://tools.applemediaservices.com/api/badges/dow
 // Primary notification emails - Centralized configuration
 export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'sales@runcourier.co.uk';
 export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'support@runcourier.co.uk';
-export const INFO_EMAIL = process.env.INFO_EMAIL || 'info@runcourier.co.uk';
+export const INFO_EMAIL = process.env.INFO_EMAIL || 'sales@runcourier.co.uk';
 
 // VERIFIED SENDER - Must be from a domain verified in Resend (runcourier.co.uk)
-export const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL || 'Run Courier <info@runcourier.co.uk>';
+export const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL || 'Run Courier <sales@runcourier.co.uk>';
 
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
@@ -697,7 +697,7 @@ ${jobDetails.customerEmail ? `Customer Email: ${jobDetails.customerEmail}\n` : '
 Please log in to the admin dashboard to manage this booking.
 Run Courier - https://runcourier.co.uk`;
 
-  const adminEmails = [ADMIN_EMAIL, 'runcourier1@gmail.com'];
+  const adminEmails = [ADMIN_EMAIL];
   let anySuccess = false;
   for (const email of adminEmails) {
     try {

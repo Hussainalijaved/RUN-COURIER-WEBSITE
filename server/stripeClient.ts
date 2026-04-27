@@ -47,8 +47,8 @@ function getConnectionString(): string | null {
     if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
       const host = process.env.PGHOST;
       const port = process.env.PGPORT || '5432';
-      const user = process.env.PGUSER;
-      const password = process.env.PGPASSWORD;
+      const user = encodeURIComponent(process.env.PGUSER);
+      const password = encodeURIComponent(process.env.PGPASSWORD);
       const database = process.env.PGDATABASE;
       return `postgresql://${user}:${password}@${host}:${port}/${database}`;
     }

@@ -955,26 +955,34 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
 
       for (const bucket of uniqueBuckets) {
         try {
+          console.log(`[POD Resolver] Attempting to sign URL for job ${job.id || 'N/A'}: bucket=${bucket}, path=${storagePath}`);
           const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600);
-          if (data?.signedUrl) return data.signedUrl;
+          if (data?.signedUrl) {
+            console.log(`[POD Resolver] Successfully signed URL for job ${job.id || 'N/A'} in bucket ${bucket}`);
+            return data.signedUrl;
+          }
           
-          // Only log if it's not a "not found" error, to avoid log spamming
-          if (error && !error.message?.includes('not found') && !error.message?.includes('The object was not found')) {
-            console.error(`[POD Resolver] Error for bucket ${bucket}:`, error.message);
+          if (error) {
+            if (!error.message?.includes('not found') && !error.message?.includes('The object was not found')) {
+              console.error(`[POD Resolver] Error signing for job ${job.id || 'N/A'}, bucket ${bucket}:`, error.message);
+            } else {
+              console.log(`[POD Resolver] Object not found in bucket ${bucket}: ${storagePath}`);
+            }
           }
         } catch (err: any) {
-          // Silent catch for individual bucket failures
+          console.error(`[POD Resolver] Exception for job ${job.id || 'N/A'}, bucket ${bucket}:`, err.message);
         }
       }
 
       // FINAL FALLBACK: If we couldn't create a signed URL, but it's a Supabase URL, 
       // try to return it as-is or transform it to a public URL as a "best effort"
       if (path.startsWith('http')) {
-        console.warn(`[POD Resolver] Could not sign URL, returning original: ${path.substring(0, 50)}...`);
+        console.warn(`[POD Resolver] All signing attempts failed for job ${job.id || 'N/A'}, returning original public URL: ${path.substring(0, 50)}...`);
         return path;
       }
 
       // If it's a raw path and everything failed, return a public URL attempt
+      console.log(`[POD Resolver] Raw path signing failed, returning public URL for job ${job.id || 'N/A'}: ${storagePath}`);
       const { data } = supabaseAdmin.storage.from(targetBucket).getPublicUrl(storagePath);
       return data?.publicUrl || path;
     };
