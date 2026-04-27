@@ -80,6 +80,9 @@ function getPgPool(): Pool {
         port: parseInt(process.env.PGPORT || '5432'),
         max: 3,
         ssl: { rejectUnauthorized: false },
+        // Force IPv4 to prevent ECONNREFUSED issues on Hostinger/VPS
+        //@ts-ignore - 'family' is passed to net.connect options
+        family: 4
       });
     } 
     // Fallback to DATABASE_URL
@@ -17243,6 +17246,9 @@ ON CONFLICT (type) DO NOTHING;
         port: parseInt(process.env.PGPORT || '5432'),
         max: 3,
         ssl: { rejectUnauthorized: false },
+        // Force IPv4 to prevent ECONNREFUSED issues on Hostinger/VPS
+        //@ts-ignore - 'family' is passed to net.connect options
+        family: 4
       });
     }
 
