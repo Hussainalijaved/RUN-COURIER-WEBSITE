@@ -978,14 +978,21 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
         try {
           const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600);
           if (data?.signedUrl) {
+            console.log(`[POD Resolver] SUCCESS: Found in ${bucket}: ${storagePath}`);
             if (bucket !== targetBucket && job.id && !fieldName.includes('stop')) {
               healJobRecord(job.id, fieldName, storagePath, bucket);
             }
             return data.signedUrl;
           }
-        } catch (err: any) {}
+          if (error) {
+            console.log(`[POD Resolver] FAIL: Bucket ${bucket} path ${storagePath}: ${error.message}`);
+          }
+        } catch (err: any) {
+             console.error(`[POD Resolver] EXCEPTION: Bucket ${bucket} path ${storagePath}: ${err.message}`);
+        }
       }
 
+      console.warn(`[POD Resolver] NOT FOUND in any bucket: ${storagePath}`);
       const { data } = supabaseAdmin.storage.from(targetBucket).getPublicUrl(storagePath);
       return data?.publicUrl || path;
     };
