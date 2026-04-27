@@ -87,6 +87,11 @@ function getPgPool(): Pool {
       if (!connString.includes('sslmode=')) {
         connString += connString.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
+      
+      const hostLog = connString.split('@')[1] || 'unknown';
+      const userLog = connString.split('://')[1]?.split(':')[0] || 'unknown';
+      console.log(`[PgPool] Attempting connection - Host: ${hostLog}, User: ${userLog}`);
+
       pgPool = new Pool({
         connectionString: connString,
         max: 3,
@@ -100,7 +105,8 @@ function getPgPool(): Pool {
     pgPool.on('error', (err: Error) => {
       console.warn('[PgPool] Idle client error:', err.message);
       if (err.message.includes('authentication failed')) {
-        console.error('[PgPool] CRITICAL: Database authentication failed. Check PGUSER/PGPASSWORD.');
+        const userLog = connString?.split('://')[1]?.split(':')[0] || 'unknown';
+        console.error(`[PgPool] CRITICAL: Auth failed for user: ${userLog}`);
       }
       pgPool = null;
     });
@@ -17251,6 +17257,11 @@ ON CONFLICT (type) DO NOTHING;
       if (!connString.includes('sslmode=')) {
         connString += connString.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
+      
+      const hostLog = connString.split('@')[1] || 'unknown';
+      const userLog = connString.split('://')[1]?.split(':')[0] || 'unknown';
+      console.log(`[getApiPool] Attempting connection - Host: ${hostLog}, User: ${userLog}`);
+
       return new Pool({ connectionString: connString, max: 3, ssl: { rejectUnauthorized: false } });
     }
 
