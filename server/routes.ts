@@ -30,6 +30,12 @@ import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcas
 import { geocodeAddress } from "./geocoding";
 import { stableJobNumberCache, persistJobNumber, ensureJobNumber, assignStableJobNumbers, generateJobNumber } from "./jobNumbers";
 import { Pool } from "pg";
+import dns from "dns";
+
+// Helper to force IPv4 lookup for database hosts
+const forceIPv4Lookup = (hostname: string, opts: any, cb: any) => {
+  return dns.lookup(hostname, { family: 4 }, cb);
+};
 
 function generateReadableTempPassword(): string {
   const words = ['Run', 'Fast', 'Drive', 'Go', 'Ace', 'Top', 'Jet', 'Max', 'Pro', 'Key', 'Win', 'Zip', 'Fly', 'Red', 'Blu',
@@ -80,9 +86,8 @@ function getPgPool(): Pool {
         port: parseInt(process.env.PGPORT || '5432'),
         max: 3,
         ssl: { rejectUnauthorized: false },
-        // Force IPv4 to prevent ECONNREFUSED issues on Hostinger/VPS
-        //@ts-ignore - 'family' is passed to net.connect options
-        family: 4
+        //@ts-ignore
+        lookup: forceIPv4Lookup
       });
     } 
     // Fallback to DATABASE_URL
@@ -92,6 +97,8 @@ function getPgPool(): Pool {
         connectionString: process.env.DATABASE_URL + (process.env.DATABASE_URL.includes('?') ? '&sslmode=require' : '?sslmode=require'),
         max: 3,
         ssl: { rejectUnauthorized: false },
+        //@ts-ignore
+        lookup: forceIPv4Lookup
       });
     } else {
       console.error('[getPgPool] No valid database configuration found');
@@ -17246,9 +17253,8 @@ ON CONFLICT (type) DO NOTHING;
         port: parseInt(process.env.PGPORT || '5432'),
         max: 3,
         ssl: { rejectUnauthorized: false },
-        // Force IPv4 to prevent ECONNREFUSED issues on Hostinger/VPS
-        //@ts-ignore - 'family' is passed to net.connect options
-        family: 4
+        //@ts-ignore
+        lookup: forceIPv4Lookup
       });
     }
 
@@ -17256,7 +17262,9 @@ ON CONFLICT (type) DO NOTHING;
       return new Pool({ 
         connectionString: process.env.DATABASE_URL + (process.env.DATABASE_URL.includes('?') ? '&sslmode=require' : '?sslmode=require'),
         max: 3, 
-        ssl: { rejectUnauthorized: false } 
+        ssl: { rejectUnauthorized: false },
+        //@ts-ignore
+        lookup: forceIPv4Lookup
       });
     }
 
