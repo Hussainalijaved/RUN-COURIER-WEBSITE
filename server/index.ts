@@ -1,4 +1,4 @@
-console.log("🔥 SERVER ENTRY LOADED");
+console.log("🔥 SERVER ENTRY LOADED - VERSION 1.1 (DB FIX)");
 
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
