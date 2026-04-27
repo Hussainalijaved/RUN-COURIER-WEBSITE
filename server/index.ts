@@ -421,6 +421,13 @@ async function runMigrations() {
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_barcode_scan_time TIMESTAMPTZ`);
       await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_barcode_scan_time TIMESTAMPTZ`);
       await db.execute(sql`ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS city TEXT`);
+      
+      // Drivers table essential columns
+      await db.execute(sql`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT false`);
+      await db.execute(sql`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false`);
+      await db.execute(sql`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS driver_code TEXT`);
+      await db.execute(sql`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS phone TEXT`);
+      await db.execute(sql`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS email TEXT`);
 
       console.log("[MIGRATION] Essential structural updates complete");
     } catch (e: any) {
