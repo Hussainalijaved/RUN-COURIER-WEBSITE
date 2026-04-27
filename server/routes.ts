@@ -908,126 +908,124 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
   const { supabaseAdmin } = await import('./supabaseAdmin');
   if (!supabaseAdmin) return jobs;
 
-  // The mobile app uploads POD images and signatures to 'pod-images'
   const POD_BUCKET = 'pod-images';
   const DOC_BUCKET = 'driver-documents';
 
-  return Promise.all(jobs.map(async (job) => {
-    // Return a shallow copy so we don't mutate original objects if cached
-    const resolved = { ...job };
-
-    const resolveUrl = async (path: string, primaryBucket: string = POD_BUCKET): Promise<string> => {
-      if (!path) return path;
+  // Helper to update job record in background if bucket was wrong
+  const healJobRecord = async (jobId: string, field: string, path: string, correctBucket: string) => {
+    try {
+      const fullPath = `${correctBucket}/${path}`;
+      console.log(`[POD Healer] Healing job ${jobId} field ${field}: ${fullPath}`);
       
-      // If it's already a working signed URL (unlikely to be stored in DB, but just in case)
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+      
+      if (field === 'podPhotoUrl') {
+        updateData.pod_photo_url = fullPath;
+      } else if (field === 'podSignatureUrl') {
+        updateData.pod_signature_url = fullPath;
+      } else {
+        // Skip for arrays or unknown fields to avoid ambiguity
+        return;
+      }
+
+      await supabaseAdmin
+        .from('jobs')
+        .update(updateData)
+        .eq('id', jobId);
+        
+    } catch (err: any) {
+      console.error(`[POD Healer] Failed to heal job ${jobId}:`, err.message);
+    }
+  };
+
+  return Promise.all(jobs.map(async (job) => {
+    const resolved = { ...job };
+    
+    const resolveUrl = async (path: string, fieldName: string, primaryBucket: string = POD_BUCKET): Promise<string> => {
+      if (!path) return path;
       if (path.includes('token=') && path.startsWith('http')) return path;
 
       let storagePath = path;
       let targetBucket = primaryBucket;
 
-      // Handle Supabase URL format: https://{project}.supabase.co/storage/v1/object/{type}/{bucket}/{path}
       if (path.startsWith('http')) {
-        // More robust regex to handle various Supabase storage URL patterns
         const match = path.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^\/]+)\/(.+?)(?:\?.*)?$/);
         if (match) {
           targetBucket = match[1];
-          // Strip any query parameters and decode
           storagePath = decodeURIComponent(match[2].split('?')[0]);
         } else {
-          // If it's an external URL but not a standard Supabase storage URL, return as-is
-          console.log(`[POD Resolver] External non-Supabase URL for job ${job.id || 'N/A'}: ${path.substring(0, 50)}...`);
           return path;
         }
       } else {
-        // Not an HTTP URL, just a raw path or legacy name
-        // Strip leading slashes and decode
-        storagePath = decodeURIComponent(path.replace(/^\/+/, '').split('?')[0]);
+        const parts = path.split('/');
+        if (parts.length > 1 && ['pod', 'pod-images', 'driver-documents', 'DRIVER-DOCUMENTS'].includes(parts[0])) {
+          targetBucket = parts[0].toLowerCase();
+          storagePath = decodeURIComponent(path.substring(parts[0].length + 1));
+        } else {
+          storagePath = decodeURIComponent(path.replace(/^\/+/, '').split('?')[0]);
+        }
       }
       
-      // Buckets to try in order of priority
       const bucketsToTry = [targetBucket];
       if (targetBucket !== POD_BUCKET) bucketsToTry.push(POD_BUCKET);
       if (targetBucket !== 'pod') bucketsToTry.push('pod');
       if (targetBucket !== DOC_BUCKET) bucketsToTry.push(DOC_BUCKET);
-
-      // Remove duplicates while preserving order
       const uniqueBuckets = [...new Set(bucketsToTry)];
 
       for (const bucket of uniqueBuckets) {
         try {
-          console.log(`[POD Resolver] Attempting to sign URL for job ${job.id || 'N/A'}: bucket=${bucket}, path=${storagePath}`);
           const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600);
           if (data?.signedUrl) {
-            console.log(`[POD Resolver] Successfully signed URL for job ${job.id || 'N/A'} in bucket ${bucket}`);
+            if (bucket !== targetBucket && job.id && !fieldName.includes('stop')) {
+              healJobRecord(job.id, fieldName, storagePath, bucket);
+            }
             return data.signedUrl;
           }
-          
-          if (error) {
-            if (!error.message?.includes('not found') && !error.message?.includes('The object was not found')) {
-              console.error(`[POD Resolver] Error signing for job ${job.id || 'N/A'}, bucket ${bucket}:`, error.message);
-            } else {
-              console.log(`[POD Resolver] Object not found in bucket ${bucket}: ${storagePath}`);
-            }
-          }
-        } catch (err: any) {
-          console.error(`[POD Resolver] Exception for job ${job.id || 'N/A'}, bucket ${bucket}:`, err.message);
-        }
+        } catch (err: any) {}
       }
 
-      // FINAL FALLBACK: If we couldn't create a signed URL, but it's a Supabase URL, 
-      // try to return it as-is or transform it to a public URL as a "best effort"
-      if (path.startsWith('http')) {
-        console.warn(`[POD Resolver] All signing attempts failed for job ${job.id || 'N/A'}, returning original public URL: ${path.substring(0, 50)}...`);
-        return path;
-      }
-
-      // If it's a raw path and everything failed, return a public URL attempt
-      console.log(`[POD Resolver] Raw path signing failed, returning public URL for job ${job.id || 'N/A'}: ${storagePath}`);
       const { data } = supabaseAdmin.storage.from(targetBucket).getPublicUrl(storagePath);
       return data?.publicUrl || path;
     };
 
-    // 1. Resolve main job POD items
+    const resolutions = [];
+    
     if (job.podPhotoUrl) {
-      resolved.podPhotoUrl = await resolveUrl(job.podPhotoUrl);
+      resolutions.push((async () => { 
+        resolved.podPhotoUrl = await resolveUrl(job.podPhotoUrl, 'podPhotoUrl'); 
+      })());
     }
 
-    // 2. Resolve multiple POD photos array (often used by mobile app)
     if (Array.isArray(job.podPhotos) && job.podPhotos.length > 0) {
-      resolved.podPhotos = await Promise.all(job.podPhotos.map(async (photoPath: string) => {
-        return await resolveUrl(photoPath);
-      }));
+      resolutions.push((async () => {
+        resolved.podPhotos = await Promise.all(job.podPhotos.map(p => resolveUrl(p, 'podPhotos')));
+      })());
     }
 
-    // 3. Resolve Signature
     if (job.podSignatureUrl) {
-      resolved.podSignatureUrl = await resolveUrl(job.podSignatureUrl);
+      resolutions.push((async () => { 
+        resolved.podSignatureUrl = await resolveUrl(job.podSignatureUrl, 'podSignatureUrl'); 
+      })());
     }
 
-    // 4. CRITICAL: Resolve POD URLs for multi-drop stops
     if (Array.isArray(resolved.multiDropStops) && resolved.multiDropStops.length > 0) {
-      resolved.multiDropStops = await Promise.all(resolved.multiDropStops.map(async (stop: any) => {
-        const resolvedStop = { ...stop };
-        if (stop.podPhotoUrl) {
-          resolvedStop.podPhotoUrl = await resolveUrl(stop.podPhotoUrl);
-        }
-        if (stop.podSignatureUrl) {
-          resolvedStop.podSignatureUrl = await resolveUrl(stop.podSignatureUrl);
-        }
-        // Also handle legacy or stop-specific pod_photo_url / pod_signature_url if they exist in snake_case
-        if (stop.pod_photo_url && !resolvedStop.podPhotoUrl) {
-          resolvedStop.podPhotoUrl = await resolveUrl(stop.pod_photo_url);
-        }
-        if (stop.pod_signature_url && !resolvedStop.podSignatureUrl) {
-          resolvedStop.podSignatureUrl = await resolveUrl(stop.pod_signature_url);
-        }
-        return resolvedStop;
-      }));
+      resolutions.push((async () => {
+        resolved.multiDropStops = await Promise.all(resolved.multiDropStops.map(async (stop: any) => {
+          const resolvedStop = { ...stop };
+          if (stop.podPhotoUrl) resolvedStop.podPhotoUrl = await resolveUrl(stop.podPhotoUrl, 'stopPhoto');
+          if (stop.podSignatureUrl) resolvedStop.podSignatureUrl = await resolveUrl(stop.podSignatureUrl, 'stopSignature');
+          return resolvedStop;
+        }));
+      })());
     }
 
+    await Promise.all(resolutions);
     return resolved;
   }));
 }
+
 async function resolveSingleJobPodUrls(job: any): Promise<any> {
   const resolved = (await resolveJobPodUrls([job]))[0];
   return resolved || job;
