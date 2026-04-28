@@ -538,8 +538,8 @@ function enforceAdminOrSupervisorAccess(req: Request, res: Response): boolean {
 // This must match the client-side config in client/src/lib/pricing.ts
 const PRICING_CONFIG = {
   vehicles: {
-    motorbike: { name: "Motorbike", baseCharge: 10, perMileRate: 1.3, rushHourRate: 1.5, maxDistance: 10 },
-    car: { name: "Car", baseCharge: 19, perMileRate: 1.2, rushHourRate: 1.4 },
+    motorbike: { name: "Motorbike", baseCharge: 12, perMileRate: 1.5, rushHourRate: 1.7, maxDistance: 10 },
+    car: { name: "Car", baseCharge: 22, perMileRate: 1.3, rushHourRate: 1.5 },
     small_van: { name: "Small Van", baseCharge: 25, perMileRate: 1.3, rushHourRate: 1.6 },
     medium_van: { name: "Medium Van", baseCharge: 30, perMileRate: 1.4, rushHourRate: 1.7 },
     lwb_van: { name: "LWB Van", baseCharge: 35, perMileRate: 1.6, rushHourRate: 1.8 },
@@ -558,11 +558,11 @@ function getBaseChargeForVehicle(vehicleType: string): number {
   return vehicle.baseCharge;
 }
 
-// Validation: ensure motorbike base price is never less than £10
+// Validation: ensure motorbike base price is never less than £12
 function validateBasePrice(vehicleType: string, basePrice: number): number {
-  if (vehicleType === 'motorbike' && basePrice < 10) {
-    console.warn(`[Pricing] Invalid motorbike base price £${basePrice}, correcting to £10.00`);
-    return 10;
+  if (vehicleType === 'motorbike' && basePrice < 12) {
+    console.warn(`[Pricing] Invalid motorbike base price £${basePrice}, correcting to £12.00`);
+    return 12;
   }
   const expectedBase = getBaseChargeForVehicle(vehicleType);
   if (basePrice < expectedBase * 0.9) {

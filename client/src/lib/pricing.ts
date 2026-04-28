@@ -42,17 +42,17 @@ export const defaultPricingConfig: PricingConfig = {
   vehicles: {
     motorbike: {
       name: "Motorbike",
-      baseCharge: 10,
-      perMileRate: 1.30,
-      rushHourRate: 1.50,
+      baseCharge: 12,
+      perMileRate: 1.50,
+      rushHourRate: 1.70,
       maxWeight: 5,
       maxDistance: 10,
     },
     car: {
       name: "Car",
-      baseCharge: 19,
-      perMileRate: 1.20,
-      rushHourRate: 1.40,
+      baseCharge: 22,
+      perMileRate: 1.30,
+      rushHourRate: 1.50,
       maxWeight: 50,
     },
     small_van: {
