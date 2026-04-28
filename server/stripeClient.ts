@@ -41,8 +41,8 @@ let stripeSync: any = null;
 function getConnectionString(): string | null {
   try {
     // First try DATABASE_URL if it looks like a valid postgres connection string
-    if (process.env.DATABASE_URL && (process.env.DATABASE_URL.startsWith('postgresql://') || process.env.DATABASE_URL.startsWith('postgres://'))) {
-      let connStr = process.env.DATABASE_URL;
+    if (process.env.DATABASE_URL && (process.env.DATABASE_URL.trim().startsWith('postgresql://') || process.env.DATABASE_URL.trim().startsWith('postgres://'))) {
+      let connStr = process.env.DATABASE_URL.trim();
       // Ensure SSL is enabled for secure connections
       if (!connStr.includes('sslmode=')) {
         connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
@@ -50,14 +50,14 @@ function getConnectionString(): string | null {
       return connStr;
     }
     
-    // Fall back to individual PG* variables (Replit built-in database)
+    // Fall back to individual PG* variables (matches db.ts precisely)
     if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
-      const host = process.env.PGHOST;
-      const port = process.env.PGPORT || '5432';
-      const user = encodeURIComponent(process.env.PGUSER);
-      const password = encodeURIComponent(process.env.PGPASSWORD);
-      const database = process.env.PGDATABASE;
-      // Add sslmode=require for secure connections to Neon/Supabase
+      const host = process.env.PGHOST.trim();
+      const port = (process.env.PGPORT || '5432').trim();
+      const user = process.env.PGUSER.trim();
+      const password = process.env.PGPASSWORD.trim();
+      const database = process.env.PGDATABASE.trim();
+      // Add sslmode=require for secure connections to Neon/Supabase/Hostinger
       return `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
     }
     
@@ -67,6 +67,7 @@ function getConnectionString(): string | null {
     return null;
   }
 }
+
 
 
 export async function getStripeSync() {
