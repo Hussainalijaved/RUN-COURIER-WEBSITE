@@ -260,10 +260,12 @@ export default function Quote() {
             finalVehicleType = switchTo;
             form.setValue('vehicleType', switchTo);
             toast({
-              title: 'Vehicle Changed',
-              description: `Distance exceeds ${defaultPricingConfig.vehicles[vehicleType].maxDistance} miles for ${vehicleType}. Switched to ${switchTo}.`,
+              title: 'Vehicle Automatically Changed',
+              description: `Motorbikes are limited to 10 miles. Since your delivery distance is ${(totalDistance + returnDistance).toFixed(1)} miles, we have upgraded your vehicle to a ${switchTo === 'car' ? 'Car' : 'Small Van'}.`,
+              duration: 10000,
             });
           }
+
           
           // Create scheduled time from date and time for rush hour calculation
           const scheduledTime = pickupDate && pickupTime 
@@ -562,6 +564,12 @@ export default function Quote() {
                                   <div className="text-xs text-muted-foreground">
                                     Up to {vehicle.maxWeight}kg
                                   </div>
+                                  {vehicle.type === 'motorbike' && (
+                                    <div className="text-[10px] text-primary font-medium mt-1">
+                                      Max 10 miles
+                                    </div>
+                                  )}
+
                                 </button>
                               );
                             })}
@@ -820,6 +828,11 @@ export default function Quote() {
                                 : `${estimatedTime} mins`}
                             </span>
                           </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Total Distance</span>
+                            <span className="font-medium">{distance.toFixed(1)} miles</span>
+                          </div>
+
                           <Separator />
                           <div className="flex justify-between font-semibold">
                             <span>Total</span>
