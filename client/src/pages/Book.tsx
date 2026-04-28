@@ -475,10 +475,12 @@ export default function Book() {
             finalVehicleType = switchTo;
             form.setValue('vehicleType', switchTo);
             toast({
-              title: 'Vehicle Changed',
-              description: `Distance exceeds ${defaultPricingConfig.vehicles[vehicleType].maxDistance} miles for ${vehicleType}. Switched to ${switchTo}.`,
+              title: 'Vehicle Automatically Changed',
+              description: `Motorbikes are limited to 10 miles. Since your delivery distance is ${(totalDistance + returnDistance).toFixed(1)} miles, we have upgraded your vehicle to a ${switchTo === 'car' ? 'Car' : 'Small Van'}.`,
+              duration: 10000,
             });
           }
+
           
           // Create scheduled time from selected pickup date/time for rush hour calculation
           const pickupDateVal = form.getValues('pickupDate');
@@ -821,7 +823,14 @@ export default function Book() {
                                       >
                                         <vehicle.icon className={`h-8 w-8 mx-auto mb-2 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                                         <div className="text-sm font-medium">{vehicle.name}</div>
-                                        <div className="text-xs text-muted-foreground">Up to {vehicle.maxWeight}kg</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          Up to {vehicle.maxWeight}kg
+                                        </div>
+                                        {vehicle.type === 'motorbike' && (
+                                          <div className="text-[10px] text-primary font-medium mt-1">
+                                            Max 10 miles
+                                          </div>
+                                        )}
                                       </button>
                                     );
                                   })}
@@ -988,9 +997,13 @@ export default function Book() {
                         <span className="text-muted-foreground">Vehicle</span>
                         <span className="font-medium">{selectedVehicle?.name}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between items-center text-sm py-1">
                         <span className="text-muted-foreground">Weight</span>
-                        <span>{weight} kg</span>
+                        <span className="font-semibold">{weight} kg</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm py-1">
+                        <span className="text-muted-foreground">Total Distance</span>
+                        <span className="font-semibold">{(distance + (booking.returnDistance || 0)).toFixed(1)} miles</span>
                       </div>
                       {isMultiDrop && multiDropStops.length > 0 && (
                         <div className="flex justify-between text-sm">
