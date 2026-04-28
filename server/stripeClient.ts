@@ -40,17 +40,25 @@ let stripeSync: any = null;
 
 function getConnectionString(): string | null {
   try {
-    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
-      return process.env.DATABASE_URL;
+    // First try DATABASE_URL if it looks like a valid postgres connection string
+    if (process.env.DATABASE_URL && (process.env.DATABASE_URL.startsWith('postgresql://') || process.env.DATABASE_URL.startsWith('postgres://'))) {
+      let connStr = process.env.DATABASE_URL;
+      // Ensure SSL is enabled for secure connections
+      if (!connStr.includes('sslmode=')) {
+        connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
+      }
+      return connStr;
     }
     
+    // Fall back to individual PG* variables (Replit built-in database)
     if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
       const host = process.env.PGHOST;
       const port = process.env.PGPORT || '5432';
       const user = encodeURIComponent(process.env.PGUSER);
       const password = encodeURIComponent(process.env.PGPASSWORD);
       const database = process.env.PGDATABASE;
-      return `postgresql://${user}:${password}@${host}:${port}/${database}`;
+      // Add sslmode=require for secure connections to Neon/Supabase
+      return `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
     }
     
     return null;
@@ -59,6 +67,7 @@ function getConnectionString(): string | null {
     return null;
   }
 }
+
 
 export async function getStripeSync() {
   if (!stripeSync) {
