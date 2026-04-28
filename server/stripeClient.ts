@@ -40,33 +40,35 @@ let stripeSync: any = null;
 
 function getConnectionString(): string | null {
   try {
-    // First try DATABASE_URL if it looks like a valid postgres connection string
-    if (process.env.DATABASE_URL && (process.env.DATABASE_URL.trim().startsWith('postgresql://') || process.env.DATABASE_URL.trim().startsWith('postgres://'))) {
+    // Match db.ts logic exactly to ensure we use the same working connection
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
       let connStr = process.env.DATABASE_URL.trim();
-      // Ensure SSL is enabled for secure connections
+      // Ensure SSL is enabled
       if (!connStr.includes('sslmode=')) {
         connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
       }
-      return connStr;
+      // Normalize to postgres:// for URL parser compatibility
+      return connStr.replace('postgresql://', 'postgres://');
     }
     
-    // Fall back to individual PG* variables (matches db.ts precisely)
+    // Fall back to individual PG* variables (exactly as db.ts does)
     if (process.env.PGHOST && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
       const host = process.env.PGHOST.trim();
       const port = (process.env.PGPORT || '5432').trim();
       const user = process.env.PGUSER.trim();
       const password = process.env.PGPASSWORD.trim();
       const database = process.env.PGDATABASE.trim();
-      // Add sslmode=require for secure connections to Neon/Supabase/Hostinger
-      return `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
+      // Use postgres:// for manual construction
+      return `postgres://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
     }
     
     return null;
   } catch (e) {
-    console.warn('[Stripe] Database connection error:', e);
+    console.warn('[Stripe] Database connection detection error:', e);
     return null;
   }
 }
+
 
 
 
