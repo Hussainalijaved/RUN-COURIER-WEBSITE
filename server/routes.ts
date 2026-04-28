@@ -949,22 +949,25 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
 
       let storagePath = path;
       let targetBucket = primaryBucket;
+      let rawPath = '';
 
       if (path.startsWith('http')) {
         const match = path.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^\/]+)\/(.+?)(?:\?.*)?$/);
         if (match) {
           targetBucket = match[1];
           storagePath = decodeURIComponent(match[2].split('?')[0]);
+          rawPath = storagePath;
         } else {
           return path;
         }
       } else {
-        const parts = path.split('/');
+        rawPath = decodeURIComponent(path.replace(/^\/+/, '').split('?')[0]);
+        const parts = rawPath.split('/');
         if (parts.length > 1 && ['pod', 'pod-images', 'driver-documents', 'DRIVER-DOCUMENTS'].includes(parts[0])) {
           targetBucket = parts[0].toLowerCase();
-          storagePath = decodeURIComponent(path.substring(parts[0].length + 1));
+          storagePath = rawPath.substring(parts[0].length + 1);
         } else {
-          storagePath = decodeURIComponent(path.replace(/^\/+/, '').split('?')[0]);
+          storagePath = rawPath;
         }
       }
       
@@ -974,25 +977,36 @@ async function resolveJobPodUrls(jobs: any[]): Promise<any[]> {
       if (targetBucket !== DOC_BUCKET) bucketsToTry.push(DOC_BUCKET);
       const uniqueBuckets = [...new Set(bucketsToTry)];
 
+      // Construct deduplicated paths to search
+      const pathsToTry = new Set<string>();
+      pathsToTry.add(storagePath);
+      if (rawPath) pathsToTry.add(rawPath);
+      // Older apps nested files correctly in "pod" but uploaded directly to other buckets without bucket prefix abstraction.
+      if (!storagePath.startsWith('pod/')) {
+        pathsToTry.add(`pod/${storagePath}`);
+      }
+
       for (const bucket of uniqueBuckets) {
-        try {
-          const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600);
-          if (data?.signedUrl) {
-            console.log(`[POD Resolver] SUCCESS: Found in ${bucket}: ${storagePath}`);
-            if (bucket !== targetBucket && job.id && !fieldName.includes('stop')) {
-              healJobRecord(job.id, fieldName, storagePath, bucket);
+        for (const attemptPath of Array.from(pathsToTry)) {
+          try {
+            const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(attemptPath, 3600);
+            if (data?.signedUrl) {
+              console.log(`[POD Resolver] SUCCESS: Found in ${bucket}: ${attemptPath}`);
+              if ((bucket !== targetBucket || attemptPath !== storagePath) && job.id && !fieldName.includes('stop')) {
+                healJobRecord(job.id, fieldName, attemptPath, bucket);
+              }
+              return data.signedUrl;
             }
-            return data.signedUrl;
+            if (error) {
+              console.log(`[POD Resolver] FAIL: Bucket ${bucket} path ${attemptPath}: ${error.message}`);
+            }
+          } catch (err: any) {
+               console.error(`[POD Resolver] EXCEPTION: Bucket ${bucket} path ${attemptPath}: ${err.message}`);
           }
-          if (error) {
-            console.log(`[POD Resolver] FAIL: Bucket ${bucket} path ${storagePath}: ${error.message}`);
-          }
-        } catch (err: any) {
-             console.error(`[POD Resolver] EXCEPTION: Bucket ${bucket} path ${storagePath}: ${err.message}`);
         }
       }
 
-      console.warn(`[POD Resolver] NOT FOUND in any bucket: ${storagePath}`);
+      console.warn(`[POD Resolver] NOT FOUND in any bucket for: ${storagePath} (raw: ${rawPath})`);
       const { data } = supabaseAdmin.storage.from(targetBucket).getPublicUrl(storagePath);
       return data?.publicUrl || path;
     };
