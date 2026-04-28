@@ -199,7 +199,14 @@ export async function sendAdminNotification(
   htmlContent: string,
   textContent?: string
 ): Promise<boolean> {
-  return sendEmailNotification(ADMIN_EMAIL, subject, htmlContent, textContent);
+  const adminEmails = ADMIN_EMAIL.split(',').map(e => e.trim()).filter(Boolean);
+  let anySuccess = false;
+  for (const email of adminEmails) {
+    if (await sendEmailNotification(email, subject, htmlContent, textContent)) {
+      anySuccess = true;
+    }
+  }
+  return anySuccess;
 }
 
 export async function sendQuoteNotification(data: {
@@ -263,13 +270,20 @@ export async function sendQuoteNotification(data: {
 
   const textContent = `New Quote Request\nPickup: ${data.pickupPostcode}\nDelivery: ${data.deliveryPostcode}\nVehicle: ${vehicle}\n${data.weight && Number(data.weight) > 0 ? `Weight: ${data.weight}kg\n` : ''}Distance: ${data.distance.toFixed(1)} miles\nDate: ${dateStr} ${timeStr}\nService Level: ${serviceLevelDisplay}\nQuoted Price: £${data.totalPrice.toFixed(2)}`;
 
-  return sendEmailNotification(
-    ADMIN_EMAIL,
-    `Quote Request: ${data.pickupPostcode} → ${data.deliveryPostcode} (£${data.totalPrice.toFixed(2)})`,
-    htmlContent,
-    textContent,
-    SENDER_EMAIL
-  );
+  const adminEmails = ADMIN_EMAIL.split(',').map(e => e.trim()).filter(Boolean);
+  let anySuccess = false;
+  for (const email of adminEmails) {
+    if (await sendEmailNotification(
+      email,
+      `Quote Request: ${data.pickupPostcode} → ${data.deliveryPostcode} (£${data.totalPrice.toFixed(2)})`,
+      htmlContent,
+      textContent,
+      SENDER_EMAIL
+    )) {
+      anySuccess = true;
+    }
+  }
+  return anySuccess;
 }
 
 export async function sendWelcomeEmail(
@@ -697,7 +711,7 @@ ${jobDetails.customerEmail ? `Customer Email: ${jobDetails.customerEmail}\n` : '
 Please log in to the admin dashboard to manage this booking.
 Run Courier - https://runcourier.co.uk`;
 
-  const adminEmails = [ADMIN_EMAIL];
+  const adminEmails = ADMIN_EMAIL.split(',').map(e => e.trim()).filter(Boolean);
   let anySuccess = false;
   for (const email of adminEmails) {
     try {
