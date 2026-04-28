@@ -504,10 +504,15 @@ export default function Book() {
             scheduledTime,
           });
           setQuote(calculatedQuote);
-          toast({
-            title: 'Quote Ready',
-            description: `Your delivery quote is £${calculatedQuote.totalPrice.toFixed(2)}`,
-          });
+          
+          // Show quote toast after a small delay if vehicle was switched to ensure both are seen
+          setTimeout(() => {
+            toast({
+              title: 'Quote Ready',
+              description: `Your delivery quote is £${calculatedQuote.totalPrice.toFixed(2)}`,
+            });
+          }, switchTo ? 1500 : 0);
+
           fetch('/api/quote-notification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
