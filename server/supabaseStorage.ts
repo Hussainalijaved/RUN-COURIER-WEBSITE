@@ -412,7 +412,7 @@ export class SupabaseStorage implements IStorage {
         maxDistance: null,
         baseCharge: "25.00",
         perMileRate: "1.30",
-        rushHourRate: "1.50",
+        rushHourRate: "1.60",
         iconUrl: null,
       }],
       ["medium_van", {
@@ -1792,7 +1792,17 @@ export class SupabaseStorage implements IStorage {
   }
 
   async calculateQuote(input: BookingQuoteInput): Promise<any> {
-    const vehicle = this.vehicles.get(input.vehicleType);
+    const distance = (input as any).distance || 0;
+    let vehicleTypeToUse = input.vehicleType;
+    let vehicle = this.vehicles.get(vehicleTypeToUse);
+    
+    if (vehicle && vehicle.maxDistance && distance > vehicle.maxDistance) {
+      if (vehicleTypeToUse === 'motorbike') {
+        vehicleTypeToUse = 'car';
+        vehicle = this.vehicles.get('car');
+      }
+    }
+
     if (!vehicle) throw new Error(`Invalid vehicle type: ${input.vehicleType}`);
 
     const baseCharge = parseFloat(vehicle.baseCharge);
@@ -1800,7 +1810,6 @@ export class SupabaseStorage implements IStorage {
       ? parseFloat(vehicle.rushHourRate || vehicle.perMileRate)
       : parseFloat(vehicle.perMileRate);
     
-    const distance = (input as any).distance || 0;
     const distanceCharge = distance * perMileRate;
     let total = baseCharge + distanceCharge;
 
@@ -1830,7 +1839,7 @@ export class SupabaseStorage implements IStorage {
       weightSurcharge: Math.round(weightSurcharge * 100) / 100,
       total: Math.round(total * 100) / 100,
       distance,
-      vehicleType: input.vehicleType,
+      vehicleType: vehicleTypeToUse,
       isRushHour: this.isRushHour(),
     };
   }
