@@ -44,8 +44,9 @@ export const defaultPricingConfig: PricingConfig = {
       name: "Motorbike",
       baseCharge: 10,
       perMileRate: 1.30,
-      rushHourRate: 1.60,
+      rushHourRate: 1.50,
       maxWeight: 5,
+      maxDistance: 10,
     },
     car: {
       name: "Car",
@@ -79,9 +80,10 @@ export const defaultPricingConfig: PricingConfig = {
       name: "Luton Van",
       baseCharge: 40,
       perMileRate: 1.70,
-      rushHourRate: 2.00,
+      rushHourRate: 1.90,
       maxWeight: 1200,
     },
+
   },
   weightSurcharges: [
     { min: 10,  max: 20,   charge: 10 },
@@ -292,16 +294,23 @@ export function getVehicleForWeightAndDistance(weight: number, distance: number)
   return "luton_van";
 }
 
-export function shouldSwitchVehicle(vehicleType: VehicleType, distance: number): VehicleType | null {
-  const vehicle = defaultPricingConfig.vehicles[vehicleType];
+export function shouldSwitchVehicle(currentType: VehicleType, distance: number, weight?: number): VehicleType | null {
+  const vehicle = defaultPricingConfig.vehicles[currentType];
   
+  // Rule: Distance limit (e.g. motorbike max 10 miles)
   if (vehicle.maxDistance && distance > vehicle.maxDistance) {
-    if (vehicleType === "motorbike") {
-      return "car";
-    }
+    if (currentType === 'motorbike') return 'car';
+    // Add other switch rules if needed
   }
+  
+  // Rule: Weight limit
+  if (weight !== undefined && weight > vehicle.maxWeight) {
+    return getVehicleForWeightAndDistance(weight, distance);
+  }
+  
   return null;
 }
+
 
 // Cache for fetched pricing config
 let cachedPricingConfig: PricingConfig | null = null;

@@ -429,7 +429,18 @@ async function runMigrations() {
       await db.execute(sql`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS phone TEXT`);
       await db.execute(sql`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS email TEXT`);
 
+      // Vehicles table updates
+      await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS max_distance INTEGER`);
+      
+      // Sync motorbike base charge and distance limit
+      await db.execute(sql`UPDATE vehicles SET base_charge = 10.00, max_distance = 10 WHERE type = 'motorbike'`);
+      
+      // Update LWB and Luton Van rates
+      await db.execute(sql`UPDATE vehicles SET base_charge = 35.00, per_mile_rate = 1.60, rush_hour_rate = 1.80 WHERE type = 'lwb_van'`);
+      await db.execute(sql`UPDATE vehicles SET base_charge = 40.00, per_mile_rate = 1.70, rush_hour_rate = 1.90 WHERE type = 'luton_van'`);
+
       console.log("[MIGRATION] Essential structural updates complete");
+
     } catch (e: any) {
       console.warn("[MIGRATION] Drizzle migration warning:", e?.message);
     }

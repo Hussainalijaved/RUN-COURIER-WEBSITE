@@ -91,11 +91,13 @@ export const vehicles = pgTable("vehicles", {
   name: text("name").notNull(),
   description: text("description"),
   maxWeight: integer("max_weight").notNull(),
+  maxDistance: integer("max_distance"), // Limit distance for specific vehicles (e.g. motorbike)
   baseCharge: decimal("base_charge", { precision: 10, scale: 2 }).notNull(),
   perMileRate: decimal("per_mile_rate", { precision: 10, scale: 2 }).notNull(),
   rushHourRate: decimal("rush_hour_rate", { precision: 10, scale: 2 }),
   iconUrl: text("icon_url"),
 });
+
 
 export const pricingSettings = pgTable("pricing_settings", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -436,8 +438,8 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertDriver = z.infer<typeof insertDriverSchema>;
 export type Driver = typeof drivers.$inferSelect;
-export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type Vehicle = typeof vehicles.$inferSelect;
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type InsertPricingSettings = z.infer<typeof insertPricingSettingsSchema>;
 export type PricingSettings = typeof pricingSettings.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;

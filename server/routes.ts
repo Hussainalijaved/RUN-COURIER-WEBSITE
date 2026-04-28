@@ -538,14 +538,16 @@ function enforceAdminOrSupervisorAccess(req: Request, res: Response): boolean {
 // This must match the client-side config in client/src/lib/pricing.ts
 const PRICING_CONFIG = {
   vehicles: {
-    motorbike: { name: "Motorbike", baseCharge: 10, perMileRate: 1.3 },
+    motorbike: { name: "Motorbike", baseCharge: 10, perMileRate: 1.3, maxDistance: 10 },
+
     car: { name: "Car", baseCharge: 19, perMileRate: 1.2 },
     small_van: { name: "Small Van", baseCharge: 25, perMileRate: 1.3 },
     medium_van: { name: "Medium Van", baseCharge: 30, perMileRate: 1.4 },
-    lwb_van: { name: "LWB Van", baseCharge: 35, perMileRate: 1.6 },
-    luton_van: { name: "Luton Van", baseCharge: 40, perMileRate: 1.7 },
+    lwb_van: { name: "LWB Van", baseCharge: 35, perMileRate: 1.6, rushHourRate: 1.8 },
+    luton_van: { name: "Luton Van", baseCharge: 40, perMileRate: 1.7, rushHourRate: 1.9 },
   }
 } as const;
+
 
 // Helper function to get base charge for any vehicle type
 function getBaseChargeForVehicle(vehicleType: string): number {

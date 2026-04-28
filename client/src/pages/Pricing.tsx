@@ -75,19 +75,23 @@ const additionalCharges = [
     icon: Weight,
     title: 'Weight Surcharges',
     items: [
-      '4-10 kg: +£5',
+      'Up to 10 kg: FREE',
       '10-20 kg: +£10',
       '20-30 kg: +£15',
       '30-50 kg: +£20',
-      'Over 50 kg: +£40',
+      '50-100 kg: +£40',
+      '100-400 kg: +£50',
+      'Over 400 kg: +£70',
     ],
+
   },
   {
     icon: MapPin,
     title: 'Central London',
     items: [
-      '+£15 surcharge',
-      'Applies to EC, WC, W1, SW1 postcodes',
+      '+£18.15 surcharge',
+      'Applies to EC, WC, W1, SW1, SE1, E1, N1, NW1 postcodes',
+
     ],
   },
   {
@@ -234,9 +238,10 @@ export default function Pricing() {
                   </div>
                   <div>
                     <h3 className="font-semibold mb-2">Evening Rush</h3>
-                    <p className="text-2xl font-bold text-primary">17:00 - 19:00</p>
+                    <p className="text-2xl font-bold text-primary">14:00 - 19:00</p>
                     <p className="text-sm text-muted-foreground">Higher per-mile rates apply</p>
                   </div>
+
                 </div>
               </CardContent>
             </Card>

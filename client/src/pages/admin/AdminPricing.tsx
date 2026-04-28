@@ -49,7 +49,9 @@ export default function AdminPricing() {
             perMileRate: parseFloat(v.perMileRate) || vehiclesMap[type].perMileRate,
             rushHourRate: parseFloat(v.rushHourRate || '0') || vehiclesMap[type].rushHourRate,
             maxWeight: v.maxWeight || vehiclesMap[type].maxWeight,
+            maxDistance: v.maxDistance || vehiclesMap[type].maxDistance,
           };
+
         }
       });
 
@@ -155,9 +157,11 @@ export default function AdminPricing() {
             baseCharge: vehicle.baseCharge.toString(),
             perMileRate: vehicle.perMileRate.toString(),
             rushHourRate: vehicle.rushHourRate.toString(),
+            maxDistance: vehicle.maxDistance,
           },
         });
       }
+
 
       clearPricingCache();
       queryClient.invalidateQueries({ queryKey: ['/api/pricing'] });
@@ -274,7 +278,19 @@ export default function AdminPricing() {
                         data-testid={`input-${type}-rushhour`}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Max Distance (mi)</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        value={vehicle.maxDistance || 0}
+                        placeholder="Unlimited"
+                        onChange={(e) => updateVehicle(type, 'maxDistance', parseInt(e.target.value) || 0)}
+                        data-testid={`input-${type}-maxdistance`}
+                      />
+                    </div>
                   </div>
+
                 </CardContent>
               </Card>
             );

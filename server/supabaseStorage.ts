@@ -383,39 +383,45 @@ export class SupabaseStorage implements IStorage {
         name: "Motorbike",
         description: "Fast delivery for small items up to 5kg",
         maxWeight: 5,
+        maxDistance: 10,
         baseCharge: "10.00",
         perMileRate: "1.30",
-        rushHourRate: "1.60",
+        rushHourRate: "1.50",
         iconUrl: null,
       }],
+
       ["car", {
         id: "2",
         type: "car" as VehicleType,
         name: "Car",
         description: "Standard delivery for medium items up to 50kg",
         maxWeight: 50,
+        maxDistance: null,
         baseCharge: "19.00",
         perMileRate: "1.20",
         rushHourRate: "1.40",
         iconUrl: null,
       }],
+
       ["small_van", {
         id: "3",
         type: "small_van" as VehicleType,
         name: "Small Van",
-        description: "Large deliveries up to 400kg",
+        description: "Large capacity for items up to 400kg",
         maxWeight: 400,
+        maxDistance: null,
         baseCharge: "25.00",
         perMileRate: "1.30",
-        rushHourRate: "1.60",
+        rushHourRate: "1.50",
         iconUrl: null,
       }],
       ["medium_van", {
         id: "4",
         type: "medium_van" as VehicleType,
         name: "Medium Van",
-        description: "Heavy deliveries up to 750kg",
+        description: "Great for bulky items up to 750kg",
         maxWeight: 750,
+        maxDistance: null,
         baseCharge: "30.00",
         perMileRate: "1.40",
         rushHourRate: "1.70",
@@ -425,8 +431,9 @@ export class SupabaseStorage implements IStorage {
         id: "5",
         type: "lwb_van" as VehicleType,
         name: "LWB Van",
-        description: "Extra-long deliveries up to 1000kg",
+        description: "Long wheelbase van for heavy loads up to 1000kg",
         maxWeight: 1000,
+        maxDistance: null,
         baseCharge: "35.00",
         perMileRate: "1.60",
         rushHourRate: "1.80",
@@ -436,11 +443,12 @@ export class SupabaseStorage implements IStorage {
         id: "6",
         type: "luton_van" as VehicleType,
         name: "Luton Van",
-        description: "Large volume deliveries up to 1200kg",
+        description: "Maximum space for large moves up to 1200kg",
         maxWeight: 1200,
+        maxDistance: null,
         baseCharge: "40.00",
         perMileRate: "1.70",
-        rushHourRate: "2.00",
+        rushHourRate: "1.90",
         iconUrl: null,
       }],
     ]);
@@ -1630,23 +1638,32 @@ export class SupabaseStorage implements IStorage {
             baseCharge: v.base_charge,
             perMileRate: v.per_mile_rate,
             rushHourRate: v.rush_hour_rate,
+            maxDistance: v.max_distance,
             iconUrl: v.icon_url,
           });
+
         }
         console.log(`[SupabaseStorage] Loaded ${data.length} vehicles from database`);
         
         const motorbikeVehicle = data.find((v: any) => v.type === 'motorbike');
-        if (motorbikeVehicle && parseFloat(motorbikeVehicle.base_charge) < 10) {
-          console.log(`[SupabaseStorage] Updating motorbike base charge from £${motorbikeVehicle.base_charge} to £10.00`);
-          await supabase
-            .from('vehicles')
-            .update({ base_charge: 10.00 })
-            .eq('type', 'motorbike');
-          const existing = this.vehicles.get('motorbike');
-          if (existing) {
-            existing.baseCharge = "10.00";
+        if (motorbikeVehicle) {
+
+          const currentBase = parseFloat(motorbikeVehicle.base_charge);
+          const currentMaxDist = motorbikeVehicle.max_distance;
+          if (currentBase < 10 || currentMaxDist !== 10) {
+            console.log(`[SupabaseStorage] Syncing motorbike: base=${currentBase}->10, maxDist=${currentMaxDist}->10`);
+            await supabase
+              .from('vehicles')
+              .update({ base_charge: 10.00, max_distance: 10 })
+              .eq('type', 'motorbike');
+            const existing = this.vehicles.get('motorbike');
+            if (existing) {
+              existing.baseCharge = "10.00";
+              (existing as any).maxDistance = 10;
+            }
           }
         }
+
 
         // Sync any vehicle types that exist in defaults but not yet in the Supabase database.
         // Note: Supabase vehicles table has a CHECK constraint on type — new types require a manual
@@ -1670,10 +1687,12 @@ export class SupabaseStorage implements IStorage {
               name: vehicle.name,
               description: vehicle.description,
               max_weight: vehicle.maxWeight,
+              max_distance: (vehicle as any).maxDistance || null,
               base_charge: vehicle.baseCharge,
               per_mile_rate: vehicle.perMileRate,
               rush_hour_rate: vehicle.rushHourRate,
               icon_url: vehicle.iconUrl,
+
             }, { onConflict: 'type' });
           if (insertError) {
             console.error(`[SupabaseStorage] Error inserting vehicle ${vehicle.type}:`, insertError);
@@ -1748,10 +1767,12 @@ export class SupabaseStorage implements IStorage {
         name: updated.name,
         description: updated.description,
         max_weight: updated.maxWeight,
+        max_distance: (updated as any).maxDistance || null,
         base_charge: updated.baseCharge,
         per_mile_rate: updated.perMileRate,
         rush_hour_rate: updated.rushHourRate,
         icon_url: updated.iconUrl,
+
       };
 
       const { error } = await supabase
