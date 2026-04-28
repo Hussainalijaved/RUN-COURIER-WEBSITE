@@ -262,8 +262,9 @@ export default function Quote() {
             toast({
               title: 'Vehicle Automatically Changed',
               description: `Motorbikes are limited to 10 miles. Since your delivery distance is ${(totalDistance + returnDistance).toFixed(1)} miles, we have upgraded your vehicle to a ${switchTo === 'car' ? 'Car' : 'Small Van'}.`,
-              duration: 10000,
+              duration: 20000,
             });
+
           }
 
           
