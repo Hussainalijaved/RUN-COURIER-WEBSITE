@@ -659,7 +659,7 @@ export function ActiveJobScreen({ navigation }: any) {
           return;
         }
         
-        // Update job status to 'delivered' in the jobs table (only status columns)
+        // Update job status and POD data in the jobs table
         const deliveredAt = new Date().toISOString();
         const { error: jobUpdateError } = await supabase
           .from('jobs')
@@ -667,6 +667,11 @@ export function ActiveJobScreen({ navigation }: any) {
             status: 'delivered',
             delivered_at: deliveredAt,
             updated_at: deliveredAt,
+            pod_photo_url: uploadResult.photos[0] || null,
+            pod_photos: uploadResult.photos,
+            pod_signature_url: uploadResult.signature || null,
+            pod_recipient_name: recipientName.trim() || null,
+            pod_notes: podNotes.trim() || null
           })
           .eq('id', activeJob.id);
 
@@ -875,20 +880,25 @@ export function ActiveJobScreen({ navigation }: any) {
         for (let i = 0; i < chars.length; i++) {
           lookup[chars.charCodeAt(i)] = i;
         }
-        let bufferLength = base64String.length * 0.75;
-        if (base64String[base64String.length - 1] === '=') bufferLength--;
-        if (base64String[base64String.length - 2] === '=') bufferLength--;
+        
+        // Remove padding and whitespace
+        const cleaned = base64String.replace(/=/g, '').replace(/[\s\n\r]/g, '');
+        const len = cleaned.length;
+        const bufferLength = Math.floor(len * 0.75);
+        
         const arraybuffer = new ArrayBuffer(bufferLength);
         const bytes = new Uint8Array(arraybuffer);
+        
         let p = 0;
-        for (let i = 0; i < base64String.length; i += 4) {
-          const encoded1 = lookup[base64String.charCodeAt(i)];
-          const encoded2 = lookup[base64String.charCodeAt(i + 1)];
-          const encoded3 = lookup[base64String.charCodeAt(i + 2)];
-          const encoded4 = lookup[base64String.charCodeAt(i + 3)];
-          bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-          bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-          bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+        for (let i = 0; i < len; i += 4) {
+          const encoded1 = lookup[cleaned.charCodeAt(i)];
+          const encoded2 = i + 1 < len ? lookup[cleaned.charCodeAt(i + 1)] : 0;
+          const encoded3 = i + 2 < len ? lookup[cleaned.charCodeAt(i + 2)] : 0;
+          const encoded4 = i + 3 < len ? lookup[cleaned.charCodeAt(i + 3)] : 0;
+          
+          if (p < bufferLength) bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+          if (p < bufferLength) bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+          if (p < bufferLength) bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
         }
         return arraybuffer;
       };
@@ -927,7 +937,7 @@ export function ActiveJobScreen({ navigation }: any) {
     }
   };
 
-  // Upload POD to Supabase Storage - uses 'pod' bucket with proper path format
+  // Upload POD to Supabase Storage - uses 'pod-images' bucket with proper path format
   const uploadPODToSupabase = async (): Promise<{ success: boolean; photos: string[]; signature?: string; error?: string }> => {
     if (!activeJob || !driverId) {
       return { success: false, photos: [], error: 'No active job or driver ID' };
@@ -963,7 +973,7 @@ export function ActiveJobScreen({ navigation }: any) {
           
           console.log(`[POD UPLOAD] Uploading photo ${index + 1}/${compressedPhotos.length}: ${filePath}`);
           
-          const result = await uploadFileToSupabase(photoUri, 'pod', filePath, 'image/jpeg');
+          const result = await uploadFileToSupabase(photoUri, 'pod-images', filePath, 'image/jpeg');
           
           if (!result.success) {
             throw new Error(result.error || `Photo ${index + 1} upload failed`);
@@ -1000,7 +1010,7 @@ export function ActiveJobScreen({ navigation }: any) {
 
           console.log('[POD UPLOAD] Uploading signature:', sigFilePath);
 
-          const sigResult = await uploadFileToSupabase(signatureData, 'pod', sigFilePath, 'image/png');
+          const sigResult = await uploadFileToSupabase(signatureData, 'pod-images', sigFilePath, 'image/png');
           
           if (!sigResult.success) {
             console.error('[POD UPLOAD] Signature upload failed:', sigResult.error);
