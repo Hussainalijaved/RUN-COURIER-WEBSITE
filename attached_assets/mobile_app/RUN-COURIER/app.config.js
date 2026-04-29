@@ -9,6 +9,12 @@ export default {
     icon: "./assets/images/icon.png",
     scheme: "runcourier",
     userInterfaceStyle: "automatic",
+    updates: {
+      url: "https://u.expo.dev/b47c7fde-4d57-42be-bfdf-4d6d73e12f46"
+    },
+    runtimeVersion: {
+      policy: "appVersion"
+    },
     newArchEnabled: true,
     ios: {
       supportsTablet: true,
