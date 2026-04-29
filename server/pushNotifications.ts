@@ -167,9 +167,11 @@ async function sendExpoPushNotifications(messages: ExpoPushMessage[]): Promise<E
   );
 
   if (validMessages.length === 0) {
-    log("No valid Expo push tokens to send to", "push");
+    log(`No valid Expo push tokens to send to (received ${messages.length} messages, 0 valid)`, "push");
     return [];
   }
+
+  log(`Sending ${validMessages.length} push notifications to Expo...`, "push");
 
   try {
     const response = await fetch("https://exp.host/--/api/v2/push/send", {
@@ -182,13 +184,35 @@ async function sendExpoPushNotifications(messages: ExpoPushMessage[]): Promise<E
       body: JSON.stringify(validMessages),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      log(`Expo API returned HTTP ${response.status}: ${errorText}`, "push");
+      return [];
+    }
+
     const result = await response.json();
     
     if (result.errors) {
-      log(`Expo push errors: ${JSON.stringify(result.errors)}`, "push");
+      log(`Expo push errors (top-level): ${JSON.stringify(result.errors)}`, "push");
     }
 
-    return result.data || [];
+    if (result.data) {
+      const tickets = result.data as ExpoPushTicket[];
+      const okCount = tickets.filter(t => t.status === "ok").length;
+      const errorCount = tickets.filter(t => t.status === "error").length;
+      
+      log(`Expo push results: ${okCount} ok, ${errorCount} errors`, "push");
+      
+      tickets.forEach((ticket, index) => {
+        if (ticket.status === "error") {
+          log(`  Error for token ${validMessages[index].to}: ${ticket.message} (${JSON.stringify(ticket.details)})`, "push");
+        }
+      });
+      
+      return tickets;
+    }
+
+    return [];
   } catch (error) {
     log(`Failed to send push notifications: ${error}`, "push");
     return [];

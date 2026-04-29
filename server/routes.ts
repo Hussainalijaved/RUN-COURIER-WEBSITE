@@ -1377,11 +1377,38 @@ export async function registerRoutes(
 
     if (result.success) {
       console.log(`[Mobile] ✅ Push token registered for driver ${driverId} (${normalizedPlatform})`);
+      log(`Driver ${driverId} registered ${normalizedPlatform} push token: ${pushToken.substring(0, 30)}...`, "push");
       return res.json({ success: true, deviceId: result.deviceId });
     } else {
       console.error(`[Mobile] ❌ Push token registration failed for driver ${driverId}:`, result.error);
+      log(`Push token registration FAILED for driver ${driverId}: ${result.error}`, "push");
       return res.status(500).json({ success: false, error: result.error || "Failed to register" });
     }
+  }));
+
+  // DEBUG: Check registered devices
+  app.get("/api/debug/push-devices", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
+    const { data: devices, error } = await supabaseAdmin
+      .from('driver_devices')
+      .select('*');
+    
+    if (error) return res.status(500).json({ error: error.message });
+    
+    const stats = {
+      total: devices?.length || 0,
+      platforms: devices?.reduce((acc: any, d: any) => {
+        acc[d.platform] = (acc[d.platform] || 0) + 1;
+        return acc;
+      }, {}),
+      sample: devices?.slice(0, 10).map((d: any) => ({
+        driver_id: d.driver_id,
+        token_prefix: d.push_token.substring(0, 20),
+        last_seen: d.last_seen_at
+      }))
+    };
+    
+    res.json(stats);
   }));
 
   // MOBILE: Driver removes their push token on logout
@@ -9404,22 +9431,26 @@ export async function registerRoutes(
   // DRIVER NOTICES (Admin)
   // ============================================
   app.get("/api/admin/notices", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
     const status = req.query.status as string | undefined;
     const notices = await storage.getDriverNotices(status ? { status } : undefined);
     res.json(notices);
   }));
 
   app.get("/api/admin/notices/recipient-driver-ids", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
     const driverIds = await storage.getAllNoticeRecipientDriverIds();
     res.json(driverIds);
   }));
 
   app.get("/api/admin/notices/driver/:driverId", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
     const notices = await storage.getDriverNoticeRecipients(req.params.driverId);
     res.json(notices);
   }));
 
   app.get("/api/admin/notices/:id", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
     const notice = await storage.getDriverNotice(req.params.id);
     if (!notice) return res.status(404).json({ error: "Notice not found" });
     const recipients = await storage.getNoticeRecipients(req.params.id);
@@ -9432,6 +9463,7 @@ export async function registerRoutes(
   }));
 
   app.post("/api/admin/notices/upload-image", uploadDocument.single('file'), asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: "Only image files are allowed (JPEG, PNG, GIF, WebP)" });
@@ -9446,6 +9478,7 @@ export async function registerRoutes(
   }));
 
   app.post("/api/admin/notices/send", asyncHandler(async (req, res) => {
+    if (!enforceAdminAccess(req, res)) return;
     const { title, subject, message, category, requires_acknowledgement, target_type, driver_ids, template_id, send_email, image_url, image_urls } = req.body;
     const allImageUrls: string[] = image_urls?.length ? image_urls : (image_url ? [image_url] : []);
     if (!title || !message) return res.status(400).json({ error: "Title and message are required" });
