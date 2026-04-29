@@ -23,7 +23,7 @@ import {
 import { stripeService, type BookingData } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { registerMobileRoutes } from "./mobileRoutes";
-import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification, wrapEmailContent, ADMIN_EMAIL, INFO_EMAIL, SENDER_EMAIL } from "./emailService";
+import { sendNewJobNotification, sendDriverApplicationNotification, sendDocumentUploadNotification, sendPaymentNotification, sendContactFormSubmission, sendPasswordResetEmail, sendWelcomeEmail, sendNewRegistrationNotification, sendCustomerBookingConfirmation, sendPaymentLinkEmail, sendPaymentConfirmationEmail, sendPaymentLinkFailureNotification, sendBusinessQuoteEmail, sendEmailVerification, sendJobCancellationEmail, sendDeliveryConfirmationEmail, sendEmailNotification, sendQuoteNotification, sendAdminNotification, wrapEmailContent, ADMIN_EMAIL, INFO_EMAIL, SENDER_EMAIL, INFO_SENDER_EMAIL } from "./emailService";
 import { sendBookingConfirmationSMS, sendPickupNotificationSMS, sendDeliveredSMS, sendStatusUpdateSMS, sendDriverJobAssignmentSMS, sendAdminNewBookingAlert } from "./twilioService";
 import { createHash, randomBytes } from "crypto";
 import { broadcastJobUpdate, broadcastJobCreated, broadcastJobAssigned, broadcastDocumentPending, broadcastJobWithdrawn, broadcastDriverAvailability, broadcastProfileUpdate } from "./realtime";
@@ -9467,21 +9467,22 @@ export async function registerRoutes(
           if (driver.email) {
             try {
               console.log(`[Notices] Sending email to driver: ${driver.email}`);
+              const noticeHtml = `
+                <h2 style="color: #1a1a1a; margin-top: 0;">${title}</h2>
+                ${subject ? `<p style="color: #666; font-size: 14px;">${subject}</p>` : ''}
+                <div style="margin: 20px 0; padding: 20px; background: #ffffff; border-radius: 8px; border: 1px solid #e0e0e0;">
+                  ${message.replace(/\n/g, '<br>')}
+                </div>
+                ${allImageUrls.length > 0 ? allImageUrls.map((url: string) => `<div style="margin: 16px 0; text-align: center;"><img src="${url}" alt="Notice attachment" style="max-width: 100%; max-height: 500px; border-radius: 6px; border: 1px solid #e0e0e0;" /></div>`).join('') : ''}
+                ${requires_acknowledgement ? '<p style="color: #e55; font-weight: bold;">This notice requires your acknowledgement. Please log in to your driver account to acknowledge.</p>' : ''}
+                <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
+              `;
               await sendEmailNotification(
                 driver.email,
                 subject || title,
-                `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #1a1a1a;">${title}</h2>
-                  ${subject ? `<p style="color: #666; font-size: 14px;">${subject}</p>` : ''}
-                  <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;">
-                    ${message.replace(/\n/g, '<br>')}
-                  </div>
-                  ${allImageUrls.length > 0 ? allImageUrls.map((url: string) => `<div style="margin: 16px 0; text-align: center;"><img src="${url}" alt="Notice attachment" style="max-width: 100%; max-height: 500px; border-radius: 6px; border: 1px solid #e0e0e0;" /></div>`).join('') : ''}
-                  ${requires_acknowledgement ? '<p style="color: #e55; font-weight: bold;">This notice requires your acknowledgement. Please log in to your driver account to acknowledge.</p>' : ''}
-                  <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
-                </div>`,
+                wrapEmailContent(noticeHtml, 'Driver Notice'),
                 message,
-                SENDER_EMAIL
+                INFO_SENDER_EMAIL
               );
             } catch (emailErr: any) {
               console.warn(`[Notices] Failed to email ${driver.email}:`, emailErr.message);
@@ -9541,16 +9542,16 @@ export async function registerRoutes(
             await sendEmailNotification(
               r.driver_email,
               notice.subject || notice.title,
-              `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #1a1a1a;">${notice.title}</h2>
+              wrapEmailContent(`
+                <h2 style="color: #1a1a1a; margin-top: 0;">${notice.title}</h2>
                 ${notice.subject ? `<p style="color: #666; font-size: 14px;">${notice.subject}</p>` : ''}
-                <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+                <div style="margin: 20px 0; padding: 20px; background: #ffffff; border-radius: 8px; border: 1px solid #e0e0e0;">
                   ${notice.message.replace(/\n/g, '<br>')}
                 </div>
                 <p style="color: #666; font-size: 13px; margin-top: 20px;">Please also review this notice in your Run Courier driver account.</p>
-              </div>`,
+              `, 'Driver Notice'),
               notice.message,
-              SENDER_EMAIL
+              INFO_SENDER_EMAIL
             );
             sentCount++;
           } catch (e: any) { console.warn(`[Notices] Resend email failed for ${r.driver_email}`); }

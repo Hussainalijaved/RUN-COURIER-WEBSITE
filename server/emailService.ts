@@ -19,10 +19,13 @@ const APP_STORE_BADGE_URL = 'https://tools.applemediaservices.com/api/badges/dow
 // Primary notification emails - Centralized configuration
 export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'sales@runcourier.co.uk';
 export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'support@runcourier.co.uk';
-export const INFO_EMAIL = process.env.INFO_EMAIL || 'sales@runcourier.co.uk';
+export const INFO_EMAIL = process.env.INFO_EMAIL || 'info@runcourier.co.uk';
 
 // VERIFIED SENDER - Must be from a domain verified in Resend (runcourier.co.uk)
 export const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL || 'Run Courier <sales@runcourier.co.uk>';
+
+// INFO SENDER - Used for driver notices and operational communications
+export const INFO_SENDER_EMAIL = 'Run Courier <info@runcourier.co.uk>';
 
 // Reusable email header with logo
 function getEmailHeader(title?: string): string {
@@ -1290,7 +1293,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       </table>
     </div>
     
-    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a></p>
+    <p style="color: #333; font-size: 14px;">If you have any questions about this invoice, please contact us at <a href="mailto:${INFO_EMAIL}" style="color: #007BFF;">${INFO_EMAIL}</a></p>
     <p style="color: #333; font-size: 14px;">Thank you for choosing Run Courier.</p>
   `;
 
@@ -1301,7 +1304,7 @@ export async function sendInvoiceToCustomerWithPaymentLink(
       `- ${job.trackingNumber}: ${job.pickupAddress.substring(0, 30)}... to ${job.deliveryAddress ? job.deliveryAddress.substring(0, 30) + '...' : job.recipientName || 'N/A'} (${job.scheduledDate}) - £${job.price.toFixed(2)}`
     ).join('\n')}\n` : '';
   
-  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\nPAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at INFO_EMAIL\n\nThank you for choosing Run Courier.`;
+  const textContent = `INVOICE from Run Courier\n\n${companyName ? `Bill To: ${customerName}\n${companyName}\n${businessAddress || ''}\n\n` : `Dear ${customerName},\n\n`}Please find below details of your invoice:\n\nInvoice Number: ${invoiceNumber}\nInvoice Date: ${new Date().toLocaleDateString('en-GB')}\nAmount Due: £${typeof amount === 'number' ? amount.toFixed(2) : amount}\nPeriod: ${periodStart} - ${periodEnd}\nDue Date: ${dueDate}\n${jobsTextList}\nPAY NOW WITH CARD\nClick this link to pay securely via Stripe:\n${paymentUrl}\n\nOR PAY BY BANK TRANSFER\nAccount Name: RUN COURIER\nSort Code: 30-99-50\nAccount Number: 36113363\nReference: ${invoiceNumber}\n\nIf you have any questions, please contact us at ${INFO_EMAIL}\n\nThank you for choosing Run Courier.`;
 
   return sendEmailNotification(customerEmail, `Invoice ${invoiceNumber} - Run Courier`, htmlContent, textContent);
 }
@@ -1594,11 +1597,11 @@ export async function sendApplicationCorrectionEmail(
       </div>
       <p style="color: #333;">Please visit <a href="https://runcourier.co.uk/apply" style="color: #007BFF;">runcourier.co.uk/apply</a> to resubmit your application with the required corrections.</p>
     </div>
-    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a> or call +44 20 4634 6100.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:${INFO_EMAIL}" style="color: #007BFF;">${INFO_EMAIL}</a> or call +44 20 4634 6100.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Corrections Required');
-  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. After reviewing your submission, we need you to make some corrections.\n\nWhat needs to be fixed:\n${feedback}\n\nPlease visit runcourier.co.uk/apply to resubmit your application.\n\nIf you have questions, contact INFO_EMAIL or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. After reviewing your submission, we need you to make some corrections.\n\nWhat needs to be fixed:\n${feedback}\n\nPlease visit runcourier.co.uk/apply to resubmit your application.\n\nIf you have questions, contact ${INFO_EMAIL} or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Application Corrections Required - Run Courier', htmlContent, textContent);
 }
@@ -1619,11 +1622,11 @@ export async function sendDocumentRequestEmail(
       </div>
       <p style="color: #333;">Please reply to this email with the requested documents, or contact us if you have any questions.</p>
     </div>
-    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a> or call +44 20 4634 6100.</p>
+    <p style="color: #333; font-size: 14px; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:${INFO_EMAIL}" style="color: #007BFF;">${INFO_EMAIL}</a> or call +44 20 4634 6100.</p>
   `;
 
   const htmlContent = wrapEmailContent(content, 'Documents Required');
-  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. We need you to upload some additional documents before we can complete your review.\n\nMessage from our team:\n${message}\n\nPlease reply to this email with the requested documents, or contact us if you have any questions.\n\nIf you have questions, contact INFO_EMAIL or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
+  const textContent = `Dear ${fullName},\n\nThank you for your application to join Run Courier. We need you to upload some additional documents before we can complete your review.\n\nMessage from our team:\n${message}\n\nPlease reply to this email with the requested documents, or contact us if you have any questions.\n\nIf you have questions, contact ${INFO_EMAIL} or call +44 20 4634 6100.\n\nRun Courier - https://runcourier.co.uk`;
 
   return sendEmailNotification(email, 'Documents Required - Run Courier', htmlContent, textContent);
 }
@@ -2525,7 +2528,7 @@ export async function sendFailedDeliveryEmail(customerEmail: string, data: {
       <p style="color: #333; margin: 0 0 10px; font-size: 14px;"><strong>Need Help?</strong></p>
       <p style="color: #333; margin: 0; font-size: 14px;">
         Call us: <a href="tel:+447311121217" style="color: #007BFF; font-weight: bold;">+44 7311 121 217</a><br>
-        Email: <a href="mailto:INFO_EMAIL" style="color: #007BFF;">INFO_EMAIL</a>
+        Email: <a href="mailto:${INFO_EMAIL}" style="color: #007BFF;">${INFO_EMAIL}</a>
       </p>
     </div>
   `;
