@@ -5838,22 +5838,33 @@ export async function registerRoutes(
     const driverIds = [...new Set([driverId, driverUserId].filter(Boolean))];
     console.log(`[Drivers] Starting PERMANENT deletion of driver (IDs: ${driverIds.join(', ')}, email: ${driverEmail})`);
     
-    // First, find the actual Supabase Auth user ID by email (using direct lookup, not listUsers)
+    // First, find the actual Supabase Auth user ID by email
     let authUserId: string | null = null;
     try {
       const { supabaseAdmin } = await import("./supabaseAdmin");
       if (supabaseAdmin && driverEmail) {
-        // Direct lookup by email - more reliable than listUsers which is paginated
-        const { data: userData, error } = await supabaseAdmin.auth.admin.getUserById(driverId);
-        if (!error && userData?.user) {
-          authUserId = userData.user.id;
-          console.log(`[Drivers] Found auth user ID by driver ID: ${authUserId}`);
-        } else if (driverUserId !== driverId) {
-          // Try with userId
-          const { data: userData2 } = await supabaseAdmin.auth.admin.getUserById(driverUserId);
-          if (userData2?.user) {
-            authUserId = userData2.user.id;
-            console.log(`[Drivers] Found auth user ID by user ID: ${authUserId}`);
+        // Direct lookup by email using listUsers (Supabase Admin API doesn't have a direct getUserByEmail in all versions)
+        const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+        if (!listError && users) {
+          const user = users.find(u => u.email?.toLowerCase() === driverEmail.toLowerCase());
+          if (user) {
+            authUserId = user.id;
+            console.log(`[Drivers] Found auth user ID by email: ${authUserId}`);
+          }
+        }
+        
+        // If not found by email, try the driverId and driverUserId as fallback
+        if (!authUserId) {
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(driverId);
+          if (userData?.user) {
+            authUserId = userData.user.id;
+            console.log(`[Drivers] Found auth user ID by driver ID: ${authUserId}`);
+          } else if (driverUserId !== driverId && driverUserId) {
+            const { data: userData2 } = await supabaseAdmin.auth.admin.getUserById(driverUserId);
+            if (userData2?.user) {
+              authUserId = userData2.user.id;
+              console.log(`[Drivers] Found auth user ID by user ID: ${authUserId}`);
+            }
           }
         }
         
@@ -6077,6 +6088,17 @@ export async function registerRoutes(
         for (const id of driverIds) {
           await supabaseAdmin.from('drivers').delete().eq('user_id', id);
         }
+        
+        // CRITICAL: Also delete from driver_applications to prevent background task from re-creating the driver
+        if (driverEmail) {
+          const { error: appDelErr } = await supabaseAdmin.from('driver_applications').delete().eq('email', driverEmail);
+          if (appDelErr) {
+            console.error(`[Drivers] Failed to delete applications for ${driverEmail}:`, appDelErr);
+          } else {
+            console.log(`[Drivers] Deleted all applications for ${driverEmail}`);
+          }
+        }
+
         console.log(`[Drivers] Deleted driver from Supabase drivers table`);
       }
     } catch (e) {
