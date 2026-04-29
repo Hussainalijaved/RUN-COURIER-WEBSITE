@@ -2952,7 +2952,7 @@ export async function registerRoutes(
     const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `stop_${stopId}_${timestamp}${ext}`;
     const BUCKET = 'pod-images';
-    const storagePath = `pod/${jobId}/${finalFilename}`;
+    const storagePath = `job_${jobId}/${finalFilename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     const fileBuffer = req.file.buffer;
 
@@ -3341,7 +3341,7 @@ export async function registerRoutes(
     const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `stop_${stopId}_${timestamp}${ext}`;
     const BUCKET = 'pod-images';
-    const storagePath = `pod/${jobId}/${finalFilename}`;
+    const storagePath = `job_${jobId}/${finalFilename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     const fileBuffer = req.file.buffer;
 
@@ -4670,7 +4670,7 @@ export async function registerRoutes(
     const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, '');
     const finalFilename = `pod_${timestamp}${ext}`;
     const BUCKET = 'pod-images';
-    const storagePath = `pod/${jobId}/${finalFilename}`;
+    const storagePath = `job_${jobId}/${finalFilename}`;
     const contentType = req.file.mimetype || 'image/jpeg';
     const fileBuffer = req.file.buffer;
 

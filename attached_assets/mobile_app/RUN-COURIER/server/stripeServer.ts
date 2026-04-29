@@ -13,11 +13,11 @@ let resendConnectionSettings: any = null;
 
 async function getResendCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
+  const xReplitToken = process.env.REPL_IDENTITY
+    ? 'repl ' + process.env.REPL_IDENTITY
+    : process.env.WEB_REPL_RENEWAL
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL
+      : null;
 
   if (!xReplitToken || !hostname) {
     console.log('[EMAIL] Resend credentials not available (running locally)');
@@ -39,7 +39,7 @@ async function getResendCredentials() {
       console.log('[EMAIL] Resend not connected');
       return null;
     }
-    
+
     return {
       apiKey: resendConnectionSettings.settings.api_key,
       fromEmail: resendConnectionSettings.settings.from_email || 'noreply@runcourier.co.uk'
@@ -53,7 +53,7 @@ async function getResendCredentials() {
 async function getResendClient() {
   const credentials = await getResendCredentials();
   if (!credentials) return null;
-  
+
   return {
     client: new Resend(credentials.apiKey),
     fromEmail: credentials.fromEmail
@@ -63,7 +63,7 @@ async function getResendClient() {
 const app = express();
 
 // Configure multer for file uploads (memory storage)
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
@@ -84,7 +84,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 // Supabase admin client for server-side operations
 const supabaseUrl = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
+const supabaseAdmin = supabaseUrl && supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : null;
 
@@ -95,26 +95,26 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
 app.post('/api/geocode', async (req: Request, res: Response) => {
   try {
     const { postcode } = req.body;
-    
+
     if (!postcode) {
       return res.status(400).json({ error: 'Postcode is required' });
     }
-    
+
     console.log('[GEOCODE] Request for postcode:', postcode);
-    
+
     // Try Google Maps API first if configured
     if (GOOGLE_MAPS_API_KEY) {
       try {
         const encodedPostcode = encodeURIComponent(`${postcode}, UK`);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedPostcode}&key=${GOOGLE_MAPS_API_KEY}`;
-        
+
         const response = await fetch(url);
         const data = await response.json();
-        
+
         if (data.status === 'OK' && data.results && data.results.length > 0) {
           const location = data.results[0].geometry.location;
           console.log('[GEOCODE] Google Maps success:', postcode, '→', location);
-          
+
           return res.json({
             lat: location.lat,
             lng: location.lng,
@@ -127,18 +127,18 @@ app.post('/api/geocode', async (req: Request, res: Response) => {
         console.log('[GEOCODE] Google Maps error, trying fallback:', googleError.message);
       }
     }
-    
+
     // Fallback to free postcodes.io API (UK postcodes only)
     try {
       const cleanPostcode = postcode.replace(/\s+/g, '').toUpperCase();
       const fallbackUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(cleanPostcode)}`;
-      
+
       const fallbackResponse = await fetch(fallbackUrl);
       const fallbackData = await fallbackResponse.json();
-      
+
       if (fallbackData.status === 200 && fallbackData.result) {
         console.log('[GEOCODE] Postcodes.io success:', cleanPostcode);
-        
+
         return res.json({
           lat: fallbackData.result.latitude,
           lng: fallbackData.result.longitude,
@@ -150,10 +150,10 @@ app.post('/api/geocode', async (req: Request, res: Response) => {
     } catch (fallbackError: any) {
       console.log('[GEOCODE] Postcodes.io error:', fallbackError.message);
     }
-    
+
     // Both services failed
     return res.status(400).json({ error: 'Could not geocode postcode' });
-    
+
   } catch (error: any) {
     console.error('[GEOCODE] Error:', error.message);
     res.status(500).json({ error: 'Failed to geocode postcode' });
@@ -164,45 +164,45 @@ app.post('/api/geocode', async (req: Request, res: Response) => {
 app.post('/api/calculate-distance', async (req: Request, res: Response) => {
   try {
     const { pickup, delivery } = req.body;
-    
+
     if (!pickup || !pickup.lat || !pickup.lng) {
       return res.status(400).json({ error: 'Pickup coordinates are required' });
     }
-    
+
     if (!delivery || !delivery.lat || !delivery.lng) {
       return res.status(400).json({ error: 'Delivery coordinates are required' });
     }
-    
+
     if (!GOOGLE_MAPS_API_KEY) {
       console.error('GOOGLE_MAPS_API_KEY not configured');
       return res.status(500).json({ error: 'Distance service not configured' });
     }
-    
+
     const origins = `${pickup.lat},${pickup.lng}`;
     const destinations = `${delivery.lat},${delivery.lng}`;
     const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins}&destinations=${destinations}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
-    
+
     console.log('[DISTANCE] Request:', { pickup, delivery });
-    
+
     const response = await fetch(url);
     const data = await response.json();
-    
+
     if (data.status !== 'OK') {
       console.log('[DISTANCE] API error:', data.status);
       return res.status(400).json({ error: 'Distance Matrix API error', status: data.status });
     }
-    
+
     const element = data.rows?.[0]?.elements?.[0];
     if (!element || element.status !== 'OK') {
       console.log('[DISTANCE] No route found:', element?.status);
       return res.status(400).json({ error: 'No route found', status: element?.status });
     }
-    
+
     const distanceMeters = element.distance.value;
     const distanceMiles = distanceMeters / 1609.344; // Convert meters to miles
-    
+
     console.log('[DISTANCE] Success:', { distanceMeters, distanceMiles: distanceMiles.toFixed(2) });
-    
+
     res.json({
       distanceMeters,
       distanceMiles: parseFloat(distanceMiles.toFixed(2)),
@@ -219,24 +219,24 @@ app.post('/api/calculate-distance', async (req: Request, res: Response) => {
 app.post('/api/places/autocomplete', async (req: Request, res: Response) => {
   try {
     const { input } = req.body;
-    
+
     if (!input || input.trim().length < 2) {
       return res.json({ predictions: [] });
     }
-    
+
     if (!GOOGLE_MAPS_API_KEY) {
       console.error('[PLACES] GOOGLE_MAPS_API_KEY not configured');
       return res.status(500).json({ error: 'Places API not configured' });
     }
-    
+
     console.log('[PLACES AUTOCOMPLETE] Request:', input);
-    
+
     const encodedInput = encodeURIComponent(input);
     const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodedInput}&components=country:uk&types=geocode|postal_code&key=${GOOGLE_MAPS_API_KEY}`;
-    
+
     const response = await fetch(url);
     const data = await response.json();
-    
+
     if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
       console.log('[PLACES AUTOCOMPLETE] Success:', data.predictions?.length || 0, 'results');
       return res.json({
@@ -247,10 +247,10 @@ app.post('/api/places/autocomplete', async (req: Request, res: Response) => {
         })) || []
       });
     }
-    
+
     console.log('[PLACES AUTOCOMPLETE] Error:', data.status, data.error_message);
     return res.status(400).json({ error: data.error_message || data.status });
-    
+
   } catch (error: any) {
     console.error('[PLACES AUTOCOMPLETE] Error:', error.message);
     res.status(500).json({ error: 'Failed to fetch autocomplete suggestions' });
@@ -261,27 +261,27 @@ app.post('/api/places/autocomplete', async (req: Request, res: Response) => {
 app.post('/api/places/details', async (req: Request, res: Response) => {
   try {
     const { place_id } = req.body;
-    
+
     if (!place_id) {
       return res.status(400).json({ error: 'place_id is required' });
     }
-    
+
     if (!GOOGLE_MAPS_API_KEY) {
       console.error('[PLACES DETAILS] GOOGLE_MAPS_API_KEY not configured');
       return res.status(500).json({ error: 'Places API not configured' });
     }
-    
+
     console.log('[PLACES DETAILS] Request:', place_id);
-    
+
     const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=formatted_address,geometry,address_components&key=${GOOGLE_MAPS_API_KEY}`;
-    
+
     const response = await fetch(url);
     const data = await response.json();
-    
+
     if (data.status === 'OK' && data.result) {
       const result = data.result;
       const location = result.geometry?.location;
-      
+
       // Extract postcode from address components
       let postcode = '';
       const addressComponents = result.address_components || [];
@@ -291,14 +291,14 @@ app.post('/api/places/details', async (req: Request, res: Response) => {
           break;
         }
       }
-      
+
       console.log('[PLACES DETAILS] Success:', {
         address: result.formatted_address,
         lat: location?.lat,
         lng: location?.lng,
         postcode
       });
-      
+
       return res.json({
         formatted_address: result.formatted_address,
         lat: location?.lat,
@@ -307,10 +307,10 @@ app.post('/api/places/details', async (req: Request, res: Response) => {
         address_components: addressComponents
       });
     }
-    
+
     console.log('[PLACES DETAILS] Error:', data.status, data.error_message);
     return res.status(400).json({ error: data.error_message || data.status });
-    
+
   } catch (error: any) {
     console.error('[PLACES DETAILS] Error:', error.message);
     res.status(500).json({ error: 'Failed to fetch place details' });
@@ -319,22 +319,22 @@ app.post('/api/places/details', async (req: Request, res: Response) => {
 
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
+
   if (!webhookSecret) {
     console.error('STRIPE_WEBHOOK_SECRET not configured - rejecting webhook');
     return res.status(500).json({ error: 'Webhook not configured' });
   }
 
   let event: any;
-  
+
   try {
     const stripe = await getUncachableStripeClient();
     const signature = req.headers['stripe-signature'] as string;
-    
+
     if (!signature) {
       return res.status(400).json({ error: 'Missing stripe-signature header' });
     }
-    
+
     event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message);
@@ -346,7 +346,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object;
         console.log('Payment succeeded:', paymentIntent.id);
-        
+
         const bookingId = paymentIntent.metadata?.bookingId;
         if (bookingId) {
           try {
@@ -358,11 +358,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         }
         break;
       }
-      
+
       case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object;
         console.log('Payment failed:', paymentIntent.id);
-        
+
         const bookingId = paymentIntent.metadata?.bookingId;
         if (bookingId) {
           try {
@@ -380,7 +380,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         console.log('Charge refunded:', charge.id);
         break;
       }
-      
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -407,19 +407,19 @@ const NEW_USER_DISCOUNT_MAX_BOOKINGS = 3;
 
 async function getCustomerCompletedBookingsCount(customerId: string): Promise<number> {
   if (!supabaseAdmin || !customerId) return 999;
-  
+
   try {
     const { count, error } = await supabaseAdmin
       .from('customer_bookings')
       .select('id', { count: 'exact', head: true })
       .eq('customer_id', customerId)
       .in('status', ['delivered', 'completed', 'paid']);
-    
+
     if (error) {
       console.log('[DISCOUNT] Error fetching booking count:', error.message);
       return 999;
     }
-    
+
     console.log('[DISCOUNT] Customer', customerId, 'has', count, 'completed bookings');
     return count || 0;
   } catch (e: any) {
@@ -440,7 +440,7 @@ function calculateNewUserDiscount(originalAmount: number, completedBookings: num
   const discountAmount = isEligible ? Math.round(originalAmount * (discountPercent / 100) * 100) / 100 : 0;
   const finalAmount = Math.round((originalAmount - discountAmount) * 100) / 100;
   const remainingDiscountBookings = Math.max(0, NEW_USER_DISCOUNT_MAX_BOOKINGS - completedBookings - 1);
-  
+
   return {
     isEligible,
     discountAmount,
@@ -463,11 +463,11 @@ app.post('/api/stripe/create-payment-intent', async (req: Request, res: Response
     // Check for new user discount eligibility
     let finalAmount = amount;
     let discountInfo = null;
-    
+
     if (applyNewUserDiscount && customerId) {
       const completedBookings = await getCustomerCompletedBookingsCount(customerId);
       const discount = calculateNewUserDiscount(amount, completedBookings);
-      
+
       if (discount.isEligible) {
         finalAmount = discount.finalAmount;
         discountInfo = {
@@ -526,20 +526,20 @@ app.post('/api/stripe/confirm-payment', async (req: Request, res: Response) => {
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     const succeeded = paymentIntent.status === 'succeeded';
-    
+
     if (succeeded) {
       const metadataBookingId = paymentIntent.metadata?.bookingId;
-      
+
       if (!metadataBookingId) {
         console.error('No bookingId in PaymentIntent metadata');
         return res.json({ status: paymentIntent.status, succeeded, error: 'No booking associated with payment' });
       }
-      
+
       if (bookingId && bookingId !== metadataBookingId) {
         console.error(`Booking ID mismatch: requested ${bookingId}, payment has ${metadataBookingId}`);
         return res.status(403).json({ error: 'Booking ID does not match payment' });
       }
-      
+
       try {
         await updateBookingPaymentStatus(metadataBookingId, paymentIntentId, 'confirmed');
       } catch (dbError) {
@@ -622,12 +622,12 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || process.env.SUPABASE_SERVICE_
 const verifyAdminKey = (req: Request, res: Response, next: Function) => {
   const authHeader = req.headers.authorization;
   const apiKey = authHeader?.replace('Bearer ', '') || req.headers['x-api-key'];
-  
+
   if (!apiKey || apiKey !== ADMIN_API_KEY) {
     console.error('[AUTH] Invalid or missing admin API key');
     return res.status(401).json({ error: 'Unauthorized - invalid API key' });
   }
-  
+
   next();
 };
 
@@ -689,9 +689,9 @@ app.post('/api/notifications/send', verifyAdminKey, async (req: Request, res: Re
     console.log('[PUSH] Expo response:', result);
 
     if (result.data?.status === 'error') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Failed to send notification',
-        details: result.data.message 
+        details: result.data.message
       });
     }
 
@@ -783,9 +783,9 @@ app.post('/api/notifications/job-offer', verifyAdminKey, async (req: Request, re
     console.log('[PUSH] Expo response:', result);
 
     if (result.data?.status === 'error') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Failed to send notification',
-        details: result.data.message 
+        details: result.data.message
       });
     }
 
@@ -813,8 +813,8 @@ app.post('/api/jobs/assign', verifyAdminKey, async (req: Request, res: Response)
     // Update job with driver assignment
     const { data: job, error: updateError } = await supabaseAdmin
       .from('jobs')
-      .update({ 
-        driver_id: driverId, 
+      .update({
+        driver_id: driverId,
         status: 'assigned',
         updated_at: new Date().toISOString()
       })
@@ -880,9 +880,9 @@ app.post('/api/jobs/assign', verifyAdminKey, async (req: Request, res: Response)
     const result = await response.json();
     console.log('[ASSIGN] Expo response:', result);
 
-    res.json({ 
-      success: true, 
-      job, 
+    res.json({
+      success: true,
+      job,
       notificationSent: result.data?.status !== 'error',
       ticketId: result.data?.id
     });
@@ -900,16 +900,16 @@ app.post('/api/jobs/assign', verifyAdminKey, async (req: Request, res: Response)
 // Send booking confirmation email
 app.post('/api/email/booking-confirmation', async (req: Request, res: Response) => {
   try {
-    const { 
-      customerEmail, 
-      customerName, 
-      trackingNumber, 
-      pickupAddress, 
-      deliveryAddress, 
+    const {
+      customerEmail,
+      customerName,
+      trackingNumber,
+      pickupAddress,
+      deliveryAddress,
       scheduledDate,
       scheduledTime,
       price,
-      vehicleType 
+      vehicleType
     } = req.body;
 
     if (!customerEmail || !trackingNumber) {
@@ -1007,12 +1007,12 @@ app.post('/api/email/booking-confirmation', async (req: Request, res: Response) 
 // Send proof of delivery email
 app.post('/api/email/pod-notification', async (req: Request, res: Response) => {
   try {
-    const { 
-      customerEmail, 
-      customerName, 
-      trackingNumber, 
+    const {
+      customerEmail,
+      customerName,
+      trackingNumber,
       recipientName,
-      deliveryAddress, 
+      deliveryAddress,
       deliveredAt,
       driverName,
       podPhotoUrls,
@@ -1210,7 +1210,7 @@ app.get('/api/email/test', async (req: Request, res: Response) => {
 // Validate scanned barcode against backend jobs
 app.post('/api/jobs/scan', async (req: Request, res: Response) => {
   const { trackingCode, driverId } = req.body;
-  
+
   console.log('[BARCODE SCAN] Request received');
   console.log('[BARCODE SCAN] Tracking code:', trackingCode);
   console.log('[BARCODE SCAN] Driver ID:', driverId);
@@ -1234,7 +1234,7 @@ app.post('/api/jobs/scan', async (req: Request, res: Response) => {
 
     if (jobError || !job) {
       console.log('[BARCODE SCAN] Job not found for tracking code:', trackingCode);
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Invalid barcode',
         message: 'No job found with this tracking code'
       });
@@ -1299,10 +1299,10 @@ app.post('/api/jobs/:jobId/upload-pod', upload.fields([
   { name: 'signature', maxCount: 1 }
 ]), async (req: Request, res: Response) => {
   const { jobId } = req.params;
-  
+
   console.log('[POD UPLOAD] Request received for job:', jobId);
   console.log('[POD UPLOAD] Body:', JSON.stringify(req.body));
-  
+
   try {
     if (!supabaseAdmin) {
       console.error('[POD UPLOAD] Supabase admin client not configured');
@@ -1317,7 +1317,7 @@ app.post('/api/jobs/:jobId/upload-pod', upload.fields([
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     const photos = files?.photos || [];
     const signatureFiles = files?.signature || [];
-    
+
     console.log('[POD UPLOAD] Photos received:', photos.length);
     console.log('[POD UPLOAD] Signature received:', signatureFiles.length > 0);
 
@@ -1342,12 +1342,12 @@ app.post('/api/jobs/:jobId/upload-pod', upload.fields([
     for (let i = 0; i < photos.length; i++) {
       const photo = photos[i];
       const fileName = `pod_${trackingNumber}_${Date.now()}_${i}.jpg`;
-      const filePath = `${driverId}/pod/${fileName}`;
+      const filePath = `job_${jobId}/${fileName}`;
 
       console.log('[POD UPLOAD] Uploading photo:', filePath, 'size:', photo.size);
 
       const { error: uploadError } = await supabaseAdmin.storage
-        .from('driver-documents')
+        .from('pod-images')
         .upload(filePath, photo.buffer, {
           contentType: photo.mimetype || 'image/jpeg',
           upsert: true
@@ -1359,7 +1359,7 @@ app.post('/api/jobs/:jobId/upload-pod', upload.fields([
       }
 
       const { data: urlData } = supabaseAdmin.storage
-        .from('driver-documents')
+        .from('pod-images')
         .getPublicUrl(filePath);
 
       uploadedPhotoUrls.push(urlData.publicUrl);
@@ -1370,12 +1370,12 @@ app.post('/api/jobs/:jobId/upload-pod', upload.fields([
     if (signatureFiles.length > 0) {
       const signature = signatureFiles[0];
       const sigFileName = `signature_${trackingNumber}_${Date.now()}.png`;
-      const sigFilePath = `${driverId}/signatures/${sigFileName}`;
+      const sigFilePath = `job_${jobId}/${sigFileName}`;
 
       console.log('[POD UPLOAD] Uploading signature:', sigFilePath);
 
       const { error: sigError } = await supabaseAdmin.storage
-        .from('driver-documents')
+        .from('pod-images')
         .upload(sigFilePath, signature.buffer, {
           contentType: 'image/png',
           upsert: true
@@ -1383,7 +1383,7 @@ app.post('/api/jobs/:jobId/upload-pod', upload.fields([
 
       if (!sigError) {
         const { data: sigUrlData } = supabaseAdmin.storage
-          .from('driver-documents')
+          .from('pod-images')
           .getPublicUrl(sigFilePath);
         signatureUrl = sigUrlData.publicUrl;
         console.log('[POD UPLOAD] Signature uploaded:', signatureUrl);
@@ -1426,7 +1426,7 @@ app.post('/api/jobs/:jobId/upload-pod', upload.fields([
 
     if (updateError) {
       console.error('[POD UPLOAD] Job update failed:', updateError);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to update job',
         photos: uploadedPhotoUrls,
         signature: signatureUrl
@@ -1485,16 +1485,16 @@ async function verifyDriverAuth(authHeader: string | undefined, expectedDriverId
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return { valid: false, error: 'Missing or invalid authorization header' };
   }
-  
+
   if (!supabaseAdmin) {
     return { valid: false, error: 'Database not configured' };
   }
 
   const token = authHeader.replace('Bearer ', '');
-  
+
   try {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    
+
     if (error || !user) {
       return { valid: false, error: 'Invalid or expired token' };
     }
@@ -1565,7 +1565,7 @@ app.post('/api/driver/status', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to update driver status' });
     }
 
-    console.log('[DRIVER STATUS]', data?.full_name, 'is now', isOnline ? 'ONLINE' : 'OFFLINE', 
+    console.log('[DRIVER STATUS]', data?.full_name, 'is now', isOnline ? 'ONLINE' : 'OFFLINE',
       latitude ? `at ${latitude.toFixed(4)},${longitude.toFixed(4)}` : '');
 
     res.json({ success: true, driver: data });
@@ -1660,14 +1660,14 @@ app.get('/api/admin/drivers/online', async (req: Request, res: Response) => {
       return {
         ...driver,
         activeJob: activeJob || null,
-        isStale: driver.location_updated_at 
+        isStale: driver.location_updated_at
           ? new Date(driver.location_updated_at) < new Date(Date.now() - 2 * 60 * 1000)
           : true,
       };
     }));
 
     console.log('[ADMIN DRIVERS] Found', enrichedDrivers.length, 'drivers with locations');
-    res.json({ 
+    res.json({
       drivers: enrichedDrivers,
       count: enrichedDrivers.length,
       timestamp: new Date().toISOString(),
@@ -1697,11 +1697,11 @@ app.post('/api/mobile/stripe/create-payment-intent', async (req: Request, res: R
     // Check for new user discount eligibility
     let finalAmount = amount;
     let discountInfo = null;
-    
+
     if (applyNewUserDiscount && customerId) {
       const completedBookings = await getCustomerCompletedBookingsCount(customerId);
       const discount = calculateNewUserDiscount(amount, completedBookings);
-      
+
       if (discount.isEligible) {
         finalAmount = discount.finalAmount;
         discountInfo = {
@@ -1765,7 +1765,7 @@ app.post('/api/discount/check-eligibility', async (req: Request, res: Response) 
       discountPercent: discount.discountPercent,
       completedBookings,
       remainingDiscountBookings: discount.isEligible ? NEW_USER_DISCOUNT_MAX_BOOKINGS - completedBookings : 0,
-      message: discount.isEligible 
+      message: discount.isEligible
         ? `You have ${NEW_USER_DISCOUNT_MAX_BOOKINGS - completedBookings} discounted booking${NEW_USER_DISCOUNT_MAX_BOOKINGS - completedBookings > 1 ? 's' : ''} remaining (${NEW_USER_DISCOUNT_PERCENT}% off)`
         : 'You have used all your new customer discounts',
     });
@@ -1786,7 +1786,7 @@ app.post('/api/mobile/stripe/confirm', async (req: Request, res: Response) => {
     const stripe = await getUncachableStripeClient();
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     const succeeded = paymentIntent.status === 'succeeded';
-    
+
     if (succeeded) {
       const metadataBookingId = paymentIntent.metadata?.bookingId;
       if (metadataBookingId) {
@@ -1865,24 +1865,24 @@ app.post('/api/mobile/upload', verifyAdminKey, express.json({ limit: '10mb' }), 
 // Middleware to verify user's own JWT token
 const verifyUserToken = async (req: Request, res: Response, next: Function) => {
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing or invalid authorization header' });
   }
-  
+
   const token = authHeader.replace('Bearer ', '');
-  
+
   if (!supabaseAdmin) {
     return res.status(500).json({ error: 'Server not configured' });
   }
-  
+
   try {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    
+
     if (error || !user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
-    
+
     // Attach user to request for use in endpoint
     (req as any).user = user;
     next();
@@ -1896,22 +1896,22 @@ app.post('/api/account/delete', verifyUserToken, async (req: Request, res: Respo
   try {
     const user = (req as any).user;
     const userId = user.id;
-    
+
     console.log('[ACCOUNT DELETE] Request for user:', userId);
-    
+
     if (!supabaseAdmin) {
       console.error('[ACCOUNT DELETE] Supabase admin not configured');
       return res.status(500).json({ error: 'Server not configured' });
     }
-    
+
     // 1. Recursively delete ALL storage files under user's prefix from driver-documents bucket
     const allFilePaths: string[] = [];
-    
+
     async function listAllFiles(bucket: string, prefix: string): Promise<string[]> {
       const paths: string[] = [];
       let offset = 0;
       const limit = 100; // Supabase default limit
-      
+
       try {
         // Paginate through all files
         while (true) {
@@ -1919,16 +1919,16 @@ app.post('/api/account/delete', verifyUserToken, async (req: Request, res: Respo
             limit,
             offset,
           });
-          
+
           if (error) {
             console.log(`[ACCOUNT DELETE] Error listing ${prefix}:`, error.message);
             break;
           }
           if (!data || data.length === 0) break;
-          
+
           for (const item of data) {
             const fullPath = prefix ? `${prefix}/${item.name}` : item.name;
-            
+
             // In Supabase Storage:
             // - Files have an 'id' property (UUID string)
             // - Folders have 'id' as null
@@ -1941,7 +1941,7 @@ app.post('/api/account/delete', verifyUserToken, async (req: Request, res: Respo
               paths.push(fullPath);
             }
           }
-          
+
           // If we got fewer items than limit, we've reached the end
           if (data.length < limit) break;
           offset += limit;
@@ -1951,14 +1951,14 @@ app.post('/api/account/delete', verifyUserToken, async (req: Request, res: Respo
       }
       return paths;
     }
-    
+
     try {
       const userFiles = await listAllFiles('driver-documents', userId);
       allFilePaths.push(...userFiles);
-      
+
       if (allFilePaths.length > 0) {
         console.log('[ACCOUNT DELETE] Found', allFilePaths.length, 'storage files to delete');
-        
+
         // Delete in batches of 100 (Supabase limit)
         const batchSize = 100;
         for (let i = 0; i < allFilePaths.length; i += batchSize) {
@@ -1966,12 +1966,12 @@ app.post('/api/account/delete', verifyUserToken, async (req: Request, res: Respo
           const { error: deleteError } = await supabaseAdmin.storage
             .from('driver-documents')
             .remove(batch);
-          
+
           if (deleteError) {
             console.error('[ACCOUNT DELETE] Storage deletion failed:', deleteError.message);
-            return res.status(500).json({ 
+            return res.status(500).json({
               error: 'Failed to delete account files. Please contact support.',
-              details: deleteError.message 
+              details: deleteError.message
             });
           }
         }
@@ -1981,60 +1981,60 @@ app.post('/api/account/delete', verifyUserToken, async (req: Request, res: Respo
       }
     } catch (storageError: any) {
       console.error('[ACCOUNT DELETE] Storage cleanup failed:', storageError.message);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to clean up account files. Please contact support.',
-        details: storageError.message 
+        details: storageError.message
       });
     }
-    
+
     // 2. Delete driver documents from database
     const { error: docsError } = await supabaseAdmin
       .from('driver_documents')
       .delete()
       .eq('driver_id', userId);
-    
+
     if (docsError) {
       console.error('[ACCOUNT DELETE] Failed to delete driver_documents:', docsError.message);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to delete account documents. Please contact support.',
-        details: docsError.message 
+        details: docsError.message
       });
     }
     console.log('[ACCOUNT DELETE] Driver documents deleted from database');
-    
+
     // 3. Delete driver record
     const { error: driverError } = await supabaseAdmin
       .from('drivers')
       .delete()
       .eq('id', userId);
-    
+
     if (driverError) {
       console.error('[ACCOUNT DELETE] Failed to delete driver record:', driverError.message);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to delete driver profile. Please contact support.',
-        details: driverError.message 
+        details: driverError.message
       });
     }
     console.log('[ACCOUNT DELETE] Driver record deleted');
-    
+
     // 4. Delete from auth.users (this is the key part!)
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    
+
     if (authError) {
       console.error('[ACCOUNT DELETE] Auth deletion failed:', authError.message);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to delete authentication account',
-        details: authError.message 
+        details: authError.message
       });
     }
-    
+
     console.log('[ACCOUNT DELETE] User fully deleted from auth.users:', userId);
-    
-    res.json({ 
-      success: true, 
-      message: 'Account permanently deleted. You can now re-register with the same email.' 
+
+    res.json({
+      success: true,
+      message: 'Account permanently deleted. You can now re-register with the same email.'
     });
-    
+
   } catch (error: any) {
     console.error('[ACCOUNT DELETE] Error:', error.message);
     res.status(500).json({ error: 'Failed to delete account', details: error.message });

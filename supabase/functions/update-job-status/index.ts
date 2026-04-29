@@ -55,7 +55,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
@@ -66,7 +66,7 @@ serve(async (req) => {
 
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
     const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
-    
+
     const { data: { user }, error: authError } = await anonClient.auth.getUser(
       authHeader.replace("Bearer ", "")
     );
@@ -121,9 +121,9 @@ serve(async (req) => {
 
     const currentStatus = existingJob.status;
     const allowedTransitions = statusTransitions[currentStatus] || [];
-    
+
     if (!isAdmin && !allowedTransitions.includes(status)) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: `Invalid status transition from ${currentStatus} to ${status}`,
         code: "INVALID_TRANSITION"
       }), {
@@ -133,7 +133,7 @@ serve(async (req) => {
     }
 
     if (isAssignedDriver && !driverAllowedStatuses.includes(status)) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: "Drivers can only update to workflow statuses (accepted, pickup, delivery, delivered)",
         code: "DRIVER_STATUS_RESTRICTED"
       }), {
@@ -143,7 +143,7 @@ serve(async (req) => {
     }
 
     if (isCustomer && !isAdmin && !customerAllowedStatuses.includes(status)) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: "Customers can only cancel their jobs",
         code: "CUSTOMER_STATUS_RESTRICTED"
       }), {
@@ -154,7 +154,7 @@ serve(async (req) => {
 
     if (status === "delivered") {
       if (!existingJob.pod_photo_url && !existingJob.pod_signature_url) {
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
           error: "Proof of Delivery required before marking as delivered",
           code: "POD_REQUIRED"
         }), {
@@ -203,21 +203,23 @@ serve(async (req) => {
 
         if (customer?.email) {
           const resendApiKey = Deno.env.get("RESEND_API_KEY");
-          
+
           if (resendApiKey) {
             // Generate signed URL for POD image (valid for 7 days)
-            const podPath = updatedJob.pod_photo_url.replace(/^.*\/storage\/v1\/object\/public\//, '').replace(/^.*\/storage\/v1\/object\/sign\//, '');
-            const bucketPath = podPath.startsWith('pod/') ? podPath : `pod/${podPath}`;
+            // Extract raw path by removing bucket name and prefix
+            const rawPath = updatedJob.pod_photo_url
+              .replace(/^.*\/storage\/v1\/object\/(?:public|sign|authenticated)\//, '')
+              .replace(/^[^\/]+\//, ''); // Remove bucket name (pod, pod-images, etc.)
             
             const { data: signedUrlData } = await supabaseClient
               .storage
-              .from('pod')
-              .createSignedUrl(bucketPath.replace('pod/', ''), 604800); // 7 days
-            
+              .from('pod-images')
+              .createSignedUrl(rawPath, 604800); // 7 days
+
             const podImageUrl = signedUrlData?.signedUrl || updatedJob.pod_photo_url;
-            
+
             const LOGO_URL = 'https://945d2f5a-7336-462a-b33f-10fb0e78a123-00-2bep7zisdjcv3.spock.replit.dev/logo-email.jpg';
-            
+
             const emailHtml = `
               <!DOCTYPE html>
               <html>
@@ -302,7 +304,7 @@ serve(async (req) => {
                 reply_to: "info@runcourier.co.uk",
               }),
             });
-            
+
             console.log(`POD email sent to ${customer.email} for job ${updatedJob.tracking_number}`);
           }
         }

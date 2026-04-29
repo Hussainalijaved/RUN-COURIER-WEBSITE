@@ -29,7 +29,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
   if (base64.includes(',')) {
     base64String = base64.split(',')[1]
   }
-  
+
   const binaryString = atob(base64String)
   const bytes = new Uint8Array(binaryString.length)
   for (let i = 0; i < binaryString.length; i++) {
@@ -68,13 +68,13 @@ Deno.serve(async (req) => {
     // Create Supabase client with user's auth
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    
+
     // Verify user token
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
+
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
@@ -122,9 +122,9 @@ Deno.serve(async (req) => {
     const validStatuses = ['on_the_way', 'on_the_way_delivery', 'picked_up', 'delivered']
     if (!validStatuses.includes(job.status)) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'POD can only be uploaded during delivery phase',
-          currentStatus: job.status 
+          currentStatus: job.status
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
     // Upload photos to Supabase Storage
     if (photos && photos.length > 0) {
       console.log(`[upload-pod] Uploading ${photos.length} photos...`)
-      
+
       for (let i = 0; i < photos.length; i++) {
         const photoBase64 = photos[i]
         if (!photoBase64) continue
@@ -145,14 +145,14 @@ Deno.serve(async (req) => {
           const uuid = generateUUID()
           const contentType = getContentType(photoBase64)
           const extension = contentType === 'image/png' ? 'png' : 'jpg'
-          const filePath = `${jobId}/${uuid}.${extension}`
-          
+          const filePath = `job_${jobId}/${uuid}.${extension}`
+
           const photoBytes = base64ToUint8Array(photoBase64)
-          
+
           console.log(`[upload-pod] Uploading photo ${i + 1}: ${filePath} (${photoBytes.length} bytes)`)
-          
+
           const { data, error: uploadError } = await supabase.storage
-            .from('pod')
+            .from('pod-images')
             .upload(filePath, photoBytes, {
               contentType,
               upsert: true
@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
           }
 
           const { data: urlData } = supabase.storage
-            .from('pod')
+            .from('pod-images')
             .getPublicUrl(filePath)
 
           uploadedPhotoUrls.push(urlData.publicUrl)
@@ -181,14 +181,14 @@ Deno.serve(async (req) => {
         const uuid = generateUUID()
         const contentType = getContentType(signature)
         const extension = contentType === 'image/png' ? 'png' : 'jpg'
-        const filePath = `${jobId}/signature_${uuid}.${extension}`
-        
+        const filePath = `job_${jobId}/signature_${uuid}.${extension}`
+
         const signatureBytes = base64ToUint8Array(signature)
-        
+
         console.log(`[upload-pod] Uploading signature: ${filePath} (${signatureBytes.length} bytes)`)
-        
+
         const { data, error: uploadError } = await supabase.storage
-          .from('pod')
+          .from('pod-images')
           .upload(filePath, signatureBytes, {
             contentType,
             upsert: true
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
           console.error(`[upload-pod] Signature upload failed:`, uploadError)
         } else {
           const { data: urlData } = supabase.storage
-            .from('pod')
+            .from('pod-images')
             .getPublicUrl(filePath)
 
           signatureUrl = urlData.publicUrl
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
     const updateData: any = {
       updated_at: new Date().toISOString()
     }
-    
+
     if (uploadedPhotoUrls.length > 0) {
       updateData.pod_photo_url = uploadedPhotoUrls[0]
       updateData.pod_photos = uploadedPhotoUrls
@@ -236,9 +236,9 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error(`[upload-pod] Failed to update job:`, updateError)
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'Failed to save POD data',
-          details: updateError.message 
+          details: updateError.message
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -272,7 +272,7 @@ Deno.serve(async (req) => {
           .from('customer_bookings')
           .update(bookingUpdate)
           .eq('id', booking.id)
-        
+
         console.log(`[upload-pod] Synced POD to customer booking ${booking.id}`)
       }
     } catch (syncErr) {
@@ -294,9 +294,9 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error('[upload-pod] Unexpected error:', error)
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Internal server error',
-        details: error.message 
+        details: error.message
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

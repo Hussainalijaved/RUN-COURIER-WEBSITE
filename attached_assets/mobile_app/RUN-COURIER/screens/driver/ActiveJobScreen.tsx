@@ -969,7 +969,7 @@ export function ActiveJobScreen({ navigation }: any) {
         // Upload all photos in parallel using Promise.all
         const photoUploadPromises = compressedPhotos.map(async (photoUri, index) => {
           const uuid = generateUUID();
-          const filePath = `pod/${jobId}/${uuid}.jpg`;
+          const filePath = `job_${jobId}/photo_${uuid}.jpg`;
           
           console.log(`[POD UPLOAD] Uploading photo ${index + 1}/${compressedPhotos.length}: ${filePath}`);
           
@@ -1006,7 +1006,7 @@ export function ActiveJobScreen({ navigation }: any) {
         
         if (signatureData && (signatureData.startsWith('file://') || signatureData.startsWith('content://'))) {
           const uuid = generateUUID();
-          const sigFilePath = `pod/${jobId}/signature_${uuid}.png`;
+          const sigFilePath = `job_${jobId}/signature_${uuid}.png`;
 
           console.log('[POD UPLOAD] Uploading signature:', sigFilePath);
 
