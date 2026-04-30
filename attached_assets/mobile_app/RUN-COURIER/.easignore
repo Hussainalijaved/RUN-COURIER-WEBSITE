@@ -1,0 +1,12 @@
+attached_assets/
+dist/
+server/
+scripts/
+docs/
+active_job_scan_state.png
+login-screen.png
+signature_area.png
+signup-screen.png
+.replit
+replit.md
+*.zip

@@ -1674,7 +1674,7 @@ export async function sendContactFormSubmission(
   const htmlContent = wrapEmailContent(content, 'Contact Form');
   const textContent = `New Contact Form Submission\n\nName: ${name}\nEmail: ${email}\n${phone ? `Phone: ${phone}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`;
 
-  return sendEmailNotification(SUPPORT_EMAIL, `Contact Form: ${subject}`, htmlContent, textContent);
+  return sendEmailNotification(INFO_EMAIL, `Contact Form: ${subject}`, htmlContent, textContent);
 }
 
 export interface PaymentLinkEmailData {
