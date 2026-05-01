@@ -38,7 +38,7 @@ export default {
     },
     android: {
       package: "com.runcourier.driver",
-      versionCode: 11,
+      versionCode: 21,
       permissions: [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
