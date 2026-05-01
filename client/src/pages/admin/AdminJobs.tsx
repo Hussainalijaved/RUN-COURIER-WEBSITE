@@ -585,6 +585,9 @@ export default function AdminJobs() {
   const [editDistance, setEditDistance] = useState<string>('0');
   const [editIsMultiDrop, setEditIsMultiDrop] = useState(false);
   const [editIsReturnTrip, setEditIsReturnTrip] = useState(false);
+  const [editIsScheduled, setEditIsScheduled] = useState(false);
+  const [editPickupDate, setEditPickupDate] = useState('');
+  const [editPickupTime, setEditPickupTime] = useState('');
   const [editMultiDropStops, setEditMultiDropStops] = useState<{ address: string; postcode: string; recipientName?: string; recipientPhone?: string; deliveryInstructions?: string; }[]>([]);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
@@ -1215,6 +1218,15 @@ export default function AdminJobs() {
     setEditDistance(job.distance?.toString() || '0');
     setEditIsMultiDrop(job.isMultiDrop || false);
     setEditIsReturnTrip(job.isReturnTrip || false);
+    setEditIsScheduled(job.isScheduled || false);
+    if (job.scheduledPickupTime) {
+      const date = new Date(job.scheduledPickupTime);
+      setEditPickupDate(date.toISOString().split('T')[0]);
+      setEditPickupTime(date.toTimeString().split(' ')[0].slice(0, 5));
+    } else {
+      setEditPickupDate('');
+      setEditPickupTime('');
+    }
     setEditMultiDropStops([]);
     if (job.isMultiDrop) {
       // Fetch stops with auth token
@@ -1354,6 +1366,10 @@ export default function AdminJobs() {
       distance: editDistance,
       isMultiDrop: editIsMultiDrop,
       isReturnTrip: editIsReturnTrip,
+      isScheduled: editIsScheduled,
+      scheduledPickupTime: editIsScheduled && editPickupDate && editPickupTime 
+        ? new Date(`${editPickupDate}T${editPickupTime}`).toISOString() 
+        : null,
       multiDropStops: editIsMultiDrop ? editMultiDropStops : [],
     };
 
@@ -3152,6 +3168,52 @@ export default function AdminJobs() {
                       />
                     </div>
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* Scheduling Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-blue-500" />
+                      Scheduling
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="edit-is-scheduled">Scheduled Booking</Label>
+                      <Switch 
+                        id="edit-is-scheduled"
+                        checked={editIsScheduled} 
+                        onCheckedChange={setEditIsScheduled}
+                        data-testid="switch-edit-is-scheduled"
+                      />
+                    </div>
+                  </div>
+                  
+                  {editIsScheduled && (
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-pickup-date">Pickup Date</Label>
+                        <Input
+                          id="edit-pickup-date"
+                          type="date"
+                          value={editPickupDate}
+                          onChange={(e) => setEditPickupDate(e.target.value)}
+                          data-testid="input-edit-pickup-date"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-pickup-time">Pickup Time</Label>
+                        <Input
+                          id="edit-pickup-time"
+                          type="time"
+                          value={editPickupTime}
+                          onChange={(e) => setEditPickupTime(e.target.value)}
+                          data-testid="input-edit-pickup-time"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />

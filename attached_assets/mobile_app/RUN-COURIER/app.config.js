@@ -4,7 +4,7 @@ export default {
   expo: {
     name: "RUN COURIER",
     slug: "run-courier",
-    version: "2.70.75",
+    version: "2.70.77",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "runcourier",
@@ -38,7 +38,7 @@ export default {
     },
     android: {
       package: "com.runcourier.driver",
-      versionCode: 9,
+      versionCode: 11,
       permissions: [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -108,6 +108,14 @@ export default {
           color: "#FF6B35",
           sounds: ["./assets/sounds/notification.mp3"],
         },
+      ],
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
       ],
     ],
     experiments: {
