@@ -3495,20 +3495,22 @@ export async function registerRoutes(
     
     // Auto-geocode addresses for live map display
     const geocodeUpdates: any = {};
-    if (job.pickupAddress && (!job.pickupLatitude || !job.pickupLongitude)) {
-      const pickupResult = await geocodeAddress(job.pickupAddress);
+    const pickupTarget = job.pickupAddress ? (job.pickupPostcode ? `${job.pickupAddress}, ${job.pickupPostcode}` : job.pickupAddress) : job.pickupPostcode;
+    if (pickupTarget && (!job.pickupLatitude || !job.pickupLongitude)) {
+      const pickupResult = await geocodeAddress(pickupTarget);
       if (pickupResult) {
         geocodeUpdates.pickupLatitude = pickupResult.lat;
         geocodeUpdates.pickupLongitude = pickupResult.lng;
-        console.log(`[Geocoding] Job ${job.id} pickup: ${pickupResult.lat}, ${pickupResult.lng}`);
+        console.log(`[Geocoding] Job ${job.id} pickup: ${pickupResult.lat}, ${pickupResult.lng} (Input: ${pickupTarget})`);
       }
     }
-    if (job.deliveryAddress && (!job.deliveryLatitude || !job.deliveryLongitude)) {
-      const deliveryResult = await geocodeAddress(job.deliveryAddress);
+    const deliveryTarget = job.deliveryAddress ? (job.deliveryPostcode ? `${job.deliveryAddress}, ${job.deliveryPostcode}` : job.deliveryAddress) : job.deliveryPostcode;
+    if (deliveryTarget && (!job.deliveryLatitude || !job.deliveryLongitude)) {
+      const deliveryResult = await geocodeAddress(deliveryTarget);
       if (deliveryResult) {
         geocodeUpdates.deliveryLatitude = deliveryResult.lat;
         geocodeUpdates.deliveryLongitude = deliveryResult.lng;
-        console.log(`[Geocoding] Job ${job.id} delivery: ${deliveryResult.lat}, ${deliveryResult.lng}`);
+        console.log(`[Geocoding] Job ${job.id} delivery: ${deliveryResult.lat}, ${deliveryResult.lng} (Input: ${deliveryTarget})`);
       }
     }
     // Update job with coordinates if geocoding succeeded
@@ -3828,6 +3830,56 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Job not found" });
     }
     console.log(`[Jobs PATCH] Job ${req.params.id} updated successfully`);
+
+    // Re-geocode main job addresses if they changed or coordinates are missing
+    if (previousJob) {
+      const pickupChanged = updateData.pickupAddress !== undefined || updateData.pickupPostcode !== undefined;
+      const deliveryChanged = updateData.deliveryAddress !== undefined || updateData.deliveryPostcode !== undefined;
+      
+      const geoUpdates: any = {};
+      
+      if (pickupChanged || !job.pickupLatitude || !job.pickupLongitude) {
+        const address = updateData.pickupAddress ?? job.pickupAddress;
+        const postcode = updateData.pickupPostcode ?? job.pickupPostcode;
+        const target = address ? (postcode ? `${address}, ${postcode}` : address) : postcode;
+        if (target) {
+          const geo = await geocodeAddress(target);
+          if (geo) {
+            geoUpdates.pickupLatitude = geo.lat;
+            geoUpdates.pickupLongitude = geo.lng;
+            console.log(`[Geocoding] Job ${job.id} pickup RE-GEOCODED: ${geo.lat}, ${geo.lng} (Input: ${target})`);
+          }
+        }
+      }
+      
+      if (deliveryChanged || !job.deliveryLatitude || !job.deliveryLongitude) {
+        const address = updateData.deliveryAddress ?? job.deliveryAddress;
+        const postcode = updateData.deliveryPostcode ?? job.deliveryPostcode;
+        const target = address ? (postcode ? `${address}, ${postcode}` : address) : postcode;
+        if (target) {
+          const geo = await geocodeAddress(target);
+          if (geo) {
+            geoUpdates.deliveryLatitude = geo.lat;
+            geoUpdates.deliveryLongitude = geo.lng;
+            console.log(`[Geocoding] Job ${job.id} delivery RE-GEOCODED: ${geo.lat}, ${geo.lng} (Input: ${target})`);
+          }
+        }
+      }
+      
+      if (Object.keys(geoUpdates).length > 0) {
+        await storage.updateJob(job.id, geoUpdates);
+        // Also update Supabase explicitly if needed (though storage.updateJob usually handles it)
+        const { supabaseAdmin } = await import("./supabaseAdmin");
+        if (supabaseAdmin) {
+          const supaUpdate: any = {};
+          if (geoUpdates.pickupLatitude) supaUpdate.pickup_latitude = geoUpdates.pickupLatitude;
+          if (geoUpdates.pickupLongitude) supaUpdate.pickup_longitude = geoUpdates.pickupLongitude;
+          if (geoUpdates.deliveryLatitude) supaUpdate.delivery_latitude = geoUpdates.deliveryLatitude;
+          if (geoUpdates.deliveryLongitude) supaUpdate.delivery_longitude = geoUpdates.deliveryLongitude;
+          await supabaseAdmin.from('jobs').update(supaUpdate).eq('id', String(job.id));
+        }
+      }
+    }
     
     // Handle multi-drop stops update when stops are provided
     if (supabaseAdmin && (multiDropStops !== undefined || updateData.isMultiDrop !== undefined)) {
