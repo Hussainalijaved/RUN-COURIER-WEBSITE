@@ -30,6 +30,7 @@ import {
   PoundSterling,
   Activity,
   LayoutGrid,
+  Calendar,
 } from 'lucide-react';
 import { SiWhatsapp } from 'react-icons/si';
 import { Card, CardContent } from '@/components/ui/card';
@@ -71,12 +72,16 @@ const fmtK = (v: string | number | null | undefined) => {
 const fmtVehicle = (v?: string | null) =>
   v ? v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—';
 
-const fmtDate = (dt?: string | Date | null) => {
+const fmtDate = (dt?: string | Date | null, includeTime = false) => {
   if (!dt) return '—';
   const d = new Date(dt as string);
-  return isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  if (isNaN(d.getTime())) return '—';
+  
+  const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  if (!includeTime) return dateStr;
+  
+  const timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${dateStr}, ${timeStr}`;
 };
 
 function StatusDot({ status }: { status: string }) {
@@ -466,7 +471,17 @@ export default function AdminDashboard() {
                           </td>
 
                           <td className="px-3 py-4 hidden sm:table-cell">
-                            <span className="text-muted-foreground/80 whitespace-nowrap" style={{ fontSize: 12 }}>{fmtDate((job as any).createdAt)}</span>
+                            {job.isScheduled && job.scheduledPickupTime ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-cyan-600 font-bold flex items-center gap-1" style={{ fontSize: 11 }}>
+                                  <Calendar style={{ width: 10, height: 10 }} />
+                                  {fmtDate(job.scheduledPickupTime, true)}
+                                </span>
+                                <span className="text-muted-foreground/60" style={{ fontSize: 9 }}>Created {fmtDate(job.createdAt)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground/80 whitespace-nowrap" style={{ fontSize: 12 }}>{fmtDate(job.createdAt)}</span>
+                            )}
                           </td>
 
                           <td className="px-3 pr-4 py-4 text-right">

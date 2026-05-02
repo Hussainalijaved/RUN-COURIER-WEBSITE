@@ -137,6 +137,8 @@ export function useAvailableJobs(enabled: boolean) {
           weight,
           distance,
           driver_price,
+          is_scheduled,
+          scheduled_pickup_time,
           created_at
         `)
         .eq('status', 'pending')
@@ -184,7 +186,8 @@ export function useAvailableJobs(enabled: boolean) {
         requiresSignature: false,
         // CRITICAL: Use driver_price ONLY - NEVER expose total_price
         driverPrice: job.driver_price,
-        scheduledPickupTime: null,
+        isScheduled: job.is_scheduled,
+        scheduledPickupTime: job.scheduled_pickup_time,
         estimatedDeliveryTime: null,
         actualPickupTime: null,
         actualDeliveryTime: null,

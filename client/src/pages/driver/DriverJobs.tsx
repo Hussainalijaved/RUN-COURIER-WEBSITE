@@ -34,6 +34,7 @@ import {
   Volume2,
   VolumeX,
   XCircle,
+  Calendar,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
@@ -429,6 +430,12 @@ export default function DriverJobs() {
                           <span className="font-mono font-medium">#{(job as any).jobNumber || job.trackingNumber}</span>
                           {getStatusBadge(job.status)}
                           <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
+                          {job.isScheduled && job.scheduledPickupTime && (
+                            <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200 gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Scheduled: {new Date(job.scheduledPickupTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <MapPin className="h-3 w-3" />
@@ -500,6 +507,12 @@ export default function DriverJobs() {
                           <span className="font-mono font-medium">#{(job as any).jobNumber || job.trackingNumber}</span>
                           {getStatusBadge(job.status)}
                           <Badge variant="outline" className="capitalize">{job.vehicleType?.replace('_', ' ')}</Badge>
+                          {job.isScheduled && job.scheduledPickupTime && (
+                            <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200 gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Scheduled: {new Date(job.scheduledPickupTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <MapPin className="h-3 w-3" />
@@ -722,6 +735,21 @@ export default function DriverJobs() {
                 <span className="text-sm text-muted-foreground">Status</span>
                 {getStatusBadge(selectedJobForDetails.status)}
               </div>
+              
+              {selectedJobForDetails.isScheduled && selectedJobForDetails.scheduledPickupTime && (
+                <div className="bg-cyan-50 dark:bg-cyan-950/30 p-3 rounded-md border border-cyan-100 dark:border-cyan-900">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className="h-4 w-4 text-cyan-600" />
+                    <span className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">Scheduled Pickup</span>
+                  </div>
+                  <p className="text-lg font-bold text-cyan-700 dark:text-cyan-300 ml-6">
+                    {new Date(selectedJobForDetails.scheduledPickupTime).toLocaleString('en-GB', { 
+                      day: '2-digit', month: 'short', year: 'numeric', 
+                      hour: '2-digit', minute: '2-digit' 
+                    })}
+                  </p>
+                </div>
+              )}
               
               <Separator />
               

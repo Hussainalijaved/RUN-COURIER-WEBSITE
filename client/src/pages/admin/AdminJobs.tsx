@@ -2019,7 +2019,19 @@ export default function AdminJobs() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(job.createdAt)}</TableCell>
+                      <TableCell className="text-sm">
+                        {job.isScheduled && job.scheduledPickupTime ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-cyan-600 dark:text-cyan-400 font-bold flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(job.scheduledPickupTime)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">Booked: {formatDate(job.createdAt)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">{formatDate(job.createdAt)}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex flex-col items-end gap-1">
                           <span className="font-medium">{formatPrice(job.totalPrice)}</span>
@@ -2355,6 +2367,31 @@ export default function AdminJobs() {
                     )}
                   </div>
                 </div>
+
+                {selectedJob.isScheduled && selectedJob.scheduledPickupTime && (
+                  <div className="p-3 bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                      <h4 className="font-semibold text-cyan-900 dark:text-cyan-100">Scheduled Booking</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Scheduled Collection</p>
+                        <p className="font-bold text-cyan-700 dark:text-cyan-300">
+                          {formatDate(selectedJob.scheduledPickupTime)}
+                        </p>
+                      </div>
+                      {selectedJob.scheduledDeliveryTime && (
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Requested Delivery</p>
+                          <p className="font-bold text-cyan-700 dark:text-cyan-300">
+                            {formatDate(selectedJob.scheduledDeliveryTime)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Vehicle</p>

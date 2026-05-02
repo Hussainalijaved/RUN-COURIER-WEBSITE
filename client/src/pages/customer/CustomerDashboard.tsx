@@ -22,6 +22,7 @@ import {
   Eye,
   Truck,
   Wallet,
+  Calendar,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -262,7 +263,19 @@ export default function CustomerDashboard() {
                       <TableCell>
                         {job.pickupPostcode} → {job.deliveryPostcode}
                       </TableCell>
-                      <TableCell>{formatDate(job.createdAt)}</TableCell>
+                      <TableCell>
+                        {job.isScheduled && job.scheduledPickupTime ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-primary font-bold flex items-center gap-1 text-xs">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(job.scheduledPickupTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">Booked {formatDate(job.createdAt)}</span>
+                          </div>
+                        ) : (
+                          formatDate(job.createdAt)
+                        )}
+                      </TableCell>
                       <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell className="text-right font-medium">{formatPrice(job.totalPrice)}</TableCell>
                       <TableCell>
