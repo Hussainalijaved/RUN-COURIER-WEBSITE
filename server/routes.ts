@@ -3824,8 +3824,10 @@ export async function registerRoutes(
     console.log(`[Jobs PATCH] multiDropStops received:`, multiDropStops);
     const job = await storage.updateJob(req.params.id, updateData);
     if (!job) {
+      console.warn(`[Jobs PATCH] Update failed - Job ${req.params.id} not found or update error`);
       return res.status(404).json({ error: "Job not found" });
     }
+    console.log(`[Jobs PATCH] Job ${req.params.id} updated successfully`);
     
     // Handle multi-drop stops update when stops are provided
     if (supabaseAdmin && (multiDropStops !== undefined || updateData.isMultiDrop !== undefined)) {

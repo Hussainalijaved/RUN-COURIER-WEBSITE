@@ -1224,6 +1224,33 @@ export class SupabaseStorage implements IStorage {
     if (data.distance !== undefined) dbData.distance = data.distance;
     if (data.isMultiDrop !== undefined) dbData.is_multi_drop = data.isMultiDrop;
     if (data.isReturnTrip !== undefined) dbData.is_return_trip = data.isReturnTrip;
+    
+    // Schedule fields
+    if (data.isScheduled !== undefined) dbData.is_scheduled = data.isScheduled;
+    if (data.scheduledPickupTime !== undefined) dbData.scheduled_pickup_time = data.scheduledPickupTime;
+    if (data.scheduledDeliveryTime !== undefined) dbData.scheduled_delivery_time = data.scheduledDeliveryTime;
+    
+    // Pricing component fields
+    if (data.basePrice !== undefined) dbData.base_price = data.basePrice;
+    if (data.distancePrice !== undefined) dbData.distance_price = data.distancePrice;
+    if (data.weightSurcharge !== undefined) dbData.weight_surcharge = data.weightSurcharge;
+    if (data.multiDropCharge !== undefined) dbData.multi_drop_charge = data.multiDropCharge;
+    if (data.returnTripCharge !== undefined) dbData.return_trip_charge = data.returnTripCharge;
+    if (data.centralLondonCharge !== undefined) dbData.central_london_charge = data.centralLondonCharge;
+    if (data.isCentralLondon !== undefined) dbData.is_central_london = data.isCentralLondon;
+    if (data.isRushHour !== undefined) dbData.is_rush_hour = data.isRushHour;
+    
+    // Return trip details
+    if (data.returnToSameLocation !== undefined) dbData.return_to_same_location = data.returnToSameLocation;
+    if (data.returnAddress !== undefined) dbData.return_address = data.returnAddress;
+    if (data.returnPostcode !== undefined) dbData.return_postcode = data.returnPostcode;
+    
+    // Identification and Metadata
+    if (data.trackingNumber !== undefined) dbData.tracking_number = data.trackingNumber;
+    if (data.customerType !== undefined) dbData.customer_type = data.customerType;
+    if ((data as any).jobNumber !== undefined) dbData.job_number = (data as any).jobNumber;
+    if (data.officeCity !== undefined) dbData.office_city = data.officeCity;
+
     // waiting_time_charge goes through normal Supabase JS client
     if (data.waitingTimeCharge !== undefined) dbData.waiting_time_charge = data.waitingTimeCharge;
     // waiting_time_minutes also goes through Supabase JS client
